@@ -7,9 +7,9 @@ it by hand.
 | ------ | -- | ----- | ----- | ----- |
 | Overview | `kpis` | Window totals; the last 7 days against the 4-week average for distance and time; the 7:28 load ratio; last night's HRV against its 7-day average. | all and each type | 3 |
 | Readiness today | `readiness` | Today's verdict (go easy, normal, ready to push) from HRV status, sleep score, resting HR and the load ratio. The dashboard's own rule. | - | 2 |
-| Fitness age | `fitnessAge` | Garmin fitness age against actual age, the achievable age, and its components with Garmin's targets. | - | 1 |
+| Fitness age | `fitnessAge` | Garmin fitness age against actual age, the achievable age, and, under Details, its components with Garmin's targets. | - | 1 |
 | Period comparison | `periodComparison` | Sessions, distance, time and load of the window against the same number of weeks before it, per type and in total. | all and each type | 3 |
-| Records | `records` | Best efforts, longest run and ride, heaviest set and the best estimated 1RM of each exercise in the window. | all and each type | 3 |
+| Records | `records` | Best efforts, longest run and ride, heaviest set and the best estimated 1RM of each exercise in the window: 4 first, the others under Show all. | all and each type | 3 |
 | Weekly volume | `weeklyVolume` | Time, distance, sessions or load of each week, stacked by type, with a 4-week average line. | all and each type | 2 |
 | Intensity minutes | `intensityMinutes` | Moderate + 2 x vigorous minutes of the activities each week, against 150 minutes. | all and each type | 1 |
 | Load safety | `loadSafety` | Weekly load with its change against the week before (flagged above +10%), and 7-day monotony and strain (Foster). | - | 3 |
@@ -30,7 +30,7 @@ it by hand.
 | Races | `races` | Each race with its time, pace, HR, power and aerobic training effect. | running | 2 |
 | Aerobic fitness | `aerobicFitness` | Pace against HR of each run (older runs paler), and weekly pace and efficiency (metres per heartbeat). | running | 2 |
 | Easy and hard running | `intensityShare` | The share of running time in Z1-2 (easy) and Z4-5 (hard) each week. | running | 1 |
-| Running form | `runningForm` | Weekly cadence, stride, ground contact, vertical oscillation and ratio, and power, one small chart for each. | running | 3 |
+| Running form | `runningForm` | Weekly cadence, ground contact, stride, vertical oscillation and ratio, and power, one small chart for each: cadence and ground contact first, the others under Show all. | running | 3 |
 | Run Walk Run | `runWalk` | Run Walk Run sessions: the pace of the run segments, the overall pace and the walk time. | running | 1 |
 | Training effect | `trainingEffect` | Aerobic and anaerobic training effect of each run, and the training effect labels of each week. | running | 2 |
 | Race predictor | `racePredictor` | Predicted 5 km, 10 km, half marathon and marathon times (Riegel), from the best effort of 5 km or more. | running | 1 |
@@ -38,7 +38,7 @@ it by hand.
 | Sets per movement | `setsPerCategory` | Completed sets of each movement category each week. | strengthTraining | 2 |
 | Muscle-group balance | `muscleBalance` | Average weekly sets of each muscle group against 10-20, and the push:pull ratio. | strengthTraining | 1 |
 | Exercises | `exercises` | Each exercise by muscle group, with sort, search and group filter; a row opens its trend and its sessions. | strengthTraining | 3 |
-| Sessions | `strengthSessions` | Each strength session with its exercises and sets in order. | strengthTraining | 3 |
+| Sessions | `strengthSessions` | Each strength session with its exercises and sets in order, the last 6 first, the others under Show all. | strengthTraining | 3 |
 | Pace and walks | `walkDetails` | Weekly pace and average HR, and steps, cadence and body battery change of each walk. | walking, hiking | 2 |
 | Daily steps | `steps` | Daily steps against the goal, and floors, for the last 14 days. | - | 1 |
 | Vertical speed | `hikeVertical` | Vertical metres per hour of each activity with ascent. | hiking, walking, running | 3 |

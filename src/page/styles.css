@@ -885,6 +885,18 @@ table.data .num {
 .more {
   margin-top: 10px;
 }
+/* "Show all" hides rows and cards whose class sets a display */
+[hidden] {
+  display: none !important;
+}
+.more-details {
+  margin-top: 10px;
+}
+.more-details summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+}
 .multiples {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));

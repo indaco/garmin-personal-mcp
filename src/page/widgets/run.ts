@@ -5,15 +5,15 @@ import type { Key } from "../i18n";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
 import { oneSession } from "./types";
-import { alpha, kpi, kpiRow, note, table, weekLabel } from "./ui";
+import { alpha, kpi, kpiRow, note, showAll, table, weekLabel } from "./ui";
 
 /** The Run board: best efforts, races, aerobic fitness, intensity, form, run/walk, training effect, predictions, long runs. */
 
 const DISTANCES = ["1k", "mile", "5k", "10k", "half", "marathon"];
 const FORM: [field: string, key: Key, unit: string, digits: number][] = [
   ["cadenceSpm", "form.cadence", "spm", 0],
-  ["strideCm", "form.stride", "cm", 0],
   ["gctMs", "form.gct", "ms", 0],
+  ["strideCm", "form.stride", "cm", 0],
   ["vertOscCm", "form.vertOsc", "cm", 1],
   ["vertRatioPct", "form.vertRatio", "%", 1],
   ["avgPowerW", "form.power", "W", 0],
@@ -240,9 +240,11 @@ register({
     if (present.length === 0) return ctx.empty(el, fmt.na);
     const grid = h("div", { class: "multiples" });
     append(el, grid);
+    const cells: HTMLElement[] = [];
     for (const [field, key, unit, digits] of present) {
       const cell = h("div", { class: "multiple" }, h("h3", {}, `${t(key)} (${unit})`));
       grid.append(cell);
+      cells.push(cell);
       const values = ctx.weeks.map((_, i) =>
         calc.mean(
           runs(ctx)
@@ -280,6 +282,8 @@ register({
         140,
       );
     }
+    // cadence and ground contact time first; a hidden chart draws itself when it shows
+    append(el, showAll(ctx, cells.slice(2), cells.length));
   },
 });
 

@@ -236,6 +236,7 @@ A built-in language is in every page. To add one:
 | `fa.age` | Fitness age |
 | `fa.actual` | Actual age |
 | `fa.achievable` | Achievable |
+| `fa.details` | Details |
 | `fa.component` | Component |
 | `fa.value` | Now |
 | `fa.target` | Garmin target |

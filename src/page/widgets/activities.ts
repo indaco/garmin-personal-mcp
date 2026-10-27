@@ -1,12 +1,11 @@
 import { type Activity, groupOf, seconds } from "../calc";
 import { append, h } from "../dom";
 import { register } from "../registry";
-import { table, typeCell } from "./ui";
+import { showAll, table, typeCell } from "./ui";
 
 /** Activities whose laps the page shows: the rows can open. */
 const open = new Set<string>();
-/** Boards that show every row, not only the first ones. */
-const full = new Set<string>();
+/** The rows shown before "Show all". */
 const ROWS = 15;
 
 register({
@@ -33,9 +32,9 @@ register({
       [3, 4, 5, 6, 7],
     );
     const body = tbl.querySelector("tbody")!;
-    const key = `${ctx.board}/${ctx.id}`;
-    const shown = full.has(key) ? acts : acts.slice(0, ROWS);
-    for (const a of shown) {
+    const extra: HTMLElement[] = [];
+    for (const [n, a] of acts.entries()) {
+      const rowsBefore = body.childElementCount;
       const id = String(a.id);
       const laps = Array.isArray(a.laps) ? (a.laps as Record<string, unknown>[]) : [];
       const isOpen = open.has(id);
@@ -104,25 +103,10 @@ register({
           ),
         );
       }
+      // the row and its laps
+      if (n >= ROWS) extra.push(...([...body.children].slice(rowsBefore) as HTMLElement[]));
     }
-    append(
-      el,
-      tbl,
-      acts.length > ROWS &&
-        h(
-          "button",
-          {
-            class: "btn more",
-            "aria-expanded": String(full.has(key)),
-            onclick: () => {
-              if (full.has(key)) full.delete(key);
-              else full.add(key);
-              ctx.refresh();
-            },
-          },
-          full.has(key) ? t("act.less") : t("act.more", { n: acts.length }),
-        ),
-    );
+    append(el, tbl, showAll(ctx, extra, acts.length));
   },
 });
 

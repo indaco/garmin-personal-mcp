@@ -7,13 +7,14 @@ import {
   between,
   delta,
   everyActivity,
-  typeName,
   kpi,
   kpiRow,
   maxHR,
   note,
+  showAll,
   table,
   totals,
+  typeName,
   windowEnd,
 } from "./ui";
 
@@ -152,15 +153,20 @@ register({
         kpi(t("fa.achievable"), fmt.num(num(fa.achievableFitnessAge), 1)),
       ),
       components.length > 0 &&
-        table(
-          [t("fa.component"), t("fa.value"), t("fa.target"), t("fa.potential")],
-          components.map(([name, c]) => [
-            known.has(name) ? t(`fa.${name}` as Key) : name,
-            fmt.num(num(c.value), 1),
-            fmt.num(num(c.targetValue), 1),
-            fmt.num(num(c.potentialAge), 1),
-          ]),
-          [1, 2, 3],
+        h(
+          "details",
+          { class: "more-details" },
+          h("summary", {}, t("fa.details")),
+          table(
+            [t("fa.component"), t("fa.value"), t("fa.target"), t("fa.potential")],
+            components.map(([name, c]) => [
+              known.has(name) ? t(`fa.${name}` as Key) : name,
+              fmt.num(num(c.value), 1),
+              fmt.num(num(c.targetValue), 1),
+              fmt.num(num(c.potentialAge), 1),
+            ]),
+            [1, 2, 3],
+          ),
         ),
       note(t("today.note")),
     );
@@ -213,11 +219,16 @@ register({
   },
 });
 
+/** The records shown before "Show all". */
+const RECORDS = 4;
+
 register({
   id: "records",
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     const badges: HTMLElement[] = [];
+    // the first ones shown: the longest best effort, the longest run and ride, the top 1RM
+    const top: (HTMLElement | undefined)[] = [];
     const badge = (label: string, value: string, a: Activity) =>
       h(
         "div",
@@ -235,17 +246,20 @@ register({
         .map((a) => ({ a, s: calc.seconds((a.best as Record<string, string> | undefined)?.[d]) }))
         .filter((x) => x.s > 0)
         .toSorted((x, y) => x.s - y.s)[0];
-      if (best)
+      if (best) {
         badges.push(badge(t("rec.best", { d: t(`d.${d}` as Key) }), fmt.hms(best.s), best.a));
+        top[0] = badges.at(-1);
+      }
     }
     const longest = (g: string) =>
       ctx.activities
         .filter((a) => groupOf(a) === g && typeof a.km === "number")
         .toSorted((x, y) => (y.km ?? 0) - (x.km ?? 0))[0];
     const run = longest("running");
-    if (run) badges.push(badge(t("rec.longestRun"), `${fmt.num(run.km, 1)} km`, run));
+    if (run) badges.push((top[1] = badge(t("rec.longestRun"), `${fmt.num(run.km, 1)} km`, run)));
     const ride = longest("cycling");
-    if (ride) badges.push(badge(t("rec.longestRide"), `${fmt.num(ride.km, 1)} km`, ride));
+    if (ride)
+      badges.push((top[2] = badge(t("rec.longestRide"), `${fmt.num(ride.km, 1)} km`, ride)));
 
     let heaviest: { kg: number; reps: number; name: string; a: Activity } | undefined;
     const best1rm = new Map<string, { v: number; a: Activity }>();
@@ -273,15 +287,19 @@ register({
       );
     for (const [name, { v, a }] of [...best1rm].toSorted((x, y) => y[1].v - x[1].v)) {
       badges.push(badge(t("rec.e1rm", { name }), `${fmt.num(v, 1)} kg`, a));
+      top[3] ??= badges.at(-1);
     }
     if (badges.length === 0) {
       ctx.empty(el, t("rec.none"));
       return;
     }
+    const first = top.filter((b): b is HTMLElement => b !== undefined);
+    const ordered = [...first, ...badges.filter((b) => !first.includes(b))];
     append(
       el,
-      h("div", { class: "badges" }, ...badges),
+      h("div", { class: "badges" }, ...ordered),
       best1rm.size > 0 && note(t("rec.estimate")),
+      showAll(ctx, ordered.slice(RECORDS), ordered.length),
     );
   },
 });
