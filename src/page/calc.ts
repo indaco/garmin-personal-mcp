@@ -9,6 +9,8 @@ export interface Activity {
   id?: number;
   name?: string;
   type?: string;
+  /** The SDK sport name, from Garmin's sportTypeId. */
+  sport?: string;
   start?: string;
   km?: number;
   duration?: string;
@@ -20,18 +22,26 @@ export interface Activity {
   [field: string]: unknown;
 }
 
-/** The activity groups of the tabs, in tab order. */
-export const GROUPS = [
-  "run",
-  "strength",
-  "walk",
-  "hike",
-  "bike",
-  "swim",
+/**
+ * The type boards, in tab order. Their keys are SDK names: the sport of Garmin's `sportTypeId`, and the
+ * sub-sport `strengthTraining`. Any other SDK sport in the data gets a board too, before `generic` (Other).
+ */
+export const GROUPS: readonly string[] = [
+  "running",
+  "strengthTraining",
+  "walking",
+  "hiking",
+  "cycling",
+  "swimming",
   "racket",
-  "other",
-] as const;
-export type Group = (typeof GROUPS)[number];
+  "generic",
+];
+
+/** Garmin types whose SDK sport is not their board: strength comes as `training` or `fitnessEquipment`. */
+const TYPE_BOARD = new Map([
+  ["strength_training", "strengthTraining"],
+  ["pickleball", "racket"],
+]);
 
 /** The racket sports of a Garmin watch, by type key. Padel's key is `paddelball`. */
 const RACKET: [RegExp, string][] = [
@@ -50,16 +60,16 @@ export function sportOf(key: string): string | undefined {
   return RACKET.find(([re]) => re.test(key))?.[1];
 }
 
-/** The group of a Garmin type key. */
-export function groupOf(key: string): Group {
-  if (key.endsWith("running")) return "run";
-  if (key.includes("strength")) return "strength";
-  if (["walking", "casual_walking", "speed_walking"].includes(key)) return "walk";
-  if (key === "hiking" || key === "mountaineering") return "hike";
-  if (/biking|cycling/.test(key) || key === "virtual_ride") return "bike";
-  if (key.includes("swimming")) return "swim";
-  if (sportOf(key)) return "racket";
-  return "other";
+/** The board of an activity: its SDK sport, or `generic` when the data has none. */
+export function groupOf(a: Activity): string {
+  const sport = typeof a.sport === "string" && a.sport && a.sport !== "all" ? a.sport : "generic";
+  return TYPE_BOARD.get(a.type ?? "") ?? sport;
+}
+
+/** The name of a board without a text of its own: the SDK sport "alpineSkiing" is "Alpine skiing". */
+export function sportName(sport: string): string {
+  const words = sport.replace(/[A-Z]/g, (c) => ` ${c.toLowerCase()}`);
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 export const isIndoor = (key: string) =>
@@ -73,8 +83,8 @@ export function seconds(v: unknown): number {
 
 /** Strength and racket sports have little moving time: their session lasts the elapsed time. */
 export function sessionSeconds(a: Activity): number {
-  const g = groupOf(a.type ?? "");
-  const whole = (g === "strength" || g === "racket") && typeof a.elapsed === "string";
+  const g = groupOf(a);
+  const whole = (g === "strengthTraining" || g === "racket") && typeof a.elapsed === "string";
   return seconds(whole ? a.elapsed : a.duration);
 }
 

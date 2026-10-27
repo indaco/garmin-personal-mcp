@@ -153,6 +153,21 @@ describe("summarize", () => {
     expect(summarize({ distance }).km).toBe(km);
   });
 
+  it.each([
+    [1, "running"],
+    [4, "fitnessEquipment"],
+    [10, "training"],
+    [13, "alpineSkiing"],
+    [64, "racket"],
+  ])("names the SDK sport of sportTypeId %i", (sportTypeId, sport) => {
+    expect(summarize({ sportTypeId }).sport).toBe(sport);
+  });
+
+  it("leaves the sport out when Garmin gives no known sport id", () => {
+    for (const sportTypeId of [undefined, null, "1", 1.5, 9999])
+      expect(summarize({ activityId: 1, sportTypeId })).toEqual({ id: 1 });
+  });
+
   it("leaves the type out when Garmin gives no type key", () => {
     expect(summarize({ activityId: 1, activityType: { typeId: 3 } })).toEqual({ id: 1 });
     expect(summarize({ activityId: 1, activityType: null })).toEqual({ id: 1 });

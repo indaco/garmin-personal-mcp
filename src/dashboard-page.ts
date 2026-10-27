@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { type Digest, digest } from "./digest";
+import { Profile } from "@garmin/fitsdk";
 import { GROUPS } from "./page/calc";
 import { CATALOGUE } from "./page/catalogue";
 import { ABOUT } from "./page/catalogue-about";
@@ -259,8 +260,10 @@ export class DashboardWriter {
     }
     const known = new Set([...CATALOGUE.map((c) => c.id), ...widgets.map((w) => w.id)]);
     for (const p of o.place ?? []) {
-      if (!BOARDS.includes(p.board))
-        throw new Error(`Unknown board ${p.board}: use one of ${BOARDS.join(", ")}`);
+      if (!TYPES.has(p.board))
+        throw new Error(
+          `Unknown board ${p.board}: use all, ${GROUPS.join(", ")} or another SDK sport name`,
+        );
       if (!known.has(p.widget)) throw new Error(`Unknown widget ${p.widget}`);
       const board = boardOf(layout, p.board, preset);
       layout = withBoard(
@@ -328,8 +331,8 @@ export class DashboardWriter {
   }
 }
 
-const BOARDS: string[] = ["all", ...GROUPS];
-const TYPES = new Set<string>(["all", ...GROUPS]);
+/** The boards and widget types: All, the type boards, and a board for any other SDK sport. */
+const TYPES = new Set<string>(["all", ...GROUPS, ...Object.values(Profile.types.sport)]);
 const spanOf = (v: unknown): Span => Math.min(3, Math.max(1, Math.round(Number(v) || 1))) as Span;
 
 /** A custom widget that the page can run; throws with what is wrong. */
@@ -477,7 +480,9 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
             z.object({
               board: z
                 .string()
-                .describe("all, run, strength, walk, hike, bike, swim, racket or other"),
+                .describe(
+                  "all, running, strengthTraining, walking, hiking, cycling, swimming, racket, generic (Other), or another SDK sport name",
+                ),
               widget: z.string().describe("A widget id of the catalogue or a custom widget"),
               type: z
                 .string()

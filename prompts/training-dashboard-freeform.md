@@ -37,18 +37,20 @@ A widget without its data shows "n/a". **Never invent, interpolate or estimate m
 
 ## 2. Compute
 
-Group every activity into one of these types by its `type` key:
+Group every activity into one type by its `sport` field, the sport name of the Garmin FIT SDK.
+Two Garmin `type` keys are exceptions: their sport does not fit their type.
 
-| Type | Garmin type keys |
+| Type | Activities |
 |---|---|
-| Run | `running`, `trail_running`, `treadmill_running`, `track_running`, any key ending in `_running` |
-| Strength | `strength_training`, any key containing `strength` |
-| Walk | `walking`, `casual_walking`, `speed_walking` |
-| Hike | `hiking`, `mountaineering` |
-| Bike | `cycling`, `road_biking`, `mountain_biking`, `gravel_cycling`, `indoor_cycling`, `virtual_ride`, any key containing `biking` or `cycling` |
-| Swim | `lap_swimming`, `open_water_swimming`, any key containing `swimming` |
-| Racket sports | `tennis`, `paddelball` (padel), `pickleball`, `racquetball`, `squash`, `badminton`, `table_tennis`, `platform_tennis` |
-| Other | all other keys, shown with a readable name (HIIT, Yoga, Cardio, Rowing, Elliptical, Ski...); in chat, name the keys that are in this group |
+| Run | `sport` is `running` |
+| Strength | `type` is `strength_training` (its `sport` is `training` or `fitnessEquipment`) |
+| Walk | `sport` is `walking` |
+| Hike | `sport` is `hiking` |
+| Bike | `sport` is `cycling` |
+| Swim | `sport` is `swimming` |
+| Racket sports | `sport` is `racket`, or `type` is `pickleball` |
+| Each other sport | one more type for each other `sport`, named from it: `alpineSkiing` is "Alpine skiing" |
+| Other | no `sport` field; in chat, name the `type` keys that are in this group |
 
 Indoor and outdoor: `indoor_cycling`, `virtual_ride`, `treadmill_running` and `indoor_rowing` are
 indoor. All other keys are outdoor.
@@ -151,7 +153,7 @@ period comparison compares the window with the same number of weeks just before 
 tiles "last 7 days against the 4-week average" end on the last day of the window, and take their
 baseline from all embedded data. The widgets about today do not follow the window, and say so:
 readiness, fitness age and the 14-day recovery panel. The URL hash also keeps the window (for
-example `#run@2026-09-07_2026-10-26`). The last week can still be in progress, when today is not a
+example `#running@2026-09-07_2026-10-26`). The last week can still be in progress, when today is not a
 Sunday. Mark it (for example with *), and do not flag its load ramp.
 
 ### Tabs and filter

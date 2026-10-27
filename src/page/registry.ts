@@ -4,7 +4,7 @@ import type * as metrics from "./metrics";
 import type * as running from "./running";
 import type * as strength from "./strength";
 import type * as sports from "./sports";
-import type { Activity, Group } from "./calc";
+import type { Activity } from "./calc";
 import type { Fmt, T } from "./i18n";
 import { CATALOGUE } from "./catalogue";
 import type { Span } from "./layout";
@@ -34,7 +34,7 @@ export interface Ctx {
   id: string;
   /** The board (tab) the widget sits on, and the type it shows: "all" or a group. */
   board: string;
-  type: "all" | Group;
+  type: string;
   /** The window: Mondays of the first and the last week, and every Monday in between. */
   from: string;
   to: string;
@@ -66,7 +66,7 @@ export interface WidgetDef {
   id: string;
   title: (t: T) => string;
   /** The types the widget can show; undefined for a widget that has no type. */
-  types?: readonly ("all" | Group)[];
+  types?: readonly string[];
   span?: Span;
   render: (el: HTMLElement, ctx: Ctx) => void;
   /** Written by Claude and stored in the page, not built in. */

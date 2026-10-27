@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { GROUPS } from "../../src/page/calc";
 import { CATALOGUE } from "../../src/page/catalogue";
 import { ABOUT } from "../../src/page/catalogue-about";
 import { en } from "../../src/page/i18n/en";
@@ -25,8 +26,13 @@ describe("widget catalogue", () => {
     expect(Object.keys(ABOUT).toSorted()).toEqual(CATALOGUE.map((c) => c.id).toSorted());
   });
 
+  it("gives a board of any other SDK sport the preset of the Other board", () => {
+    expect(preset("alpineSkiing")).toEqual(preset("generic"));
+    expect(preset("generic").length).toBeGreaterThan(0);
+  });
+
   it("has every widget of the presets", () => {
-    const boards = ["all", "run", "strength", "walk", "hike", "bike", "swim", "racket", "other"];
+    const boards = ["all", ...GROUPS];
     const ids = new Set(CATALOGUE.map((c) => c.id));
     for (const board of boards) {
       for (const inst of preset(board))

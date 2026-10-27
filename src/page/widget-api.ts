@@ -6,20 +6,20 @@ export const WIDGET_API = `A custom widget is the body of a JavaScript function 
 
 ctx gives:
 - ctx.data: the getDashboardData result (activities, previousActivities, hrv, recovery, zones, fitnessAge, sync) and notes.
-- ctx.type: "all" or the group the widget shows (run, strength, walk, hike, bike, swim, racket, other).
+- ctx.type: "all" or the board the widget shows: running, strengthTraining, walking, hiking, cycling, swimming, racket, generic (Other), or another SDK sport name such as alpineSkiing. Each activity has type (the Garmin type key) and sport (the SDK sport name).
 - ctx.from, ctx.to: Mondays of the first and last week of the window; ctx.weeks: every Monday in it.
 - ctx.activities: the activities of the window and of ctx.type (and of the type chips on the All board). ctx.allActivities: every type. ctx.ofType(list): the same type filter for any list.
 - ctx.t(key, params): a page text; ctx.lang: the page language.
 - ctx.fmt: num(v, digits), pct(v), day("yyyy-MM-dd"), longDay(d), hms(seconds), hours(seconds), na (the text for a missing value).
-- ctx.calc: groupOf(typeKey), sportOf(typeKey), seconds("1:02:03"), sessionSeconds(activity), dayOf(activity), mondayOf(day), weekly(activities, weeks, a => value), loadOf(activity, maxHR), loadRatio(activities, day, maxHR), dailyLoads(activities, from, to, maxHR), mean, sd, rolling(values, n), change(now, before), zonesOf(ctx.data.zones), zoneSeconds(activity, floors), paceSeconds(activity), efficiency(activity), epley(kg, reps), riegel(seconds, km, km), exerciseStats(activities), muscleSets(activities, weeks), swimPace(activity), verticalPerHour(activity).
+- ctx.calc: groupOf(activity) (its board), sportOf(typeKey), seconds("1:02:03"), sessionSeconds(activity), dayOf(activity), mondayOf(day), weekly(activities, weeks, a => value), loadOf(activity, maxHR), loadRatio(activities, day, maxHR), dailyLoads(activities, from, to, maxHR), mean, sd, rolling(values, n), change(now, before), zonesOf(ctx.data.zones), zoneSeconds(activity, floors), paceSeconds(activity), efficiency(activity), epley(kg, reps), riegel(seconds, km, km), exerciseStats(activities), muscleSets(activities, weeks), swimPace(activity), verticalPerHour(activity).
 - ctx.chart(el, config, heightPx): a Chart.js 4 chart that follows the theme, with tooltips. Chart types: bar, line, scatter, doughnut, pie, with the category and linear scales.
-- ctx.color(token): a theme colour: text, muted, accent, good, bad, warn, line, panel, panel2, or a group (run, strength, walk, hike, bike, swim, racket, other).
+- ctx.color(token): a theme colour: text, muted, accent, good, bad, warn, line, panel, panel2, or a board (running, strengthTraining, walking, hiking, cycling, swimming, racket, generic); another sport gets the generic colour.
 - ctx.empty(el, message): a short message in place of the content.
 
 Rules: build elements with document.createElement and set text with textContent, never innerHTML with data. Use only values in ctx.data; show ctx.fmt.na for a missing value; label an estimate as one. Keep the code short.
 
 Example (the longest ride of the window):
-const rides = ctx.activities.filter((a) => ctx.calc.groupOf(a.type ?? "") === "bike" && typeof a.km === "number");
+const rides = ctx.activities.filter((a) => ctx.calc.groupOf(a) === "cycling" && typeof a.km === "number");
 if (rides.length === 0) return ctx.empty(el);
 const best = rides.reduce((x, y) => (y.km > x.km ? y : x));
 const p = document.createElement("p");

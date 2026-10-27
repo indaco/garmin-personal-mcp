@@ -51,20 +51,32 @@ Reload the page in the browser to see the new data.
 Each tab is a board: a grid of widgets with up to 3 columns. A board has 2 columns on a tablet and 1
 column on a phone. Each widget is 1, 2 or 3 columns wide.
 
-The All board shows all types. Each type board shows one group of sports. The Run, Strength, Walk,
-Bike and Racket sports tabs are always there. The Hike, Swim and Other tabs show only when you have
-activities of that group.
+The All board shows all types. Each type board shows one sport. The board of an activity is its
+sport in the Garmin FIT SDK. Garmin sends that sport as a number with each activity. The server
+gives it the SDK name, for example `running` or `racket`.
 
-| Group         | Garmin types                                                                                                          |
-| ------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Run           | every type that ends in `running`                                                                                     |
-| Strength      | every type with `strength`                                                                                            |
-| Walk          | `walking`, `casual_walking`, `speed_walking`                                                                          |
-| Hike          | `hiking`, `mountaineering`                                                                                            |
-| Bike          | every type with `cycling` or `biking`, and `virtual_ride`                                                             |
-| Swim          | every type with `swimming`                                                                                            |
-| Racket sports | `tennis`, `paddelball` (padel), `pickleball`, `racquetball`, `squash`, `badminton`, `table_tennis`, `platform_tennis` |
-| Other         | all other types                                                                                                       |
+The Run, Strength, Walk, Bike and Racket sports tabs are always there. The Hike, Swim and Other
+tabs show only when you have activities of that sport.
+
+| Tab           | Board key          | Activities                                       |
+| ------------- | ------------------ | ------------------------------------------------ |
+| Run           | `running`          | SDK sport `running`                              |
+| Strength      | `strengthTraining` | Garmin type `strength_training`                  |
+| Walk          | `walking`          | SDK sport `walking`                              |
+| Hike          | `hiking`           | SDK sport `hiking`                               |
+| Bike          | `cycling`          | SDK sport `cycling`                              |
+| Swim          | `swimming`         | SDK sport `swimming`                             |
+| Racket sports | `racket`           | SDK sport `racket`, and Garmin type `pickleball` |
+| Other         | `generic`          | activities without a sport                       |
+
+Two Garmin types are exceptions, because their SDK sport does not fit:
+
+- Garmin sends strength training as the sport `training` or `fitnessEquipment`.
+- Garmin sends pickleball as the sport `hiit`.
+
+Each other sport gets a tab of its own, with the widgets of the Other board. The tab name comes from
+the SDK name: `alpineSkiing` is "Alpine skiing". The tabs of other sports come after Racket sports,
+in the order of their keys. Other is always the last tab.
 
 [The widget catalogue](widgets.md) lists every widget, with what it shows and how it calculates.
 

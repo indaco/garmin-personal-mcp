@@ -7,7 +7,7 @@ import {
   between,
   delta,
   everyActivity,
-  groupKey,
+  typeName,
   kpi,
   kpiRow,
   maxHR,
@@ -19,7 +19,7 @@ import {
 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 const last = <T>(list: T[]) => list.at(-1);
-const of = (acts: Activity[], g: string) => acts.filter((a) => groupOf(a.type ?? "") === g);
+const of = (acts: Activity[], g: string) => acts.filter((a) => groupOf(a) === g);
 
 register({
   id: "kpis",
@@ -176,9 +176,7 @@ register({
     const prev = calc.periodWindow(ctx.from, ctx.to, ctx.data.prevStart);
     const now = ctx.activities;
     const before = ctx.ofType(between(everyActivity(ctx), prev.from, prev.to));
-    const groups = GROUPS.filter((g) =>
-      [...now, ...before].some((a) => groupOf(a.type ?? "") === g),
-    );
+    const groups = GROUPS.filter((g) => [...now, ...before].some((a) => groupOf(a) === g));
     const row = (label: Node | string, a: Activity[], b: Activity[]) => {
       const x = totals(ctx, a);
       const y = totals(ctx, b);
@@ -207,7 +205,7 @@ register({
       table(
         [t("pc.type"), t("pc.sessions"), t("pc.distance"), t("pc.time"), t("pc.load")],
         [
-          ...groups.map((g) => row(t(groupKey(g)), of(now, g), of(before, g))),
+          ...groups.map((g) => row(typeName(t, g), of(now, g), of(before, g))),
           ...(groups.length > 1 ? [row(h("strong", {}, t("pc.total")), now, before)] : []),
         ],
         [1, 2, 3, 4],
@@ -243,11 +241,11 @@ register({
     }
     const longest = (g: string) =>
       ctx.activities
-        .filter((a) => groupOf(a.type ?? "") === g && typeof a.km === "number")
+        .filter((a) => groupOf(a) === g && typeof a.km === "number")
         .toSorted((x, y) => (y.km ?? 0) - (x.km ?? 0))[0];
-    const run = longest("run");
+    const run = longest("running");
     if (run) badges.push(badge(t("rec.longestRun"), `${fmt.num(run.km, 1)} km`, run));
-    const ride = longest("bike");
+    const ride = longest("cycling");
     if (ride) badges.push(badge(t("rec.longestRide"), `${fmt.num(ride.km, 1)} km`, ride));
 
     let heaviest: { kg: number; reps: number; name: string; a: Activity } | undefined;

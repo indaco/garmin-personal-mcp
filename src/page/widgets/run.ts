@@ -20,7 +20,7 @@ const FORM: [field: string, key: Key, unit: string, digits: number][] = [
   ["normPowerW", "form.normPower", "W", 0],
 ];
 
-const runs = (ctx: Ctx) => ctx.activities.filter((a) => groupOf(a.type ?? "") === "run");
+const runs = (ctx: Ctx) => ctx.activities.filter((a) => groupOf(a) === "running");
 const day = (a: Activity) => String(a.start).slice(0, 10);
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 const weekOf = (ctx: Ctx, a: Activity) =>
@@ -151,7 +151,7 @@ register({
             {
               label: t("af.weekPace"),
               data: pace,
-              borderColor: ctx.color("run"),
+              borderColor: ctx.color("running"),
               yAxisID: "y",
               spanGaps: true,
             },
@@ -261,7 +261,7 @@ register({
               {
                 label: t(key),
                 data: values,
-                borderColor: ctx.color("run"),
+                borderColor: ctx.color("running"),
                 spanGaps: true,
                 pointRadius: 2,
               },
@@ -342,7 +342,16 @@ register({
       180,
     );
     const labels = [...new Set(list.map((a) => String(a.teLabel ?? "")).filter(Boolean))];
-    const palette = ["accent", "good", "warn", "bad", "strength", "swim", "hike", "other"];
+    const palette = [
+      "accent",
+      "good",
+      "warn",
+      "bad",
+      "strengthTraining",
+      "swimming",
+      "hiking",
+      "generic",
+    ];
     ctx.chart(
       el,
       {
@@ -411,14 +420,16 @@ register({
               type: "bar",
               label: t("lr.share"),
               data: share,
-              backgroundColor: share.map((s) => ctx.color(s !== null && s > 35 ? "bad" : "run")),
+              backgroundColor: share.map((s) =>
+                ctx.color(s !== null && s > 35 ? "bad" : "running"),
+              ),
               yAxisID: "y",
             },
             {
               type: "line",
               label: t("lr.ascent"),
               data: ascent,
-              borderColor: ctx.color("hike"),
+              borderColor: ctx.color("hiking"),
               yAxisID: "y1",
             },
           ],

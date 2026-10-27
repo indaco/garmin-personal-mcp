@@ -37,7 +37,7 @@
             "properties": {
               "board": {
                 "type": "string",
-                "description": "all, run, strength, walk, hike, bike, swim, racket or other"
+                "description": "all, running, strengthTraining, walking, hiking, cycling, swimming, racket, generic (Other), or another SDK sport name"
               },
               "widget": {
                 "type": "string",

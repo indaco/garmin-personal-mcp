@@ -121,9 +121,9 @@ register({
       data: {
         labels: labels(ctx, rows),
         datasets: [
-          stage("deep", t("sl.deep"), ctx.color("strength")),
-          stage("light", t("sl.light"), ctx.color("bike")),
-          stage("rem", t("sl.rem"), ctx.color("swim")),
+          stage("deep", t("sl.deep"), ctx.color("strengthTraining")),
+          stage("light", t("sl.light"), ctx.color("cycling")),
+          stage("rem", t("sl.rem"), ctx.color("swimming")),
           stage("awake", t("sl.awake"), ctx.color("racket")),
           {
             type: "line" as const,

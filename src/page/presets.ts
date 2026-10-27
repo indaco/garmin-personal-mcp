@@ -22,7 +22,7 @@ const PRESETS: Record<string, [widget: string, span: Span][]> = {
     ["activities", 3],
     ["coachNotes", 3],
   ],
-  run: [
+  running: [
     ["typeKpis", 3],
     ["typeWeekly", 2],
     ["hrZones", 1],
@@ -37,7 +37,7 @@ const PRESETS: Record<string, [widget: string, span: Span][]> = {
     ["longRuns", 2],
     ["activities", 3],
   ],
-  strength: [
+  strengthTraining: [
     ["typeKpis", 3],
     ["typeWeekly", 2],
     ["hrZones", 1],
@@ -46,7 +46,7 @@ const PRESETS: Record<string, [widget: string, span: Span][]> = {
     ["exercises", 3],
     ["strengthSessions", 3],
   ],
-  walk: [
+  walking: [
     ["typeKpis", 3],
     ["typeWeekly", 2],
     ["hrZones", 1],
@@ -54,21 +54,21 @@ const PRESETS: Record<string, [widget: string, span: Span][]> = {
     ["steps", 1],
     ["activities", 3],
   ],
-  hike: [
+  hiking: [
     ["typeKpis", 3],
     ["typeWeekly", 2],
     ["hrZones", 1],
     ["hikeVertical", 3],
     ["activities", 3],
   ],
-  bike: [
+  cycling: [
     ["typeKpis", 3],
     ["typeWeekly", 2],
     ["hrZones", 1],
     ["bikeDetails", 3],
     ["activities", 3],
   ],
-  swim: [
+  swimming: [
     ["typeKpis", 3],
     ["typeWeekly", 2],
     ["hrZones", 1],
@@ -82,7 +82,7 @@ const PRESETS: Record<string, [widget: string, span: Span][]> = {
     ["racketDetails", 3],
     ["activities", 3],
   ],
-  other: [
+  generic: [
     ["typeKpis", 3],
     ["typeWeekly", 2],
     ["hrZones", 1],
@@ -91,5 +91,10 @@ const PRESETS: Record<string, [widget: string, span: Span][]> = {
 };
 
 export function preset(board: string): Instance[] {
-  return (PRESETS[board] ?? []).map(([widget, span]) => ({ id: widget, widget, span }));
+  // any other SDK sport has the widgets of the Other board
+  return (PRESETS[board] ?? PRESETS.generic).map(([widget, span]) => ({
+    id: widget,
+    widget,
+    span,
+  }));
 }

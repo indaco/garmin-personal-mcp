@@ -17,7 +17,7 @@ import {
 
 /** The widgets that every type board has: KPIs, the weekly chart and the time in HR zones. */
 
-export const DISTANCE = new Set(["run", "walk", "hike", "bike", "swim"]);
+export const DISTANCE = new Set(["running", "walking", "hiking", "cycling", "swimming"]);
 
 /** Trends need two sessions: with one, the widget says so instead of drawing a chart. */
 export function oneSession(el: HTMLElement, ctx: Ctx): boolean {
@@ -63,10 +63,10 @@ register({
       hasDistance && kpi(t("tk.distance"), `${fmt.num(sum.km, 1)} km`, vs(week.km, base.km)),
       hasDistance &&
         sum.km > 0 &&
-        (ctx.type === "bike"
+        (ctx.type === "cycling"
           ? kpi(t("tk.speed"), `${fmt.num(sum.km / (sum.seconds / 3600), 1)} km/h`)
           : kpi(t("tk.pace"), `${fmt.hms(sum.seconds / sum.km)}/km`)),
-      ctx.type === "bike" && kpi(t("tk.ascent"), `${fmt.num(ascent)} m`),
+      ctx.type === "cycling" && kpi(t("tk.ascent"), `${fmt.num(ascent)} m`),
       kpi(
         t("tk.hr"),
         `${fmt.num(calc.mean(hr) ?? undefined)} bpm`,
@@ -108,7 +108,7 @@ register({
       approximate ||= z.approximate;
       z.sec.forEach((s, n) => (weeks[i][n] += s / 60));
     }
-    const colors = ["muted", "bike", "walk", "racket", "bad"];
+    const colors = ["muted", "cycling", "walking", "racket", "bad"];
     ctx.chart(el, {
       type: "bar",
       data: {

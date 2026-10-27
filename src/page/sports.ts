@@ -31,7 +31,7 @@ export function runLoadPerMinute(acts: Activity[]): number | null {
   let load = 0;
   let minutes = 0;
   for (const a of acts) {
-    if (groupOf(a.type ?? "") !== "run" || typeof a.trainingLoad !== "number") continue;
+    if (groupOf(a) !== "running" || typeof a.trainingLoad !== "number") continue;
     load += a.trainingLoad;
     minutes += seconds(a.duration) / 60;
   }

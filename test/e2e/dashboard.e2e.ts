@@ -112,10 +112,10 @@ describe("the page", () => {
     const { page } = await open(browser, pageFile());
     expect(await tabs(page)).toEqual([
       ["all", "75"],
-      ["run", "36"],
-      ["strength", "24"],
-      ["walk", "9"],
-      ["bike", "3"],
+      ["running", "36"],
+      ["strengthTraining", "24"],
+      ["walking", "9"],
+      ["cycling", "3"],
       ["racket", "3"],
     ]);
   });
@@ -123,15 +123,17 @@ describe("the page", () => {
   it("keeps the tab and the window in the URL hash", async () => {
     const file = pageFile();
     const { page } = await open(browser, file);
-    await page.click("[data-tab=run]");
-    await page.focus("[data-tab=run]");
+    await page.click("[data-tab=running]");
+    await page.focus("[data-tab=running]");
     await page.keyboard.press("ArrowRight");
-    expect(await page.getAttribute("[data-tab=strength]", "aria-selected")).toBe("true");
+    expect(await page.getAttribute("[data-tab=strengthTraining]", "aria-selected")).toBe("true");
     await page.click(".window-bar .chip >> text=Last 4");
-    expect(await hash(page)).toBe("#strength@2026-10-05_2026-10-26");
+    expect(await hash(page)).toBe("#strengthTraining@2026-10-05_2026-10-26");
 
-    const again = await open(browser, file, { hash: "#strength@2026-10-05_2026-10-26" });
-    expect(await again.page.getAttribute("[data-tab=strength]", "aria-selected")).toBe("true");
+    const again = await open(browser, file, { hash: "#strengthTraining@2026-10-05_2026-10-26" });
+    expect(await again.page.getAttribute("[data-tab=strengthTraining]", "aria-selected")).toBe(
+      "true",
+    );
     expect(await again.page.inputValue("#from")).toBe("2026-10-05");
   });
 
@@ -139,9 +141,9 @@ describe("the page", () => {
     const { page } = await open(browser, pageFile());
     const pressed = () =>
       page.$$eval(".chips .chip[aria-pressed=true]", (els) => els.map((e) => e.textContent));
-    await page.click(".chip-run");
+    await page.click(".chip-running");
     expect(await pressed()).toEqual(["Run"]);
-    await page.click(".chip-run");
+    await page.click(".chip-running");
     expect(await pressed()).toEqual(["All"]);
   });
 
@@ -163,7 +165,7 @@ describe("the page", () => {
   it("follows the browser language, and the language menu", async () => {
     const { page } = await open(browser, pageFile(), { locale: "it-IT" });
     expect(await page.textContent("h1")).toBe("Allenamento + Recupero");
-    expect(await page.textContent("[data-tab=run]")).toContain("Corsa");
+    expect(await page.textContent("[data-tab=running]")).toContain("Corsa");
     await page.selectOption("#lang", "en");
     expect(await page.textContent("h1")).toBe("Training + Recovery");
     expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
@@ -342,7 +344,7 @@ describe("overview widgets", () => {
 
   it("filters the activities with the type chips", async () => {
     const { page } = await open(browser, pageFile());
-    await page.click(".chip-run");
+    await page.click(".chip-running");
     expect(await page.textContent("[data-id=activities] .more")).toBe("Show all 36");
     // the load ratio still uses all activities, and says so
     expect(await page.textContent("[data-id=kpis]")).toContain("Uses all activities");
@@ -373,7 +375,7 @@ describe("overview widgets", () => {
 describe("type boards", () => {
   it("draws every board without errors, with a tooltip on every chart", async () => {
     const { page, errors } = await open(browser, pageFile());
-    for (const tab of ["run", "strength", "walk", "bike", "racket"]) {
+    for (const tab of ["running", "strengthTraining", "walking", "cycling", "racket"]) {
       await page.click(`[data-tab=${tab}]`);
       expect([tab, await chartsWithoutTooltip(page)]).toEqual([tab, []]);
     }
@@ -382,7 +384,7 @@ describe("type boards", () => {
 
   it("fits every board on a phone", async () => {
     const { page } = await open(browser, pageFile(), { viewport: { width: 390, height: 844 } });
-    for (const tab of ["all", "run", "strength", "walk", "bike", "racket"]) {
+    for (const tab of ["all", "running", "strengthTraining", "walking", "cycling", "racket"]) {
       await page.click(`[data-tab=${tab}]`);
       expect([
         tab,
@@ -392,7 +394,7 @@ describe("type boards", () => {
   });
 
   it("shows the Run widgets", async () => {
-    const { page } = await open(browser, pageFile(), { hash: "#run" });
+    const { page } = await open(browser, pageFile(), { hash: "#running" });
     expect(await tiles(page)).toEqual([
       "typeKpis",
       "typeWeekly",
@@ -423,7 +425,7 @@ describe("type boards", () => {
     const { page } = await open(
       browser,
       pageFile({ data: { ...data, activities: [ride], v: 3 } }),
-      { hash: "#bike" },
+      { hash: "#cycling" },
     );
     expect(await page.textContent("[data-id=typeWeekly]")).toContain("One session so far");
     expect(await page.textContent("[data-id=typeKpis]")).toContain("One session so far");
@@ -435,7 +437,7 @@ const rows = (page: Page) =>
 
 describe("strength board", () => {
   it("shows the Strength widgets", async () => {
-    const { page, errors } = await open(browser, pageFile(), { hash: "#strength" });
+    const { page, errors } = await open(browser, pageFile(), { hash: "#strengthTraining" });
     expect(await tiles(page)).toEqual([
       "typeKpis",
       "typeWeekly",
@@ -453,7 +455,7 @@ describe("strength board", () => {
   });
 
   it("searches, filters by group, and a second click on the chip shows all groups", async () => {
-    const { page } = await open(browser, pageFile(), { hash: "#strength" });
+    const { page } = await open(browser, pageFile(), { hash: "#strengthTraining" });
     await page.fill(".search", "squat");
     expect(await rows(page)).toEqual(["Barbell Back Squat"]);
     await page.fill(".search", "");
@@ -464,7 +466,7 @@ describe("strength board", () => {
   });
 
   it("sorts by a column, and a second click turns the order", async () => {
-    const { page } = await open(browser, pageFile(), { hash: "#strength" });
+    const { page } = await open(browser, pageFile(), { hash: "#strengthTraining" });
     const sort = () => page.getAttribute("[data-id=exercises] th[aria-sort]", "aria-sort");
     await page.click("[data-id=exercises] .sort >> text=Best est. 1RM");
     expect(await sort()).toBe("descending");
@@ -474,9 +476,9 @@ describe("strength board", () => {
 
   it("opens an exercise with a click or Enter, keeps it in the hash, and closes it with a second click", async () => {
     const file = pageFile();
-    const { page, errors } = await open(browser, file, { hash: "#strength" });
+    const { page, errors } = await open(browser, file, { hash: "#strengthTraining" });
     await page.click("[data-exercise=barbell-back-squat]");
-    expect(await hash(page)).toMatch(/^#strength@.+\/barbell-back-squat$/);
+    expect(await hash(page)).toMatch(/^#strengthTraining@.+\/barbell-back-squat$/);
     expect(await page.textContent(".detail h3")).toBe("Barbell Back Squat");
     expect(await page.$$eval(".detail .ex-sessions > li", (l) => l.length)).toBe(12);
     expect(await chartsWithoutTooltip(page)).toEqual([]);
@@ -488,14 +490,14 @@ describe("strength board", () => {
     expect(await page.textContent(".detail h3")).toBe("Plank");
 
     const again = await open(browser, file, {
-      hash: "#strength@2026-08-03_2026-10-26/lat-pulldown",
+      hash: "#strengthTraining@2026-08-03_2026-10-26/lat-pulldown",
     });
     expect(await again.page.textContent(".detail h3")).toBe("Lat Pulldown");
     expect(errors).toEqual([]);
   });
 
   it("opens and closes a session", async () => {
-    const { page } = await open(browser, pageFile(), { hash: "#strength" });
+    const { page } = await open(browser, pageFile(), { hash: "#strengthTraining" });
     const first = "[data-id=strengthSessions] details >> nth=0";
     await page.click(`${first} >> summary`);
     expect(await page.getAttribute(first, "open")).toBe("");
@@ -509,6 +511,7 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     id: 9001,
     name: "Ridge Hike",
     type: "hiking",
+    sport: "hiking",
     start: "2026-10-25 09:00:00",
     km: 12,
     duration: "3:00:00",
@@ -521,6 +524,7 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     id: 9002,
     name: "Pool Swim",
     type: "lap_swimming",
+    sport: "swimming",
     start: "2026-10-24 07:00:00",
     km: 1.5,
     duration: "30:00",
@@ -535,6 +539,7 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     id: 9004,
     name: "Club Tennis",
     type: "tennis",
+    sport: "racket",
     start: "2026-10-22 19:00:00",
     duration: "40:00",
     elapsed: "1:30:00",
@@ -542,6 +547,7 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     maxHR: 178,
     trainingLoad: 95,
   };
+  // no SDK sport known for this type: it goes to the Other board
   const yoga = {
     id: 9003,
     name: "Yoga",
@@ -550,29 +556,50 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     duration: "45:00",
     avgHR: 90,
   };
+  const ski = {
+    id: 9005,
+    name: "Ski Day",
+    type: "resort_skiing",
+    sport: "alpineSkiing",
+    start: "2026-10-21 10:00:00",
+    km: 30,
+    duration: "3:00:00",
+    avgHR: 120,
+  };
   const more = () =>
     pageFile({
-      data: { ...data, v: 3, activities: [hike, swim, yoga, tennis, ...data.activities] },
+      data: { ...data, v: 3, activities: [hike, swim, yoga, tennis, ski, ...data.activities] },
     });
 
-  it("adds the Hike, Swim and Other tabs only when the data has them", async () => {
+  it("adds a tab for each other sport in the data, and the Other tab last", async () => {
     const { page } = await open(browser, more());
     expect((await tabs(page)).map(([tab]) => tab)).toEqual([
       "all",
-      "run",
-      "strength",
-      "walk",
-      "hike",
-      "bike",
-      "swim",
+      "running",
+      "strengthTraining",
+      "walking",
+      "hiking",
+      "cycling",
+      "swimming",
       "racket",
-      "other",
+      "alpineSkiing",
+      "generic",
     ]);
+    expect(await page.textContent("[data-tab=alpineSkiing] span")).toBe("Alpine skiing");
+    expect(await page.textContent("[data-tab=generic] span")).toBe("Other");
+  });
+
+  it("gives a new sport the board of the Other tab", async () => {
+    const { page, errors } = await open(browser, more(), { hash: "#alpineSkiing" });
+    expect(await tiles(page)).toEqual(["typeKpis", "typeWeekly", "hrZones", "activities"]);
+    expect(await page.textContent("[data-tab=alpineSkiing] .count")).toBe("1");
+    expect(await chartsWithoutTooltip(page)).toEqual([]);
+    expect(errors).toEqual([]);
   });
 
   it("draws every extra board without errors, with a tooltip on every chart", async () => {
     const { page, errors } = await open(browser, more());
-    for (const tab of ["walk", "hike", "bike", "swim", "racket", "other"]) {
+    for (const tab of ["walking", "hiking", "cycling", "swimming", "racket", "generic"]) {
       await page.click(`[data-tab=${tab}]`);
       expect([tab, await chartsWithoutTooltip(page)]).toEqual([tab, []]);
     }
@@ -580,11 +607,11 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
   });
 
   it("gives the numbers of each sport", async () => {
-    const { page } = await open(browser, more(), { hash: "#hike" });
+    const { page } = await open(browser, more(), { hash: "#hiking" });
     expect(await page.textContent("[data-id=hikeVertical]")).toContain("300 m/h");
-    await page.click("[data-tab=swim]");
+    await page.click("[data-tab=swimming]");
     expect(await page.textContent("[data-id=swimDetails]")).toContain("2:00/100 m");
-    await page.click("[data-tab=bike]");
+    await page.click("[data-tab=cycling]");
     expect(await page.textContent("[data-id=bikeDetails] .kpis")).toContain("3 rides");
     await page.click("[data-tab=racket]");
     // tennis and padel share the board; the sport column tells them apart
@@ -594,7 +621,7 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     // in the order of the data, where the test puts tennis first
     expect(sports).toEqual(["Tennis", "Padel", "Padel", "Padel"]);
     expect(await page.textContent("[data-tab=racket] .count")).toBe("4");
-    await page.click("[data-tab=walk]");
+    await page.click("[data-tab=walking]");
     expect(await tiles(page)).toEqual([
       "typeKpis",
       "typeWeekly",
@@ -622,9 +649,9 @@ describe("custom widgets and languages", () => {
     const code = `
       const p = document.createElement("p");
       p.className = "rides";
-      p.textContent = ctx.activities.filter((a) => ctx.calc.groupOf(a.type) === "bike").length + " rides </script>";
+      p.textContent = ctx.activities.filter((a) => ctx.calc.groupOf(a) === "cycling").length + " rides </script>";
       el.append(p);
-      ctx.chart(el, { type: "bar", data: { labels: ["a", "b"], datasets: [{ label: "x", data: [1, 2], backgroundColor: ctx.color("bike") }] } });`;
+      ctx.chart(el, { type: "bar", data: { labels: ["a", "b"], datasets: [{ label: "x", data: [1, 2], backgroundColor: ctx.color("cycling") }] } });`;
     const { page, errors } = await open(
       browser,
       pageFile({ widgets: [custom("rides", code)], layout: on("rides") }),

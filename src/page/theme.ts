@@ -36,7 +36,7 @@ export const store = {
   },
 };
 
-/** The value of a theme token (`--text`, `--run`...) as the page shows it now. */
+/** The value of a theme token (`--text`, `--running`...) as the page shows it now. */
 export function token(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim();
 }
