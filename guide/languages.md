@@ -205,7 +205,8 @@ A built-in language is in every page. To add one:
 | `copy.hint` | This layout is saved in this browser only. To keep it in the page, paste this text to Claude and ask it to save the dashboard layout. |
 | `copy.copy` | Copy |
 | `copy.copied` | Copied |
-| `board.empty` | This board has no widgets. Use “Edit layout”, then “Add widget”. |
+| `board.empty` | This board has no widgets. |
+| `board.emptyEdit` | This board has no widgets: use “Add widget” to put some on it. |
 | `widget.failed` | This widget failed: {message} |
 | `widget.unknown` | Unknown widget: {id} |
 | `empty.window` | No sessions in the selected weeks. |

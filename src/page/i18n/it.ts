@@ -180,7 +180,8 @@ export const it: Catalogue = {
   "copy.copy": "Copia",
   "copy.copied": "Copiato",
 
-  "board.empty": "Questa scheda non ha widget. Usa “Modifica layout”, poi “Aggiungi widget”.",
+  "board.empty": "Questa scheda non ha widget.",
+  "board.emptyEdit": "Questa scheda non ha widget: usa “Aggiungi widget” per metterne.",
   "widget.failed": "Questo widget non funziona: {message}",
   "widget.unknown": "Widget sconosciuto: {id}",
   "empty.window": "Nessuna sessione nelle settimane scelte.",

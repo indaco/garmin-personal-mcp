@@ -16,7 +16,7 @@ Claude:
 Reload the page to see the widget. Claude cannot open the page, so Claude cannot test the widget.
 
 You can also ask Claude to change or remove a custom widget. The widget catalogue of the page
-(**Edit layout**, then **Add widget**) lists the custom widgets too.
+(the settings menu, **Edit layout**, then **Add widget**) lists the custom widgets too.
 
 ## When a widget fails
 

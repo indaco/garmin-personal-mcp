@@ -12,7 +12,7 @@ const ICONS: Record<string, string> = {
   racket: "M6 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8M8.5 9.5l5 5M13 4a1 1 0 1 1 0 .1",
   generic: "M8 2v12M2 8h12",
   eye: "M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM8 6a2 2 0 1 1 0 4 2 2 0 0 1 0-4",
-  user: "M8 2.5a2.75 2.75 0 1 1 0 5.5 2.75 2.75 0 0 1 0-5.5M2.75 14c.5-2.75 2.6-4.25 5.25-4.25s4.75 1.5 5.25 4.25",
+  settings: "M2 4h6M12 4h2M2 8h2M8 8h6M2 12h8M14 12h0M10 2.5v3M6 6.5v3M12 10.5v3",
 };
 
 export function icon(name: string): SVGElement {
