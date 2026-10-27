@@ -1,0 +1,36 @@
+name: Question
+description: Ask a question about garmin-personal-mcp
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before you ask, read:
+        - the [README](https://github.com/indaco/garmin-personal-mcp#readme), mainly "Problems and solutions"
+        - the [existing issues](https://github.com/indaco/garmin-personal-mcp/issues)
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+    validations:
+      required: true
+
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic
+      options:
+        - Setup (API key, Claude Desktop, Claude Code)
+        - Tools
+        - Prompts and the dashboard
+        - Configuration
+        - Coming from garmin-mcp
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context

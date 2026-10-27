@@ -1,0 +1,53 @@
+name: Feature Request
+description: Suggest a new feature or an improvement for garmin-personal-mcp
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for the suggestion. Fill in the form below.
+
+        The server is read-only and uses only the official Garmin Connect Personal API. CONTRIBUTING.md lists what is out of scope.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: The problem that the feature solves.
+      placeholder: "e.g., I cannot see my cycling power per lap..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What you want the server, a tool or a prompt to do.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives that you considered
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Activity tools (activities, laps, sets, .FIT files)
+        - Health tools (HRV, sleep, heart rate, summaries)
+        - getDashboardData and its cache
+        - training-dashboard prompts
+        - Configuration
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Examples, the Personal API endpoint, or screenshots without personal data.

@@ -302,7 +302,7 @@ flowchart LR
   created it.
 - **Report a vulnerability**: do not open a public issue. Use a
   [private security advisory](https://github.com/indaco/garmin-personal-mcp/security/advisories/new)
-  on GitHub.
+  on GitHub. [SECURITY.md](SECURITY.md) gives the procedure.
 
 The Personal API is for personal use that is not commercial, under the terms of Garmin. Garmin
 does not endorse this project, and the project has no affiliation with Garmin.
@@ -335,6 +335,8 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 ```
 
 ## Development
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request.
 
 ### Run from source
 
