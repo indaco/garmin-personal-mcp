@@ -131,16 +131,6 @@ describe("the page", () => {
     expect(await again.page.inputValue("#from")).toBe("2026-10-05");
   });
 
-  it("selects one type with a chip, and a second click shows all again", async () => {
-    const { page } = await open(browser, pageFile());
-    const pressed = () =>
-      page.$$eval(".chips .chip[aria-pressed=true]", (els) => els.map((e) => e.textContent));
-    await page.click(".chip-running");
-    expect(await pressed()).toEqual(["Run"]);
-    await page.click(".chip-running");
-    expect(await pressed()).toEqual(["All"]);
-  });
-
   it("switches between the 11 themes and keeps the choice", async () => {
     const file = pageFile();
     const { page, errors } = await open(browser, file);
@@ -449,14 +439,6 @@ describe("overview widgets", () => {
     expect(await page.$$eval(".laps-row", (r) => r.length)).toBe(1);
     await page.click(`${button}[aria-expanded=true]`);
     expect(await page.$$eval(".laps-row", (r) => r.length)).toBe(0);
-  });
-
-  it("filters the activities with the type chips", async () => {
-    const { page } = await open(browser, pageFile());
-    await page.click(".chip-running");
-    expect(await page.textContent("[data-id=activities] .more")).toBe("Show all 36");
-    // the load ratio still uses all activities, and says so
-    expect(await page.textContent("[data-id=kpis]")).toContain("Uses all activities");
   });
 
   it("switches the weekly volume between time, distance, sessions and load", async () => {

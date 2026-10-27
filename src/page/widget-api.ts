@@ -8,7 +8,7 @@ ctx gives:
 - ctx.data: the getDashboardData result (activities, previousActivities, hrv, recovery, zones, fitnessAge, sync) and notes.
 - ctx.type: "all" or the board the widget shows: running, strengthTraining, walking, hiking, cycling, swimming, racket, generic (Other), or another SDK sport name such as alpineSkiing. Each activity has type (the Garmin type key) and sport (the SDK sport name).
 - ctx.from, ctx.to: Mondays of the first and last week of the window; ctx.weeks: every Monday in it.
-- ctx.activities: the activities of the window and of ctx.type (and of the type chips on the All board). ctx.allActivities: every type. ctx.ofType(list): the same type filter for any list.
+- ctx.activities: the activities of the window and of ctx.type. ctx.allActivities: every type. ctx.ofType(list): the same type filter for any list.
 - ctx.t(key, params): a page text; ctx.lang: the page language.
 - ctx.fmt: num(v, digits), pct(v), day("yyyy-MM-dd"), longDay(d), hms(seconds), hours(seconds), na (the text for a missing value).
 - ctx.calc: groupOf(activity) (its board), sportOf(typeKey), seconds("1:02:03"), sessionSeconds(activity), dayOf(activity), mondayOf(day), weekly(activities, weeks, a => value), loadOf(activity, maxHR), loadRatio(activities, day, maxHR), dailyLoads(activities, from, to, maxHR), mean, sd, rolling(values, n), change(now, before), zonesOf(ctx.data.zones), zoneSeconds(activity, floors), paceSeconds(activity), efficiency(activity), epley(kg, reps), riegel(seconds, km, km), exerciseStats(activities), muscleSets(activities, weeks), swimPace(activity), verticalPerHour(activity).

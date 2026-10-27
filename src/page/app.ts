@@ -65,7 +65,6 @@ let fmt = formatter("en");
 const pageLayout = parseLayout(G.layout);
 let layout: Layout = merge(pageLayout, readLocal());
 let view: View;
-let only: string | null = null;
 let editing = false;
 let accountOpen = false;
 let tabs: string[] = [];
@@ -208,7 +207,6 @@ function header(data: Data): HTMLElement {
     ),
     windowBar(inProgress),
     tabBar(data),
-    view.tab === "all" && chips(),
     editing && editBar(),
   );
 }
@@ -378,42 +376,6 @@ function tabBar(data: Data): HTMLElement {
   );
 }
 
-/** The type chips of the All board: a click shows only that type, a second click (or "All") shows every type. */
-function chips(): HTMLElement {
-  const groups = tabs.filter((x) => x !== "all" && x !== "recovery");
-  return h(
-    "div",
-    { class: "chips", role: "group", "aria-label": t("chips.label") },
-    h(
-      "button",
-      {
-        class: "chip",
-        "aria-pressed": String(only === null),
-        onclick: () => {
-          only = null;
-          render();
-        },
-      },
-      t("type.all"),
-    ),
-    ...groups.map((g) =>
-      h(
-        "button",
-        {
-          class: `chip chip-${g}`,
-          "aria-pressed": String(only === g),
-          onclick: () => {
-            only = only === g ? null : g;
-            render();
-          },
-        },
-        icon(g),
-        typeName(t, g),
-      ),
-    ),
-  );
-}
-
 // ------------------------------------------------------------------ boards
 
 function boardView(data: Data): HTMLElement {
@@ -479,9 +441,8 @@ function tile(data: Data, inst: Instance, def: WidgetDef | undefined): HTMLEleme
 function ctxFor(data: Data, inst: Instance): Ctx {
   const type = inst.type ?? boardType();
   const all = activitiesIn(data.activities, view.from, view.to);
-  const pick = type !== "all" ? type : only;
   const ofType = <A extends Activity>(acts: A[]) =>
-    pick ? acts.filter((a) => groupOf(a) === pick) : acts;
+    type !== "all" ? acts.filter((a) => groupOf(a) === type) : acts;
   return {
     data,
     id: inst.id,

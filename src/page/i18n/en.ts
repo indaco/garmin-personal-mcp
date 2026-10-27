@@ -122,7 +122,6 @@ export const en = {
   "type.geocaching": "Geocaching",
   "type.canoeing": "Canoeing",
   "tabs.label": "Activity types",
-  "chips.label": "Show types",
 
   "edit.start": "Edit layout",
   "edit.done": "Done",

@@ -84,13 +84,9 @@ in the order of their keys. Other is always the last tab.
 
 [The widget catalogue](widgets.md) lists every widget, with what it shows and how it calculates.
 
-Above the boards:
-
-- **The week window**: the last 4, 8 or 12 weeks, all the weeks, or a first and a last week. Every
-  widget about training follows the window. The widgets about today do not follow it: readiness,
-  fitness age and the 14-day recovery widgets.
-- **The type chips** on the All board: a click on a type shows only that type. A second click, or a
-  click on _All_, shows all types again. The load ratio always uses all activities.
+Above the boards is **the week window**: the last 4, 8 or 12 weeks, all the weeks, or a first and a
+last week. Every widget about training follows the window. The widgets about today do not follow it:
+readiness, fitness age and the 14-day recovery widgets.
 
 The URL keeps the board, the window and an open exercise. A reload or a shared link opens the same
 view.
