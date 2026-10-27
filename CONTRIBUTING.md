@@ -66,6 +66,8 @@ pnpm test:page           # the dashboard page in headless Chromium, after the bu
 ```
 
 `pnpm fmt` corrects the format. `pnpm guide` writes the generated parts of `guide/`. After a
+visible change to the dashboard page, `pnpm demo` records the README demo `assets/dashboard.gif`
+again: it needs the build and ImageMagick. After a
 dependency change, commit the new `THIRD-PARTY-NOTICES.md` that the build writes. CI fails when the
 file does not match the bundle.
 
