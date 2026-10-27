@@ -195,6 +195,8 @@ export const it: Catalogue = {
   "kpi.distance": "Distanza · ultimi 7 giorni",
   "kpi.time": "Tempo · ultimi 7 giorni",
   "kpi.vs4w": "rispetto alla media di 4 settimane",
+  "delta.good": "meglio",
+  "delta.bad": "peggio",
   "kpi.ratio": "Rapporto di carico 7:28",
   "kpi.band": "Fascia 0,8-1,3",
   "kpi.ratioAll": "Usa tutte le attività, anche con un filtro per tipo",

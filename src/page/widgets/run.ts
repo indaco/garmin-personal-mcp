@@ -216,7 +216,13 @@ register({
         labels: ctx.weeks.map((w) => weekLabel(ctx, w)),
         datasets: [
           { label: t("is.easy"), data: share(0), borderColor: ctx.color("good"), spanGaps: true },
-          { label: t("is.hard"), data: share(1), borderColor: ctx.color("bad"), spanGaps: true },
+          {
+            label: t("is.hard"),
+            data: share(1),
+            borderColor: ctx.color("bad"),
+            borderDash: [6, 4], // not told apart by colour alone
+            spanGaps: true,
+          },
         ],
       },
       options: {

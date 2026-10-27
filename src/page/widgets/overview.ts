@@ -79,7 +79,7 @@ register({
             h(
               "span",
               {},
-              delta(ctx, calc.change(hrvNow, hrvBase)),
+              delta(ctx, calc.change(hrvNow, hrvBase), "up"),
               " ",
               t("kpi.vsBaseline", { v: fmt.num(hrvBase) }),
             ),

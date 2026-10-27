@@ -3,7 +3,7 @@ import { type Activity, dayOf, GROUPS, groupOf, sessionSeconds } from "../calc";
 import { append, h } from "../dom";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
-import { typeName, kpi, kpiRow, maxHR, note, picker, weekLabel, windowEnd } from "./ui";
+import { alpha, typeName, kpi, kpiRow, maxHR, note, picker, weekLabel, windowEnd } from "./ui";
 
 /** The heat of a calendar day by its training minutes. */
 const level = (m: number) => (m === 0 ? 0 : m < 30 ? 1 : m < 60 ? 2 : m < 90 ? 3 : 4);
@@ -164,7 +164,10 @@ register({
             type: "bar",
             label: t("ls.load"),
             data: load,
-            backgroundColor: flagged.map((f) => ctx.color(f ? "bad" : "accent")),
+            // only the flagged weeks stand out
+            backgroundColor: flagged.map((f) =>
+              f ? ctx.color("bad") : alpha(ctx.color("muted"), 0.6),
+            ),
             yAxisID: "y",
           },
           {
