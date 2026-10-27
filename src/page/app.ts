@@ -602,7 +602,7 @@ function editBar(): HTMLElement {
     h("button", { class: "btn", onclick: addDialog }, t("edit.add")),
     h(
       "button",
-      { class: "btn", onclick: () => setLayout(resetBoard(layout, view.tab)) },
+      { class: "btn", onclick: () => setLayout(resetBoard(layout, view.tab, preset)) },
       t("edit.reset"),
     ),
     h("button", { class: "btn", onclick: copyDialog }, t("edit.copy")),

@@ -85,9 +85,16 @@ describe("edits", () => {
   });
 
   it("resets a board to the preset", () => {
-    const l = resetBoard(layout({ boards: { all: [], run: [] } }), "all");
+    const l = resetBoard(layout({ boards: { all: [], run: [] } }), "all", preset);
     expect(l.boards).toEqual({ run: [] });
     expect(ids(boardOf(l, "all", preset))).toEqual(["kpis", "hrv", "notes"]);
+  });
+
+  it("resets only that board on a blank layout", () => {
+    const l = resetBoard(layout({ base: "blank", boards: { all: [] } }), "all", preset);
+    expect(l.base).toBe("blank");
+    expect(ids(boardOf(l, "all", preset))).toEqual(["kpis", "hrv", "notes"]);
+    expect(boardOf(l, "running", (b) => (b === "running" ? board : []))).toEqual([]);
   });
 
   it("never changes the board it gets", () => {

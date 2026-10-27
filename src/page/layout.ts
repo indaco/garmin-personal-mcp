@@ -40,10 +40,16 @@ export function withBoard(layout: Layout, board: string, instances: Instance[]):
   return { ...layout, boards: { ...layout.boards, [board]: instances } };
 }
 
-/** The board shows its preset again. */
-export function resetBoard(layout: Layout, board: string): Layout {
+/** The board shows its preset again; the other boards keep what they show. */
+export function resetBoard(
+  layout: Layout,
+  board: string,
+  preset: (board: string) => Instance[],
+): Layout {
+  // a blank layout shows an unlisted board empty, so the preset is stored for this board only
+  if (layout.base === "blank") return withBoard(layout, board, preset(board));
   const { [board]: _, ...boards } = layout.boards;
-  return { ...layout, base: "preset", boards };
+  return { ...layout, boards };
 }
 
 export function move(board: Instance[], id: string, to: number): Instance[] {
