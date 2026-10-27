@@ -19,11 +19,85 @@ const tiles = (page: Page) =>
   page.$$eval(".tile", (els) => els.map((e) => (e as HTMLElement).dataset.id));
 const hash = (page: Page) => page.evaluate(() => location.hash);
 
+const ALL_PRESET = [
+  "kpis",
+  "readiness",
+  "fitnessAge",
+  "periodComparison",
+  "records",
+  "weeklyVolume",
+  "intensityMinutes",
+  "loadSafety",
+  "calendar",
+  "loadVsRecovery",
+  "hrv",
+  "restingHr",
+  "sleep",
+  "sleepNeed",
+  "bedtime",
+  "bodyBattery",
+  "activities",
+  "coachNotes",
+];
+
+/** Hovers a real data point of every visible chart; returns the ids of the charts without a tooltip. */
+async function chartsWithoutTooltip(page: Page): Promise<string[]> {
+  const keys = await page.evaluate(() =>
+    Object.values(window.Chart!.instances)
+      .filter((c) => c.canvas.offsetParent)
+      .map((c, i) => {
+        c.canvas.dataset.probe = String(i);
+        return String(i);
+      }),
+  );
+  const missing: string[] = [];
+  for (const key of keys) {
+    const pos = await page.evaluate((k) => {
+      const c = Object.values(window.Chart!.instances).find((x) => x.canvas.dataset.probe === k)!;
+      c.canvas.scrollIntoView({ block: "center" });
+      for (let d = 0; d < c.data.datasets.length; d++) {
+        const meta = c.getDatasetMeta(d);
+        const i = meta.data.findIndex(
+          (p) =>
+            p && !(p as { skip?: boolean }).skip && Number.isFinite(p.x) && Number.isFinite(p.y),
+        );
+        if (i >= 0) {
+          const r = c.canvas.getBoundingClientRect();
+          return { x: r.left + meta.data[i].x, y: r.top + meta.data[i].y };
+        }
+      }
+      return null;
+    }, key);
+    if (!pos) continue;
+    await page.mouse.move(pos.x, pos.y);
+    await page.waitForTimeout(80);
+    const shown = await page.evaluate(
+      (k) =>
+        Object.values(window.Chart!.instances)
+          .find((x) => x.canvas.dataset.probe === k)!
+          .tooltip!.getActiveElements().length > 0,
+      key,
+    );
+    if (!shown)
+      missing.push(
+        await page.evaluate(
+          (k) =>
+            Object.values(window.Chart!.instances)
+              .find((x) => x.canvas.dataset.probe === k)!
+              .canvas.closest(".tile")!
+              .getAttribute("data-id")!,
+          key,
+        ),
+      );
+  }
+  return missing;
+}
+
 describe("the page", () => {
-  it("shows the All board with the coach notes and no errors", async () => {
+  it("shows the preset widgets of the All board and no errors", async () => {
     const { page, errors } = await open(browser, pageFile());
     expect(await page.textContent("h1")).toBe("Training + Recovery");
-    expect(await tiles(page)).toEqual(["coachNotes"]);
+    expect(await tiles(page)).toEqual(ALL_PRESET);
     // the server escaped the note: it shows as text
     expect(await page.textContent(".notes li")).toBe("Load <b>1.2");
     expect(errors).toEqual([]);
@@ -105,6 +179,11 @@ describe("the page", () => {
 });
 
 describe("edit mode", () => {
+  const one = {
+    rev: "r0",
+    base: "preset",
+    boards: { all: [{ id: "coachNotes", widget: "coachNotes", span: 3 }] },
+  };
   const two = {
     rev: "r1",
     base: "preset",
@@ -117,7 +196,7 @@ describe("edit mode", () => {
   };
 
   it("hides a widget in its place, and a second click shows it again", async () => {
-    const { page } = await open(browser, pageFile());
+    const { page } = await open(browser, pageFile({ layout: one }));
     await page.click("text=Edit layout");
     await page.click("[aria-label='Hide Coach notes']");
     expect(await page.getAttribute("[data-id=coachNotes]", "class")).toContain("is-hidden");
@@ -166,7 +245,7 @@ describe("edit mode", () => {
     expect(await tiles(page)).toEqual(["x", "coachNotes"]);
     await page.click("text=Reset to preset");
     await page.click("text=Done");
-    expect(await tiles(page)).toEqual(["coachNotes"]);
+    expect(await tiles(page)).toEqual(ALL_PRESET);
   });
 
   it("keeps a browser edit after a reload, until the page gets a new layout", async () => {
@@ -183,6 +262,7 @@ describe("edit mode", () => {
     writeFileSync(file, readFileSync(file, "utf8").replace('"rev":"r1"', '"rev":"r2"'));
     await page.reload();
     await page.waitForSelector(".page");
+    // the page layout has the notes and a widget that does not exist yet
     expect(await tiles(page)).toEqual(["coachNotes"]);
   });
 
@@ -206,4 +286,81 @@ describe("edit mode", () => {
 
 it("uses only the synthetic fixture", () => {
   expect(data.activities.every((a: { name: string }) => !/\d{5,}/.test(a.name))).toBe(true);
+});
+
+describe("overview widgets", () => {
+  it("shows a tooltip on every chart", async () => {
+    const { page, errors } = await open(browser, pageFile());
+    expect(await page.evaluate(() => Object.keys(window.Chart!.instances).length)).toBeGreaterThan(
+      8,
+    );
+    expect(await chartsWithoutTooltip(page)).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
+  it("totals the window", async () => {
+    const { page } = await open(browser, pageFile());
+    const km = data.activities.reduce((s: number, a: { km?: number }) => s + (a.km ?? 0), 0);
+    expect(await page.textContent(".totals")).toContain(`${km.toFixed(1)} km`);
+    expect(await page.textContent(".totals")).toContain("75 sessions");
+  });
+
+  it("gives a readiness verdict from its four inputs", async () => {
+    const { page } = await open(browser, pageFile());
+    expect(await page.textContent(".verdict")).toMatch(/^(Go easy|Ready to push|Normal)$/);
+    expect(await page.$$eval("[data-id=readiness] .kpi", (k) => k.length)).toBe(4);
+  });
+
+  it("shows a calendar day with its activities on hover", async () => {
+    const { page } = await open(browser, pageFile());
+    await page.hover("[data-date='2026-10-17']");
+    const tip = await page.textContent(".cal-tip");
+    expect(tip).toContain("Riverside Half Marathon");
+    expect(await page.isVisible(".cal-tip")).toBe(true);
+  });
+
+  it("lists the activities, and opens and closes their laps", async () => {
+    const { page } = await open(browser, pageFile());
+    const rows = () =>
+      page.$$eval("[data-id=activities] table.data > tbody > tr:not(.laps-row)", (r) => r.length);
+    expect(await rows()).toBe(15);
+    await page.click("text=Show all 75");
+    expect(await rows()).toBe(75);
+    await page.click("text=Show fewer");
+    expect(await rows()).toBe(15);
+    const button = "[data-id=activities] button[aria-expanded]";
+    await page.click(button);
+    expect(await page.$$eval(".laps-row", (r) => r.length)).toBe(1);
+    await page.click(`${button}[aria-expanded=true]`);
+    expect(await page.$$eval(".laps-row", (r) => r.length)).toBe(0);
+  });
+
+  it("filters the activities with the type chips", async () => {
+    const { page } = await open(browser, pageFile());
+    await page.click(".chip-run");
+    expect(await page.textContent("[data-id=activities] .more")).toBe("Show all 36");
+    // the load ratio still uses all activities, and says so
+    expect(await page.textContent("[data-id=kpis]")).toContain("Uses all activities");
+  });
+
+  it("switches the weekly volume between time, distance, sessions and load", async () => {
+    const { page } = await open(browser, pageFile());
+    const axis = () =>
+      page.evaluate(() => {
+        const c = Object.values(window.Chart!.instances).find((x) =>
+          x.canvas.closest("[data-id=weeklyVolume]"),
+        )!;
+        return (c.options.scales!.y as { title: { text: string } }).title.text;
+      });
+    expect(await axis()).toBe("h");
+    await page.click("[data-id=weeklyVolume] .picker >> text=Distance");
+    expect(await axis()).toBe("km");
+  });
+
+  it("shows the widgets in Italian", async () => {
+    const { page, errors } = await open(browser, pageFile(), { locale: "it-IT" });
+    expect(await page.textContent("[data-id=readiness] h2")).toBe("Prontezza di oggi");
+    expect(await page.textContent(".totals")).toContain("sessioni");
+    expect(errors).toEqual([]);
+  });
 });

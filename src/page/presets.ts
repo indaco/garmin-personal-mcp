@@ -19,7 +19,7 @@ const PRESETS: Record<string, [widget: string, span: Span][]> = {
     ["sleepNeed", 1],
     ["bedtime", 1],
     ["bodyBattery", 1],
-    ["recentActivities", 3],
+    ["activities", 3],
     ["coachNotes", 3],
   ],
   run: [

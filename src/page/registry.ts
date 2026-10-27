@@ -1,5 +1,6 @@
 import type { Chart, ChartConfiguration } from "chart.js";
 import type * as calc from "./calc";
+import type * as metrics from "./metrics";
 import type { Activity, Group } from "./calc";
 import type { Fmt, T } from "./i18n";
 import type { Span } from "./layout";
@@ -25,6 +26,8 @@ export interface Data {
 /** What a widget gets to draw itself. Built-in and custom widgets get the same. */
 export interface Ctx {
   data: Data;
+  /** The widget instance on its board. */
+  id: string;
   /** The board (tab) the widget sits on, and the type it shows: "all" or a group. */
   board: string;
   type: "all" | Group;
@@ -34,12 +37,14 @@ export interface Ctx {
   weeks: string[];
   /** The activities of the window and of the widget's type (and of the type chips on the All board). */
   activities: Activity[];
+  /** The type filter of the widget (its type, or the type chips on the All board) for any list of activities. */
+  ofType: <A extends Activity>(acts: A[]) => A[];
   /** The activities of the window, every type: for numbers that always use all activities, like the load ratio. */
   allActivities: Activity[];
   lang: string;
   t: T;
   fmt: Fmt;
-  calc: typeof calc;
+  calc: typeof calc & typeof metrics;
   /** A Chart.js chart in `el` that follows the theme; `height` in px. */
   chart: (el: HTMLElement, config: ChartConfiguration, height?: number) => Chart;
   /** A colour token of the theme, e.g. "text", "good", or a group for its type colour. */
@@ -49,6 +54,8 @@ export interface Ctx {
   /** The item in the URL hash (e.g. a strength exercise), and a way to set it. */
   item?: string;
   setItem: (item: string | undefined) => void;
+  /** Draws the whole page again, e.g. after a widget changed one of its own options. */
+  refresh: () => void;
 }
 
 export interface WidgetDef {

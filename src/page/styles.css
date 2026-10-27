@@ -539,3 +539,203 @@ select {
   font-family: ui-monospace, monospace;
   font-size: 12px;
 }
+
+/* Widget parts */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+@media (max-width: 700px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.kpi,
+.badge {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-width: 0;
+}
+.kpi-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+.kpi-value {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 2px 0;
+}
+.kpi-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+.totals {
+  margin: 0 0 10px;
+  color: var(--muted);
+}
+.verdict {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+.verdict-easy {
+  color: var(--bad);
+}
+.verdict-push {
+  color: var(--good);
+}
+.verdict-normal {
+  color: var(--warn);
+}
+.badges {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+}
+.badge-value {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 2px 0;
+}
+.note {
+  margin: 8px 0 0;
+}
+.picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.chip.small {
+  padding: 2px 10px;
+  font-size: 12px;
+}
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+table.data th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+table.data td {
+  border-bottom: 1px solid var(--line);
+  padding: 6px 8px;
+}
+table.data .num {
+  text-align: right;
+  white-space: nowrap;
+}
+.laps-row > td {
+  background: var(--panel2);
+}
+.type {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.type-run .icon {
+  color: var(--run);
+}
+.type-strength .icon {
+  color: var(--strength);
+}
+.type-walk .icon {
+  color: var(--walk);
+}
+.type-hike .icon {
+  color: var(--hike);
+}
+.type-bike .icon {
+  color: var(--bike);
+}
+.type-swim .icon {
+  color: var(--swim);
+}
+.type-padel .icon {
+  color: var(--padel);
+}
+.type-other .icon {
+  color: var(--other);
+}
+.tag {
+  margin-left: 6px;
+  font-size: 11px;
+  border: 1px solid var(--warn);
+  color: var(--warn);
+  border-radius: 999px;
+  padding: 0 6px;
+}
+.linkish {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+  text-decoration: underline dotted var(--muted);
+}
+
+/* Consistency calendar */
+.cal-wrap {
+  position: relative;
+}
+.cal {
+  display: grid;
+  justify-content: start;
+  gap: 3px;
+  align-items: center;
+}
+.cal-day {
+  padding-right: 6px;
+}
+.cal-cell {
+  aspect-ratio: 1;
+  width: 100%;
+  border-radius: 3px;
+  border: 0;
+  padding: 0;
+  background: var(--panel2);
+  cursor: pointer;
+}
+.cal-cell.out {
+  background: none;
+  cursor: default;
+}
+.cal-cell.l1 {
+  background: color-mix(in srgb, var(--good) 30%, var(--panel2));
+}
+.cal-cell.l2 {
+  background: color-mix(in srgb, var(--good) 55%, var(--panel2));
+}
+.cal-cell.l3 {
+  background: color-mix(in srgb, var(--good) 78%, var(--panel2));
+}
+.cal-cell.l4 {
+  background: var(--good);
+}
+.cal-tip {
+  position: absolute;
+  z-index: 5;
+  width: 220px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 30%);
+  pointer-events: none;
+}
+.more {
+  margin-top: 10px;
+}

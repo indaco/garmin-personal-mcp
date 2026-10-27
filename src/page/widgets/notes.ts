@@ -1,4 +1,4 @@
-import { h } from "../dom";
+import { append, h } from "../dom";
 import { register } from "../registry";
 
 register({
@@ -16,7 +16,8 @@ register({
       // the server escapes each note, so it is safe as HTML
       list.append(Object.assign(h("li"), { innerHTML: note }));
     }
-    el.append(
+    append(
+      el,
       list,
       h(
         "p",
