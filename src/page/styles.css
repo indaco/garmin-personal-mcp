@@ -217,6 +217,23 @@ h2 {
 .small {
   font-size: 12px;
 }
+/* the first stop of the keyboard: hidden until it has focus */
+.skip {
+  position: absolute;
+  left: 16px;
+  top: -40px;
+  z-index: 60;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--bg);
+}
+.skip:focus {
+  top: 8px;
+}
+#board:focus {
+  outline: none;
+}
 /* read by screen readers only */
 .sr-only {
   position: absolute;
@@ -892,11 +909,21 @@ table.data .num {
 .cal-wrap {
   position: relative;
 }
+/* 20 px days 4 px apart: a 24 px target for each */
 .cal {
   display: grid;
   justify-content: start;
-  gap: 3px;
+  gap: 4px;
   align-items: center;
+}
+.cal-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+.cal-legend .cal-cell {
+  width: 12px;
 }
 .cal-day {
   padding-right: 6px;

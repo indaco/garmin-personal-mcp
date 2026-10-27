@@ -1,4 +1,5 @@
 import { readFileSync, statSync, writeFileSync } from "node:fs";
+import axe from "axe-core";
 import type { Browser, Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { data, launch, open, pageFile } from "./page";
@@ -457,6 +458,38 @@ const focused = (page: Page) =>
     return el.getAttribute("aria-label") ?? (el.id || el.textContent?.trim());
   });
 
+/** The serious and critical WCAG 2.2 AA problems that axe finds on the page now. */
+async function problems(page: Page): Promise<string[]> {
+  if (!(await page.evaluate(() => "axe" in window)))
+    await page.addScriptTag({ content: axe.source });
+  return page.evaluate(async () => {
+    const r = await (window as unknown as { axe: typeof axe }).axe.run(document, {
+      runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"] },
+    });
+    return r.violations
+      .filter((v) => v.impact === "serious" || v.impact === "critical")
+      .map((v) => `${v.id}: ${v.nodes.length}`);
+  });
+}
+
+describe("accessibility", () => {
+  it("has no serious problem on the boards, in edit mode and in a light theme", async () => {
+    const { page } = await open(browser, pageFile());
+    for (const tab of ["all", "recovery", "running", "strengthTraining"]) {
+      await page.click(`[data-tab=${tab}]`);
+      expect([tab, await problems(page)]).toEqual([tab, []]);
+    }
+    await page.click("[data-tab=all]");
+    await page.click("text=Edit layout");
+    expect(["edit", await problems(page)]).toEqual(["edit", []]);
+    await page.click(".edit-bar >> text=Done");
+    await page.click(".account summary");
+    await page.focus("#theme");
+    await page.selectOption("#theme", "light");
+    expect(["light", await problems(page)]).toEqual(["light", []]);
+  });
+});
+
 describe("phone", () => {
   const phone = { viewport: { width: 390, height: 844 } };
 
@@ -802,9 +835,11 @@ describe("strength board", () => {
     await page.click("[data-exercise=barbell-back-squat]");
     expect(await page.$(".detail")).toBeNull();
 
-    await page.focus("[data-exercise=plank]");
+    await page.focus("[data-exercise=plank] button");
     await page.keyboard.press("Enter");
     expect(await page.textContent(".detail h3")).toBe("Plank");
+    // focus goes to the detail, which opens after the table
+    expect(await page.evaluate(() => document.activeElement?.textContent)).toBe("Plank");
 
     const again = await open(browser, file, {
       hash: "#strengthTraining@2026-08-03_2026-10-26/lat-pulldown",

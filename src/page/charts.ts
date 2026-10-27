@@ -96,6 +96,54 @@ export function themeCharts(): void {
 
 export const CHART_TYPES = ["bar", "line", "scatter", "doughnut", "pie"];
 
+/** A value of a dataset as text: a number, an {x, y} point, or nothing. */
+function text(v: unknown): string {
+  if (typeof v === "number") return String(Math.round(v * 100) / 100);
+  if (v && typeof v === "object" && "y" in v) {
+    const p = v as { x: unknown; y: unknown };
+    return `${text(p.x)}: ${text(p.y)}`;
+  }
+  return v === null || v === undefined ? "" : String(v);
+}
+
+/** The data of a chart as a table that only screen readers get: one row per label, one column per series. */
+function dataTable(config: ChartConfiguration, title: string): HTMLElement {
+  const sets = config.data.datasets;
+  const labels = config.data.labels ?? (sets[0]?.data ?? []).map((_, i) => i + 1);
+  // the wrapper hides it: a table grows to its content whatever its width
+  return h(
+    "div",
+    { class: "sr-only" },
+    h(
+      "table",
+      {},
+      h("caption", {}, title),
+      h(
+        "thead",
+        {},
+        h(
+          "tr",
+          {},
+          h("td", {}),
+          ...sets.map((d) => h("th", { scope: "col" }, String(d.label ?? ""))),
+        ),
+      ),
+      h(
+        "tbody",
+        {},
+        ...labels.map((label, i) =>
+          h(
+            "tr",
+            {},
+            h("th", { scope: "row" }, text(label)),
+            ...sets.map((d) => h("td", {}, text(d.data[i]))),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 export function chart(el: HTMLElement, config: ChartConfiguration, height = 220): Chart {
   // Chart.js builds the chart only when the canvas is in the page, after the widget's try/catch:
   // check the types now, so a wrong type shows in the widget's tile
@@ -104,8 +152,14 @@ export function chart(el: HTMLElement, config: ChartConfiguration, height = 220)
   if (unknown) {
     throw new Error(`Chart type ${unknown} is not available: use ${CHART_TYPES.join(", ")}`);
   }
-  const canvas = h("canvas", { role: "img" });
-  el.append(h("div", { class: "chart", style: `height:${height}px` }, canvas));
+  // the title of the small chart, else of the tile; screen readers read the table instead of the picture
+  const title =
+    (el.closest(".multiple")?.querySelector("h3") ?? el.closest(".tile")?.querySelector("h2"))
+      ?.textContent ?? "";
+  const canvas = h("canvas", { "aria-hidden": "true" });
+  el.append(
+    h("div", { class: "chart", style: `height:${height}px` }, canvas, dataTable(config, title)),
+  );
   const c = new Chart(canvas, config);
   live.push(c);
   return c;

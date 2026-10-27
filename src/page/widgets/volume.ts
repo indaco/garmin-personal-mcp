@@ -42,6 +42,7 @@ export function renderVolume(el: HTMLElement, ctx: Ctx, only?: string[]): void {
     Object.entries(metrics)
       .filter(([k]) => !only || only.includes(k))
       .map(([k, [label]]) => [k, label]),
+    t("m.label"),
   );
   const [, unit, value] = metrics[metric];
   const total = calc.weekly(ctx.activities, ctx.weeks, value);
@@ -268,6 +269,11 @@ register({
       (byDay.get(d) ?? []).reduce((s, a) => s + sessionSeconds(a) / 60, 0);
     const weekday = new Intl.DateTimeFormat(ctx.lang, { weekday: "short", timeZone: "UTC" });
     const tip = h("div", { class: "cal-tip", role: "status", hidden: true });
+    // the last day of the window takes the tab stop
+    const last = [...ctx.weeks.map((w) => addDays(w, 6)), ctx.data.end]
+      .filter((d) => d <= ctx.data.end)
+      .toSorted()
+      .at(-1);
     const show = (cell: HTMLElement, d: string) => {
       const acts = byDay.get(d) ?? [];
       tip.replaceChildren(
@@ -287,9 +293,30 @@ register({
       tip.style.left = `${Math.min(box.left - host.left, host.width - 220)}px`;
       tip.style.top = `${box.bottom - host.top + 6}px`;
     };
+    // one tab stop: the arrow keys move a day (up, down) or a week (left, right)
     const grid = h("div", {
       class: "cal",
-      style: `grid-template-columns: auto repeat(${ctx.weeks.length}, minmax(10px, 18px))`,
+      role: "group",
+      "aria-label": t("cal.label"),
+      style: `grid-template-columns: auto repeat(${ctx.weeks.length}, minmax(10px, 20px))`,
+      onkeydown: (e: KeyboardEvent) => {
+        const cell = (e.target as HTMLElement).closest<HTMLElement>(".cal-cell[data-date]");
+        if (!cell) return;
+        if (e.key === "Escape") {
+          tip.hidden = true;
+          return;
+        }
+        const step = { ArrowUp: -1, ArrowDown: 1, ArrowLeft: -7, ArrowRight: 7 }[e.key];
+        if (step === undefined) return;
+        e.preventDefault();
+        const next = grid.querySelector<HTMLElement>(
+          `[data-date="${addDays(cell.dataset.date!, step)}"]`,
+        );
+        if (!next) return;
+        cell.tabIndex = -1;
+        next.tabIndex = 0;
+        next.focus();
+      },
     });
     for (let day = 0; day < 7; day++) {
       grid.append(
@@ -308,6 +335,7 @@ register({
         const cell = h("button", {
           class: `cal-cell l${level(minutes(d))}`,
           "data-date": d,
+          tabindex: d === last ? "0" : "-1",
           "aria-label": `${fmt.longDay(d)}: ${byDay.has(d) ? t("cal.minutes", { n: fmt.num(minutes(d)) }) : t("cal.rest")}`,
           onpointerenter: () => show(cell, d),
           onfocus: () => show(cell, d),
@@ -318,6 +346,13 @@ register({
         grid.append(cell);
       }
     }
-    append(el, h("div", { class: "cal-wrap" }, grid, tip));
+    const legend = h(
+      "div",
+      { class: "cal-legend muted small", "aria-hidden": "true" },
+      t("cal.less"),
+      ...[0, 1, 2, 3, 4].map((l) => h("span", { class: `cal-cell l${l}` })),
+      t("cal.more"),
+    );
+    append(el, h("div", { class: "cal-wrap" }, grid, tip), legend);
   },
 });
