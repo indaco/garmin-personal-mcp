@@ -136,9 +136,9 @@ Claude gives you the path of the page and the command to open it. The page has:
 
 - a board for each sport: All, Run, Strength, Walk, Bike and Racket sports. Hike, Swim, Other
   and each other sport have a board when you have them;
-- on the All board: an overview, readiness for today, fitness age, a period comparison, records,
-  weekly volume, load safety, intensity minutes, a consistency calendar, load against recovery,
-  the recovery widgets and the coach notes;
+- on the All board: an overview, readiness for today next to a consistency calendar, a period
+  comparison, records, weekly volume, intensity minutes, load safety, load against recovery, fitness
+  age, the recovery widgets and the coach notes;
 - on each type board: a summary, the weekly chart, the time in HR zones and the widgets of that
   sport, for example best efforts and a race predictor for Run, and each exercise with its trend
   for Strength;
