@@ -50,6 +50,16 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # the dashboard page in headless Chromium, once: the page does not depend on the Node version.
+      # playwright-core in the lockfile picks the matching browser build.
+      - name: Install the Chromium headless shell
+        if: matrix.node == 24
+        run: pnpm exec playwright-core install --with-deps --only-shell chromium
+
+      - name: Page tests
+        if: matrix.node == 24
+        run: pnpm test:page
+
       # stdout carries MCP messages only: one initialize request, one JSON line back
       - name: Smoke test
         run: |
@@ -68,5 +78,6 @@ jobs:
             const allowed = ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "package.json"];
             const extra = files.filter((p) => !/^(dist|prompts)\//.test(p) && !allowed.includes(p));
             if (extra.length) { console.error("unexpected files in the package:", extra); process.exit(1); }
+            if (!files.includes("dist/dashboard.html")) { console.error("the dashboard template is missing"); process.exit(1); }
             console.log(`${files.length} files in the package`);
           '
