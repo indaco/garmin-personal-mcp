@@ -303,6 +303,62 @@ it("uses only the synthetic fixture", () => {
   expect(data.activities.every((a: { name: string }) => !/\d{5,}/.test(a.name))).toBe(true);
 });
 
+/** Clicks legend item `i` of the chart in tile `id`; returns the visible dataset labels. */
+async function clickLegend(
+  page: Page,
+  id: string,
+  i: number,
+  modifier?: "Shift",
+): Promise<string[]> {
+  const canvas = page.locator(`[data-id=${id}] canvas`);
+  await canvas.scrollIntoViewIfNeeded();
+  const box = (await canvas.boundingBox())!;
+  const hit = await canvas.evaluate((el, n) => {
+    type Box = { left: number; top: number; width: number; height: number };
+    // the item boxes are not in the Chart.js types
+    const legend = window.Chart!.getChart(el as HTMLCanvasElement)!.legend as unknown as {
+      legendHitBoxes: Box[];
+    };
+    const h = legend.legendHitBoxes[n];
+    return { x: h.left + h.width / 2, y: h.top + h.height / 2 };
+  }, i);
+  if (modifier) await page.keyboard.down(modifier);
+  await page.mouse.click(box.x + hit.x, box.y + hit.y);
+  if (modifier) await page.keyboard.up(modifier);
+  // Chart.js handles events on the next animation frame
+  await page.evaluate(
+    () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+  );
+  return canvas.evaluate((el) => {
+    const c = window.Chart!.getChart(el as HTMLCanvasElement)!;
+    return c.data.datasets.filter((_, n) => c.isDatasetVisible(n)).map((d) => String(d.label));
+  });
+}
+
+describe("chart legends", () => {
+  it("shows only the clicked series, and all of them on a second click", async () => {
+    const { page, errors } = await open(browser, pageFile());
+    // the legend of the HRV chart: band, nightly, 7-day average; the band's low edge is not in it
+    expect(await clickLegend(page, "hrv", 1)).toEqual(["Range low", "Nightly HRV"]);
+    expect(await clickLegend(page, "hrv", 1)).toEqual([
+      "Range low",
+      "Balanced range",
+      "Nightly HRV",
+      "7-day average",
+    ]);
+    expect(errors).toEqual([]);
+  });
+
+  it("hides just the clicked series with Shift", async () => {
+    const { page } = await open(browser, pageFile());
+    expect(await clickLegend(page, "hrv", 1, "Shift")).toEqual([
+      "Range low",
+      "Balanced range",
+      "7-day average",
+    ]);
+  });
+});
+
 describe("overview widgets", () => {
   it("shows a tooltip on every chart", async () => {
     const { page, errors } = await open(browser, pageFile());

@@ -14,7 +14,10 @@ import {
   PieController,
   PointElement,
   ScatterController,
+  type ChartEvent,
   Tooltip,
+  type LegendElement,
+  type LegendItem,
 } from "chart.js";
 import { h } from "./dom";
 import { token } from "./theme";
@@ -36,6 +39,40 @@ Chart.register(
   Legend,
   Filler,
 );
+
+// pie and doughnut legend items are data points (index); the others are datasets (datasetIndex)
+const key = (i: LegendItem) => i.datasetIndex ?? i.index ?? -1;
+
+/**
+ * A legend click shows only that series; a click on the one series left shows them all again.
+ * Shift, Cmd or Ctrl hides or shows just that series. Only the series in the legend change, so a
+ * series a widget keeps out of its legend (the low edge of a band) stays.
+ */
+function legendClick(e: ChartEvent, item: LegendItem, legend: LegendElement<never>): void {
+  const c = legend.chart;
+  const shown = (i: LegendItem) =>
+    i.datasetIndex === undefined
+      ? c.getDataVisibility(i.index ?? -1)
+      : c.isDatasetVisible(i.datasetIndex);
+  const show = (i: LegendItem, on: boolean) => {
+    if (i.datasetIndex !== undefined) c.setDatasetVisibility(i.datasetIndex, on);
+    else if (shown(i) !== on) c.toggleDataVisibility(i.index ?? -1);
+  };
+  const native = e.native as MouseEvent | null;
+  const items = legend.legendItems ?? [];
+  if (native?.shiftKey || native?.metaKey || native?.ctrlKey) {
+    show(item, !shown(item));
+  } else {
+    const alone = items.every((i) => shown(i) === (key(i) === key(item)));
+    for (const i of items) show(i, alone || key(i) === key(item));
+  }
+  c.update();
+}
+
+Chart.defaults.plugins.legend.onClick = legendClick;
+// pie and doughnut set their own handler, which wins over the default
+Chart.overrides.doughnut.plugins.legend.onClick = legendClick;
+Chart.overrides.pie.plugins.legend.onClick = legendClick;
 
 const live: Chart[] = [];
 
