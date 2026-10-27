@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "ci"
+      - "deps"
+    commit-message:
+      prefix: "ci"
+    open-pull-requests-limit: 3
+
+  # the project uses the latest version of each dependency
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "deps"
+    commit-message:
+      prefix: "chore"
+    groups:
+      dev-dependencies:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 3

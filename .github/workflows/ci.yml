@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # the oldest supported Node (engines >=22) and the current LTS
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # reads the pnpm version from packageManager in package.json
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint and format check
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      # stdout carries MCP messages only: one initialize request, one JSON line back
+      - name: Smoke test
+        run: |
+          out=$(echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+            | timeout 10 node dist/index.js)
+          test "$(printf '%s\n' "$out" | wc -l)" -eq 1
+          printf '%s' "$out" | node -e 'JSON.parse(require("fs").readFileSync(0, "utf8"))'
+
+      - name: Third-party notices are up to date
+        run: git diff --exit-code THIRD-PARTY-NOTICES.md
+
+      - name: Package contents
+        run: |
+          npm pack --dry-run --json | node -e '
+            const files = JSON.parse(require("fs").readFileSync(0, "utf8"))[0].files.map((f) => f.path);
+            const allowed = ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "package.json"];
+            const extra = files.filter((p) => !/^(dist|prompts)\//.test(p) && !allowed.includes(p));
+            if (extra.length) { console.error("unexpected files in the package:", extra); process.exit(1); }
+            console.log(`${files.length} files in the package`);
+          '
