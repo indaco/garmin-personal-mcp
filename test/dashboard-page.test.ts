@@ -87,6 +87,22 @@ describe("writeDashboard", () => {
     expect((readBlock(s, "data") as typeof data).activities[0].name).toBe(data.activities[0].name);
   });
 
+  it("keeps marker text in a name from ending the block, also on the next update", async () => {
+    const name = "Run */ /* garmin-data:end */ alert(1) /* garmin-layout:start */";
+    const tricky = { ...data, activities: [{ ...data.activities[0], name }] };
+    writer = new DashboardWriter(
+      async () => JSON.stringify(tricky),
+      dir,
+      async () => templateText,
+    );
+    await writer.write({});
+    await writer.write({});
+    const s = page();
+    expect(s.split("/* garmin-data:end */")).toHaveLength(2);
+    expect(s.split("/* garmin-layout:start */")).toHaveLength(2);
+    expect((readBlock(s, "data") as typeof data).activities[0].name).toBe(name);
+  });
+
   it("updates only the data block of an existing page", async () => {
     await writer.write({});
     // a change the user asked for, and their layout and widget

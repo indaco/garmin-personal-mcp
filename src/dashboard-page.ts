@@ -43,9 +43,12 @@ export function readBlock(page: string, block: Block): unknown {
   return m ? JSON.parse(m[1]) : undefined;
 }
 
-/** The page with the block set to `value`. `<` is written as <, so no value can close the script. */
+/**
+ * The page with the block set to `value`. `<` is written as \u003c, so no value can close the script,
+ * and `/` as \u002f, so no value can hold marker text and end its block early.
+ */
 export function writeBlock(page: string, block: Block, value: unknown): string {
-  const json = JSON.stringify(value).replaceAll("<", "\\u003c");
+  const json = JSON.stringify(value).replaceAll("<", "\\u003c").replaceAll("/", "\\u002f");
   return page.replace(
     marker(block),
     () => `/* garmin-${block}:start */${json}/* garmin-${block}:end */`,
