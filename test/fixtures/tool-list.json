@@ -1,0 +1,368 @@
+[
+  {
+    "name": "downloadActivityFit",
+    "description": "Download the ORIGINAL .FIT file of an activity and save it on the user's computer.\nReturns the absolute path of the saved .fit file (second-by-second HR, cadence, speed, laps).",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "activityId": {
+          "type": "integer",
+          "description": "Garmin activity id"
+        }
+      },
+      "required": ["activityId"]
+    }
+  },
+  {
+    "name": "editDashboard",
+    "description": "Changes the layout, the custom widgets or the languages of the dashboard page (a page from the\ntemplate; call writeDashboard first). Without arguments it only reads: the reply has the layout, the\ncustom widgets, the missing texts of each language, the catalogue of built-in widgets and `widgetApi`,\nthe guide to writing a custom widget. `layout` replaces the whole layout (the text of the page's\n'Copy layout'); `place` adds widgets at the end of a board; `widgets` adds or replaces custom widgets\nby id; `removeWidgets` removes them, also from the boards. `languages` adds texts by key, e.g.\n{\"de\": {\"title\": \"Training + Erholung\"}}: keys and {placeholders} as in `englishTexts: true`; a\ntext with \"|\" has a singular and a plural form. Missing texts show in English.",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "layout": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "A whole layout: { base, boards: { all: [{ id, widget, type?, span, hidden? }] } }"
+        },
+        "place": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "board": {
+                "type": "string",
+                "description": "all, run, strength, walk, hike, bike, swim, racket or other"
+              },
+              "widget": {
+                "type": "string",
+                "description": "A widget id of the catalogue or a custom widget"
+              },
+              "type": {
+                "type": "string",
+                "description": "The type the widget shows, when not the board's"
+              },
+              "span": {
+                "type": "integer",
+                "description": "Width in columns, 1 to 3"
+              }
+            },
+            "required": ["board", "widget"]
+          }
+        },
+        "widgets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Letters, digits and -, e.g. longest-ride"
+              },
+              "title": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string",
+                "description": "The body of a function (el, ctx): see widgetApi"
+              },
+              "span": {
+                "type": "integer"
+              },
+              "types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Types the widget can show"
+              }
+            },
+            "required": ["id", "title", "code"]
+          }
+        },
+        "removeWidgets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ids of custom widgets"
+        },
+        "languages": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "description": "Texts by language code and key"
+        },
+        "englishTexts": {
+          "type": "boolean",
+          "description": "Also return the English texts to translate"
+        },
+        "path": {
+          "type": "string",
+          "description": "The .html file; relative paths are inside the data dir"
+        }
+      }
+    }
+  },
+  {
+    "name": "garminGet",
+    "description": "Generic read-only GET on the Garmin Connect Personal API, for endpoints not covered by the\nother tools or when a query parameter name has to be adjusted. 'path' is relative and starts\nwith '/', e.g. /fitnessage-service/fitnessage/v2/2026-10-25 . 'query' is an optional\nURL query string without '?', e.g. date=2026-10-25&foo=bar .",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Relative API path starting with /"
+        },
+        "query": {
+          "type": "string",
+          "description": "Query string, e.g. a=1&b=2"
+        }
+      },
+      "required": ["path"]
+    }
+  },
+  {
+    "name": "getActivity",
+    "description": "Get the full detail of one activity (summary, metadata, splits/laps) as JSON.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "activityId": {
+          "type": "integer",
+          "description": "Garmin activity id"
+        }
+      },
+      "required": ["activityId"]
+    }
+  },
+  {
+    "name": "getActivityLaps",
+    "description": "Laps of an activity as recorded by the watch (manual laps, auto-lap every km, or workout\nsteps), read from the original .FIT file. One row per lap: distance (km), timer time,\npace (min/km, foot sports) or speed (km/h), average/max HR, cadence (spm for running),\nascent/descent, average power, intensity (active/rest/warmup/cooldown) and lap trigger.\nUse it for intervals and per-km splits; getActivity does not have them.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "activityId": {
+          "type": "integer",
+          "description": "Garmin activity id"
+        }
+      },
+      "required": ["activityId"]
+    }
+  },
+  {
+    "name": "getActivitySets",
+    "description": "Strength training sets of an activity, read from the original .FIT file. One entry per\nexercise, in the order first done, with its movement category, its primary and secondary\nmuscles (from Garmin's exercise catalogue) and its active sets: reps,\nweight (kg, absent when none was recorded), set time in seconds and the rest after the set\n(restSec). Exercise names are stable across sessions, so they can be used for per-exercise\ntrends. Edits made later in Garmin Connect (renamed exercises, corrected reps or weights)\nare not in the .FIT file.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "activityId": {
+          "type": "integer",
+          "description": "Garmin activity id"
+        }
+      },
+      "required": ["activityId"]
+    }
+  },
+  {
+    "name": "getDailyHeartRate",
+    "description": "Daily heart rate for one date (includes resting heart rate), yyyy-MM-dd.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "description": "Date yyyy-MM-dd"
+        }
+      },
+      "required": ["date"]
+    }
+  },
+  {
+    "name": "getDailySummary",
+    "description": "Daily user summary for one date (steps, calories, stress, body battery, resting HR), yyyy-MM-dd.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "description": "Date yyyy-MM-dd"
+        }
+      },
+      "required": ["date"]
+    }
+  },
+  {
+    "name": "getDashboardData",
+    "description": "All the data of the training dashboard in one call: HR zones, fitness age, the activities of the\nlast `weeks` weeks (compact summaries, with strength sets and laps where they apply), the activities\nof the weeks before for the period comparison, daily HRV, and the last 14 days of sleep and daily\nsummaries. Keeps a local cache and fetches from Garmin only what is new since the last call, so a\nrebuild or an update needs few calls. `sync` in the result says what was fetched.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "weeks": {
+          "type": "integer",
+          "description": "Weeks to cover, default 12, max 52"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "getFitnessAge",
+    "description": "Garmin fitness age for a date, yyyy-MM-dd: fitness age vs chronological age, the achievable\nfitness age, and its components (body fat, vigorous days and minutes per week, resting HR)\nwith the targets Garmin suggests.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "description": "Date yyyy-MM-dd"
+        }
+      },
+      "required": ["date"]
+    }
+  },
+  {
+    "name": "getHeartRateZones",
+    "description": "Heart rate zones currently configured in Garmin Connect.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "getHrvRange",
+    "description": "Daily HRV (overnight) summaries for a date range, yyyy-MM-dd.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "fromDate": {
+          "type": "string",
+          "description": "From date yyyy-MM-dd"
+        },
+        "toDate": {
+          "type": "string",
+          "description": "To date yyyy-MM-dd"
+        }
+      },
+      "required": ["fromDate", "toDate"]
+    }
+  },
+  {
+    "name": "getSleep",
+    "description": "Sleep data for one night, yyyy-MM-dd (the date of the morning you woke up).",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "description": "Date yyyy-MM-dd"
+        }
+      },
+      "required": ["date"]
+    }
+  },
+  {
+    "name": "listActivities",
+    "description": "List the user's Garmin activities (most recent first) as a compact summary: id, name, type,\nlocal start time, distance (km), moving duration, average pace, average/max heart rate,\ncadence, ascent; when Garmin has them: elapsed time (if longer than moving time), race flag,\nGarmin training load, aerobic/anaerobic training effect and label, seconds in HR zones 1-5,\ncalories, moderate/vigorous intensity minutes, body battery change, steps, swim SWOLF, pool\nlength, lengths and strokes, power, running form (stride, ground contact, vertical\noscillation and ratio), grade-adjusted pace, best efforts (1k, mile, 5k, 10k, half,\nmarathon) and run/walk segments. Dates are yyyy-MM-dd. Set raw=true for Garmin's full JSON.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "startDate": {
+          "type": "string",
+          "description": "Start date yyyy-MM-dd (optional)"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "End date yyyy-MM-dd (optional)"
+        },
+        "activityType": {
+          "type": "string",
+          "description": "Activity type key, e.g. running (optional)"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max number of activities, default 20"
+        },
+        "raw": {
+          "type": "boolean",
+          "description": "Return Garmin's raw JSON instead of the summary"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "writeDashboard",
+    "description": "Writes the training dashboard page (default <data-dir>/garmin-dashboard.html) with the data of the\nlast `weeks` weeks, and returns its path and a short digest of the data (totals, weekly sums, load,\nbest efforts, races, strength top sets, HRV, recovery, fitness age, sync) for the coach notes.\nAn existing page keeps all its code, layout and widgets: only its data is replaced. A page from an\nolder template gets the new template and keeps its layout and widgets. `layout` writes a new page\nfrom the template: `preset` (the default widgets) or `blank` (empty boards). `page` writes your own\npage code instead; it must contain /* garmin-data:start */null/* garmin-data:end */. A replaced\npage is kept as <file>.bak. `notes`: at most 5 plain-text coach notes; the server escapes them.",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "weeks": {
+          "type": "integer",
+          "description": "Weeks to cover, default 12, max 52"
+        },
+        "notes": {
+          "maxItems": 5,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Coach notes, plain text; without notes the page has none"
+        },
+        "layout": {
+          "type": "string",
+          "enum": ["preset", "blank"],
+          "description": "Write a new page from the template with this layout"
+        },
+        "page": {
+          "type": "string",
+          "description": "Your own page code, with an empty garmin-data block, instead of the template"
+        },
+        "path": {
+          "type": "string",
+          "description": "The .html file; relative paths are inside the data dir"
+        }
+      }
+    }
+  }
+]

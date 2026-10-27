@@ -2,29 +2,41 @@
   "name": "@indaco/garmin-personal-mcp",
   "version": "0.1.0",
   "description": "MCP server for the official Garmin Connect Personal API",
+  "homepage": "https://github.com/indaco/garmin-personal-mcp#readme",
+  "bugs": "https://github.com/indaco/garmin-personal-mcp/issues",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/indaco/garmin-personal-mcp.git"
+  },
   "bin": {
     "garmin-personal-mcp": "dist/index.js"
   },
   "files": [
     "dist",
-    "prompts"
+    "prompts",
+    "THIRD-PARTY-NOTICES.md"
   ],
   "type": "module",
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && node scripts/build-template.mjs && node scripts/third-party-notices.mjs",
     "test": "vitest run --passWithNoTests",
+    "test:page": "vitest run --config vitest.page.config.ts",
+    "guide": "UPDATE_DOCS=1 vitest run test/docs.test.ts",
     "lint": "oxlint --deny-warnings && oxfmt --check",
     "fmt": "oxfmt",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@garmin/fitsdk": "^21.218.0",
+    "@modelcontextprotocol/client": "^2.4.0",
     "@modelcontextprotocol/server": "^2.4.0",
     "@types/node": "^26.6.5",
+    "chart.js": "^4.6.1",
     "fflate": "^0.8.3",
     "oxfmt": "0.75.0",
     "oxlint": "^1.90.0",
+    "playwright-core": "^1.64.1",
     "tsdown": "^0.23.2",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5",
@@ -32,5 +44,6 @@
   },
   "engines": {
     "node": ">=22"
-  }
+  },
+  "packageManager": "pnpm@12.15.0"
 }

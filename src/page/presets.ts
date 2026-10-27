@@ -1,0 +1,95 @@
+import type { Instance, Span } from "./layout";
+
+/** The preset widgets of each board, in order, with their width in columns. */
+const PRESETS: Record<string, [widget: string, span: Span][]> = {
+  all: [
+    ["kpis", 3],
+    ["readiness", 2],
+    ["fitnessAge", 1],
+    ["periodComparison", 3],
+    ["records", 3],
+    ["weeklyVolume", 2],
+    ["intensityMinutes", 1],
+    ["loadSafety", 3],
+    ["calendar", 3],
+    ["loadVsRecovery", 3],
+    ["hrv", 1],
+    ["restingHr", 1],
+    ["sleep", 1],
+    ["sleepNeed", 1],
+    ["bedtime", 1],
+    ["bodyBattery", 1],
+    ["activities", 3],
+    ["coachNotes", 3],
+  ],
+  run: [
+    ["typeKpis", 3],
+    ["typeWeekly", 2],
+    ["hrZones", 1],
+    ["bestEfforts", 1],
+    ["races", 2],
+    ["aerobicFitness", 2],
+    ["intensityShare", 1],
+    ["runningForm", 3],
+    ["runWalk", 1],
+    ["trainingEffect", 2],
+    ["racePredictor", 1],
+    ["longRuns", 2],
+    ["activities", 3],
+  ],
+  strength: [
+    ["typeKpis", 3],
+    ["typeWeekly", 2],
+    ["hrZones", 1],
+    ["setsPerCategory", 2],
+    ["muscleBalance", 1],
+    ["exercises", 3],
+    ["strengthSessions", 3],
+  ],
+  walk: [
+    ["typeKpis", 3],
+    ["typeWeekly", 2],
+    ["hrZones", 1],
+    ["walkDetails", 2],
+    ["steps", 1],
+    ["activities", 3],
+  ],
+  hike: [
+    ["typeKpis", 3],
+    ["typeWeekly", 2],
+    ["hrZones", 1],
+    ["hikeVertical", 3],
+    ["activities", 3],
+  ],
+  bike: [
+    ["typeKpis", 3],
+    ["typeWeekly", 2],
+    ["hrZones", 1],
+    ["bikeDetails", 3],
+    ["activities", 3],
+  ],
+  swim: [
+    ["typeKpis", 3],
+    ["typeWeekly", 2],
+    ["hrZones", 1],
+    ["swimDetails", 3],
+    ["activities", 3],
+  ],
+  racket: [
+    ["typeKpis", 3],
+    ["typeWeekly", 2],
+    ["hrZones", 1],
+    ["racketDetails", 3],
+    ["activities", 3],
+  ],
+  other: [
+    ["typeKpis", 3],
+    ["typeWeekly", 2],
+    ["hrZones", 1],
+    ["activities", 3],
+  ],
+};
+
+export function preset(board: string): Instance[] {
+  return (PRESETS[board] ?? []).map(([widget, span]) => ({ id: widget, widget, span }));
+}

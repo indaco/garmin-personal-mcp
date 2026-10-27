@@ -1,0 +1,101 @@
+name: Bug Report
+description: Report a bug or an unexpected result in garmin-personal-mcp
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for the report. Fill in the form below.
+
+        **Do not paste your API key, your access token or personal health data.** Remove them from logs and tool output before you send the report.
+
+  - type: input
+    id: version
+    attributes:
+      label: Server version
+      description: The `serverInfo.version` from the test command in the README section "Problems and solutions".
+      placeholder: "e.g., 0.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: client
+    attributes:
+      label: MCP client
+      options:
+        - Claude Desktop
+        - Claude Code
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: How you run the server
+      options:
+        - npx
+        - From source (node dist/index.js)
+    validations:
+      required: true
+
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version and OS
+      description: Output of `node --version`, and your operating system.
+      placeholder: "e.g., v24.11.0, macOS 15.5"
+    validations:
+      required: true
+
+  - type: input
+    id: tool
+    attributes:
+      label: Tool or prompt
+      description: The tool or prompt that has the problem, if you know it.
+      placeholder: "e.g., getActivitySets, training-dashboard"
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: A short description of the bug.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Ask Claude "show the sets of my last strength workout"
+        2. Claude calls getActivitySets
+        3. See the error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server log
+      description: The related lines of `~/.cache/garmin-personal-mcp/garmin-personal-mcp.log`. Remove personal data first.
+      render: shell
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context

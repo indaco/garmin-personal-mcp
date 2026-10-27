@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check (Node ${{ matrix.node }})
+    # a fixed image: a move to a new Ubuntu is a change that we watch, not a surprise
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # the oldest supported Node (engines >=22, end of life 2027-04-30), 24, and the newest LTS
+        node: [22, 24, 26]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # reads the pnpm version from packageManager in package.json
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint and format check
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      # the dashboard page in headless Chromium, once: the page does not depend on the Node version.
+      # playwright-core in the lockfile picks the browser build; the cache keeps it between runs.
+      # The image has the system libraries already, so no apt download (--with-deps took 10 min once).
+      - name: Browser version
+        if: matrix.node == 26
+        id: browser
+        run: echo "playwright=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the Chromium headless shell
+        if: matrix.node == 26
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.browser.outputs.playwright }}
+
+      - name: Install the Chromium headless shell
+        if: matrix.node == 26
+        run: pnpm exec playwright-core install --only-shell chromium
+
+      - name: Page tests
+        if: matrix.node == 26
+        run: pnpm test:page
+
+      # stdout carries MCP messages only: one initialize request, one JSON line back
+      - name: Smoke test
+        run: |
+          out=$(echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+            | timeout 10 node dist/index.js)
+          test "$(printf '%s\n' "$out" | wc -l)" -eq 1
+          printf '%s' "$out" | node -e 'JSON.parse(require("fs").readFileSync(0, "utf8"))'
+
+      - name: Third-party notices are up to date
+        run: git diff --exit-code THIRD-PARTY-NOTICES.md
+
+      - name: Package contents
+        run: |
+          npm pack --dry-run --json | node -e '
+            const files = JSON.parse(require("fs").readFileSync(0, "utf8"))[0].files.map((f) => f.path);
+            const allowed = ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "package.json"];
+            const extra = files.filter((p) => !/^(dist|prompts)\//.test(p) && !allowed.includes(p));
+            if (extra.length) { console.error("unexpected files in the package:", extra); process.exit(1); }
+            if (!files.includes("dist/dashboard.html")) { console.error("the dashboard template is missing"); process.exit(1); }
+            console.log(`${files.length} files in the package`);
+          '

@@ -1,0 +1,51 @@
+[
+  {
+    "name": "dashboard-language",
+    "description": "Add a language to the training dashboard (Claude translates its texts)",
+    "arguments": [
+      {
+        "name": "language",
+        "description": "The language, e.g. German; empty = the language of this chat",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "dashboard-widget",
+    "description": "Make a new widget for the training dashboard from your idea",
+    "arguments": [
+      {
+        "name": "idea",
+        "description": "What the widget shows, e.g. my longest ride each month",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "training-dashboard",
+    "description": "Build a personal training + recovery dashboard (volume, load, HRV, sleep) from Garmin data",
+    "arguments": [
+      {
+        "name": "weeks",
+        "description": "Number of weeks to cover, default 12",
+        "required": false
+      },
+      {
+        "name": "layout",
+        "description": "preset (default): the built-in widgets; blank: an empty grid; freeform: Claude designs the whole page",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "training-dashboard-update",
+    "description": "Update the training dashboard with the new Garmin data; it keeps the layout, widgets and languages",
+    "arguments": [
+      {
+        "name": "weeks",
+        "description": "Weeks to cover; empty = keep the weeks of the dashboard",
+        "required": false
+      }
+    ]
+  }
+]

@@ -1,0 +1,125 @@
+# The training dashboard
+
+The training dashboard is one HTML file. It shows your training load next to HRV, sleep and resting
+heart rate. The server writes the file, and Claude writes the coach notes.
+
+- [Make the dashboard](#make-the-dashboard)
+- [Update the dashboard](#update-the-dashboard)
+- [Boards and widgets](#boards-and-widgets)
+- [Change the layout](#change-the-layout)
+- [Themes and languages](#themes-and-languages)
+- [How the page keeps your changes](#how-the-page-keeps-your-changes)
+
+## Make the dashboard
+
+Run the `training-dashboard` prompt. It has two optional arguments:
+
+| Argument | Values                          | Default  |
+| -------- | ------------------------------- | -------- |
+| `weeks`  | 1 to 52                         | 12       |
+| `layout` | `preset`, `blank` or `freeform` | `preset` |
+
+| Layout     | What you get                                                                                                               |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `preset`   | The built-in widgets on each board, in a fixed order. A build takes less than a minute.                                    |
+| `blank`    | An empty grid on each board. You add the widgets that you want.                                                            |
+| `freeform` | Claude designs the whole page from a long description. A build can take 25 minutes or more, and each page looks different. |
+
+With `preset` and `blank`, Claude does not write the page. The server writes the page from its
+template, and Claude writes only the coach notes. The page is the same in Claude Code and Claude
+Desktop.
+
+The server writes `garmin-dashboard.html` in the data folder. Claude gives you the path and the
+command to open the file. An existing page stays as `garmin-dashboard.html.bak`. To write the page in
+a different place, ask Claude for a path. A relative path is in the data folder.
+
+The page works offline. It has Chart.js inside, and it sends no requests.
+
+## Update the dashboard
+
+Run the `training-dashboard-update` prompt. The server replaces only the data and the coach notes.
+Your layout, your custom widgets and your languages stay. Leave `weeks` empty to keep the weeks of
+the page.
+
+When a new version of the server has a newer page template, the update writes the new template. It
+keeps your layout, custom widgets and languages, and it keeps the old page as a `.bak` file.
+
+Reload the page in the browser to see the new data.
+
+## Boards and widgets
+
+Each tab is a board: a grid of widgets with up to 3 columns. A board has 2 columns on a tablet and 1
+column on a phone. Each widget is 1, 2 or 3 columns wide.
+
+The All board shows all types. Each type board shows one group of sports. The Run, Strength, Walk,
+Bike and Racket sports tabs are always there. The Hike, Swim and Other tabs show only when you have
+activities of that group.
+
+| Group         | Garmin types                                                                                                          |
+| ------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Run           | every type that ends in `running`                                                                                     |
+| Strength      | every type with `strength`                                                                                            |
+| Walk          | `walking`, `casual_walking`, `speed_walking`                                                                          |
+| Hike          | `hiking`, `mountaineering`                                                                                            |
+| Bike          | every type with `cycling` or `biking`, and `virtual_ride`                                                             |
+| Swim          | every type with `swimming`                                                                                            |
+| Racket sports | `tennis`, `paddelball` (padel), `pickleball`, `racquetball`, `squash`, `badminton`, `table_tennis`, `platform_tennis` |
+| Other         | all other types                                                                                                       |
+
+[The widget catalogue](widgets.md) lists every widget, with what it shows and how it calculates.
+
+Above the boards:
+
+- **The week window**: the last 4, 8 or 12 weeks, all the weeks, or a first and a last week. Every
+  widget about training follows the window. The widgets about today do not follow it: readiness,
+  fitness age and the 14-day recovery widgets.
+- **The type chips** on the All board: a click on a type shows only that type. A second click, or a
+  click on _All_, shows all types again. The load ratio always uses all activities.
+
+The URL keeps the board, the window and an open exercise. A reload or a shared link opens the same
+view.
+
+## Change the layout
+
+Select **Edit layout**. Each widget then has these controls:
+
+| Control | Action                                                              |
+| ------- | ------------------------------------------------------------------- |
+| ⠿       | Drag the widget to a new place. This works with touch too.          |
+| ← and → | Move the widget one place earlier or later.                         |
+| 1, 2, 3 | Set the width in columns.                                           |
+| ◉ and ◌ | Hide the widget, or show it again. A hidden widget keeps its place. |
+| ✕       | Remove the widget.                                                  |
+
+Above the board:
+
+- **Add widget** opens the catalogue: the built-in widgets, your custom widgets and the hidden
+  widgets of the board.
+- **Reset to preset** puts the preset widgets back on the board.
+- **Copy layout** gives the layout as text.
+
+Select **Done** to see the board.
+
+You can also ask Claude to change the layout, for example "hide the bedtime widget and move HRV to
+the top". Claude uses the `editDashboard` tool.
+
+To make your own widget, see [Custom widgets](custom-widgets.md).
+
+## Themes and languages
+
+The **Theme** menu has 11 themes: System, five dark themes, three light themes and two
+high-contrast themes. Midnight is the default.
+
+The **Language** menu has English, Italian and the languages that you add. _Auto_ follows the
+language of the browser. [Languages](languages.md) tells how to add a language.
+
+## How the page keeps your changes
+
+The page keeps its state in four blocks of the file: the data, the layout, the custom widgets and the
+languages. An update replaces only the data block.
+
+The browser saves a layout change at once, but only in that browser. To keep the layout in the page,
+select **Copy layout** and give the text to Claude. Claude saves it with `editDashboard`. When Claude
+saves a layout, the page layout replaces the layout that the browser saved.
+
+The choice of theme and language stays in the browser.
