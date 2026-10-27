@@ -4,5 +4,6 @@ import "./notes";
 import "./overview";
 import "./recovery";
 import "./run";
+import "./strength";
 import "./types";
 import "./volume";

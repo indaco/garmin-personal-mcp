@@ -750,3 +750,95 @@ table.data .num {
   color: var(--muted);
   margin: 0 0 4px;
 }
+.ex-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.search {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 10px;
+  color: var(--text);
+  font: inherit;
+  min-width: 200px;
+}
+.sort {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.group-row th {
+  text-align: left;
+  color: var(--muted);
+  background: var(--panel2);
+  font-weight: 500;
+}
+.ex-row {
+  cursor: pointer;
+}
+.ex-row:hover,
+.ex-row.selected {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.spark {
+  width: 80px;
+  height: 20px;
+  fill: none;
+  stroke: var(--strength);
+  stroke-width: 1.5;
+}
+.detail {
+  margin-top: 12px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 12px;
+}
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.detail-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.detail-head .tool {
+  margin-left: auto;
+}
+.ex-sessions {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+.ex-sessions > li {
+  margin: 6px 0;
+}
+/* the sets of a session on one wrapping line: "62.5 × 10 (62%) · rest 1:25" */
+.sets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--muted);
+}
+.not-done {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.session {
+  border-bottom: 1px solid var(--line);
+  padding: 6px 0;
+}
+.session summary {
+  cursor: pointer;
+}

@@ -424,3 +424,77 @@ describe("type boards", () => {
     expect(await page.textContent("[data-id=typeKpis]")).toContain("One session so far");
   });
 });
+
+const rows = (page: Page) =>
+  page.$$eval(".ex-row", (r) => r.map((x) => x.firstElementChild!.textContent));
+
+describe("strength board", () => {
+  it("shows the Strength widgets", async () => {
+    const { page, errors } = await open(browser, pageFile(), { hash: "#strength" });
+    expect(await tiles(page)).toEqual([
+      "typeKpis",
+      "typeWeekly",
+      "hrZones",
+      "setsPerCategory",
+      "muscleBalance",
+      "exercises",
+      "strengthSessions",
+    ]);
+    expect(await rows(page)).toHaveLength(9);
+    expect(await page.textContent("[data-id=muscleBalance]")).toMatch(
+      /Push : pull sets\s*[\d.]+ : 1/,
+    );
+    expect(errors).toEqual([]);
+  });
+
+  it("searches, filters by group, and a second click on the chip shows all groups", async () => {
+    const { page } = await open(browser, pageFile(), { hash: "#strength" });
+    await page.fill(".search", "squat");
+    expect(await rows(page)).toEqual(["Barbell Back Squat"]);
+    await page.fill(".search", "");
+    await page.click("[data-id=exercises] .chips >> text=Shoulders");
+    expect(await rows(page)).toEqual(["Dumbbell Shoulder Press"]);
+    await page.click("[data-id=exercises] .chips >> text=Shoulders");
+    expect(await rows(page)).toHaveLength(9);
+  });
+
+  it("sorts by a column, and a second click turns the order", async () => {
+    const { page } = await open(browser, pageFile(), { hash: "#strength" });
+    const sort = () => page.getAttribute("[data-id=exercises] th[aria-sort]", "aria-sort");
+    await page.click("[data-id=exercises] .sort >> text=Best est. 1RM");
+    expect(await sort()).toBe("descending");
+    await page.click("[data-id=exercises] .sort >> text=Best est. 1RM");
+    expect(await sort()).toBe("ascending");
+  });
+
+  it("opens an exercise with a click or Enter, keeps it in the hash, and closes it with a second click", async () => {
+    const file = pageFile();
+    const { page, errors } = await open(browser, file, { hash: "#strength" });
+    await page.click("[data-exercise=barbell-back-squat]");
+    expect(await hash(page)).toMatch(/^#strength@.+\/barbell-back-squat$/);
+    expect(await page.textContent(".detail h3")).toBe("Barbell Back Squat");
+    expect(await page.$$eval(".detail .ex-sessions > li", (l) => l.length)).toBe(12);
+    expect(await chartsWithoutTooltip(page)).toEqual([]);
+    await page.click("[data-exercise=barbell-back-squat]");
+    expect(await page.$(".detail")).toBeNull();
+
+    await page.focus("[data-exercise=plank]");
+    await page.keyboard.press("Enter");
+    expect(await page.textContent(".detail h3")).toBe("Plank");
+
+    const again = await open(browser, file, {
+      hash: "#strength@2026-08-03_2026-10-26/lat-pulldown",
+    });
+    expect(await again.page.textContent(".detail h3")).toBe("Lat Pulldown");
+    expect(errors).toEqual([]);
+  });
+
+  it("opens and closes a session", async () => {
+    const { page } = await open(browser, pageFile(), { hash: "#strength" });
+    const first = "[data-id=strengthSessions] details >> nth=0";
+    await page.click(`${first} >> summary`);
+    expect(await page.getAttribute(first, "open")).toBe("");
+    await page.click(`${first} >> summary`);
+    expect(await page.getAttribute(first, "open")).toBeNull();
+  });
+});

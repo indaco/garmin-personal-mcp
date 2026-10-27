@@ -16,8 +16,16 @@ export function pickLang(choice: string, browser: readonly string[]): string {
 
 export function translator(lang: string): T {
   const c = CATALOGUES[lang] ?? en;
-  return (key, params = {}) =>
-    (c[key] ?? en[key]).replace(/\{(\w+)\}/g, (m, name: string) => String(params[name] ?? m));
+  const plural = new Intl.PluralRules(lang);
+  return (key, params = {}) => {
+    let text: string = c[key] ?? en[key];
+    // "{n} session|{n} sessions": the singular form, then the plural one, chosen by n
+    if (text.includes("|") && typeof params.n === "number") {
+      const [one, other] = text.split("|");
+      text = plural.select(params.n) === "one" ? one : other;
+    }
+    return text.replace(/\{(\w+)\}/g, (m, name: string) => String(params[name] ?? m));
+  };
 }
 
 export type Fmt = ReturnType<typeof formatter>;

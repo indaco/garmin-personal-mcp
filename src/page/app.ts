@@ -1,6 +1,7 @@
 import * as calc from "./calc";
 import * as metrics from "./metrics";
 import * as running from "./running";
+import * as strength from "./strength";
 import { type Activity, activitiesIn, type Group, GROUPS, groupOf, weeksOf } from "./calc";
 import { Chart, chart, destroyCharts, themeCharts } from "./charts";
 import { h } from "./dom";
@@ -397,7 +398,7 @@ function ctxFor(data: Data, inst: Instance): Ctx {
     lang,
     t,
     fmt,
-    calc: { ...calc, ...metrics, ...running },
+    calc: { ...calc, ...metrics, ...running, ...strength },
     chart,
     color: token,
     empty: (el, message) =>

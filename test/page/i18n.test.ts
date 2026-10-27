@@ -36,6 +36,19 @@ describe("translator", () => {
   });
 });
 
+describe("plurals", () => {
+  it("picks the singular or plural form of a text with {n}", () => {
+    expect(translator("en")("kpi.totals", { km: "5", time: "1h", n: 1 })).toBe(
+      "5 km · 1h · 1 session",
+    );
+    expect(translator("en")("kpi.totals", { km: "5", time: "1h", n: 2 })).toBe(
+      "5 km · 1h · 2 sessions",
+    );
+    expect(translator("it")("ss.count", { n: 1 })).toBe("1 esercizio");
+    expect(translator("it")("ss.count", { n: 3 })).toBe("3 esercizi");
+  });
+});
+
 describe("formatter", () => {
   it("formats numbers and dates in the page language", () => {
     expect(formatter("en").num(1234.5, 1)).toBe("1,234.5");

@@ -1,0 +1,158 @@
+import { describe, expect, it } from "vitest";
+import {
+  completed,
+  exerciseStats,
+  muscleGroup,
+  muscleSets,
+  pushPull,
+  setsByCategory,
+  slug,
+} from "../../src/page/strength";
+
+const squat = (sets: Record<string, number>[]) => ({
+  exercise: "Back Squat",
+  category: "Squat",
+  primaryMuscles: ["Quads"],
+  secondaryMuscles: ["Glutes", "Lower Back"],
+  sets,
+});
+const plank = {
+  exercise: "Plank",
+  category: "Plank",
+  primaryMuscles: ["Abs"],
+  sets: [{ seconds: 60 }, { seconds: 45 }],
+};
+const pushUp = {
+  exercise: "Push Up",
+  category: "Push Up",
+  primaryMuscles: ["Chest"],
+  secondaryMuscles: ["Triceps"],
+  sets: [{ reps: 20 }, { reps: 15 }],
+};
+const acts = [
+  {
+    id: 2,
+    name: "Strength B",
+    type: "strength_training",
+    start: "2026-10-22 18:00:00",
+    exercises: [
+      squat([
+        { reps: 8, kg: 60, restSec: 90 },
+        { reps: 0, kg: 80 },
+        { reps: 6, kg: 70, restSec: 120 },
+      ]),
+      plank,
+    ],
+  },
+  {
+    id: 1,
+    name: "Strength A",
+    type: "strength_training",
+    start: "2026-10-15 18:00:00",
+    exercises: [squat([{ reps: 8, kg: 55, restSec: 60 }]), pushUp],
+  },
+];
+
+describe("sets", () => {
+  it("counts a set as done when it has reps, or time without reps", () => {
+    expect(completed({ reps: 8, kg: 60 })).toBe(true);
+    expect(completed({ reps: 0, kg: 80 })).toBe(false);
+    expect(completed({ seconds: 60 })).toBe(true);
+    expect(completed({})).toBe(false);
+  });
+});
+
+describe("muscle groups", () => {
+  it.each([
+    ["Chest", "chest"],
+    ["Lats", "back"],
+    ["Traps", "back"],
+    ["Lower Back", "back"],
+    ["Shoulders", "shoulders"],
+    ["Forearm", "forearms"],
+    ["Obliques", "abs"],
+    ["Adductors", "hips"],
+    ["Hamstrings", "hamstrings"],
+    ["Neck", "other"],
+  ])("%s is %s", (muscle, group) => {
+    expect(muscleGroup(muscle)).toBe(group);
+  });
+
+  it("counts a set 1 for each primary group and 0.5 for each secondary group", () => {
+    const sets = muscleSets(acts, ["2026-10-12", "2026-10-19"]);
+    // week of 12 Oct: squat 1 set (quads 1; glutes and back 0.5), push up 2 sets (chest 2, triceps 1)
+    expect(sets.quads).toEqual([1, 2]);
+    expect(sets.glutes).toEqual([0.5, 1]);
+    expect(sets.back).toEqual([0.5, 1]);
+    expect(sets.chest).toEqual([2, 0]);
+    expect(sets.triceps).toEqual([1, 0]);
+    expect(sets.abs).toEqual([0, 2]);
+  });
+
+  it("gives push against pull sets", () => {
+    expect(pushPull({ chest: [2], shoulders: [1], triceps: [1], back: [2], biceps: [0] })).toBe(2);
+    expect(pushPull({ chest: [2] })).toBeNull();
+  });
+});
+
+describe("categories", () => {
+  it("counts completed sets of each movement category per week", () => {
+    expect(setsByCategory(acts, ["2026-10-12", "2026-10-19"])).toEqual({
+      Squat: [1, 2],
+      "Push Up": [2, 0],
+      Plank: [0, 2],
+    });
+  });
+});
+
+describe("exercise stats", () => {
+  const stats = exerciseStats(acts);
+
+  it("gives the top set, volume and estimated 1RM of each session, oldest first", () => {
+    const s = stats.find((x) => x.name === "Back Squat")!;
+    expect(s.kind).toBe("weight");
+    expect(s.muscle).toBe("quads");
+    expect(s.sessions.map((x) => [x.date, x.top, x.volume])).toEqual([
+      ["2026-10-15", { kg: 55, reps: 8 }, 440],
+      ["2026-10-22", { kg: 70, reps: 6 }, 900],
+    ]);
+    expect(s.sessions[1].e1rm).toBe(84);
+    expect(s.best1rm).toBe(84);
+    // the top set and the 1RM from the first to the last session
+    expect(s.change).toBeCloseTo(((84 - 55 * (1 + 8 / 30)) / (55 * (1 + 8 / 30))) * 100, 6);
+    expect(s.medianRest).toBe(90);
+  });
+
+  it("uses reps for exercises without weight, and seconds for timed ones", () => {
+    const push = stats.find((x) => x.name === "Push Up")!;
+    expect(push.kind).toBe("reps");
+    expect(push.sessions[0]).toMatchObject({ maxReps: 20, reps: 35 });
+    const p = stats.find((x) => x.name === "Plank")!;
+    expect(p.kind).toBe("time");
+    expect(p.sessions[0].longest).toBe(60);
+  });
+
+  it("counts sets of 1 rep with a time as timed, as the watch records a plank", () => {
+    const timed = exerciseStats([
+      {
+        start: "2026-10-01 18:00:00",
+        exercises: [
+          {
+            exercise: "Plank",
+            sets: [
+              { reps: 1, seconds: 45 },
+              { reps: 1, seconds: 50 },
+            ],
+          },
+        ],
+      },
+    ])[0];
+    expect(timed.kind).toBe("time");
+    expect(timed.sessions[0].longest).toBe(50);
+  });
+
+  it("makes a URL name of the exercise", () => {
+    expect(slug("Barbell Back Squat")).toBe("barbell-back-squat");
+    expect(slug("Pull-Up (Assisted)")).toBe("pull-up-assisted");
+  });
+});
