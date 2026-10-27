@@ -1,13 +1,16 @@
 import { addDays } from "../../dates";
-import { type Activity, type Group, groupOf, mondayOf, sessionSeconds } from "../calc";
+import { type Activity, groupOf, sportName, mondayOf, sessionSeconds } from "../calc";
 import { h } from "../dom";
-import type { Key } from "../i18n";
+import { en } from "../i18n/en";
+import type { Key, T } from "../i18n";
 import { icon } from "../icons";
 import type { Ctx } from "../registry";
 
 /** Small building blocks that the built-in widgets share. */
 
-export const groupKey = (g: string) => `type.${g}` as Key;
+/** The name of a board: its text, or the SDK sport's name for a sport without one. */
+export const typeName = (t: T, g: string) =>
+  `type.${g}` in en ? t(`type.${g}` as Key) : sportName(g);
 
 /** A KPI tile: label, big value, and an optional line under it. */
 export function kpi(
@@ -57,8 +60,8 @@ export function table(
 
 /** The type of an activity with its icon (decorative) and label. */
 export function typeCell(ctx: Ctx, a: Activity): HTMLElement {
-  const g = groupOf(a.type ?? "");
-  return h("span", { class: `type type-${g}` }, icon(g), ctx.t(groupKey(g)));
+  const g = groupOf(a);
+  return h("span", { class: `type type-${g}` }, icon(g), typeName(ctx.t, g));
 }
 
 /** A week label; the last week is marked with * while it is in progress. */
@@ -84,11 +87,11 @@ export function between(
   acts: Activity[],
   from: string,
   to: string,
-  type: "all" | Group = "all",
+  type: string = "all",
 ): Activity[] {
   return acts.filter((a) => {
     const d = typeof a.start === "string" ? a.start.slice(0, 10) : "";
-    return d >= from && d <= to && (type === "all" || groupOf(a.type ?? "") === type);
+    return d >= from && d <= to && (type === "all" || groupOf(a) === type);
   });
 }
 

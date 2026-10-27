@@ -20,7 +20,9 @@ describe("sport numbers", () => {
   });
 
   it("gives a value per hour of session time", () => {
-    expect(perHour(900, { type: "paddelball", duration: "30:00", elapsed: "1:30:00" })).toBe(600);
+    expect(
+      perHour(900, { type: "paddelball", sport: "racket", duration: "30:00", elapsed: "1:30:00" }),
+    ).toBe(600);
   });
 
   it("gives the share of zone time in some zones", () => {
@@ -30,9 +32,9 @@ describe("sport numbers", () => {
 
   it("gives the average load per minute of the runs", () => {
     const runs = [
-      { type: "running", duration: "30:00", trainingLoad: 60 },
-      { type: "running", duration: "60:00", trainingLoad: 90 },
-      { type: "walking", duration: "60:00", trainingLoad: 10 },
+      { type: "running", sport: "running", duration: "30:00", trainingLoad: 60 },
+      { type: "running", sport: "running", duration: "60:00", trainingLoad: 90 },
+      { type: "walking", sport: "walking", duration: "60:00", trainingLoad: 10 },
     ];
     // (60 + 90) / 90 min
     expect(runLoadPerMinute(runs)).toBeCloseTo(150 / 90, 6);

@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { GROUPS } from "../src/page/calc";
 import { CATALOGUE } from "../src/page/catalogue";
 import { ABOUT } from "../src/page/catalogue-about";
 import { en } from "../src/page/i18n/en";
@@ -11,7 +12,7 @@ import { WIDGET_API } from "../src/page/widget-api";
  * not current, so the guide never drifts from the widgets and the texts.
  */
 
-const BOARDS = ["all", "run", "strength", "walk", "hike", "bike", "swim", "racket", "other"];
+const BOARDS = ["all", ...GROUPS];
 const cell = (s: string) => s.replaceAll("|", "\\|").replaceAll("\n", " ");
 
 /** The types of a widget for the table: every type in short, or a list. */

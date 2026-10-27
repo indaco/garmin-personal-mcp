@@ -7,39 +7,45 @@ import {
   mondayOf,
   seconds,
   sessionSeconds,
+  sportName,
   sportOf,
   weeksOf,
 } from "../../src/page/calc";
 import { formatHash, parseHash } from "../../src/page/state";
 
 describe("activity types", () => {
+  // [Garmin type key, SDK sport from sportTypeId, board]
   it.each([
-    ["running", "run"],
-    ["trail_running", "run"],
-    ["treadmill_running", "run"],
-    ["strength_training", "strength"],
-    ["walking", "walk"],
-    ["casual_walking", "walk"],
-    ["hiking", "hike"],
-    ["mountaineering", "hike"],
-    ["road_biking", "bike"],
-    ["indoor_cycling", "bike"],
-    ["virtual_ride", "bike"],
-    ["lap_swimming", "swim"],
-    ["open_water_swimming", "swim"],
-    ["paddelball", "racket"],
-    ["padel", "racket"],
-    ["tennis", "racket"],
-    ["pickleball", "racket"],
-    ["racquetball", "racket"],
-    ["squash", "racket"],
-    ["badminton", "racket"],
-    ["table_tennis", "racket"],
-    ["platform_tennis", "racket"],
-    ["yoga", "other"],
-    ["", "other"],
-  ])("%s is %s", (key, group) => {
-    expect(groupOf(key)).toBe(group);
+    ["running", "running", "running"],
+    ["trail_running", "running", "running"],
+    ["treadmill_running", "running", "running"],
+    ["strength_training", "training", "strengthTraining"],
+    ["strength_training", "fitnessEquipment", "strengthTraining"],
+    ["strength_training", undefined, "strengthTraining"],
+    ["walking", "walking", "walking"],
+    ["hiking", "hiking", "hiking"],
+    ["cycling", "cycling", "cycling"],
+    ["mountain_biking", "cycling", "cycling"],
+    ["lap_swimming", "swimming", "swimming"],
+    ["paddelball", "racket", "racket"],
+    ["tennis", "racket", "racket"],
+    ["pickleball", "hiit", "racket"],
+    ["pickleball", undefined, "racket"],
+    ["resort_skiing", "alpineSkiing", "alpineSkiing"],
+    ["yoga", undefined, "generic"],
+    ["running", undefined, "generic"],
+    ["running", "all", "generic"],
+    ["", "", "generic"],
+  ])("%s with the sport %s is on the %s board", (type, sport, board) => {
+    expect(groupOf({ type, sport })).toBe(board);
+  });
+
+  it.each([
+    ["alpineSkiing", "Alpine skiing"],
+    ["mixedMartialArts", "Mixed martial arts"],
+    ["hiit", "Hiit"],
+  ])("names the board of the SDK sport %s", (sport, name) => {
+    expect(sportName(sport)).toBe(name);
   });
 
   it("names the sport of a racket type", () => {
@@ -71,10 +77,17 @@ describe("time", () => {
     expect(
       sessionSeconds({ type: "strength_training", duration: "10:00", elapsed: "1:00:00" }),
     ).toBe(3600);
-    expect(sessionSeconds({ type: "paddelball", duration: "20:00", elapsed: "1:30:00" })).toBe(
-      5400,
-    );
-    expect(sessionSeconds({ type: "tennis", duration: "20:00", elapsed: "1:00:00" })).toBe(3600);
+    expect(
+      sessionSeconds({
+        type: "paddelball",
+        sport: "racket",
+        duration: "20:00",
+        elapsed: "1:30:00",
+      }),
+    ).toBe(5400);
+    expect(
+      sessionSeconds({ type: "tennis", sport: "racket", duration: "20:00", elapsed: "1:00:00" }),
+    ).toBe(3600);
     expect(sessionSeconds({ type: "running", duration: "30:00", elapsed: "31:30" })).toBe(1800);
     expect(sessionSeconds({ type: "strength_training", duration: "40:00" })).toBe(2400);
   });
@@ -108,17 +121,17 @@ describe("time", () => {
 });
 
 describe("URL hash", () => {
-  const tabs = ["all", "run", "strength"];
+  const tabs = ["all", "running", "strengthTraining", "alpineSkiing"];
   const weeks = ["2026-10-05", "2026-10-12", "2026-10-19"];
 
   it("reads tab, window and item", () => {
-    expect(parseHash("#run@2026-10-12_2026-10-19", tabs, weeks)).toEqual({
-      tab: "run",
+    expect(parseHash("#running@2026-10-12_2026-10-19", tabs, weeks)).toEqual({
+      tab: "running",
       from: "2026-10-12",
       to: "2026-10-19",
     });
-    expect(parseHash("#strength/back-squat", tabs, weeks)).toEqual({
-      tab: "strength",
+    expect(parseHash("#strengthTraining/back-squat", tabs, weeks)).toEqual({
+      tab: "strengthTraining",
       from: "2026-10-05",
       to: "2026-10-19",
       item: "back-squat",
@@ -128,12 +141,15 @@ describe("URL hash", () => {
   it("falls back to the All tab and every week", () => {
     const all = { tab: "all", from: "2026-10-05", to: "2026-10-19" };
     expect(parseHash("", tabs, weeks)).toEqual(all);
-    expect(parseHash("#swim@1999-01-04_2026-10-19", tabs, weeks)).toEqual(all);
-    expect(parseHash("#run@2026-10-19_2026-10-05", tabs, weeks)).toEqual({ ...all, tab: "run" });
+    expect(parseHash("#swimming@1999-01-04_2026-10-19", tabs, weeks)).toEqual(all);
+    expect(parseHash("#running@2026-10-19_2026-10-05", tabs, weeks)).toEqual({
+      ...all,
+      tab: "running",
+    });
   });
 
   it("writes the hash that it reads", () => {
-    const s = { tab: "run", from: "2026-10-12", to: "2026-10-19", item: "x" };
+    const s = { tab: "alpineSkiing", from: "2026-10-12", to: "2026-10-19", item: "x" };
     expect(parseHash(formatHash(s), tabs, weeks)).toEqual(s);
     expect(formatHash({ tab: "all", from: "2026-10-05", to: "2026-10-19" })).toBe(
       "#all@2026-10-05_2026-10-19",

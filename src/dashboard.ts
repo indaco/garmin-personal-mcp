@@ -96,6 +96,15 @@ export class GarminDashboard {
 
   async #syncActivities(cache: Json, from: string, to: string, sync: Sync): Promise<void> {
     const byId = objectAt(cache, "activities");
+    // rows written before the sport field, or by another server: fetch the activities again.
+    // shortcut: a row that Garmin sends without sportTypeId repeats this on every call; mark rows if that happens
+    if (
+      Object.values(byId).some((a) => isObject(a) && a.type !== undefined && a.sport === undefined)
+    ) {
+      for (const id of Object.keys(byId)) delete byId[id];
+      delete cache.activitiesFrom;
+      delete cache.activitiesTo;
+    }
     const cachedFrom = date(cache.activitiesFrom);
     const cachedTo = date(cache.activitiesTo);
     for (const [rFrom, rTo] of toFetch(cachedFrom, cachedTo, from, to)) {

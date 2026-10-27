@@ -75,8 +75,8 @@ describe("edits", () => {
     const one = add(board, "hrv", { span: 2 });
     expect(one.at(-1)).toEqual({ id: "hrv-2", widget: "hrv", span: 2 });
     expect(add(one, "hrv", {}).at(-1)?.id).toBe("hrv-3");
-    expect(add([], "weeklyVolume", { type: "run" })).toEqual([
-      { id: "weeklyVolume", widget: "weeklyVolume", type: "run", span: 1 },
+    expect(add([], "weeklyVolume", { type: "running" })).toEqual([
+      { id: "weeklyVolume", widget: "weeklyVolume", type: "running", span: 1 },
     ]);
   });
 

@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
+import { Profile } from "@garmin/fitsdk";
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { type GarminApiClient, GarminApiError } from "./api-client";
@@ -172,6 +173,8 @@ export class GarminTools {
 
 // ------------------------------------------------------------------ summary
 
+const SPORTS = Profile.types.sport as Record<number, string | undefined>;
+
 /** The compact activity summary of listActivities and the dashboard. */
 export function summarize(a: Json): Json {
   const o: Json = {};
@@ -180,6 +183,11 @@ export function summarize(a: Json): Json {
   const typeKey = asString(field(a.activityType, "typeKey"));
   if (typeKey !== null) {
     o.type = typeKey;
+  }
+  // Garmin's sport number is the SDK sport: its name picks the dashboard board
+  const sport = Number.isInteger(a.sportTypeId) ? SPORTS[a.sportTypeId as number] : undefined;
+  if (sport !== undefined) {
+    o.sport = sport;
   }
   copy(a, o, "startTimeLocal", "start");
   const distM = asDouble(a.distance, 0);

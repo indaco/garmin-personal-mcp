@@ -43,7 +43,7 @@ register({
             {
               label: t("af.weekPace"),
               data: pace,
-              borderColor: ctx.color(ctx.type === "hike" ? "hike" : "walk"),
+              borderColor: ctx.color(ctx.type === "hiking" ? "hiking" : "walking"),
               yAxisID: "y",
               spanGaps: true,
             },
@@ -116,7 +116,7 @@ register({
             type: "bar",
             label: t("wd.steps"),
             data: series("steps"),
-            backgroundColor: ctx.color("walk"),
+            backgroundColor: ctx.color("walking"),
             yAxisID: "y",
           },
           {
@@ -132,7 +132,7 @@ register({
             type: "line",
             label: t("wd.floors"),
             data: series("floors"),
-            borderColor: ctx.color("hike"),
+            borderColor: ctx.color("hiking"),
             yAxisID: "y1",
             spanGaps: true,
           },
@@ -210,7 +210,7 @@ register({
                   const h = w.reduce((s, a) => s + seconds(a.duration), 0) / 3600;
                   return h > 0 ? km / h : null;
                 }),
-                borderColor: ctx.color("bike"),
+                borderColor: ctx.color("cycling"),
                 yAxisID: "y",
                 spanGaps: true,
               },
@@ -218,7 +218,7 @@ register({
                 type: "bar",
                 label: t("lr.ascent"),
                 data: weekly.map((w) => w.reduce((s, a) => s + (num(a.ascentM) ?? 0), 0)),
-                backgroundColor: `${ctx.color("hike")}88`,
+                backgroundColor: `${ctx.color("hiking")}88`,
                 yAxisID: "y1",
               },
             ],

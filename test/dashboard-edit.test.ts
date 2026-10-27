@@ -76,20 +76,29 @@ describe("editDashboard", () => {
   });
 
   it("places a widget at the end of a board that still shows its preset", async () => {
-    await writer.edit({ place: [{ board: "run", widget: "weeklyVolume", span: 2 }] });
-    const run = layout().boards.run as { widget: string }[];
+    await writer.edit({ place: [{ board: "running", widget: "weeklyVolume", span: 2 }] });
+    const run = layout().boards.running as { widget: string }[];
     expect(run.at(0)).toMatchObject({ widget: "typeKpis" });
     expect(run.at(-1)).toEqual({ id: "weeklyVolume", widget: "weeklyVolume", span: 2 });
+  });
+
+  it("places a widget on the board of any SDK sport", async () => {
+    await writer.edit({
+      widgets: [{ ...widget, types: ["alpineSkiing"] }],
+      place: [{ board: "alpineSkiing", widget: "typeKpis" }],
+    });
+    expect(layout().boards.alpineSkiing.at(-1)).toMatchObject({ widget: "typeKpis" });
+    expect(readBlock(page(), "widgets")).toMatchObject([{ types: ["alpineSkiing"] }]);
   });
 
   it("adds, replaces and removes a custom widget, also from the boards", async () => {
     await writer.edit({ widgets: [widget], place: [{ board: "all", widget: "longest-ride" }] });
     expect(readBlock(page(), "widgets")).toEqual([{ ...widget, span: 1 }]);
     await writer.edit({
-      widgets: [{ ...widget, title: "Longest ride ever", span: 2, types: ["bike"] }],
+      widgets: [{ ...widget, title: "Longest ride ever", span: 2, types: ["cycling"] }],
     });
     expect(readBlock(page(), "widgets")).toEqual([
-      { ...widget, title: "Longest ride ever", span: 2, types: ["bike"] },
+      { ...widget, title: "Longest ride ever", span: 2, types: ["cycling"] },
     ]);
     await writer.edit({ removeWidgets: ["longest-ride"] });
     expect(readBlock(page(), "widgets")).toEqual([]);

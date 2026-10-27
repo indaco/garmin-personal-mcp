@@ -76,14 +76,14 @@
 
 /* Bright type colours for the dark themes. */
 :root {
-  --run: #ff7a45;
-  --strength: #a78bfa;
-  --walk: #34d399;
-  --hike: #a3e635;
-  --bike: #60a5fa;
-  --swim: #22d3ee;
+  --running: #ff7a45;
+  --strengthTraining: #a78bfa;
+  --walking: #34d399;
+  --hiking: #a3e635;
+  --cycling: #60a5fa;
+  --swimming: #22d3ee;
   --racket: #fbbf24;
-  --other: #94a3b8;
+  --generic: #94a3b8;
   color-scheme: dark;
 }
 
@@ -155,26 +155,26 @@
 :root[data-theme="paper"],
 :root[data-theme="mist"],
 :root[data-theme="hcLight"] {
-  --run: #c2410c;
-  --strength: #6d28d9;
-  --walk: #047857;
-  --hike: #4d7c0f;
-  --bike: #1d4ed8;
-  --swim: #0e7490;
+  --running: #c2410c;
+  --strengthTraining: #6d28d9;
+  --walking: #047857;
+  --hiking: #4d7c0f;
+  --cycling: #1d4ed8;
+  --swimming: #0e7490;
   --racket: #a16207;
-  --other: #475569;
+  --generic: #475569;
   color-scheme: light;
 }
 @media (prefers-color-scheme: light) {
   :root[data-theme="system"] {
-    --run: #c2410c;
-    --strength: #6d28d9;
-    --walk: #047857;
-    --hike: #4d7c0f;
-    --bike: #1d4ed8;
-    --swim: #0e7490;
+    --running: #c2410c;
+    --strengthTraining: #6d28d9;
+    --walking: #047857;
+    --hiking: #4d7c0f;
+    --cycling: #1d4ed8;
+    --swimming: #0e7490;
     --racket: #a16207;
-    --other: #475569;
+    --generic: #475569;
     color-scheme: light;
   }
 }
@@ -339,37 +339,37 @@ select {
   stroke-linejoin: round;
   flex: none;
 }
-.tab-run .icon,
-.chip-run .icon {
-  color: var(--run);
+.tab-running .icon,
+.chip-running .icon {
+  color: var(--running);
 }
-.tab-strength .icon,
-.chip-strength .icon {
-  color: var(--strength);
+.tab-strengthTraining .icon,
+.chip-strengthTraining .icon {
+  color: var(--strengthTraining);
 }
-.tab-walk .icon,
-.chip-walk .icon {
-  color: var(--walk);
+.tab-walking .icon,
+.chip-walking .icon {
+  color: var(--walking);
 }
-.tab-hike .icon,
-.chip-hike .icon {
-  color: var(--hike);
+.tab-hiking .icon,
+.chip-hiking .icon {
+  color: var(--hiking);
 }
-.tab-bike .icon,
-.chip-bike .icon {
-  color: var(--bike);
+.tab-cycling .icon,
+.chip-cycling .icon {
+  color: var(--cycling);
 }
-.tab-swim .icon,
-.chip-swim .icon {
-  color: var(--swim);
+.tab-swimming .icon,
+.chip-swimming .icon {
+  color: var(--swimming);
 }
 .tab-racket .icon,
 .chip-racket .icon {
   color: var(--racket);
 }
-.tab-other .icon,
-.chip-other .icon {
-  color: var(--other);
+.tab-generic .icon,
+.chip-generic .icon {
+  color: var(--generic);
 }
 
 /* The grid: 3 columns, 2 on a tablet, 1 on a phone */
@@ -646,28 +646,28 @@ table.data .num {
   white-space: nowrap;
 }
 .type-run .icon {
-  color: var(--run);
+  color: var(--running);
 }
 .type-strength .icon {
-  color: var(--strength);
+  color: var(--strengthTraining);
 }
 .type-walk .icon {
-  color: var(--walk);
+  color: var(--walking);
 }
 .type-hike .icon {
-  color: var(--hike);
+  color: var(--hiking);
 }
 .type-bike .icon {
-  color: var(--bike);
+  color: var(--cycling);
 }
 .type-swim .icon {
-  color: var(--swim);
+  color: var(--swimming);
 }
 .type-racket .icon {
   color: var(--racket);
 }
 .type-other .icon {
-  color: var(--other);
+  color: var(--generic);
 }
 .tag {
   margin-left: 6px;
@@ -791,7 +791,7 @@ table.data .num {
   width: 80px;
   height: 20px;
   fill: none;
-  stroke: var(--strength);
+  stroke: var(--strengthTraining);
   stroke-width: 1.5;
 }
 .detail {

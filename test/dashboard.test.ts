@@ -161,6 +161,7 @@ const activity = (
   activityName: `A${id}`,
   startTimeLocal: `${day} 07:00:00`,
   activityType: { typeKey: type },
+  sportTypeId: 1,
   distance: 5000,
   movingDuration: 1500,
   ...extra,
@@ -305,6 +306,24 @@ describe("getDashboardData", () => {
     expect(callsTo("/sleep-service").map(([, q]) => q.date)).toEqual(["2026-10-25", "2026-10-26"]);
     expect(out.activities.map((a: { id: number }) => a.id)).toEqual([4, 1]);
     expect(out.sync).toMatchObject({ garminCalls: 8, newActivities: 1, cachedActivities: 2 });
+  });
+
+  it("fetches the activities again when the cache has rows without a sport", async () => {
+    garminActivities = [activity(1, "2026-10-20"), activity(2, "2026-01-05")];
+    await dashboard.getDashboardData(2);
+    const cache = readCache();
+    delete cache.activities["1"].sport;
+    cache.activities["2"] = { id: 2, type: "running", start: "2026-01-05 07:00:00" };
+    writeFileSync(cacheFile(), JSON.stringify(cache));
+    api.getJson.mockClear();
+
+    const out = JSON.parse(await dashboard.getDashboardData(2));
+    expect(callsTo("/activitylist").map(([, q]) => [q.startDate, q.endDate])).toEqual([
+      ["2026-09-21", "2026-10-26"],
+    ]);
+    expect(out.activities[0].sport).toBe("running");
+    // the old row outside the window goes too, so the next call is a normal one
+    expect(Object.keys(readCache().activities)).toEqual(["1"]);
   });
 
   it("drops a cached activity that Garmin no longer has in a refetched day", async () => {

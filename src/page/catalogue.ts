@@ -1,4 +1,4 @@
-import { GROUPS, type Group } from "./calc";
+import { GROUPS } from "./calc";
 import type { Key } from "./i18n/en";
 import type { Span } from "./layout";
 
@@ -10,7 +10,7 @@ import type { Span } from "./layout";
 export interface CatalogueEntry {
   id: string;
   title: Key;
-  types?: readonly ("all" | Group)[];
+  types?: readonly string[];
   span: Span;
 }
 
@@ -130,85 +130,85 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
   {
     id: "bestEfforts",
     title: "w.bestEfforts",
-    types: ["run"],
+    types: ["running"],
     span: 1,
   },
   {
     id: "races",
     title: "w.races",
-    types: ["run"],
+    types: ["running"],
     span: 2,
   },
   {
     id: "aerobicFitness",
     title: "w.aerobicFitness",
-    types: ["run"],
+    types: ["running"],
     span: 2,
   },
   {
     id: "intensityShare",
     title: "w.intensityShare",
-    types: ["run"],
+    types: ["running"],
     span: 1,
   },
   {
     id: "runningForm",
     title: "w.runningForm",
-    types: ["run"],
+    types: ["running"],
     span: 3,
   },
   {
     id: "runWalk",
     title: "w.runWalk",
-    types: ["run"],
+    types: ["running"],
     span: 1,
   },
   {
     id: "trainingEffect",
     title: "w.trainingEffect",
-    types: ["run"],
+    types: ["running"],
     span: 2,
   },
   {
     id: "racePredictor",
     title: "w.racePredictor",
-    types: ["run"],
+    types: ["running"],
     span: 1,
   },
   {
     id: "longRuns",
     title: "w.longRuns",
-    types: ["run"],
+    types: ["running"],
     span: 2,
   },
   {
     id: "setsPerCategory",
     title: "w.setsPerCategory",
-    types: ["strength"],
+    types: ["strengthTraining"],
     span: 2,
   },
   {
     id: "muscleBalance",
     title: "w.muscleBalance",
-    types: ["strength"],
+    types: ["strengthTraining"],
     span: 1,
   },
   {
     id: "exercises",
     title: "w.exercises",
-    types: ["strength"],
+    types: ["strengthTraining"],
     span: 3,
   },
   {
     id: "strengthSessions",
     title: "w.strengthSessions",
-    types: ["strength"],
+    types: ["strengthTraining"],
     span: 3,
   },
   {
     id: "walkDetails",
     title: "w.walkDetails",
-    types: ["walk", "hike"],
+    types: ["walking", "hiking"],
     span: 2,
   },
   {
@@ -219,25 +219,25 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
   {
     id: "hikeVertical",
     title: "w.hikeVertical",
-    types: ["hike", "walk", "run"],
+    types: ["hiking", "walking", "running"],
     span: 3,
   },
   {
     id: "bikeDetails",
     title: "w.bikeDetails",
-    types: ["bike"],
+    types: ["cycling"],
     span: 3,
   },
   {
     id: "swimDetails",
     title: "w.swimDetails",
-    types: ["swim"],
+    types: ["swimming"],
     span: 3,
   },
   {
     id: "racketDetails",
     title: "w.racketDetails",
-    types: ["racket", "other"],
+    types: ["racket", "generic"],
     span: 3,
   },
 ];

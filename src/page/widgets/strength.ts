@@ -10,17 +10,17 @@ import { kpi, kpiRow, note, weekLabel } from "./ui";
 
 const mg = (g: string) => `mg.${g}` as Key;
 const PALETTE = [
-  "strength",
+  "strengthTraining",
   "accent",
   "good",
   "warn",
   "bad",
-  "swim",
-  "hike",
+  "swimming",
+  "hiking",
   "racket",
-  "bike",
-  "run",
-  "other",
+  "cycling",
+  "running",
+  "generic",
 ];
 
 register({
@@ -365,7 +365,7 @@ function detail(ctx: Ctx, s: ExerciseStats): HTMLElement {
             line(
               t("ex.weight"),
               s.sessions.map((x) => x.top?.kg ?? null),
-              "strength",
+              "strengthTraining",
             ),
             line(
               t("ex.e1rm"),
@@ -385,7 +385,7 @@ function detail(ctx: Ctx, s: ExerciseStats): HTMLElement {
               line(
                 t("ex.maxReps"),
                 s.sessions.map((x) => x.maxReps),
-                "strength",
+                "strengthTraining",
               ),
               {
                 type: "bar" as const,
@@ -399,7 +399,7 @@ function detail(ctx: Ctx, s: ExerciseStats): HTMLElement {
               line(
                 t("ex.longest"),
                 s.sessions.map((x) => x.longest),
-                "strength",
+                "strengthTraining",
               ),
             ];
     ctx.chart(

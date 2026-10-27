@@ -128,10 +128,10 @@ register({
 
 /** Pace for activities on foot, speed for rides, nothing for strength or racket sports (their distance means little). */
 function pace(a: Activity, num: (v: number, digits: number) => string): string {
-  const g = groupOf(a.type ?? "");
-  if (g === "strength" || g === "racket") return "";
+  const g = groupOf(a);
+  if (g === "strengthTraining" || g === "racket") return "";
   const hours = seconds(a.duration) / 3600;
-  if (g === "bike")
+  if (g === "cycling")
     return typeof a.km === "number" && hours > 0 ? `${num(a.km / hours, 1)} km/h` : "";
   return typeof a.pace === "string" ? a.pace : "";
 }

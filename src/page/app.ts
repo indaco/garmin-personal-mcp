@@ -3,7 +3,7 @@ import * as metrics from "./metrics";
 import * as running from "./running";
 import * as strength from "./strength";
 import * as sports from "./sports";
-import { type Activity, activitiesIn, type Group, GROUPS, groupOf, weeksOf } from "./calc";
+import { type Activity, activitiesIn, GROUPS, groupOf, weeksOf } from "./calc";
 import { Chart, chart, destroyCharts, themeCharts } from "./charts";
 import { h } from "./dom";
 import { icon } from "./icons";
@@ -42,6 +42,7 @@ import {
   type WidgetDef,
 } from "./registry";
 import { formatHash, parseHash, type View } from "./state";
+import { typeName } from "./widgets/ui";
 import { DEFAULT_THEME, store, THEMES, themeKey, token } from "./theme";
 import "./widgets";
 
@@ -55,7 +56,7 @@ declare global {
 
 const G = window.GARMIN ?? { data: null, layout: null, widgets: [] };
 const LAYOUT_KEY = `garmin-layout:${location.pathname}`;
-const ALWAYS: Group[] = ["run", "strength", "walk", "bike", "racket"];
+const ALWAYS: readonly string[] = ["running", "strengthTraining", "walking", "cycling", "racket"];
 
 let langChoice = store.get("garmin-lang") ?? "auto";
 let lang = "en";
@@ -64,7 +65,7 @@ let fmt = formatter("en");
 const pageLayout = parseLayout(G.layout);
 let layout: Layout = merge(pageLayout, readLocal());
 let view: View;
-let only: Group | null = null;
+let only: string | null = null;
 let editing = false;
 let tabs: string[] = [];
 let weeks: string[] = [];
@@ -79,10 +80,12 @@ export function start(): void {
   setLanguage(langChoice);
   const data = G.data;
   if (data) {
+    const present = new Set(data.activities.map(groupOf));
+    const others = [...present].filter((g) => !GROUPS.includes(g)).toSorted();
     tabs = [
       "all",
-      ...GROUPS.filter(
-        (g) => ALWAYS.includes(g) || data.activities.some((a) => groupOf(a.type ?? "") === g),
+      ...[...GROUPS.slice(0, -1), ...others, "generic"].filter(
+        (g) => ALWAYS.includes(g) || present.has(g),
       ),
     ];
     weeks = weeksOf(data.start, data.end);
@@ -267,7 +270,7 @@ function windowBar(inProgress: boolean): HTMLElement {
 function tabBar(data: Data): HTMLElement {
   const inWindow = activitiesIn(data.activities, view.from, view.to);
   const count = (tab: string) =>
-    tab === "all" ? inWindow.length : inWindow.filter((a) => groupOf(a.type ?? "") === tab).length;
+    tab === "all" ? inWindow.length : inWindow.filter((a) => groupOf(a) === tab).length;
   const select = (tab: string) => {
     view = { tab, from: view.from, to: view.to };
     render();
@@ -297,7 +300,7 @@ function tabBar(data: Data): HTMLElement {
           onclick: () => select(tab),
         },
         icon(tab),
-        h("span", {}, t(`type.${tab}` as Key)),
+        h("span", {}, typeName(t, tab)),
         h("span", { class: "count" }, count(tab)),
       ),
     ),
@@ -306,7 +309,7 @@ function tabBar(data: Data): HTMLElement {
 
 /** The type chips of the All board: a click shows only that type, a second click (or "All") shows every type. */
 function chips(): HTMLElement {
-  const groups = tabs.filter((x) => x !== "all") as Group[];
+  const groups = tabs.filter((x) => x !== "all");
   return h(
     "div",
     { class: "chips", role: "group", "aria-label": t("chips.label") },
@@ -334,7 +337,7 @@ function chips(): HTMLElement {
           },
         },
         icon(g),
-        t(`type.${g}` as Key),
+        typeName(t, g),
       ),
     ),
   );
@@ -356,13 +359,13 @@ function boardView(data: Data): HTMLElement {
   return h("main", {}, grid);
 }
 
-function boardType(): "all" | Group {
-  return view.tab === "all" ? "all" : (view.tab as Group);
+function boardType(): string {
+  return view.tab === "all" ? "all" : view.tab;
 }
 
 function titleOf(inst: Instance, def: WidgetDef | undefined): string {
   if (!def) return t("widget.unknown", { id: inst.widget });
-  const own = inst.type && inst.type !== boardType() ? ` · ${t(`type.${inst.type}` as Key)}` : "";
+  const own = inst.type && inst.type !== boardType() ? ` · ${typeName(t, inst.type)}` : "";
   return def.title(t) + own;
 }
 
@@ -400,11 +403,11 @@ function tile(data: Data, inst: Instance, def: WidgetDef | undefined): HTMLEleme
 }
 
 function ctxFor(data: Data, inst: Instance): Ctx {
-  const type = (inst.type as Group | undefined) ?? boardType();
+  const type = inst.type ?? boardType();
   const all = activitiesIn(data.activities, view.from, view.to);
   const pick = type !== "all" ? type : only;
   const ofType = <A extends Activity>(acts: A[]) =>
-    pick ? acts.filter((a) => groupOf(a.type ?? "") === pick) : acts;
+    pick ? acts.filter((a) => groupOf(a) === pick) : acts;
   return {
     data,
     id: inst.id,
@@ -421,7 +424,7 @@ function ctxFor(data: Data, inst: Instance): Ctx {
     fmt,
     calc: { ...calc, ...metrics, ...running, ...strength, ...sports },
     chart,
-    color: token,
+    color: (name: string) => token(name) || token("generic"),
     empty: (el, message) =>
       el.replaceChildren(h("p", { class: "muted empty" }, message ?? t("empty.window"))),
     item: view.item,
@@ -581,9 +584,7 @@ function addDialog(): void {
         ? h(
             "select",
             { "aria-label": t("add.type") },
-            ...types.map((x) =>
-              h("option", { value: x, selected: x === own }, t(`type.${x}` as Key)),
-            ),
+            ...types.map((x) => h("option", { value: x, selected: x === own }, typeName(t, x))),
           )
         : undefined;
     list.append(

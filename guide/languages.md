@@ -65,14 +65,14 @@ A built-in language is in every page. To add one:
 | `window.from` | From week |
 | `window.to` | To week |
 | `type.all` | All |
-| `type.run` | Run |
-| `type.strength` | Strength |
-| `type.walk` | Walk |
-| `type.hike` | Hike |
-| `type.bike` | Bike |
-| `type.swim` | Swim |
+| `type.running` | Run |
+| `type.strengthTraining` | Strength |
+| `type.walking` | Walk |
+| `type.hiking` | Hike |
+| `type.cycling` | Bike |
+| `type.swimming` | Swim |
 | `type.racket` | Racket sports |
-| `type.other` | Other |
+| `type.generic` | Other |
 | `tabs.label` | Activity types |
 | `chips.label` | Show types |
 | `edit.start` | Edit layout |
