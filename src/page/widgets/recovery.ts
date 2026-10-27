@@ -127,7 +127,7 @@ register({
           stage("deep", t("sl.deep"), ctx.color("strength")),
           stage("light", t("sl.light"), ctx.color("bike")),
           stage("rem", t("sl.rem"), ctx.color("swim")),
-          stage("awake", t("sl.awake"), ctx.color("padel")),
+          stage("awake", t("sl.awake"), ctx.color("racket")),
           {
             type: "line" as const,
             label: t("sl.score"),

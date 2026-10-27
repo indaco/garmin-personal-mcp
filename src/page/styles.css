@@ -82,7 +82,7 @@
   --hike: #a3e635;
   --bike: #60a5fa;
   --swim: #22d3ee;
-  --padel: #fbbf24;
+  --racket: #fbbf24;
   --other: #94a3b8;
   color-scheme: dark;
 }
@@ -161,7 +161,7 @@
   --hike: #4d7c0f;
   --bike: #1d4ed8;
   --swim: #0e7490;
-  --padel: #a16207;
+  --racket: #a16207;
   --other: #475569;
   color-scheme: light;
 }
@@ -173,7 +173,7 @@
     --hike: #4d7c0f;
     --bike: #1d4ed8;
     --swim: #0e7490;
-    --padel: #a16207;
+    --racket: #a16207;
     --other: #475569;
     color-scheme: light;
   }
@@ -363,9 +363,9 @@ select {
 .chip-swim .icon {
   color: var(--swim);
 }
-.tab-padel .icon,
-.chip-padel .icon {
-  color: var(--padel);
+.tab-racket .icon,
+.chip-racket .icon {
+  color: var(--racket);
 }
 .tab-other .icon,
 .chip-other .icon {
@@ -663,8 +663,8 @@ table.data .num {
 .type-swim .icon {
   color: var(--swim);
 }
-.type-padel .icon {
-  color: var(--padel);
+.type-racket .icon {
+  color: var(--racket);
 }
 .type-other .icon {
   color: var(--other);

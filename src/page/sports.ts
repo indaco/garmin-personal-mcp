@@ -1,6 +1,6 @@
 import { type Activity, groupOf, seconds, sessionSeconds } from "./calc";
 
-/** Numbers of the walk, hike, bike, swim and padel widgets. Pure functions. */
+/** Numbers of the walk, hike, bike, swim and racket sport widgets. Pure functions. */
 
 /** Seconds per 100 m. */
 export function swimPace(a: Activity): number | undefined {

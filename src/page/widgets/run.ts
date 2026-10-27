@@ -350,7 +350,7 @@ register({
             {
               label: t("te.anaerobic"),
               data: list.map((a) => num(a.anaerobicTE) ?? null),
-              borderColor: ctx.color("padel"),
+              borderColor: ctx.color("racket"),
               showLine: false,
               pointRadius: 3,
             },

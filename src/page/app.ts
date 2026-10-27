@@ -40,7 +40,7 @@ declare global {
 
 const G = window.GARMIN ?? { data: null, layout: null, widgets: [] };
 const LAYOUT_KEY = `garmin-layout:${location.pathname}`;
-const ALWAYS: Group[] = ["run", "strength", "walk", "bike", "padel"];
+const ALWAYS: Group[] = ["run", "strength", "walk", "bike", "racket"];
 
 let langChoice = store.get("garmin-lang") ?? "auto";
 let lang = "en";

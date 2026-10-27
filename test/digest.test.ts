@@ -117,13 +117,23 @@ describe("digest", () => {
     });
   });
 
-  it("sums each type key, with elapsed time only for strength and padel", () => {
+  it("sums each type key, with elapsed time only for strength and racket sports", () => {
     expect(d.totals).toEqual({
       walking: { sessions: 1, km: 3, hours: 0.6, load: 0 },
       running: { sessions: 2, km: 15.5, hours: 1.3, load: 150 },
       strength_training: { sessions: 2, hours: 1.8, load: 70 },
       cycling: { sessions: 1, km: 40, hours: 1.5, load: 60 },
     });
+  });
+
+  it("counts the elapsed time of every racket sport", () => {
+    const tennis = {
+      type: "tennis",
+      start: "2026-10-20 18:00:00",
+      duration: "20:00",
+      elapsed: "1:30:00",
+    };
+    expect(digest({ ...data, activities: [tennis] }).totals.tennis.hours).toBe(1.5);
   });
 
   it("sums the previous period for the comparison", () => {

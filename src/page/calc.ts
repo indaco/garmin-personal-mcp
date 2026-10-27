@@ -28,12 +28,29 @@ export const GROUPS = [
   "hike",
   "bike",
   "swim",
-  "padel",
+  "racket",
   "other",
 ] as const;
 export type Group = (typeof GROUPS)[number];
 
-/** The group of a Garmin type key. Padel's key is `paddelball`. */
+/** The racket sports of a Garmin watch, by type key. Padel's key is `paddelball`. */
+const RACKET: [RegExp, string][] = [
+  [/table_tennis/, "tableTennis"],
+  [/platform_tennis/, "platformTennis"],
+  [/padel|paddel/, "padel"],
+  [/pickleball/, "pickleball"],
+  [/racquetball|racketball/, "racquetball"],
+  [/squash/, "squash"],
+  [/badminton/, "badminton"],
+  [/tennis/, "tennis"],
+];
+
+/** The racket sport of a type key ("padel", "tableTennis"...); undefined for other types. */
+export function sportOf(key: string): string | undefined {
+  return RACKET.find(([re]) => re.test(key))?.[1];
+}
+
+/** The group of a Garmin type key. */
 export function groupOf(key: string): Group {
   if (key.endsWith("running")) return "run";
   if (key.includes("strength")) return "strength";
@@ -41,7 +58,7 @@ export function groupOf(key: string): Group {
   if (key === "hiking" || key === "mountaineering") return "hike";
   if (/biking|cycling/.test(key) || key === "virtual_ride") return "bike";
   if (key.includes("swimming")) return "swim";
-  if (/padel|paddel/.test(key)) return "padel";
+  if (sportOf(key)) return "racket";
   return "other";
 }
 
@@ -54,10 +71,10 @@ export function seconds(v: unknown): number {
   return m ? m[1].split(":").reduce((s, x) => s * 60 + Number(x), 0) : 0;
 }
 
-/** Strength and padel have little moving time: their session lasts the elapsed time. */
+/** Strength and racket sports have little moving time: their session lasts the elapsed time. */
 export function sessionSeconds(a: Activity): number {
   const g = groupOf(a.type ?? "");
-  const whole = (g === "strength" || g === "padel") && typeof a.elapsed === "string";
+  const whole = (g === "strength" || g === "racket") && typeof a.elapsed === "string";
   return seconds(whole ? a.elapsed : a.duration);
 }
 

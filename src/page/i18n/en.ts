@@ -38,7 +38,7 @@ export const en = {
   "type.hike": "Hike",
   "type.bike": "Bike",
   "type.swim": "Swim",
-  "type.padel": "Padel",
+  "type.racket": "Racket sports",
   "type.other": "Other",
   "tabs.label": "Activity types",
   "chips.label": "Show types",
@@ -324,7 +324,7 @@ export const en = {
   "sw.lengths": "Lengths",
   "sw.strokes": "Strokes",
   "sw.pool": "Pool",
-  "w.padelDetails": "Sessions and intensity",
+  "w.racketDetails": "Sessions and intensity",
   "pd.peak": "Peak HR",
   "pd.z3": "Time in Z3+",
   "pd.z45": "Z4-5 share",
@@ -332,6 +332,15 @@ export const en = {
   "pd.load": "Load / run of same length",
   "pd.note":
     "The second load is an estimate: the average Garmin load per minute of your runs, times the length of the session.",
+  "col.sport": "Sport",
+  "sport.tennis": "Tennis",
+  "sport.padel": "Padel",
+  "sport.pickleball": "Pickleball",
+  "sport.racquetball": "Racquetball",
+  "sport.squash": "Squash",
+  "sport.badminton": "Badminton",
+  "sport.tableTennis": "Table tennis",
+  "sport.platformTennis": "Platform tennis",
 } as const;
 
 export type Key = keyof typeof en;

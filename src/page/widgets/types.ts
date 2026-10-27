@@ -118,7 +118,7 @@ register({
       approximate ||= z.approximate;
       z.sec.forEach((s, n) => (weeks[i][n] += s / 60));
     }
-    const colors = ["muted", "bike", "walk", "padel", "bad"];
+    const colors = ["muted", "bike", "walk", "racket", "bad"];
     ctx.chart(el, {
       type: "bar",
       data: {

@@ -1,12 +1,13 @@
 import { addDays } from "../../dates";
-import { type Activity, isIndoor, seconds, sessionSeconds } from "../calc";
+import { type Activity, isIndoor, seconds, sessionSeconds, sportOf } from "../calc";
 import { append } from "../dom";
+import type { Key } from "../i18n";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
 import { oneSession } from "./types";
 import { everyActivity, kpi, kpiRow, note, table, weekLabel } from "./ui";
 
-/** The extras of the Walk, Hike, Bike, Swim and Padel boards. */
+/** The extras of the Walk, Hike, Bike, Swim and Racket sports boards. */
 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 const day = (a: Activity) => String(a.start).slice(0, 10);
@@ -309,9 +310,9 @@ register({
 });
 
 register({
-  id: "padelDetails",
-  title: (t) => t("w.padelDetails"),
-  types: ["padel", "other"],
+  id: "racketDetails",
+  title: (t) => t("w.racketDetails"),
+  types: ["racket", "other"],
   span: 3,
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
@@ -323,9 +324,11 @@ register({
       const z = calc.zoneSeconds(a, floors);
       approximate ||= !!z?.approximate;
       const runLoad = perMinute === null ? undefined : (perMinute * sessionSeconds(a)) / 60;
+      const sport = sportOf(a.type ?? "");
       return [
         fmt.day(day(a)),
         a.name ?? "",
+        sport ? t(`sport.${sport}` as Key) : (a.type ?? "").replaceAll("_", " "),
         fmt.hours(sessionSeconds(a)),
         fmt.num(num(a.avgHR)),
         fmt.num(num(a.maxHR)),
@@ -342,6 +345,7 @@ register({
         [
           t("col.date"),
           t("col.name"),
+          t("col.sport"),
           t("col.time"),
           t("col.hr"),
           t("pd.peak"),

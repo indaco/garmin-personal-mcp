@@ -198,7 +198,7 @@ export function summarize(a: Json): Json {
   copy(a, o, "averageRunningCadenceInStepsPerMinute", "cadenceSpm");
   copy(a, o, "elevationGain", "ascentM");
 
-  // moving time is near zero for padel or strength: the elapsed time is the session length
+  // moving time is near zero for racket sports or strength: the elapsed time is the session length
   const elapsedS = asDouble(a.duration, 0);
   if (elapsedS - durS >= 60) {
     o.elapsed = hms(elapsedS);

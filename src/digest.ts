@@ -137,10 +137,12 @@ export function digest(data: Json): Digest {
   };
 }
 
-/** Strength and padel have little moving time: their session lasts the elapsed time. */
+/** Strength and racket sports have little moving time: their session lasts the elapsed time. */
 function sessionSeconds(a: Json): number {
   const type = typeOf(a);
-  const whole = /strength|padel|paddel/.test(type) && typeof a.elapsed === "string";
+  const whole =
+    /strength|tennis|padel|paddel|pickleball|racquetball|racketball|squash|badminton/.test(type) &&
+    typeof a.elapsed === "string";
   return seconds(whole ? a.elapsed : a.duration);
 }
 
@@ -162,7 +164,7 @@ function roundWeek(w: Week): Week {
   };
 }
 
-/** Rounded to 0.1; no km for types without distance (strength, padel). */
+/** Rounded to 0.1; no km for types without distance (strength, racket sports). */
 function roundTotals(t: Totals): Totals {
   return {
     sessions: t.sessions,

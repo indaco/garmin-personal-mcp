@@ -7,6 +7,7 @@ import {
   mondayOf,
   seconds,
   sessionSeconds,
+  sportOf,
   weeksOf,
 } from "../../src/page/calc";
 import { formatHash, parseHash } from "../../src/page/state";
@@ -26,12 +27,27 @@ describe("activity types", () => {
     ["virtual_ride", "bike"],
     ["lap_swimming", "swim"],
     ["open_water_swimming", "swim"],
-    ["paddelball", "padel"],
-    ["padel", "padel"],
+    ["paddelball", "racket"],
+    ["padel", "racket"],
+    ["tennis", "racket"],
+    ["pickleball", "racket"],
+    ["racquetball", "racket"],
+    ["squash", "racket"],
+    ["badminton", "racket"],
+    ["table_tennis", "racket"],
+    ["platform_tennis", "racket"],
     ["yoga", "other"],
     ["", "other"],
   ])("%s is %s", (key, group) => {
     expect(groupOf(key)).toBe(group);
+  });
+
+  it("names the sport of a racket type", () => {
+    expect(sportOf("paddelball")).toBe("padel");
+    expect(sportOf("table_tennis")).toBe("tableTennis");
+    expect(sportOf("platform_tennis")).toBe("platformTennis");
+    expect(sportOf("tennis")).toBe("tennis");
+    expect(sportOf("running")).toBeUndefined();
   });
 
   it("knows the indoor types", () => {
@@ -51,13 +67,14 @@ describe("time", () => {
     expect(seconds("n/a")).toBe(0);
   });
 
-  it("counts elapsed time for strength and padel, moving time for the others", () => {
+  it("counts elapsed time for strength and racket sports, moving time for the others", () => {
     expect(
       sessionSeconds({ type: "strength_training", duration: "10:00", elapsed: "1:00:00" }),
     ).toBe(3600);
     expect(sessionSeconds({ type: "paddelball", duration: "20:00", elapsed: "1:30:00" })).toBe(
       5400,
     );
+    expect(sessionSeconds({ type: "tennis", duration: "20:00", elapsed: "1:00:00" })).toBe(3600);
     expect(sessionSeconds({ type: "running", duration: "30:00", elapsed: "31:30" })).toBe(1800);
     expect(sessionSeconds({ type: "strength_training", duration: "40:00" })).toBe(2400);
   });

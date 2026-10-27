@@ -75,11 +75,11 @@ const PRESETS: Record<string, [widget: string, span: Span][]> = {
     ["swimDetails", 3],
     ["activities", 3],
   ],
-  padel: [
+  racket: [
     ["typeKpis", 3],
     ["typeWeekly", 2],
     ["hrZones", 1],
-    ["padelDetails", 3],
+    ["racketDetails", 3],
     ["activities", 3],
   ],
   other: [

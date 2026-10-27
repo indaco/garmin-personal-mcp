@@ -111,7 +111,7 @@ describe("the page", () => {
       ["strength", "24"],
       ["walk", "9"],
       ["bike", "3"],
-      ["padel", "3"],
+      ["racket", "3"],
     ]);
   });
 
@@ -368,7 +368,7 @@ describe("overview widgets", () => {
 describe("type boards", () => {
   it("draws every board without errors, with a tooltip on every chart", async () => {
     const { page, errors } = await open(browser, pageFile());
-    for (const tab of ["run", "strength", "walk", "bike", "padel"]) {
+    for (const tab of ["run", "strength", "walk", "bike", "racket"]) {
       await page.click(`[data-tab=${tab}]`);
       expect([tab, await chartsWithoutTooltip(page)]).toEqual([tab, []]);
     }
@@ -377,7 +377,7 @@ describe("type boards", () => {
 
   it("fits every board on a phone", async () => {
     const { page } = await open(browser, pageFile(), { viewport: { width: 390, height: 844 } });
-    for (const tab of ["all", "run", "strength", "walk", "bike", "padel"]) {
+    for (const tab of ["all", "run", "strength", "walk", "bike", "racket"]) {
       await page.click(`[data-tab=${tab}]`);
       expect([
         tab,
@@ -499,7 +499,7 @@ describe("strength board", () => {
   });
 });
 
-describe("walk, hike, bike, swim and padel boards", () => {
+describe("walk, hike, bike, swim and racket sport boards", () => {
   const hike = {
     id: 9001,
     name: "Ridge Hike",
@@ -526,6 +526,17 @@ describe("walk, hike, bike, swim and padel boards", () => {
     avgHR: 130,
     trainingLoad: 40,
   };
+  const tennis = {
+    id: 9004,
+    name: "Club Tennis",
+    type: "tennis",
+    start: "2026-10-22 19:00:00",
+    duration: "40:00",
+    elapsed: "1:30:00",
+    avgHR: 140,
+    maxHR: 178,
+    trainingLoad: 95,
+  };
   const yoga = {
     id: 9003,
     name: "Yoga",
@@ -535,7 +546,9 @@ describe("walk, hike, bike, swim and padel boards", () => {
     avgHR: 90,
   };
   const more = () =>
-    pageFile({ data: { ...data, v: 3, activities: [hike, swim, yoga, ...data.activities] } });
+    pageFile({
+      data: { ...data, v: 3, activities: [hike, swim, yoga, tennis, ...data.activities] },
+    });
 
   it("adds the Hike, Swim and Other tabs only when the data has them", async () => {
     const { page } = await open(browser, more());
@@ -547,14 +560,14 @@ describe("walk, hike, bike, swim and padel boards", () => {
       "hike",
       "bike",
       "swim",
-      "padel",
+      "racket",
       "other",
     ]);
   });
 
   it("draws every extra board without errors, with a tooltip on every chart", async () => {
     const { page, errors } = await open(browser, more());
-    for (const tab of ["walk", "hike", "bike", "swim", "padel", "other"]) {
+    for (const tab of ["walk", "hike", "bike", "swim", "racket", "other"]) {
       await page.click(`[data-tab=${tab}]`);
       expect([tab, await chartsWithoutTooltip(page)]).toEqual([tab, []]);
     }
@@ -568,8 +581,14 @@ describe("walk, hike, bike, swim and padel boards", () => {
     expect(await page.textContent("[data-id=swimDetails]")).toContain("2:00/100 m");
     await page.click("[data-tab=bike]");
     expect(await page.textContent("[data-id=bikeDetails] .kpis")).toContain("3 rides");
-    await page.click("[data-tab=padel]");
-    expect(await page.$$eval("[data-id=padelDetails] tbody tr", (r) => r.length)).toBe(3);
+    await page.click("[data-tab=racket]");
+    // tennis and padel share the board; the sport column tells them apart
+    const sports = await page.$$eval("[data-id=racketDetails] tbody tr", (r) =>
+      r.map((x) => x.children[2].textContent),
+    );
+    // in the order of the data, where the test puts tennis first
+    expect(sports).toEqual(["Tennis", "Padel", "Padel", "Padel"]);
+    expect(await page.textContent("[data-tab=racket] .count")).toBe("4");
     await page.click("[data-tab=walk]");
     expect(await tiles(page)).toEqual([
       "typeKpis",

@@ -18,7 +18,7 @@ const PALETTE = [
   "bad",
   "swim",
   "hike",
-  "padel",
+  "racket",
   "bike",
   "run",
   "other",
