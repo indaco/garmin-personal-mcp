@@ -384,7 +384,8 @@ Praticò.
 
 This project uses the [MIT License](LICENSE).
 
-`dist/index.js` includes these libraries, with their own licenses:
+`dist/index.js` includes these libraries, with their own licenses. The full license texts are in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 | Library                                                                                                     | License                                                                                    |
 | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
