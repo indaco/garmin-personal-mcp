@@ -71,6 +71,19 @@ describe("writeDashboard", () => {
     expect(readBlock(page(), "widgets")).toEqual([]);
   });
 
+  it("gives each new page layout its own rev, so an old browser edit does not apply to it", async () => {
+    await writer.write({});
+    const first = (readBlock(page(), "layout") as { rev: string }).rev;
+    await writer.write({ layout: "preset" });
+    const second = (readBlock(page(), "layout") as { rev: string }).rev;
+    expect(first).toMatch(/^\w{8,}$/);
+    expect(second).toMatch(/^\w{8,}$/);
+    expect(second).not.toBe(first);
+    // an update keeps the rev
+    await writer.write({});
+    expect((readBlock(page(), "layout") as { rev: string }).rev).toBe(second);
+  });
+
   it("returns the digest of the data, not the data", async () => {
     const r = await writer.write({});
     expect(r.digest).toEqual(digest(data));

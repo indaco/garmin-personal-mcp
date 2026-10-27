@@ -1,9 +1,11 @@
-// Writes THIRD-PARTY-NOTICES.md: the license of every package that tsdown bundled into dist/index.js.
-// The build runs it after tsdown, so the file follows each dependency update.
+// Writes THIRD-PARTY-NOTICES.md: the license of every package that tsdown bundled into dist/index.js
+// and into the dashboard page. The build runs it last, so the file follows each dependency update.
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const bundle = readFileSync("dist/index.js", "utf8");
+const bundle = ["dist/index.js", "dist/dashboard.html"]
+  .map((f) => readFileSync(f, "utf8"))
+  .join("\n");
 
 // tsdown marks each bundled module with its path, e.g. node_modules/.pnpm/zod@4.6.7/node_modules/zod/...
 const dirs = [
@@ -64,7 +66,7 @@ const fence = (text) => `\`\`\`text\n${text}\n\`\`\``;
 const out = [
   "# Third-party notices",
   "",
-  "`dist/index.js` includes the packages below. Each package keeps its own license.",
+  "`dist/index.js` and `dist/dashboard.html` include the packages below. Each package keeps its own license.",
   "The build writes this file (`scripts/third-party-notices.mjs`). Do not edit it by hand.",
   "",
 ];

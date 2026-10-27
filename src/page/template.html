@@ -3,26 +3,28 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="garmin-template" content="1" />
+    <meta name="garmin-template" content="2" />
     <title>Training + Recovery</title>
-  </head>
-  <body>
-    <h1>Training + Recovery</h1>
-    <p id="summary"></p>
-    <ul id="notes"></ul>
     <script>
-      const DATA = /* garmin-data:start */ null; /* garmin-data:end */
-      const LAYOUT = /* garmin-layout:start */ null; /* garmin-layout:end */
-      const WIDGETS = /* garmin-widgets:start */ []; /* garmin-widgets:end */
-      if (DATA) {
-        document.getElementById("summary").textContent =
-          `${DATA.start} to ${DATA.end}: ${DATA.activities.length} activities`;
-        for (const note of DATA.notes ?? []) {
-          const li = document.createElement("li");
-          li.innerHTML = note; // the server escapes the notes
-          document.getElementById("notes").append(li);
-        }
+      // the theme before the first paint; a blocked storage gives the default
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem("garmin-theme") || "midnight";
+      } catch (e) {
+        document.documentElement.dataset.theme = "midnight";
       }
     </script>
+    <!--style-->
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      // the server fills these blocks; nothing else in the page changes on an update
+      window.GARMIN = {
+        data: /* garmin-data:start */ null /* garmin-data:end */,
+        layout: /* garmin-layout:start */ null /* garmin-layout:end */,
+        widgets: /* garmin-widgets:start */ [] /* garmin-widgets:end */,
+      };
+    </script>
+    <!--script-->
   </body>
 </html>

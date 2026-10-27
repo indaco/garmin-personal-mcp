@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { copyFile, readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/server";
@@ -55,6 +56,9 @@ export function writeBlock(page: string, block: Block, value: unknown): string {
   );
 }
 
+/** A new layout rev: a browser edit made on another layout never applies to this one. */
+const newRev = () => randomBytes(6).toString("hex");
+
 const templateVersion = (page: string) => Number(TEMPLATE_VERSION.exec(page)?.[1] ?? 0);
 
 const escapeHtml = (s: string) =>
@@ -101,7 +105,11 @@ export class DashboardWriter {
       next = page;
       kind = "replaced";
     } else if (layout || old === undefined) {
-      next = writeBlock(template, "layout", { rev: "", base: layout ?? "preset", boards: {} });
+      next = writeBlock(template, "layout", {
+        rev: newRev(),
+        base: layout ?? "preset",
+        boards: {},
+      });
       kind = old === undefined ? "created" : "replaced";
     } else if (templateVersion(old) > 0 && templateVersion(old) < templateVersion(template)) {
       // a newer template: the user's state lives in the blocks, so it moves over as it is
