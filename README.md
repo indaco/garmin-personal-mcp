@@ -480,20 +480,21 @@ have GPS data. The page tests use synthetic data from `test/fixtures/dashboard-d
 
 ### Code map
 
-| File                              | Content                                                                  |
-| --------------------------------- | ------------------------------------------------------------------------ |
-| `src/index.ts`                    | the stdio entry point                                                    |
-| `src/server.ts`                   | the MCP server with its tools and prompts                                |
-| `src/api-client.ts`               | HTTP, the token and the retries                                          |
-| `src/tools.ts`, `src/fit.ts`      | the tools and the .FIT decoder                                           |
-| `src/dashboard.ts`                | the `getDashboardData` tool and its cache                                |
-| `src/dashboard-page.ts`           | `writeDashboard` and `editDashboard`: the page file and its blocks       |
-| `src/digest.ts`                   | the digest of the data for the coach notes                               |
-| `src/page/`                       | the dashboard page: app, layout, calculations, widgets, themes and texts |
-| `src/prompts.ts`                  | the prompts. The prompt texts are in `prompts/`.                         |
-| `src/config.ts`, `src/log.ts`     | the settings and the log                                                 |
-| `scripts/build-template.mjs`      | writes `dist/dashboard.html`                                             |
-| `scripts/third-party-notices.mjs` | writes `THIRD-PARTY-NOTICES.md` after each build                         |
+| File                                 | Content                                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------ |
+| `src/index.ts`                       | the stdio entry point                                                    |
+| `src/server.ts`                      | the MCP server with its tools and prompts                                |
+| `src/api-client.ts`                  | HTTP, the token and the retries                                          |
+| `src/tools.ts`, `src/fit.ts`         | the tools and the .FIT decoder                                           |
+| `src/dashboard.ts`                   | the `getDashboardData` tool and its cache                                |
+| `src/dashboard-page.ts`              | `writeDashboard` and `editDashboard`: the page file and its blocks       |
+| `src/digest.ts`                      | the digest of the data for the coach notes                               |
+| `src/page/`                          | the dashboard page: app, layout, calculations, widgets, themes and texts |
+| `src/prompts.ts`                     | the prompts. The prompt texts are in `prompts/`.                         |
+| `src/config.ts`, `src/log.ts`        | the settings and the log                                                 |
+| `scripts/build-template.mjs`         | writes `dist/dashboard.html`                                             |
+| `scripts/third-party-notices.mjs`    | writes `THIRD-PARTY-NOTICES.md` after each build                         |
+| `scripts/fill-dashboard-fixture.mjs` | fills `dist/dashboard.html` with a data file, for screenshots and checks |
 
 ## Credits
 
