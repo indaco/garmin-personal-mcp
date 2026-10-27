@@ -6,12 +6,42 @@ export const CATALOGUES: Record<string, Catalogue> = { en, it };
 /** Each language by its own name, for the language menu. */
 export const LANGUAGE_NAMES: Record<string, string> = { en: "English", it: "Italiano" };
 
+/**
+ * The languages of the page's i18n block: new languages, or texts that replace built-in ones. A missing
+ * text shows in English.
+ */
+export function addLanguages(extra: unknown): void {
+  if (!extra || typeof extra !== "object") return;
+  for (const [code, texts] of Object.entries(extra as Record<string, unknown>)) {
+    if (!/^[a-z]{2,3}(-[A-Z]{2})?$/.test(code) || !texts || typeof texts !== "object") continue;
+    const own = Object.fromEntries(
+      Object.entries(texts as Record<string, unknown>).filter(
+        ([k, v]) => k in en && typeof v === "string",
+      ),
+    );
+    CATALOGUES[code] = { ...(CATALOGUES[code] ?? en), ...own };
+    LANGUAGE_NAMES[code] ??= languageName(code);
+  }
+}
+
+/** A language by its own name, e.g. "Deutsch" for de. */
+function languageName(code: string): string {
+  try {
+    const name = new Intl.DisplayNames([code], { type: "language" }).of(code);
+    return name ? name[0].toUpperCase() + name.slice(1) : code;
+  } catch {
+    return code;
+  }
+}
+
 export type T = (key: Key, params?: Record<string, string | number>) => string;
 
 /** The chosen language when it is built in; for "auto", the first browser language that is; else English. */
 export function pickLang(choice: string, browser: readonly string[]): string {
   if (choice in CATALOGUES) return choice;
-  return browser.map((l) => l.slice(0, 2).toLowerCase()).find((l) => l in CATALOGUES) ?? "en";
+  // a full tag (pt-BR) first, then its language (pt)
+  const tags = browser.flatMap((l) => [l, l.slice(0, 2).toLowerCase()]);
+  return tags.find((l) => l in CATALOGUES) ?? "en";
 }
 
 export function translator(lang: string): T {

@@ -154,6 +154,19 @@ Leave `weeks` empty to keep the weeks of the dashboard. A new Claude Desktop con
 artifact to update, so the prompt builds a new dashboard. The prompt also builds a new dashboard
 when the dashboard comes from older build instructions, and it tells you so.
 
+### dashboard-widget
+
+This prompt makes a new widget from your idea, for example "my longest ride of each month". Claude
+writes a small widget, and `editDashboard` stores it in the page. The widget stays after each
+update. The argument `idea` is required. Reload the page to see the widget.
+
+### dashboard-language
+
+This prompt adds a language to the dashboard. Claude translates the texts of the page, and
+`editDashboard` stores them in the page. The argument `language` is optional: the default is the
+language of the conversation. English and Italian are built in. A text without a translation shows
+in English.
+
 ## Tools
 
 | Tool                  | Endpoint                                             | What it gives                                                                                                                                                                                                                                                                                               |
@@ -171,6 +184,7 @@ when the dashboard comes from older build instructions, and it tells you so.
 | `getDailySummary`     | `/usersummary-service/usersummary/daily`             | steps, stress and body battery                                                                                                                                                                                                                                                                              |
 | `getDashboardData`    | the endpoints above                                  | all the data of the dashboard in one call. It keeps a local cache and asks Garmin only for new days.                                                                                                                                                                                                        |
 | `writeDashboard`      | the endpoints above                                  | writes the dashboard page (default `garmin-dashboard.html` in the data folder) and gives a short digest of the data for the coach notes. An update changes only the data of the page. A replaced page is kept as `.bak`.                                                                                    |
+| `editDashboard`       | none                                                 | changes the layout of the dashboard page, adds or removes custom widgets, and adds languages. Without arguments, it gives the layout, the widget catalogue and the guide for a custom widget.                                                                                                               |
 | `garminGet`           | all other GET endpoints                              | a relative path and a query string                                                                                                                                                                                                                                                                          |
 
 Dates use the format `yyyy-MM-dd`. The API reference does not always give the names of the query

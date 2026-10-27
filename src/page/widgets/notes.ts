@@ -3,8 +3,6 @@ import { register } from "../registry";
 
 register({
   id: "coachNotes",
-  title: (t) => t("w.coachNotes"),
-  span: 3,
   render(el, ctx) {
     const notes = (ctx.data.notes ?? []).slice(0, 5);
     if (notes.length === 0) {

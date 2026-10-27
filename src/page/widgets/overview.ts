@@ -17,16 +17,12 @@ import {
   windowEnd,
 } from "./ui";
 
-const ANY = ["all", ...GROUPS] as const;
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 const last = <T>(list: T[]) => list.at(-1);
 const of = (acts: Activity[], g: string) => acts.filter((a) => groupOf(a.type ?? "") === g);
 
 register({
   id: "kpis",
-  title: (t) => t("w.kpis"),
-  types: ANY,
-  span: 3,
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     const sum = totals(ctx, ctx.activities);
@@ -95,8 +91,6 @@ register({
 
 register({
   id: "readiness",
-  title: (t) => t("w.readiness"),
-  span: 2,
   render(el, ctx) {
     const { t, fmt, calc, data } = ctx;
     const hrv = last(data.hrv);
@@ -140,7 +134,6 @@ register({
 
 register({
   id: "fitnessAge",
-  title: (t) => t("w.fitnessAge"),
   render(el, ctx) {
     const { t, fmt } = ctx;
     const fa = ctx.data.fitnessAge;
@@ -177,9 +170,6 @@ register({
 
 register({
   id: "periodComparison",
-  title: (t) => t("w.periodComparison"),
-  types: ANY,
-  span: 3,
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     const end = windowEnd(ctx);
@@ -228,9 +218,6 @@ register({
 
 register({
   id: "records",
-  title: (t) => t("w.records"),
-  types: ANY,
-  span: 3,
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     const badges: HTMLElement[] = [];

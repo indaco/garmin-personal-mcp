@@ -600,3 +600,71 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     ]);
   });
 });
+
+const custom = (id: string, code: string) => ({ id, title: `Custom ${id}`, span: 1, code });
+const on = (...ids: string[]) => ({
+  rev: "c",
+  base: "preset",
+  boards: { all: ids.map((id) => ({ id, widget: id, span: 1 })) },
+});
+
+describe("custom widgets and languages", () => {
+  it("runs a custom widget with the widget API, chart and all", async () => {
+    const code = `
+      const p = document.createElement("p");
+      p.className = "rides";
+      p.textContent = ctx.activities.filter((a) => ctx.calc.groupOf(a.type) === "bike").length + " rides </script>";
+      el.append(p);
+      ctx.chart(el, { type: "bar", data: { labels: ["a", "b"], datasets: [{ label: "x", data: [1, 2], backgroundColor: ctx.color("bike") }] } });`;
+    const { page, errors } = await open(
+      browser,
+      pageFile({ widgets: [custom("rides", code)], layout: on("rides") }),
+    );
+    expect(await page.textContent("[data-id=rides] h2")).toBe("Custom rides");
+    expect(await page.textContent(".rides")).toBe("3 rides </script>");
+    expect(await chartsWithoutTooltip(page)).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
+  it("shows the error of a failing widget in its own tile only", async () => {
+    const { page, errors } = await open(
+      browser,
+      pageFile({
+        widgets: [
+          custom("broken", "throw new Error('no data here');"),
+          custom("bad", "this is not code ("),
+        ],
+        layout: on("broken", "bad", "coachNotes"),
+      }),
+    );
+    expect(await page.textContent("[data-id=broken] .error")).toContain("no data here");
+    expect(await page.textContent("[data-id=bad] .error")).toContain("This widget failed");
+    expect(await page.textContent("[data-id=coachNotes] .notes")).toContain("Load");
+    expect(errors).toEqual([]);
+  });
+
+  it("offers custom widgets in the catalogue", async () => {
+    const { page } = await open(
+      browser,
+      pageFile({ widgets: [custom("mine", "el.textContent = 'mine';")], layout: on("coachNotes") }),
+    );
+    await page.click("text=Edit layout");
+    await page.click("text=Add widget");
+    await page.click(".catalogue li:has-text('Custom mine') button");
+    expect(await tiles(page)).toEqual(["coachNotes", "mine"]);
+  });
+
+  it("adds the languages of the page to the menu, with English for a missing text", async () => {
+    const i18n = { de: { title: "Training + Erholung" }, it: { title: "Il mio allenamento" } };
+    const { page } = await open(browser, pageFile({ i18n }), { locale: "it-IT" });
+    // a page text replaces the built-in Italian one
+    expect(await page.textContent("h1")).toBe("Il mio allenamento");
+    expect(await page.$$eval("#lang option", (o) => o.map((x) => x.textContent))).toContain(
+      "Deutsch",
+    );
+    await page.selectOption("#lang", "de");
+    expect(await page.textContent("h1")).toBe("Training + Erholung");
+    expect(await page.textContent("[data-id=readiness] h2")).toBe("Readiness today");
+    expect(await page.evaluate(() => document.documentElement.lang)).toBe("de");
+  });
+});

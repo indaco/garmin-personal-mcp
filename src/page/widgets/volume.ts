@@ -5,8 +5,6 @@ import { register } from "../registry";
 import type { Ctx } from "../registry";
 import { groupKey, kpi, kpiRow, maxHR, note, picker, weekLabel, windowEnd } from "./ui";
 
-const ANY = ["all", ...GROUPS] as const;
-
 /** The heat of a calendar day by its training minutes. */
 const level = (m: number) => (m === 0 ? 0 : m < 30 ? 1 : m < 60 ? 2 : m < 90 ? 3 : 4);
 
@@ -87,16 +85,11 @@ export function renderVolume(el: HTMLElement, ctx: Ctx, only?: string[]): void {
 
 register({
   id: "weeklyVolume",
-  title: (t) => t("w.weeklyVolume"),
-  types: ANY,
-  span: 2,
   render: (el, ctx) => renderVolume(el, ctx),
 });
 
 register({
   id: "intensityMinutes",
-  title: (t) => t("w.intensityMinutes"),
-  types: ANY,
   render(el, ctx) {
     const { t, calc } = ctx;
     if (ctx.activities.length === 0) {
@@ -133,8 +126,6 @@ register({
 
 register({
   id: "loadSafety",
-  title: (t) => t("w.loadSafety"),
-  span: 3,
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     const max = maxHR(ctx);
@@ -204,9 +195,6 @@ register({
 
 register({
   id: "loadVsRecovery",
-  title: (t) => t("w.loadVsRecovery"),
-  types: ANY,
-  span: 3,
   render(el, ctx) {
     const { t, calc } = ctx;
     const max = maxHR(ctx);
@@ -267,9 +255,6 @@ register({
 
 register({
   id: "calendar",
-  title: (t) => t("w.calendar"),
-  types: ANY,
-  span: 3,
   render(el, ctx) {
     const { t, fmt } = ctx;
     const byDay = new Map<string, Activity[]>();

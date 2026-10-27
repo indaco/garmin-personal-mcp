@@ -27,7 +27,6 @@ const clock = (m: number) =>
 
 register({
   id: "hrv",
-  title: (t) => t("w.hrv"),
   render(el, ctx) {
     const { t, calc } = ctx;
     const rows = ctx.data.hrv.slice(-14);
@@ -80,7 +79,6 @@ register({
 
 register({
   id: "restingHr",
-  title: (t) => t("w.restingHr"),
   render(el, ctx) {
     const rows = recoveryDays(ctx);
     if (noRows(el, ctx, rows)) return;
@@ -106,7 +104,6 @@ register({
 
 register({
   id: "sleep",
-  title: (t) => t("w.sleep"),
   render(el, ctx) {
     const { t } = ctx;
     const rows = recoveryDays(ctx);
@@ -153,7 +150,6 @@ register({
 
 register({
   id: "sleepNeed",
-  title: (t) => t("w.sleepNeed"),
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     const rows = recoveryDays(ctx);
@@ -196,7 +192,6 @@ register({
 
 register({
   id: "bedtime",
-  title: (t) => t("w.bedtime"),
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     const rows = recoveryDays(ctx);
@@ -234,7 +229,6 @@ register({
 
 register({
   id: "bodyBattery",
-  title: (t) => t("w.bodyBattery"),
   render(el, ctx) {
     const { t } = ctx;
     const rows = recoveryDays(ctx);

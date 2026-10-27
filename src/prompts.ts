@@ -19,6 +19,8 @@ const load = (name: string) => readFileSync(new URL(`../prompts/${name}`, import
 export function registerPrompts(server: McpServer): void {
   const build = load("training-dashboard.md");
   const update = load("training-dashboard-update.md");
+  const widgetPrompt = load("dashboard-widget.md");
+  const languagePrompt = load("dashboard-language.md");
 
   const dashboardDescription =
     "Build a personal training + recovery dashboard (volume, load, HRV, sleep) from Garmin data";
@@ -66,6 +68,40 @@ export function registerPrompts(server: McpServer): void {
         }),
       );
     },
+  );
+
+  const widgetDescription = "Make a new widget for the training dashboard from your idea";
+  server.registerPrompt(
+    "dashboard-widget",
+    {
+      description: widgetDescription,
+      argsSchema: z.object({
+        idea: z.string().describe("What the widget shows, e.g. my longest ride each month"),
+      }),
+    },
+    (args) => result(widgetDescription, render(widgetPrompt, { idea: arg(args.idea) })),
+  );
+
+  const languageDescription =
+    "Add a language to the training dashboard (Claude translates its texts)";
+  server.registerPrompt(
+    "dashboard-language",
+    {
+      description: languageDescription,
+      argsSchema: z.object({
+        language: z
+          .string()
+          .describe("The language, e.g. German; empty = the language of this chat")
+          .optional(),
+      }),
+    },
+    (args) =>
+      result(
+        languageDescription,
+        render(languagePrompt, {
+          language: arg(args.language) || "my language (the language of this chat)",
+        }),
+      ),
   );
 }
 

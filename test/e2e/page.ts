@@ -12,7 +12,7 @@ let n = 0;
 
 /** A page file from the built template, filled like the server fills it. */
 export function pageFile(
-  blocks: { data?: unknown; layout?: unknown; widgets?: unknown } = {},
+  blocks: { data?: unknown; layout?: unknown; widgets?: unknown; i18n?: unknown } = {},
 ): string {
   let page = readFileSync("dist/dashboard.html", "utf8");
   page = writeBlock(
@@ -22,6 +22,7 @@ export function pageFile(
   );
   page = writeBlock(page, "layout", blocks.layout ?? null);
   page = writeBlock(page, "widgets", blocks.widgets ?? []);
+  page = writeBlock(page, "i18n", blocks.i18n ?? {});
   const file = join(dir, `page-${++n}.html`);
   writeFileSync(file, page);
   return file;

@@ -1,5 +1,4 @@
 import { addDays } from "../../dates";
-import { GROUPS } from "../calc";
 import { append, h } from "../dom";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
@@ -18,7 +17,6 @@ import {
 
 /** The widgets that every type board has: KPIs, the weekly chart and the time in HR zones. */
 
-const ANY = ["all", ...GROUPS] as const;
 export const DISTANCE = new Set(["run", "walk", "hike", "bike", "swim"]);
 
 /** Trends need two sessions: with one, the widget says so instead of drawing a chart. */
@@ -36,9 +34,6 @@ export function oneSession(el: HTMLElement, ctx: Ctx): boolean {
 
 register({
   id: "typeKpis",
-  title: (t) => t("w.typeKpis"),
-  types: ANY,
-  span: 3,
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     const acts = ctx.activities;
@@ -89,9 +84,6 @@ register({
 
 register({
   id: "typeWeekly",
-  title: (t) => t("w.typeWeekly"),
-  types: ANY,
-  span: 2,
   render(el, ctx) {
     if (oneSession(el, ctx)) return;
     const metrics = ["time", "sessions"];
@@ -102,8 +94,6 @@ register({
 
 register({
   id: "hrZones",
-  title: (t) => t("w.hrZones"),
-  types: ANY,
   render(el, ctx) {
     const { t, calc, fmt } = ctx;
     if (oneSession(el, ctx)) return;

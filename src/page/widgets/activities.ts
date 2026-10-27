@@ -1,4 +1,4 @@
-import { type Activity, GROUPS, groupOf, seconds } from "../calc";
+import { type Activity, groupOf, seconds } from "../calc";
 import { append, h } from "../dom";
 import { register } from "../registry";
 import { table, typeCell } from "./ui";
@@ -11,9 +11,6 @@ const ROWS = 15;
 
 register({
   id: "activities",
-  title: (t) => t("w.activities"),
-  types: ["all", ...GROUPS],
-  span: 3,
   render(el, ctx) {
     const { t, fmt } = ctx;
     const acts = ctx.activities;

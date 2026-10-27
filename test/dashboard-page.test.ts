@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { DashboardWriter, readBlock } from "../src/dashboard-page";
+import { DashboardWriter, readBlock, templateVersion } from "../src/dashboard-page";
 import { digest } from "../src/digest";
 
 const template = (version: number, extra = "") => `<!doctype html>
@@ -62,6 +62,20 @@ const code = (s: string) =>
   s.replace(/\/\* garmin-data:start \*\/[\s\S]*?\/\* garmin-data:end \*\//, "");
 
 describe("writeDashboard", () => {
+  it("reads the template version of the real template, as the formatter writes it", async () => {
+    const real = readFileSync("src/page/template.html", "utf8");
+    expect(templateVersion(real)).toBeGreaterThan(2);
+    expect(templateVersion('<meta name="garmin-template" content="7" />')).toBe(7);
+    expect(templateVersion('<meta name="garmin-template" content="7">')).toBe(7);
+  });
+
+  it("has every block in the real template", () => {
+    const real = readFileSync("src/page/template.html", "utf8");
+    for (const block of ["data", "layout", "widgets", "i18n"] as const) {
+      expect([block, readBlock(real, block) !== undefined]).toEqual([block, true]);
+    }
+  });
+
   it("creates <data-dir>/garmin-dashboard.html from the template, with the preset layout", async () => {
     const r = await writer.write({ weeks: 8 });
     expect(r).toMatchObject({ path: file, page: "created", notes: 0 });

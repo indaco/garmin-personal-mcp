@@ -125,3 +125,21 @@ describe("prompts", () => {
     );
   });
 });
+
+describe("widget and language prompts", () => {
+  it("puts the idea into the widget prompt", async () => {
+    const text = await render("dashboard-widget", { idea: "  my longest ride each month\n" });
+    expect(text).toContain("dashboard: my longest ride each month. Use");
+    expect(text).toContain("Never invent");
+    expect(text.includes("{{")).toBe(false);
+  });
+
+  it("asks for the language, or uses the language of the chat", async () => {
+    expect(await render("dashboard-language", { language: "German" })).toContain(
+      "Add German to my",
+    );
+    expect(await render("dashboard-language", {})).toContain(
+      "Add my language (the language of this chat) to my",
+    );
+  });
+});

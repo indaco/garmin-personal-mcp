@@ -6,6 +6,7 @@ import type * as strength from "./strength";
 import type * as sports from "./sports";
 import type { Activity, Group } from "./calc";
 import type { Fmt, T } from "./i18n";
+import { CATALOGUE } from "./catalogue";
 import type { Span } from "./layout";
 
 /** The getDashboardData result embedded in the page, plus the coach notes. */
@@ -68,12 +69,23 @@ export interface WidgetDef {
   types?: readonly ("all" | Group)[];
   span?: Span;
   render: (el: HTMLElement, ctx: Ctx) => void;
+  /** Written by Claude and stored in the page, not built in. */
+  custom?: boolean;
 }
 
 const widgets = new Map<string, WidgetDef>();
 
-export function register(def: WidgetDef): void {
-  widgets.set(def.id, def);
+/** A built-in widget: its title, types and width come from the catalogue. */
+export function register(def: Pick<WidgetDef, "id" | "render">): void {
+  const meta = CATALOGUE.find((c) => c.id === def.id);
+  if (!meta) throw new Error(`widget ${def.id} is not in the catalogue`);
+  widgets.set(def.id, { ...def, title: (t) => t(meta.title), types: meta.types, span: meta.span });
+}
+
+/** A custom widget: Claude wrote it, the page block keeps it. A built-in id is never replaced. */
+export function registerCustom(def: WidgetDef): void {
+  if (widgets.get(def.id)?.custom === false || CATALOGUE.some((c) => c.id === def.id)) return;
+  widgets.set(def.id, { ...def, custom: true });
 }
 
 export const widget = (id: string) => widgets.get(id);

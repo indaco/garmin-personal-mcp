@@ -1,5 +1,27 @@
 [
   {
+    "name": "dashboard-language",
+    "description": "Add a language to the training dashboard (Claude translates its texts)",
+    "arguments": [
+      {
+        "name": "language",
+        "description": "The language, e.g. German; empty = the language of this chat",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "dashboard-widget",
+    "description": "Make a new widget for the training dashboard from your idea",
+    "arguments": [
+      {
+        "name": "idea",
+        "description": "What the widget shows, e.g. my longest ride each month",
+        "required": true
+      }
+    ]
+  },
+  {
     "name": "training-dashboard",
     "description": "Build a personal training + recovery dashboard (volume, load, HRV, sleep) from Garmin data",
     "arguments": [

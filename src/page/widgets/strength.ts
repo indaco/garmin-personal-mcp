@@ -8,7 +8,6 @@ import { kpi, kpiRow, note, weekLabel } from "./ui";
 
 /** The Strength board: sets per movement, muscle-group balance, the exercises with their detail, the sessions. */
 
-const STRENGTH = ["strength"] as const;
 const mg = (g: string) => `mg.${g}` as Key;
 const PALETTE = [
   "strength",
@@ -26,9 +25,6 @@ const PALETTE = [
 
 register({
   id: "setsPerCategory",
-  title: (t) => t("w.setsPerCategory"),
-  types: STRENGTH,
-  span: 2,
   render(el, ctx) {
     if (oneSession(el, ctx)) return;
     const sets = ctx.calc.setsByCategory(ctx.activities, ctx.weeks);
@@ -65,8 +61,6 @@ const sum = (v: number[]) => v.reduce((s, x) => s + x, 0);
 
 register({
   id: "muscleBalance",
-  title: (t) => t("w.muscleBalance"),
-  types: STRENGTH,
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     if (oneSession(el, ctx)) return;
@@ -116,9 +110,6 @@ const state = new Map<
 
 register({
   id: "exercises",
-  title: (t) => t("w.exercises"),
-  types: STRENGTH,
-  span: 3,
   render(el, ctx) {
     const { t, calc } = ctx;
     const stats = calc.exerciseStats(ctx.activities);
@@ -461,9 +452,6 @@ function detail(ctx: Ctx, s: ExerciseStats): HTMLElement {
 
 register({
   id: "strengthSessions",
-  title: (t) => t("w.strengthSessions"),
-  types: STRENGTH,
-  span: 3,
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     const acts = ctx.activities.filter((a) => calc.exercisesOf(a).length > 0);

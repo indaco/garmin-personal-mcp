@@ -22,9 +22,6 @@ const weekOf = (ctx: Ctx, a: Activity) =>
 
 register({
   id: "walkDetails",
-  title: (t) => t("w.walkDetails"),
-  types: ["walk", "hike"],
-  span: 2,
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     if (oneSession(el, ctx)) return;
@@ -105,7 +102,6 @@ register({
 
 register({
   id: "steps",
-  title: (t) => t("w.steps"),
   render(el, ctx) {
     const { t } = ctx;
     const rows = ctx.data.recovery.slice(-14);
@@ -154,9 +150,6 @@ register({
 
 register({
   id: "hikeVertical",
-  title: (t) => t("w.hikeVertical"),
-  types: ["hike", "walk", "run"],
-  span: 3,
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     const list = ctx.activities.filter((a) => calc.verticalPerHour(a) !== undefined);
@@ -180,9 +173,6 @@ register({
 
 register({
   id: "bikeDetails",
-  title: (t) => t("w.bikeDetails"),
-  types: ["bike"],
-  span: 3,
   render(el, ctx) {
     const { t, fmt } = ctx;
     const rides = ctx.activities;
@@ -274,9 +264,6 @@ register({
 
 register({
   id: "swimDetails",
-  title: (t) => t("w.swimDetails"),
-  types: ["swim"],
-  span: 3,
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     if (ctx.activities.length === 0) return ctx.empty(el);
@@ -311,9 +298,6 @@ register({
 
 register({
   id: "racketDetails",
-  title: (t) => t("w.racketDetails"),
-  types: ["racket", "other"],
-  span: 3,
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     if (ctx.activities.length === 0) return ctx.empty(el);

@@ -9,7 +9,6 @@ import { alpha, kpi, kpiRow, note, table, weekLabel } from "./ui";
 
 /** The Run board: best efforts, races, aerobic fitness, intensity, form, run/walk, training effect, predictions, long runs. */
 
-const RUN = ["run"] as const;
 const DISTANCES = ["1k", "mile", "5k", "10k", "half", "marathon"];
 const FORM: [field: string, key: Key, unit: string, digits: number][] = [
   ["cadenceSpm", "form.cadence", "spm", 0],
@@ -41,8 +40,6 @@ function bestEfforts(ctx: Ctx) {
 
 register({
   id: "bestEfforts",
-  title: (t) => t("w.bestEfforts"),
-  types: RUN,
   render(el, ctx) {
     const { t, fmt } = ctx;
     const best = bestEfforts(ctx);
@@ -58,9 +55,6 @@ register({
 
 register({
   id: "races",
-  title: (t) => t("w.races"),
-  types: RUN,
-  span: 2,
   render(el, ctx) {
     const { t, fmt } = ctx;
     const races = runs(ctx).filter((a) => a.race === true);
@@ -96,9 +90,6 @@ register({
 
 register({
   id: "aerobicFitness",
-  title: (t) => t("w.aerobicFitness"),
-  types: RUN,
-  span: 2,
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     if (oneSession(el, ctx)) return;
@@ -205,8 +196,6 @@ register({
 
 register({
   id: "intensityShare",
-  title: (t) => t("w.intensityShare"),
-  types: RUN,
   render(el, ctx) {
     const { t, calc, fmt } = ctx;
     if (oneSession(el, ctx)) return;
@@ -244,9 +233,6 @@ register({
 
 register({
   id: "runningForm",
-  title: (t) => t("w.runningForm"),
-  types: RUN,
-  span: 3,
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     if (oneSession(el, ctx)) return;
@@ -299,8 +285,6 @@ register({
 
 register({
   id: "runWalk",
-  title: (t) => t("w.runWalk"),
-  types: RUN,
   render(el, ctx) {
     const { t, fmt } = ctx;
     const list = runs(ctx).filter((a) => a.runWalk && typeof a.runWalk === "object");
@@ -326,9 +310,6 @@ register({
 
 register({
   id: "trainingEffect",
-  title: (t) => t("w.trainingEffect"),
-  types: RUN,
-  span: 2,
   render(el, ctx) {
     const { t, fmt } = ctx;
     if (oneSession(el, ctx)) return;
@@ -387,8 +368,6 @@ register({
 
 register({
   id: "racePredictor",
-  title: (t) => t("w.racePredictor"),
-  types: RUN,
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     const best = bestEfforts(ctx);
@@ -411,9 +390,6 @@ register({
 
 register({
   id: "longRuns",
-  title: (t) => t("w.longRuns"),
-  types: RUN,
-  span: 2,
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     if (oneSession(el, ctx)) return;

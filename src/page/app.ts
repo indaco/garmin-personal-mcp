@@ -7,7 +7,15 @@ import { type Activity, activitiesIn, type Group, GROUPS, groupOf, weeksOf } fro
 import { Chart, chart, destroyCharts, themeCharts } from "./charts";
 import { h } from "./dom";
 import { icon } from "./icons";
-import { formatter, type Key, LANGUAGE_NAMES, pickLang, type T, translator } from "./i18n";
+import {
+  addLanguages,
+  formatter,
+  type Key,
+  LANGUAGE_NAMES,
+  pickLang,
+  type T,
+  translator,
+} from "./i18n";
 import {
   add,
   boardOf,
@@ -25,7 +33,14 @@ import {
   withBoard,
 } from "./layout";
 import { preset } from "./presets";
-import { allWidgets, type Ctx, type Data, widget, type WidgetDef } from "./registry";
+import {
+  allWidgets,
+  type Ctx,
+  type Data,
+  registerCustom,
+  widget,
+  type WidgetDef,
+} from "./registry";
 import { formatHash, parseHash, type View } from "./state";
 import { DEFAULT_THEME, store, THEMES, themeKey, token } from "./theme";
 import "./widgets";
@@ -33,7 +48,7 @@ import "./widgets";
 declare global {
   interface Window {
     /** The page blocks, set by the inline script that the server fills. */
-    GARMIN?: { data: Data | null; layout: unknown; widgets: unknown };
+    GARMIN?: { data: Data | null; layout: unknown; widgets: unknown; i18n?: unknown };
     Chart?: typeof Chart;
   }
 }
@@ -56,6 +71,11 @@ let weeks: string[] = [];
 
 export function start(): void {
   window.Chart = Chart; // for custom widgets and the page tests
+  addLanguages(G.i18n);
+  for (const w of Array.isArray(G.widgets) ? G.widgets : []) {
+    const def = compile(w);
+    if (def) registerCustom(def);
+  }
   setLanguage(langChoice);
   const data = G.data;
   if (data) {
@@ -623,4 +643,29 @@ function copyDialog(): void {
     area,
     h("div", { class: "dialog-actions" }, copy),
   );
+}
+
+// ------------------------------------------------------------------ custom widgets
+
+/** A custom widget from the page block. Code that does not compile gives a widget that shows the error. */
+function compile(w: unknown): WidgetDef | undefined {
+  if (!w || typeof w !== "object") return undefined;
+  const { id, title, code, span, types } = w as Record<string, unknown>;
+  if (typeof id !== "string" || typeof code !== "string") return undefined;
+  let draw: WidgetDef["render"];
+  try {
+    // the body of a function (el, ctx) that Claude wrote on the user's request; the server keeps it in this page
+    draw = new Function("el", "ctx", code) as WidgetDef["render"];
+  } catch (e) {
+    draw = () => {
+      throw new Error((e as Error).message, { cause: e });
+    };
+  }
+  return {
+    id,
+    title: () => (typeof title === "string" ? title : id),
+    span: Math.min(3, Math.max(1, Math.round(Number(span) || 1))) as Span,
+    types: Array.isArray(types) ? (types as WidgetDef["types"]) : undefined,
+    render: draw,
+  };
 }

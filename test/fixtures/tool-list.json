@@ -16,6 +16,110 @@
     }
   },
   {
+    "name": "editDashboard",
+    "description": "Changes the layout, the custom widgets or the languages of the dashboard page (a page from the\ntemplate; call writeDashboard first). Without arguments it only reads: the reply has the layout, the\ncustom widgets, the missing texts of each language, the catalogue of built-in widgets and `widgetApi`,\nthe guide to writing a custom widget. `layout` replaces the whole layout (the text of the page's\n'Copy layout'); `place` adds widgets at the end of a board; `widgets` adds or replaces custom widgets\nby id; `removeWidgets` removes them, also from the boards. `languages` adds texts by key, e.g.\n{\"de\": {\"title\": \"Training + Erholung\"}}: keys and {placeholders} as in `englishTexts: true`; a\ntext with \"|\" has a singular and a plural form. Missing texts show in English.",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "layout": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "A whole layout: { base, boards: { all: [{ id, widget, type?, span, hidden? }] } }"
+        },
+        "place": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "board": {
+                "type": "string",
+                "description": "all, run, strength, walk, hike, bike, swim, racket or other"
+              },
+              "widget": {
+                "type": "string",
+                "description": "A widget id of the catalogue or a custom widget"
+              },
+              "type": {
+                "type": "string",
+                "description": "The type the widget shows, when not the board's"
+              },
+              "span": {
+                "type": "integer",
+                "description": "Width in columns, 1 to 3"
+              }
+            },
+            "required": ["board", "widget"]
+          }
+        },
+        "widgets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Letters, digits and -, e.g. longest-ride"
+              },
+              "title": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string",
+                "description": "The body of a function (el, ctx): see widgetApi"
+              },
+              "span": {
+                "type": "integer"
+              },
+              "types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Types the widget can show"
+              }
+            },
+            "required": ["id", "title", "code"]
+          }
+        },
+        "removeWidgets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ids of custom widgets"
+        },
+        "languages": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "description": "Texts by language code and key"
+        },
+        "englishTexts": {
+          "type": "boolean",
+          "description": "Also return the English texts to translate"
+        },
+        "path": {
+          "type": "string",
+          "description": "The .html file; relative paths are inside the data dir"
+        }
+      }
+    }
+  },
+  {
     "name": "garminGet",
     "description": "Generic read-only GET on the Garmin Connect Personal API, for endpoints not covered by the\nother tools or when a query parameter name has to be adjusted. 'path' is relative and starts\nwith '/', e.g. /fitnessage-service/fitnessage/v2/2026-10-25 . 'query' is an optional\nURL query string without '?', e.g. date=2026-10-25&foo=bar .",
     "inputSchema": {
