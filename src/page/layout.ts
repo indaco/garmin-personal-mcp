@@ -52,12 +52,37 @@ export function resetBoard(
   return { ...layout, boards };
 }
 
-export function move(board: Instance[], id: string, to: number): Instance[] {
-  const from = board.findIndex((i) => i.id === id);
-  if (from < 0) return board;
+/**
+ * Moves a widget before another one, or to the end with null. The page moves widgets among the
+ * shown ones; a hidden widget keeps its place between them.
+ */
+export function moveBefore(board: Instance[], id: string, before: string | null): Instance[] {
+  const item = board.find((i) => i.id === id);
+  if (!item || before === id) return board;
   const next = board.filter((i) => i.id !== id);
-  next.splice(Math.max(0, Math.min(to, next.length)), 0, board[from]);
+  const at = before === null ? -1 : next.findIndex((i) => i.id === before);
+  next.splice(at < 0 ? next.length : at, 0, item);
   return next;
+}
+
+/** The columns a tile spans when its right edge is `width` px from its left edge, snapped. */
+export function snapSpan(
+  width: number,
+  cols: number,
+  colWidth: number,
+  gap: number,
+  min = 1,
+): number {
+  const n = Math.round((width + gap) / (colWidth + gap));
+  return Math.max(1, Math.min(cols, Math.max(min, n)));
+}
+
+/**
+ * The span to save for a resize to `target` on a grid of `cols` columns. Full width on a narrower
+ * grid keeps a wider saved span, so a resize on a tablet does not shrink the desktop layout.
+ */
+export function storedSpan(target: number, old: Span, cols: number): Span {
+  return (target === cols ? Math.max(old, target) : target) as Span;
 }
 
 export function setSpan(board: Instance[], id: string, span: Span): Instance[] {

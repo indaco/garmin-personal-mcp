@@ -55,14 +55,20 @@ await page.click("[data-exercise=barbell-back-squat]");
 await scrollTo(page, "exercises");
 await shot(page);
 
-// Edit mode: drag Fitness age before Readiness, then hide Readiness
+// Edit mode: drag Consistency before Readiness, widen Readiness, then hide it
 page = await open(pageFile("edit", null));
 await page.click("text=Edit layout");
-const from = await page.locator("[aria-label='Drag to move Fitness age']").boundingBox();
-const to = await page.locator("[data-id=readiness]").boundingBox();
+const from = await page.locator("[aria-label='Move Consistency']").boundingBox();
 await page.mouse.move(from.x + 5, from.y + 5);
 await page.mouse.down();
-await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
+const to = await page.locator("[data-id=readiness]").boundingBox();
+await page.mouse.move(to.x + to.width / 4, to.y + to.height / 2, { steps: 8 });
+await shot(page);
+await page.mouse.up();
+const edge = await page.locator("[aria-label='Width of Readiness today']").boundingBox();
+await page.mouse.move(edge.x + edge.width / 2, edge.y + edge.height / 2);
+await page.mouse.down();
+await page.mouse.move(1260, edge.y + edge.height / 2, { steps: 6 });
 await shot(page);
 await page.mouse.up();
 await page.click("[aria-label='Hide Readiness today']");
@@ -81,7 +87,7 @@ for (const title of ["Weekly volume", "HRV", "Sleep"]) await addWidget(title);
 await page.click("text=Add widget");
 await shot(page);
 await page.click(".catalogue li:has(span:text-is('Resting HR')) button");
-await page.click("text=Done");
+await page.click(".edit-bar >> text=Done");
 await shot(page);
 
 // The light and high-contrast themes

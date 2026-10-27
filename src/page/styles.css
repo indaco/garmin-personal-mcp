@@ -488,14 +488,99 @@ select {
   min-width: 0;
   overflow-x: auto;
 }
-.tile.is-hidden {
-  opacity: 0.45;
+/* Edit mode: a lifted tile follows the pointer, a slot shows where it lands */
+.grid.editing {
+  position: relative;
 }
-.tile.dragging {
-  outline: 2px dashed var(--accent);
+.grid.editing .tile {
+  position: relative;
 }
-.tile.drop-target {
+.grid.editing .tile.lifted {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 50;
   outline: 2px solid var(--accent);
+  box-shadow: 0 24px 48px rgb(0 0 0 / 45%);
+  pointer-events: none;
+}
+.tile.picked {
+  outline: 2px solid var(--accent);
+  box-shadow: 0 16px 36px rgb(0 0 0 / 40%);
+}
+.tile-slot {
+  box-sizing: border-box;
+  border: 2px dashed var(--accent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+html.dragging,
+html.dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+html.resizing,
+html.resizing * {
+  cursor: ew-resize !important;
+  user-select: none;
+}
+/* The resize handle: a bar on the right edge of the tile */
+.resize {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  right: -7px;
+  width: 14px;
+  display: grid;
+  place-items: center;
+  cursor: ew-resize;
+  touch-action: none;
+  border-radius: 7px;
+}
+.resize::after {
+  content: "";
+  width: 4px;
+  height: 40px;
+  max-height: 100%;
+  border-radius: 2px;
+  background: var(--muted);
+}
+.resize:hover::after,
+.resize:focus-visible::after,
+.resize.active::after {
+  height: 72px;
+  background: var(--accent);
+}
+.span-badge {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 6;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 12px;
+  font-weight: 700;
+}
+.guides {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  display: grid;
+  pointer-events: none;
+}
+.guides div {
+  border: 1.5px dashed color-mix(in srgb, var(--accent) 70%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+@media (max-width: 700px) {
+  .resize {
+    display: none;
+  }
 }
 .tools {
   display: flex;
@@ -518,9 +603,19 @@ select {
   opacity: 0.4;
   cursor: default;
 }
-.handle {
+.grip {
   cursor: grab;
   touch-action: none;
+  font-size: 16px;
+}
+.tool .icon {
+  display: block;
+}
+@media (pointer: coarse) {
+  .grip {
+    min-width: 40px;
+    height: 40px;
+  }
 }
 .chart {
   position: relative;
