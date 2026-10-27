@@ -7,7 +7,6 @@ import {
   mondayOf,
   seconds,
   sessionSeconds,
-  sportName,
   sportOf,
   weeksOf,
 } from "../../src/page/calc";
@@ -38,14 +37,6 @@ describe("activity types", () => {
     ["", "", "generic"],
   ])("%s with the sport %s is on the %s board", (type, sport, board) => {
     expect(groupOf({ type, sport })).toBe(board);
-  });
-
-  it.each([
-    ["alpineSkiing", "Alpine skiing"],
-    ["mixedMartialArts", "Mixed martial arts"],
-    ["hiit", "Hiit"],
-  ])("names the board of the SDK sport %s", (sport, name) => {
-    expect(sportName(sport)).toBe(name);
   });
 
   it("names the sport of a racket type", () => {

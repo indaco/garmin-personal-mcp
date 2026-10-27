@@ -1,6 +1,8 @@
+import { Profile } from "@garmin/fitsdk";
 import { describe, expect, it } from "vitest";
 import { CATALOGUES, formatter, pickLang, translator } from "../../src/page/i18n";
 import { en } from "../../src/page/i18n/en";
+import { typeName } from "../../src/page/widgets/ui";
 
 const names = (s: string) => (s.match(/\{\w+\}/g) ?? []).toSorted();
 
@@ -17,6 +19,19 @@ describe("catalogues", () => {
     for (const [key, text] of Object.entries(en)) {
       expect([key, names(catalogue[key as keyof typeof en])]).toEqual([key, names(text)]);
     }
+  });
+});
+
+describe("sport names", () => {
+  it("has a text for every sport of the FIT SDK, the name of its board", () => {
+    const sports = Object.values(Profile.types.sport).filter((s) => s !== "all");
+    expect(sports.filter((s) => !(`type.${s}` in en))).toEqual([]);
+  });
+
+  it("names a board in the page language, or by its key when it has no text", () => {
+    expect(typeName(translator("it"), "alpineSkiing")).toBe("Sci alpino");
+    expect(typeName(translator("en"), "hiit")).toBe("HIIT");
+    expect(typeName(translator("en"), "newSport")).toBe("newSport");
   });
 });
 

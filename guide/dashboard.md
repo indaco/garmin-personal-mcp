@@ -74,8 +74,9 @@ Two Garmin types are exceptions, because their SDK sport does not fit:
 - Garmin sends strength training as the sport `training` or `fitnessEquipment`.
 - Garmin sends pickleball as the sport `hiit`.
 
-Each other sport gets a tab of its own, with the widgets of the Other board. The tab name comes from
-the SDK name: `alpineSkiing` is "Alpine skiing". The tabs of other sports come after Racket sports,
+Each other sport gets a tab of its own, with the widgets of the Other board. The tab shows the name
+of the sport in the page language: `alpineSkiing` is "Alpine skiing" in English and "Sci alpino" in
+Italian. The tabs of other sports come after Racket sports,
 in the order of their keys. Other is always the last tab.
 
 [The widget catalogue](widgets.md) lists every widget, with what it shows and how it calculates.
