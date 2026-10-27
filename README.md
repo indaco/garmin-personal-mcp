@@ -1,17 +1,394 @@
 # garmin-personal-mcp
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node.js 22 or later](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://nodejs.org)
+[![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)](tsconfig.json)
+[![MCP stdio server](https://img.shields.io/badge/MCP-stdio%20server-8a2be2.svg)](https://modelcontextprotocol.io)
+[![Garmin Connect Personal API](https://img.shields.io/badge/Garmin-Personal%20API-007cc3.svg)](https://developer.garmin.com/gc-developer-program/personal/)
+
 **Your Garmin training in Claude, through the official Personal API. Read-only, nothing to
 install.**
 
-> Work in progress: a TypeScript port of [indaco/garmin-mcp](https://github.com/indaco/garmin-mcp).
-> The tools, prompts and setup are documented when the port is complete.
+MCP server for the official Garmin Connect Personal API. Read-only access to activities, laps and
+strength sets from .FIT files, HRV, sleep and heart rate. Includes a training and recovery
+dashboard. Runs with npx, with nothing to install.
+
+It works with **Claude Desktop**, **Claude Code** and every other MCP client that uses stdio.
+
+```mermaid
+flowchart LR
+    C["Claude Desktop / Claude Code"] -- "MCP over stdio" --> S["garmin-personal-mcp (Node.js)"]
+    S -- "API key → access token (24 h)" --> T["Garmin token endpoint"]
+    S -- "Bearer token, GET" --> G["Garmin Connect Personal API"]
+    S -- "exercise catalogue, no token" --> E["connect.garmin.com"]
+    S -- ".FIT files and caches" --> F[("~/workspace/garmin-data")]
+```
+
+## Contents
+
+- [What you get](#what-you-get)
+- [Requirements](#requirements)
+- [1. Create the personal API key](#1-create-the-personal-api-key)
+- [2. Connect to Claude Desktop](#2-connect-to-claude-desktop)
+- [3. Connect to Claude Code](#3-connect-to-claude-code)
+- [Run from source](#run-from-source)
+- [The training dashboard prompt](#the-training-dashboard-prompt)
+- [Tools](#tools)
+- [Configuration](#configuration)
+- [Improvements over garmin-mcp](#improvements-over-garmin-mcp)
+- [Problems and solutions](#problems-and-solutions)
+- [How it works](#how-it-works)
+- [Security](#security)
+- [Development](#development)
+- [Credits](#credits)
+- [License](#license)
+
+## What you get
+
+- **13 tools**: activities, laps and strength sets from the original .FIT files, HRV, sleep,
+  daily heart rate, HR zones, fitness age and daily summaries.
+- **training-dashboard**: Claude gets your data for the last weeks and builds an interactive
+  dashboard. The dashboard shows your training load next to HRV, sleep and resting heart rate.
+- **training-dashboard-update**: Claude adds the new data to an existing dashboard. The code, the
+  layout and the styles stay the same.
+
+The server is read-only: the Personal API has no write endpoints. The API key stays on your
+computer, and the server never writes it to a log.
+
+## Requirements
+
+- Node.js 22 or later. `node --version` shows the version.
+- A Garmin Connect account with access to the
+  [Personal API](https://developer.garmin.com/gc-developer-program/personal/).
+
+## 1. Create the personal API key
+
+1. Open Garmin Connect web at <https://connect.garmin.com/app/settings/personalApiToken>.
+2. Select _Create Key_, accept the terms, select the expiry (1 year at most) and select _Create_.
+3. Garmin shows the key **only one time**. Save it in a file that only you can read:
+
+```bash
+mkdir -p ~/.config/garmin-mcp
+nano ~/.config/garmin-mcp/api-key      # paste the key and save
+chmod 600 ~/.config/garmin-mcp/api-key
+```
+
+You can also set the environment variable `GARMIN_PERSONAL_API_KEY`. The variable has priority
+over the file.
+
+To test the key, run this command. It shows only the HTTP status, and `200` means that the key
+is correct:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  'https://personal.connectapi.garmin.com/personalapitoken-service/personal-api/personal-api-key/token' \
+  -H "Authorization: ApiKey $(cat ~/.config/garmin-mcp/api-key)"
+```
+
+## 2. Connect to Claude Desktop
+
+In Claude Desktop, select Settings → Developer → _Edit Config_. This opens
+`claude_desktop_config.json`:
+
+| OS      | Path                                                              |
+| ------- | ----------------------------------------------------------------- |
+| Linux   | `~/.config/Claude/claude_desktop_config.json`                     |
+| macOS   | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json`                     |
+
+Add a top-level `mcpServers` key, next to the keys that the file has. Do not put it in
+`preferences`:
+
+```json
+{
+  "mcpServers": {
+    "garmin": {
+      "command": "npx",
+      "args": ["-y", "@indaco/garmin-personal-mcp"]
+    }
+  }
+}
+```
+
+To change a setting, add an `env` object next to `args`, for example
+`"env": { "GARMIN_DATA_DIR": "/absolute/path/to/garmin-data" }`. The
+[Configuration](#configuration) section lists all the settings.
+
+Quit Claude Desktop **fully**, including the tray icon, and start it again. Claude Desktop starts
+the server when it starts. The `garmin` tools show in the connectors menu, and the prompts show in
+the **+** menu.
+
+## 3. Connect to Claude Code
+
+This command adds the server to all your projects (`--scope user`):
+
+```bash
+claude mcp add garmin --scope user -- npx -y @indaco/garmin-personal-mcp
+claude mcp list          # garmin: ... ✔ Connected
+```
+
+To add a setting, use `--env`, for example `--env GARMIN_DATA_DIR=/path/to/garmin-data`. Use
+`--scope project` to write a `.mcp.json` file that you can share in the current repository. In a
+session, `/mcp` shows the server status and its tools.
+
+## Run from source
+
+Use this procedure before the first npm release, or to test a change:
+
+```bash
+git clone https://github.com/indaco/garmin-personal-mcp.git
+cd garmin-personal-mcp
+pnpm install
+pnpm build               # writes dist/index.js
+```
+
+Then use `node` with the absolute path of `dist/index.js` in place of `npx -y
+@indaco/garmin-personal-mcp`:
+
+```json
+{
+  "mcpServers": {
+    "garmin": {
+      "command": "node",
+      "args": ["/absolute/path/to/garmin-personal-mcp/dist/index.js"]
+    }
+  }
+}
+```
+
+## The training dashboard prompt
+
+The `training-dashboard` prompt has one optional argument, `weeks`. The default is 12 and the
+maximum is 52. Claude gets all the data with one `getDashboardData` call and builds a dashboard
+with:
+
+- a tab for each sport (Run, Strength, Walk, Bike, Padel, and Hike and Swim when you have them).
+  Each tab has its own colour and icon;
+- on the _All_ tab: readiness for today, fitness age, these weeks against the weeks before, and
+  the records. Also weekly volume, load safety, intensity minutes, a consistency calendar, load
+  against recovery, the recovery panel and coach notes;
+- on the _Run_ tab: best efforts, races side by side, aerobic fitness, running form, a race
+  predictor and the pace split of each race;
+- on the _Strength_ tab: each exercise with its sets, grouped by muscle group, its trend over
+  time, and the balance between the muscle groups;
+- a week selector, and a theme selector with dark, light and high-contrast themes.
+
+The dashboard uses the training load, HR zones and training effect from Garmin. It labels each
+value that it calculates as an estimate. It does not invent missing values: a failed call shows
+as "n/a" in the related widget.
+
+### Before you run a prompt
+
+- **Permissions**: the first `getDashboardData` call sends approximately 35 requests to Garmin.
+  Later calls use the local cache and send approximately 8. In Claude Desktop, answer **Allow
+  always** the first time that a garmin tool asks for permission. In Claude Code, use
+  `/permissions` and add `mcp__garmin`.
+- **New session**: after an update of the server, the prompts and tools change only in a new
+  Claude Code session. In Claude Desktop, they change after a full restart.
+- **Activity id**: the number at the end of the activity page URL on Garmin Connect web. You can
+  also ask Claude to "list my last 5 activities".
+
+### Run it
+
+| Client         | How to run it                                                                                       | Output                                           |
+| -------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Claude Desktop | **+** in the message box → _garmin_ → `training-dashboard` → set `weeks` (or leave it empty) → send | an interactive artifact                          |
+| Claude Code    | `/mcp__garmin__training-dashboard 8`                                                                | `garmin-dashboard.html` in the current directory |
+
+In Claude Code, open the file with `open` (macOS) or `xdg-open` (Linux).
+
+### Update the dashboard
+
+You do not have to build the dashboard again to see new data. The `training-dashboard-update`
+prompt finds the dashboard and replaces only its data and its coach notes. The code, the layout
+and the styles stay the same.
+
+| Client         | How to run it                                         | What it updates                                  |
+| -------------- | ----------------------------------------------------- | ------------------------------------------------ |
+| Claude Desktop | **+** → _garmin_ → `training-dashboard-update` → send | the dashboard artifact in the same conversation  |
+| Claude Code    | `/mcp__garmin__training-dashboard-update`             | `garmin-dashboard.html` in the current directory |
+
+Leave `weeks` empty to keep the weeks of the dashboard. A new Claude Desktop conversation has no
+artifact to update, so the prompt builds a new dashboard. The prompt also builds a new dashboard
+when the dashboard comes from older build instructions, and it tells you so.
+
+The server keeps the data of each call in `dashboard-cache.json` in the data folder. The next
+call asks Garmin only for the days after the last call. It also asks again for the last two days,
+because Garmin can still add data to them. The .FIT files of strength sessions and laps stay in
+the `fit` folder, so their sets and laps need no new download.
+
+## Tools
+
+| Tool                  | Endpoint                                             | Notes                                                                                                                                                                                                                                                                                                       |
+| --------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `listActivities`      | `/activitylist-service/activities/search/activities` | a compact summary of each activity: km, moving and elapsed time, pace, HR, cadence, ascent, HR-zone seconds, Garmin training load and training effect, intensity minutes, race flag, best efforts, power, running form, run/walk segments, swim SWOLF, lengths and strokes. `raw=true` gives the full JSON. |
+| `getActivity`         | `/activity-service/activity/{id}`                    | summary, metadata and segments by type                                                                                                                                                                                                                                                                      |
+| `getActivityLaps`     | `/download-service/files/activity/{id}`              | laps from the .FIT file: km, time, pace or speed, HR, cadence, ascent, power and intensity                                                                                                                                                                                                                  |
+| `getActivitySets`     | `/download-service/files/activity/{id}`              | strength sets from the .FIT file: exercise, movement category, primary and secondary muscles, reps, weight (kg), set time and the rest after the set                                                                                                                                                        |
+| `downloadActivityFit` | `/download-service/files/activity/{id}`              | saves `{id}.fit` in the `fit` folder of the data folder. The server downloads each file one time only.                                                                                                                                                                                                      |
+| `getHrvRange`         | `/hrv-service/hrv/daily/{from}/{to}`                 | HRV during the night                                                                                                                                                                                                                                                                                        |
+| `getDailyHeartRate`   | `/wellness-service/wellness/dailyHeartRate`          | includes the resting HR                                                                                                                                                                                                                                                                                     |
+| `getSleep`            | `/sleep-service/sleep/dailySleep`                    | the date is the morning after the night                                                                                                                                                                                                                                                                     |
+| `getHeartRateZones`   | `/biometric-service/heartRateZones/v2`               |                                                                                                                                                                                                                                                                                                             |
+| `getFitnessAge`       | `/fitnessage-service/fitnessage/v2/{date}`           | fitness age against actual age, and its components                                                                                                                                                                                                                                                          |
+| `getDailySummary`     | `/usersummary-service/usersummary/daily`             | steps, stress and body battery                                                                                                                                                                                                                                                                              |
+| `getDashboardData`    | the endpoints above                                  | all the data of the dashboard in one call. It keeps a local cache and asks Garmin only for new days.                                                                                                                                                                                                        |
+| `garminGet`           | all other GET endpoints                              | a relative path and a query string                                                                                                                                                                                                                                                                          |
+
+The Personal API does not have these Garmin Connect data, and their endpoints answer 404:
+
+- VO2 max, training status and readiness, race predictions and personal records;
+- weight, gear and activity weather;
+- endurance and hill score, lactate threshold and exercise sets.
+
+When the dashboard needs one of these values, it calculates an estimate and labels it.
+
+Dates use the format `yyyy-MM-dd`. The API reference does not always give the names of the query
+parameters. If an endpoint answers 400, Claude can use `garminGet` to try a different name.
+`listActivities` with `activityType` sometimes answers 400.
+API reference: <https://developer.garmin.com/gc-developer-program/personal/swagger-docs/>
+
+## Configuration
+
+You configure the server with environment variables. All of them are optional.
+
+| Variable                  | Default                                  | Meaning                                                                         |
+| ------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------- |
+| `GARMIN_PERSONAL_API_KEY` | not set                                  | the personal API key. It has priority over the key file.                        |
+| `GARMIN_API_KEY_FILE`     | `~/.config/garmin-mcp/api-key`           | the file with the API key                                                       |
+| `GARMIN_DATA_DIR`         | `~/workspace/garmin-data`                | the data folder: the .FIT files, the dashboard cache and the exercise catalogue |
+| `GARMIN_BASE_URL`         | `https://personal.connectapi.garmin.com` | the Personal API host                                                           |
+
+The server writes its log to `~/.cache/garmin-personal-mcp/garmin-personal-mcp.log`. When the log
+is larger than 1 MB, the server moves it to `garmin-personal-mcp.log.1` and starts a new log.
+
+The defaults are the same as in [garmin-mcp](https://github.com/indaco/garmin-mcp), so this
+server uses an API key and a data folder that you already have. The two servers can use the same
+data folder, because the dashboard cache has the same format.
+
+## Improvements over garmin-mcp
+
+This server is a new version of [garmin-mcp](https://github.com/indaco/garmin-mcp). The tool
+names, the dashboard prompt names, the arguments and the output fields are the same. This
+server does not have the `social-card` prompt. These changes make it
+better:
+
+- **Nothing to install**: the server runs with npx. It needs Node.js 22 or later, and no JVM.
+- **Encoded queries in `garminGet`**: the server decodes the query string before it sends it.
+  In garmin-mcp, an encoded value such as `calendarDate=2026%2D10%2D24` is encoded two times, and
+  Garmin answers 404.
+- **No empty set at the end of a workout**: at the end of a strength workout, the watch opens one
+  more set. This set has no exercise, reps or weight, and `getActivitySets` does not show it.
+- **Better input**: the prompts remove all spaces around an argument, also the no-break space from
+  a phone keyboard. A very large `weeks` value gives 52. Numbers from Garmin can have spaces
+  around them.
+- **Cleaner data**: the activity summary does not show `"type": null` when Garmin gives no type.
+  The dashboard cache does not keep HRV entries or recovery days without a valid date.
+- **One token request**: calls that start at the same time share one token request.
+- **A log with a size limit**: the log rotates at 1 MB.
+
+## Problems and solutions
+
+| Symptom                              | Fix                                                                                                                                                                                                                     |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The server does not start            | Make sure that Node.js is version 22 or later: `node --version`.                                                                                                                                                        |
+| Claude Desktop does not find `npx`   | GUI apps do not read your shell profile. Use the absolute path of `npx` (`which npx`) as the `command`.                                                                                                                 |
+| Changes have no effect               | The client keeps the old server process. Start a new Claude Code session, or quit and start Claude Desktop again.                                                                                                       |
+| `Token request failed: HTTP 401/403` | The key is incorrect, expired or revoked. Create a new key. The error shows the Content-Type and the body from Garmin.                                                                                                  |
+| An endpoint answers 400              | A query parameter has a different name. Use `garminGet` with the correct query string.                                                                                                                                  |
+| You need more details                | Read the server log: `~/.cache/garmin-personal-mcp/garmin-personal-mcp.log`. Claude Desktop also writes `~/.config/Claude/logs/mcp-server-garmin.log` (Linux) or `~/Library/Logs/Claude/mcp-server-garmin.log` (macOS). |
+
+Manual test: the server must answer with one JSON line.
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}' \
+  | npx -y @indaco/garmin-personal-mcp
+```
+
+## How it works
+
+- **Transport**: stdio. The client starts the server as a child process and sends JSON-RPC
+  messages on stdin and stdout. The process stops when the client stops. Only MCP messages go to
+  stdout, so the log goes to a file.
+- **Authentication**: the server sends the API key to `POST .../personal-api-key/token` and gets
+  an access token. The token is valid for 24 hours, and there is no refresh token. The server keeps
+  the token in memory. It gets a new token before the token expires, and after a `401`. Garmin
+  can send the token as JSON or as plain text. The server accepts the two formats.
+- **Content type**: JSON calls send `Accept: application/json`. After a `406`, the server sends
+  the call again one time with `*/*`.
+- **Laps and sets**: the Personal API has no endpoint for laps or exercise sets. For this reason,
+  `getActivityLaps` and `getActivitySets` download the original .FIT file one time and keep it in
+  the `fit` folder. They read its lap and set messages with the official
+  [Garmin FIT SDK](https://github.com/garmin/fit-javascript-sdk). The .FIT file does not include
+  changes that you make to the exercises later in Garmin Connect.
+- **Muscles**: the .FIT file has no muscle data. `getActivitySets` reads the primary and secondary
+  muscles of each exercise from the public exercise catalogue of Garmin. The Garmin Connect web
+  app uses the same file. The server downloads it without your token and keeps a copy in
+  `exercises.json` in the data folder. It downloads a new copy after 30 days. If the download
+  fails, the server uses the old copy and tries again after 10 minutes. Without a copy, the sets
+  have no muscles.
+- **Code map**:
+  - `src/index.ts`: the stdio entry point
+  - `src/server.ts`: the MCP server with its tools and prompts
+  - `src/api-client.ts`: HTTP, the token and the retries
+  - `src/tools.ts` and `src/fit.ts`: the tools and the .FIT decoder
+  - `src/dashboard.ts`: the `getDashboardData` tool and its cache
+  - `src/prompts.ts`: the prompts. The prompt texts are in `prompts/`.
+  - `src/config.ts` and `src/log.ts`: the settings and the log
+
+## Security
+
+- **API key**: the server reads the key from an environment variable or from a file. Give the
+  file the permission `600`, so that only you can read it. The server sends the key only to the
+  Garmin token endpoint.
+- **Access token**: the server keeps the token in memory only. It never writes the key or the
+  token to the log, and no tool returns them.
+- **Read-only**: the server sends only GET requests to the Personal API. It sends one POST request
+  to get the token.
+- **Exercise catalogue**: the server gets the catalogue from `connect.garmin.com` without your
+  token.
+- **Local data**: the data folder has your .FIT files. A .FIT file can have your GPS track, so
+  keep the data folder private. `.gitignore` excludes `api-key`, `*.fit` and `*.zip` files.
+- **Paths**: `garminGet` accepts only a relative API path. It refuses a full URL and `..`, so
+  the token goes only to the Personal API host.
+- **Revoke the key**: you can revoke the key at any time on the Garmin Connect page where you
+  created it.
+- **Report a vulnerability**: do not open a public issue. Use a
+  [private security advisory](https://github.com/indaco/garmin-personal-mcp/security/advisories/new)
+  on GitHub.
+
+The Personal API is for personal use that is not commercial, under the terms of Garmin. Garmin
+does not endorse this project, and the project has no affiliation with Garmin.
+
+## Development
+
+```bash
+pnpm install
+pnpm test          # Vitest
+pnpm lint          # Oxlint, then an Oxfmt check
+pnpm fmt           # Oxfmt
+pnpm typecheck     # tsc --noEmit
+pnpm build         # tsdown: one dist/index.js with all the dependencies
+```
+
+The tests make their .FIT files in code. Do not add real .FIT files to the repository: they can
+have GPS data.
 
 ## Credits
 
-Ported from [indaco/garmin-mcp](https://github.com/indaco/garmin-mcp), a fork of
-[apratico/garmin-mcp](https://github.com/apratico/garmin-mcp).
+This project is a TypeScript version of [indaco/garmin-mcp](https://github.com/indaco/garmin-mcp),
+which is a fork of [apratico/garmin-mcp](https://github.com/apratico/garmin-mcp) by Alessandro
+Praticò.
 
 ## License
 
-[MIT](LICENSE). The Garmin FIT SDK dependency is distributed under the
-[FIT Protocol License](https://github.com/garmin/fit-javascript-sdk/blob/main/LICENSE.txt).
+This project uses the [MIT License](LICENSE).
+
+`dist/index.js` includes these libraries, with their own licenses:
+
+| Library                                                                                                     | License                                                                                    |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| [@garmin/fitsdk](https://github.com/garmin/fit-javascript-sdk)                                              | [FIT Protocol License](https://github.com/garmin/fit-javascript-sdk/blob/main/LICENSE.txt) |
+| [@modelcontextprotocol/server](https://github.com/modelcontextprotocol/typescript-sdk) and its core package | Apache-2.0                                                                                 |
+| [zod](https://github.com/colinhacks/zod)                                                                    | MIT                                                                                        |
+| [fflate](https://github.com/101arrowz/fflate)                                                               | MIT                                                                                        |
