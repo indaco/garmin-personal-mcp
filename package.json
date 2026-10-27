@@ -22,6 +22,7 @@
     "build": "tsdown && node scripts/build-template.mjs && node scripts/third-party-notices.mjs",
     "test": "vitest run --passWithNoTests",
     "test:page": "vitest run --config vitest.page.config.ts",
+    "guide": "UPDATE_DOCS=1 vitest run test/docs.test.ts",
     "lint": "oxlint --deny-warnings && oxfmt --check",
     "fmt": "oxfmt",
     "typecheck": "tsc --noEmit"

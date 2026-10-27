@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardWriter, readBlock, templateVersion } from "../src/dashboard-page";
 import { digest } from "../src/digest";
 
@@ -96,6 +96,35 @@ describe("writeDashboard", () => {
     // an update keeps the rev
     await writer.write({});
     expect((readBlock(page(), "layout") as { rev: string }).rev).toBe(second);
+  });
+
+  it("keeps the weeks of an existing page when the call has none", async () => {
+    data.weeks = 8;
+    await writer.write({ weeks: 8 });
+    asked.length = 0;
+    vi.useFakeTimers({ now: Date.now() + 20 * 60_000, toFake: ["Date"] });
+    try {
+      await writer.write({});
+    } finally {
+      vi.useRealTimers();
+      data.weeks = 12;
+    }
+    expect(asked).toEqual([8]);
+  });
+
+  it("reuses the data of the last call for 15 minutes, so the notes match their digest", async () => {
+    await writer.write({ weeks: 12 });
+    await writer.write({ weeks: 12, notes: ["n"] });
+    expect(asked).toEqual([12]);
+    // other weeks, or later than 15 minutes: new data
+    await writer.write({ weeks: 6 });
+    vi.useFakeTimers({ now: Date.now() + 16 * 60_000, toFake: ["Date"] });
+    try {
+      await writer.write({ weeks: 6 });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(asked).toEqual([12, 6, 6]);
   });
 
   it("returns the digest of the data, not the data", async () => {

@@ -10,7 +10,7 @@ import { addDays, localToday } from "./dates";
 
 const DEFAULT_WEEKS = 12;
 const MAX_WEEKS = 52;
-/** Version of the dashboard build text. Bump it when the page that it describes changes: updates then rebuild older pages. */
+/** Version of the dashboard data contract, written into each page as `v`. */
 export const DASHBOARD_VERSION = 3;
 
 /** prompts/ sits next to dist/ in the package and next to src/ in the repo. */
@@ -18,6 +18,7 @@ const load = (name: string) => readFileSync(new URL(`../prompts/${name}`, import
 
 export function registerPrompts(server: McpServer): void {
   const build = load("training-dashboard.md");
+  const freeform = load("training-dashboard-freeform.md");
   const update = load("training-dashboard-update.md");
   const widgetPrompt = load("dashboard-widget.md");
   const languagePrompt = load("dashboard-language.md");
@@ -30,14 +31,33 @@ export function registerPrompts(server: McpServer): void {
       description: dashboardDescription,
       argsSchema: z.object({
         weeks: z.string().describe(`Number of weeks to cover, default ${DEFAULT_WEEKS}`).optional(),
+        layout: z
+          .string()
+          .describe(
+            "preset (default): the built-in widgets; blank: an empty grid; freeform: Claude designs the whole page",
+          )
+          .optional(),
       }),
     },
-    (args) => result(dashboardDescription, renderDashboard(build, weeks(args.weeks))),
+    (args) => {
+      const w = weeks(args.weeks);
+      const layout = layoutOf(args.layout);
+      const text =
+        layout === "freeform"
+          ? renderDashboard(freeform, w)
+          : render(renderDashboard(build, w), {
+              layout,
+              layoutNote:
+                layout === "blank"
+                  ? '\nThe page is an empty grid: tell me to add widgets with "Edit layout" and "Add widget".'
+                  : "",
+            });
+      return result(dashboardDescription, text);
+    },
   );
 
   const updateDescription =
-    "Update an existing training dashboard with the Garmin data since its last build " +
-    "(builds a new one when there is none)";
+    "Update the training dashboard with the new Garmin data; it keeps the layout, widgets and languages";
   server.registerPrompt(
     "training-dashboard-update",
     {
@@ -45,29 +65,21 @@ export function registerPrompts(server: McpServer): void {
       argsSchema: z.object({
         weeks: z
           .string()
-          .describe("Weeks to cover; empty = keep the weeks of the existing dashboard")
+          .describe("Weeks to cover; empty = keep the weeks of the dashboard")
           .optional(),
       }),
     },
-    (args) => {
-      const given = arg(args.weeks) !== "";
-      const w = weeks(args.weeks);
-      // the build text becomes sections B1-B3, so its numbers do not clash with the update's own sections
-      const buildText = renderDashboard(build, w)
-        .replace(/^### /gm, "#### ")
-        .replace(/^## (\d+)\. /gm, "### B$1. ");
-      return result(
+    (args) =>
+      result(
         updateDescription,
         render(update, {
           today: localToday(),
-          weeks: given
-            ? String(w)
-            : `the \`weeks\` value of the data block (${DEFAULT_WEEKS} if it has none)`,
-          dashboardVersion: String(DASHBOARD_VERSION),
-          build: buildText,
+          weeksArgument:
+            arg(args.weeks) === ""
+              ? "no `weeks` (the page keeps its weeks)"
+              : `\`weeks\` = ${weeks(args.weeks)}`,
         }),
-      );
-    },
+      ),
   );
 
   const widgetDescription = "Make a new widget for the training dashboard from your idea";
@@ -138,6 +150,12 @@ function render(template: string, values: Record<string, string>): string {
 function arg(v: string | undefined): string {
   // oxlint-disable-next-line no-control-regex -- the control characters are what is stripped
   return (v ?? "").replace(/^[\s\u0000-\u001f]+|[\s\u0000-\u001f]+$/g, "");
+}
+
+/** The layout argument: preset (the default), blank or freeform. */
+function layoutOf(v: string | undefined): "preset" | "blank" | "freeform" {
+  const s = arg(v).toLowerCase();
+  return s === "blank" || s === "freeform" ? s : "preset";
 }
 
 /** weeks clamped to 1..52; the default when empty or not a whole number. */

@@ -21,6 +21,7 @@ import { writeAtomically } from "./tools";
 
 export const DASHBOARD_FILE = "garmin-dashboard.html";
 const MAX_NOTES = 5;
+const REUSE_MS = 15 * 60_000;
 
 export type Block = "data" | "layout" | "widgets" | "i18n";
 const marker = (b: Block) =>
@@ -107,6 +108,16 @@ export function writeBlock(page: string, block: Block, value: unknown): string {
 /** A new layout rev: a browser edit made on another layout never applies to this one. */
 const newRev = () => randomBytes(6).toString("hex");
 
+/** The weeks of the page's data; undefined when it has none. */
+function weeksOf(page: string): number | undefined {
+  try {
+    const w = (readBlock(page, "data") as { weeks?: unknown } | null)?.weeks;
+    return typeof w === "number" && Number.isInteger(w) ? w : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** The template version of a page; 0 for a page that Claude wrote. */
 export const templateVersion = (page: string) => Number(TEMPLATE_VERSION.exec(page)?.[1] ?? 0);
 
@@ -119,6 +130,8 @@ const escapeHtml = (s: string) =>
 export class DashboardWriter {
   /** Writes run one at a time, so two calls never mix their pages. */
   #queue: Promise<unknown> = Promise.resolve();
+  /** The data of the last call: a second call soon after (to add the notes) uses the same snapshot. */
+  #last: { weeks: number | undefined; at: number; json: string } | undefined;
 
   constructor(
     private readonly getData: (weeks?: number) => Promise<string>,
@@ -171,7 +184,9 @@ export class DashboardWriter {
       kind = "updated";
     }
 
-    const data = JSON.parse(await this.getData(weeks)) as Record<string, unknown>;
+    // without weeks, an existing page keeps its own
+    const pageWeeks = old === undefined ? undefined : weeksOf(old);
+    const data = JSON.parse(await this.#data(weeks ?? pageWeeks)) as Record<string, unknown>;
     next = writeBlock(next, "data", {
       ...data,
       v: DASHBOARD_VERSION,
@@ -290,6 +305,15 @@ export class DashboardWriter {
       widgetApi: WIDGET_API,
       ...(o.englishTexts ? { englishTexts: en } : {}),
     };
+  }
+
+  /** The data for `weeks`; the same snapshot for 15 minutes, so the notes match the digest they come from. */
+  async #data(weeks: number | undefined): Promise<string> {
+    const last = this.#last;
+    if (last && last.weeks === weeks && Date.now() - last.at < REUSE_MS) return last.json;
+    const json = await this.getData(weeks);
+    this.#last = { weeks, at: Date.now(), json };
+    return json;
   }
 
   /** The page file: relative paths sit in the data dir; only .html files. */

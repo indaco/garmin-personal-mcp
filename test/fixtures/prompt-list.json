@@ -29,16 +29,21 @@
         "name": "weeks",
         "description": "Number of weeks to cover, default 12",
         "required": false
+      },
+      {
+        "name": "layout",
+        "description": "preset (default): the built-in widgets; blank: an empty grid; freeform: Claude designs the whole page",
+        "required": false
       }
     ]
   },
   {
     "name": "training-dashboard-update",
-    "description": "Update an existing training dashboard with the Garmin data since its last build (builds a new one when there is none)",
+    "description": "Update the training dashboard with the new Garmin data; it keeps the layout, widgets and languages",
     "arguments": [
       {
         "name": "weeks",
-        "description": "Weeks to cover; empty = keep the weeks of the existing dashboard",
+        "description": "Weeks to cover; empty = keep the weeks of the dashboard",
         "required": false
       }
     ]

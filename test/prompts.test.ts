@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { DASHBOARD_VERSION } from "../src/prompts";
 import { createServer } from "../src/server";
 import promptList from "./fixtures/prompt-list.json";
 
@@ -50,22 +49,33 @@ const shape = (p: { name: string; description?: string; arguments?: unknown[] })
 });
 
 describe("prompts", () => {
-  it("gives the build and the update the same dashboard version", async () => {
-    const v = `"v": ${DASHBOARD_VERSION}`;
-    const build = await render("training-dashboard", { weeks: "12" });
-    const update = await render("training-dashboard-update");
-    expect(build).toContain(v);
-    expect(update).toContain(`its \`v\` is not ${DASHBOARD_VERSION}`);
-    expect(build.includes("{{") || update.includes("{{")).toBe(false);
+  it("builds from the template with the preset layout by default, or a blank one", async () => {
+    const preset = await render("training-dashboard", { weeks: "12" });
+    expect(preset).toContain('`layout` = "preset"');
+    expect(preset).not.toContain("empty grid");
+    const blank = await render("training-dashboard", { layout: " Blank " });
+    expect(blank).toContain('`layout` = "blank"');
+    expect(blank).toContain("empty grid");
+    expect(await render("training-dashboard", { layout: "fancy" })).toContain(
+      '`layout` = "preset"',
+    );
+    expect(preset.includes("{{") || blank.includes("{{")).toBe(false);
   });
 
-  it("numbers the build sections B1 to B3 in the update", async () => {
-    const update = await render("training-dashboard-update", { weeks: "8" });
-    expect(update).toContain("### B1. Collect the data");
-    expect(update).toContain("### B3. Build the dashboard");
-    expect(update).toContain("#### Time window");
-    expect(update).not.toContain("\n## 1. Collect");
-    expect(update).toContain("last **8 weeks**");
+  it("lets Claude design the whole page with the freeform layout, with the data from the server", async () => {
+    const text = await render("training-dashboard", { layout: "freeform", weeks: "8" });
+    expect(text).toContain("You design the page; the server puts the data into it.");
+    expect(text).toContain("`page` = the page code");
+    expect(text).toContain("last **8 weeks**");
+    expect(text.includes("{{")).toBe(false);
+  });
+
+  it("updates with the weeks given, or the weeks of the page", async () => {
+    expect(await render("training-dashboard-update", { weeks: "8" })).toContain("`weeks` = 8,");
+    const keep = await render("training-dashboard-update", { weeks: " " });
+    expect(keep).toContain("no `weeks` (the page keeps its weeks)");
+    expect(keep).toContain("2026-10-28");
+    expect(keep.includes("{{")).toBe(false);
   });
 
   it("has the names, descriptions and arguments of the reference prompt list", async () => {
@@ -83,10 +93,9 @@ describe("prompts", () => {
   });
 
   it("fills the dates of the time window from today", async () => {
-    const build = await render("training-dashboard", { weeks: "4" });
-    expect(build).toBe(
-      template("training-dashboard")
-        .replaceAll("{{dashboardVersion}}", String(DASHBOARD_VERSION))
+    const text = await render("training-dashboard", { weeks: "4", layout: "freeform" });
+    expect(text).toBe(
+      template("training-dashboard-freeform")
         .replaceAll("{{weeks}}", "4")
         .replaceAll("{{today}}", "2026-10-28")
         .replaceAll("{{startDate}}", "2026-09-30")
@@ -108,12 +117,6 @@ describe("prompts", () => {
     ["99999999999", 52],
   ])("reads weeks %j as %i", async (weeks, expected) => {
     expect(await render("training-dashboard", { weeks })).toContain(`last **${expected} weeks**`);
-  });
-
-  it("keeps the weeks of the existing dashboard when the update has none", async () => {
-    const update = await render("training-dashboard-update", { weeks: " " });
-    expect(update).toContain("the `weeks` value of the data block (12 if it has none)");
-    expect(update).toContain("2026-10-28");
   });
 
   it("trims any whitespace and control characters around an argument", async () => {

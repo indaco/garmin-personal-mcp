@@ -7,6 +7,9 @@
     "docs/**",
     "pnpm-lock.yaml",
     "THIRD-PARTY-NOTICES.md",
-    "test/fixtures/dashboard-data.json"
+    "test/fixtures/dashboard-data.json",
+    "guide/widgets.md",
+    "guide/languages.md",
+    "guide/custom-widgets.md"
   ]
 }

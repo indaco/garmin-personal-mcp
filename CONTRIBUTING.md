@@ -48,7 +48,7 @@ version, so `corepack enable` gives you the same pnpm as CI.
 
 ```bash
 pnpm install
-pnpm build               # writes dist/index.js and THIRD-PARTY-NOTICES.md
+pnpm build               # writes dist/index.js, dist/dashboard.html and THIRD-PARTY-NOTICES.md
 ```
 
 To use your build in a client, follow "Run from source" in the README.
@@ -61,11 +61,13 @@ Run these commands before you open the PR. CI runs the same commands on Node 22 
 pnpm lint                # Oxlint, then an Oxfmt check
 pnpm typecheck           # tsc --noEmit
 pnpm test                # Vitest
-pnpm build               # tsdown, then the third-party notices
+pnpm build               # tsdown, the page template, then the third-party notices
+pnpm test:page           # the dashboard page in headless Chromium, after the build
 ```
 
-`pnpm fmt` corrects the format. After a dependency change, commit the new
-`THIRD-PARTY-NOTICES.md` that the build writes. CI fails when the file does not match the bundle.
+`pnpm fmt` corrects the format. `pnpm guide` writes the generated parts of `guide/`. After a
+dependency change, commit the new `THIRD-PARTY-NOTICES.md` that the build writes. CI fails when the
+file does not match the bundle.
 
 ## Rules for each change
 
@@ -96,6 +98,22 @@ module that they test (`test/tools.test.ts` for `src/tools.ts`).
 - **No real Garmin calls.** Mock `fetch`, or give the code a mocked API client.
 - **No writes to your home folder.** Use a temporary folder for the data folder, and set `HOME`
   for tests of the log.
+
+## Add a widget
+
+1. Add the widget to `src/page/catalogue.ts`: its id, the key of its title, its types, its width
+   and a short English description.
+2. Add the title to every catalogue in `src/page/i18n/`.
+3. Put its calculations in a module of `src/page/` (for example `metrics.ts`), with a test in
+   `test/page/`.
+4. Register it in a file of `src/page/widgets/` with `register({ id, render })`.
+5. Add a page test in `test/e2e/` if it has controls or a chart.
+6. Run `pnpm guide` to write the widget catalogue in `guide/widgets.md`.
+
+## Add a language
+
+[guide/languages.md](guide/languages.md) gives the procedure. The tests make sure that the new
+catalogue has every key and every placeholder of English.
 
 ## License
 

@@ -11,7 +11,7 @@ install.**
 
 MCP server for the official Garmin Connect Personal API. Read-only access to activities, laps and
 strength sets from .FIT files, HRV, sleep and heart rate. Includes a training and recovery
-dashboard. Runs with npx, with nothing to install.
+dashboard with widgets that you can arrange. Runs with npx, with nothing to install.
 
 With this server, you can ask Claude:
 
@@ -20,17 +20,18 @@ With this server, you can ask Claude:
 - "Compare my sets of this week with the week before."
 - "How did I sleep this week, and how was my HRV?"
 
-Two ready-made prompts do more:
+Ready-made prompts do more:
 
-- **training-dashboard** builds an interactive dashboard. It shows your training load next to
-  HRV, sleep and resting heart rate.
-- **training-dashboard-update** adds the new data to a dashboard that you have. The code, the
-  layout and the styles stay the same.
+- **training-dashboard** writes a dashboard page in less than a minute. It shows your training
+  load next to HRV, sleep and resting heart rate, in widgets that you can move, resize, hide and
+  add.
+- **training-dashboard-update** adds the new data to the dashboard. Your layout stays.
+- **dashboard-widget** makes a new widget from your idea.
+- **dashboard-language** adds a language to the dashboard.
 
-![The training dashboard: the All tab, load against recovery, the Run tab, strength trends, and the light and high-contrast themes](assets/dashboard.gif)
+![The training dashboard: the All board, load against recovery, the Run board, strength trends, edit mode, and the light and high-contrast themes](assets/dashboard.gif)
 
-_The training dashboard with demo data. Claude writes the dashboard each time, so your dashboard
-can look different._
+_The training dashboard with demo data._
 
 The server works with Claude Desktop, Claude Code and all other MCP clients that use stdio.
 
@@ -112,60 +113,70 @@ Claude Desktop, they change after a full restart.
 
 ### training-dashboard
 
-The prompt has one optional argument, `weeks`. The default is 12 and the maximum is 52.
+The server writes the dashboard page from its template, and Claude writes the coach notes. The page
+is one HTML file, `garmin-dashboard.html` in the data folder. It works offline.
 
-| Client         | How to run it                                                                    | Output                                                                                               |
-| -------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Claude Desktop | **+** → _garmin_ → `training-dashboard` → set `weeks` (or leave it empty) → send | an interactive artifact                                                                              |
-| Claude Code    | `/mcp__garmin__training-dashboard 8`                                             | `garmin-dashboard.html` in the current directory. Open it with `open` (macOS) or `xdg-open` (Linux). |
+| Argument | Values                          | Default  |
+| -------- | ------------------------------- | -------- |
+| `weeks`  | 1 to 52                         | 12       |
+| `layout` | `preset`, `blank` or `freeform` | `preset` |
 
-Claude gets all the data with one `getDashboardData` call. The dashboard has:
+- `preset` gives the built-in widgets on each board.
+- `blank` gives empty boards: you add the widgets that you want.
+- `freeform` lets Claude design the whole page. This takes much longer, and each page looks
+  different.
 
-- a tab for each sport (Run, Strength, Walk, Bike, Padel, and Hike and Swim when you have them),
-  each with its own colour and icon;
-- on the _All_ tab: readiness for today, fitness age, these weeks against the weeks before, and
-  the records;
-- also on the _All_ tab: weekly volume, load safety, intensity minutes, a consistency calendar,
-  load against recovery, the recovery panel and coach notes;
-- on the _Run_ tab: best efforts, races side by side, aerobic fitness, running form, a race
-  predictor and the pace split of each race;
-- on the _Strength_ tab: each exercise with its sets, grouped by muscle group, its trend over
-  time, and the balance between the muscle groups;
-- a week selector, and a theme selector with dark, light and high-contrast themes.
+| Client         | How to run it                                                      |
+| -------------- | ------------------------------------------------------------------ |
+| Claude Desktop | **+** → _garmin_ → `training-dashboard` → set the arguments → send |
+| Claude Code    | `/mcp__garmin__training-dashboard 8`                               |
+
+Claude gives you the path of the page and the command to open it. The page has:
+
+- a board for each group of sports: All, Run, Strength, Walk, Bike and Racket sports, and Hike,
+  Swim and Other when you have them;
+- on the All board: an overview, readiness for today, fitness age, a period comparison, records,
+  weekly volume, load safety, intensity minutes, a consistency calendar, load against recovery,
+  the recovery widgets and the coach notes;
+- on each type board: a summary, the weekly chart, the time in HR zones and the widgets of that
+  sport, for example best efforts and a race predictor for Run, and each exercise with its trend
+  for Strength;
+- a week window, 11 themes, and English and Italian texts.
 
 The dashboard uses the training load, HR zones and training effect from Garmin. It labels each
-value that it calculates as an estimate. It does not invent missing values: a failed call shows
-as "n/a" in the related widget.
+value that it calculates as an estimate. It does not invent missing values: a missing value shows
+as "n/a".
 
-The first call sends approximately 35 requests to Garmin. Later calls use the local cache and send
-approximately 8.
+[The dashboard guide](guide/dashboard.md) tells how to change the layout, and
+[the widget catalogue](guide/widgets.md) lists every widget.
 
 ### training-dashboard-update
 
-You do not have to build the dashboard again to see new data. This prompt finds the dashboard and
-replaces only its data and its coach notes. The code, the layout and the styles stay the same.
+This prompt replaces the data and the coach notes of the page. Your layout, your custom widgets and
+your languages stay. Leave `weeks` empty to keep the weeks of the page. Reload the page to see the
+new data.
 
-| Client         | How to run it                                         | What it updates                                  |
-| -------------- | ----------------------------------------------------- | ------------------------------------------------ |
-| Claude Desktop | **+** → _garmin_ → `training-dashboard-update` → send | the dashboard artifact in the same conversation  |
-| Claude Code    | `/mcp__garmin__training-dashboard-update`             | `garmin-dashboard.html` in the current directory |
+| Client         | How to run it                                         |
+| -------------- | ----------------------------------------------------- |
+| Claude Desktop | **+** → _garmin_ → `training-dashboard-update` → send |
+| Claude Code    | `/mcp__garmin__training-dashboard-update`             |
 
-Leave `weeks` empty to keep the weeks of the dashboard. A new Claude Desktop conversation has no
-artifact to update, so the prompt builds a new dashboard. The prompt also builds a new dashboard
-when the dashboard comes from older build instructions, and it tells you so.
+The first call sends approximately 35 requests to Garmin. Later calls use the local cache and send
+approximately 8.
 
 ### dashboard-widget
 
 This prompt makes a new widget from your idea, for example "my longest ride of each month". Claude
 writes a small widget, and `editDashboard` stores it in the page. The widget stays after each
 update. The argument `idea` is required. Reload the page to see the widget.
+[Custom widgets](guide/custom-widgets.md) tells more.
 
 ### dashboard-language
 
 This prompt adds a language to the dashboard. Claude translates the texts of the page, and
 `editDashboard` stores them in the page. The argument `language` is optional: the default is the
-language of the conversation. English and Italian are built in. A text without a translation shows
-in English.
+language of the conversation. A text without a translation shows in English.
+[Languages](guide/languages.md) tells more.
 
 ## Tools
 
@@ -232,11 +243,21 @@ is larger than 1 MB, the server moves it to `garmin-personal-mcp.log.1` and star
 
 ## Coming from garmin-mcp
 
-This server is a new version of [garmin-mcp](https://github.com/indaco/garmin-mcp). The tool
-names, the dashboard prompt names, the arguments and the output fields are the same. This
-server does not have the `social-card` prompt. The default key file
-and data folder are the same too, so the server uses the key and the data that you have. The two
-servers can use the same data folder, because the dashboard cache has the same format.
+This server is a new version of [garmin-mcp](https://github.com/indaco/garmin-mcp). The tools of
+garmin-mcp have the same names, arguments and output fields. The default key file and data folder
+are the same too, so the server uses the key and the data that you have. The two servers can use
+the same data folder, because the dashboard cache has the same format.
+
+The dashboard prompts have the same names, but they work differently:
+
+- The server writes the page. Claude writes only the coach notes. In garmin-mcp, Claude writes the
+  whole page, which takes 25 minutes or more.
+- The page is a file in the data folder, also in Claude Desktop. Claude Desktop does not show it as
+  an artifact.
+- To let Claude design the whole page as before, use `layout` = `freeform`.
+- A dashboard from garmin-mcp does not change: the update writes a new page in the data folder.
+
+This server does not have the `social-card` prompt.
 
 The settings have new names. Change them in the configuration of your client:
 
@@ -262,6 +283,8 @@ These changes make the server better:
   The dashboard cache does not keep HRV entries or recovery days without a valid date.
 - **One token request**: calls that start at the same time share one token request.
 - **A log with a size limit**: the log rotates at 1 MB.
+- **A dashboard that you can arrange**: widgets on a grid, an edit mode, custom widgets and more
+  languages. A build or an update takes less than a minute, with no Bash and no copied data.
 
 ## How it works
 
@@ -359,7 +382,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request.
 git clone https://github.com/indaco/garmin-personal-mcp.git
 cd garmin-personal-mcp
 pnpm install
-pnpm build               # writes dist/index.js and THIRD-PARTY-NOTICES.md
+pnpm build               # writes dist/index.js, dist/dashboard.html and THIRD-PARTY-NOTICES.md
 ```
 
 In the client configuration, use `node` with the absolute path of `dist/index.js` in place of
@@ -380,27 +403,39 @@ In the client configuration, use `node` with the absolute path of `dist/index.js
 
 ```bash
 pnpm test          # Vitest
+pnpm test:page     # the dashboard page in headless Chromium (run pnpm build first)
+pnpm guide         # writes the generated parts of guide/
 pnpm lint          # Oxlint, then an Oxfmt check
 pnpm fmt           # Oxfmt
 pnpm typecheck     # tsc --noEmit
-pnpm build         # tsdown, then the third-party notices
+pnpm build         # tsdown, the page template, then the third-party notices
+```
+
+`pnpm test:page` needs the Chromium headless shell. Install it one time:
+
+```bash
+pnpm exec playwright-core install --only-shell chromium
 ```
 
 The tests make their .FIT files in code. Do not add real .FIT files to the repository: they can
-have GPS data.
+have GPS data. The page tests use synthetic data from `test/fixtures/dashboard-data.json`.
 
 ### Code map
 
-| File                              | Content                                          |
-| --------------------------------- | ------------------------------------------------ |
-| `src/index.ts`                    | the stdio entry point                            |
-| `src/server.ts`                   | the MCP server with its tools and prompts        |
-| `src/api-client.ts`               | HTTP, the token and the retries                  |
-| `src/tools.ts`, `src/fit.ts`      | the tools and the .FIT decoder                   |
-| `src/dashboard.ts`                | the `getDashboardData` tool and its cache        |
-| `src/prompts.ts`                  | the prompts. The prompt texts are in `prompts/`. |
-| `src/config.ts`, `src/log.ts`     | the settings and the log                         |
-| `scripts/third-party-notices.mjs` | writes `THIRD-PARTY-NOTICES.md` after each build |
+| File                              | Content                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------ |
+| `src/index.ts`                    | the stdio entry point                                                    |
+| `src/server.ts`                   | the MCP server with its tools and prompts                                |
+| `src/api-client.ts`               | HTTP, the token and the retries                                          |
+| `src/tools.ts`, `src/fit.ts`      | the tools and the .FIT decoder                                           |
+| `src/dashboard.ts`                | the `getDashboardData` tool and its cache                                |
+| `src/dashboard-page.ts`           | `writeDashboard` and `editDashboard`: the page file and its blocks       |
+| `src/digest.ts`                   | the digest of the data for the coach notes                               |
+| `src/page/`                       | the dashboard page: app, layout, calculations, widgets, themes and texts |
+| `src/prompts.ts`                  | the prompts. The prompt texts are in `prompts/`.                         |
+| `src/config.ts`, `src/log.ts`     | the settings and the log                                                 |
+| `scripts/build-template.mjs`      | writes `dist/dashboard.html`                                             |
+| `scripts/third-party-notices.mjs` | writes `THIRD-PARTY-NOTICES.md` after each build                         |
 
 ## Credits
 
@@ -412,8 +447,8 @@ Praticò.
 
 This project uses the [MIT License](LICENSE).
 
-`dist/index.js` includes these libraries, with their own licenses. The full license texts are in
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+`dist/index.js` and the dashboard page include these libraries, with their own licenses. The full
+license texts are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 | Library                                                                                                     | License                                                                                    |
 | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -421,3 +456,4 @@ This project uses the [MIT License](LICENSE).
 | [@modelcontextprotocol/server](https://github.com/modelcontextprotocol/typescript-sdk) and its core package | Apache-2.0                                                                                 |
 | [zod](https://github.com/colinhacks/zod)                                                                    | MIT                                                                                        |
 | [fflate](https://github.com/101arrowz/fflate)                                                               | MIT                                                                                        |
+| [Chart.js](https://github.com/chartjs/Chart.js) and [@kurkle/color](https://github.com/kurkle/color)        | MIT                                                                                        |
