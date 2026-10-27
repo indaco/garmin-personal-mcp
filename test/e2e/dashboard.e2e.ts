@@ -178,6 +178,10 @@ describe("the page", () => {
   });
 });
 
+/** The layout that this browser saved, or null. */
+const saved = (page: Page) =>
+  page.evaluate(() => localStorage.getItem(`garmin-layout:${location.pathname}`));
+
 describe("edit mode", () => {
   const one = {
     rev: "r0",
@@ -243,7 +247,7 @@ describe("edit mode", () => {
     await page.click("text=Add widget");
     await page.click(".catalogue li:has-text('Coach notes') button");
     expect(await tiles(page)).toEqual(["x", "coachNotes"]);
-    await page.click("text=Reset to preset");
+    await page.click("text=Reset board");
     await page.click("text=Done");
     expect(await tiles(page)).toEqual(ALL_PRESET);
   });
@@ -273,6 +277,50 @@ describe("edit mode", () => {
     await page.waitForSelector(".page");
     expect(await tiles(page)).toEqual([]);
     expect(await page.$(".banner")).toBeNull();
+  });
+
+  it("saves the edits only on Done", async () => {
+    const { page } = await open(browser, pageFile({ layout: two }));
+    await page.click("text=Edit layout");
+    await page.click("[aria-label='Move Coach notes later']");
+    expect(await page.textContent(".edit-bar")).toContain("Unsaved changes");
+    expect(await saved(page)).toBeNull();
+    await page.click(".edit-bar >> text=Done");
+    expect(
+      JSON.parse((await saved(page))!).layout.boards.all.map((i: { id: string }) => i.id),
+    ).toEqual(["x", "coachNotes"]);
+    expect(await page.textContent("#announce")).toBe("Layout saved");
+    expect(await focused(page)).toBe("Edit layout");
+  });
+
+  it("asks before it discards the edits, and puts the layout back", async () => {
+    const { page } = await open(browser, pageFile({ layout: two }));
+    await page.click("text=Edit layout");
+    await page.click("[aria-label='Remove Coach notes']");
+    await page.click(".edit-bar >> text=Discard");
+    await page.click("dialog >> text=Keep editing");
+    expect(await tiles(page)).toEqual(["x"]);
+    await page.keyboard.press("Escape"); // Escape is Discard too
+    await page.click("dialog >> text=Discard changes");
+    expect(await page.$(".edit-bar")).toBeNull();
+    expect(await tiles(page)).toEqual(["coachNotes"]);
+    expect(await saved(page)).toBeNull();
+  });
+
+  it("leaves edit mode without a question when nothing changed", async () => {
+    const { page } = await open(browser, pageFile({ layout: two }));
+    await page.click("text=Edit layout");
+    await page.keyboard.press("Escape");
+    expect(await page.$(".edit-bar")).toBeNull();
+    expect(await page.$("dialog")).toBeNull();
+  });
+
+  it("keeps the edit bar in view while you scroll", async () => {
+    const { page } = await open(browser, pageFile());
+    await page.click("text=Edit layout");
+    await page.evaluate(() => window.scrollTo(0, 2000));
+    const top = await page.$eval(".edit-bar", (el) => el.getBoundingClientRect().top);
+    expect(top).toBe(0);
   });
 
   it("uses the new layout from Claude when you choose it", async () => {
