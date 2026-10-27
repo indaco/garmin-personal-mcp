@@ -137,6 +137,12 @@ export const it: Catalogue = {
   "edit.show": "Mostra {title}",
   "edit.remove": "Rimuovi {title}",
   "edit.hidden": "Nascosto",
+  "said.moved": "{title} spostato in posizione {n} di {count}",
+  "said.width": "{title}: larghezza {n}",
+  "said.hidden": "{title} nascosto",
+  "said.shown": "{title} visibile",
+  "said.removed": "{title} rimosso",
+  "said.added": "{title} aggiunto",
 
   "add.title": "Aggiungi un widget",
   "add.type": "Tipo",

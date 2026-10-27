@@ -335,6 +335,57 @@ async function clickLegend(
   });
 }
 
+/** The focused element: its aria-label, else its id, else its text. */
+const focused = (page: Page) =>
+  page.evaluate(() => {
+    const el = document.activeElement as HTMLElement;
+    return el.getAttribute("aria-label") ?? (el.id || el.textContent?.trim());
+  });
+
+describe("focus", () => {
+  it("stays on a window preset and on the theme menu after the page draws again", async () => {
+    const { page } = await open(browser, pageFile());
+    await page.focus(".window-bar .chip >> text=Last 8");
+    await page.keyboard.press("Enter");
+    expect(await focused(page)).toBe("Last 8");
+    await page.click(".account summary");
+    await page.focus("#theme");
+    await page.selectOption("#theme", "light");
+    expect(await focused(page)).toBe("theme");
+  });
+
+  it("stays on an edit tool, and says what changed", async () => {
+    const { page } = await open(browser, pageFile());
+    await page.click("text=Edit layout");
+    await page.focus("[aria-label='Move Weekly volume later']");
+    await page.keyboard.press("Enter");
+    expect(await focused(page)).toBe("Move Weekly volume later");
+    expect(await page.textContent("#announce")).toBe("Weekly volume moved to position 7 of 18");
+    // a removed tile gives focus to the tile in its place
+    await page.focus("[aria-label='Remove Weekly volume']");
+    await page.keyboard.press("Enter");
+    expect(await focused(page)).toMatch(/Load safety$/);
+    expect(await page.textContent("#announce")).toBe("Weekly volume removed");
+  });
+
+  it("stays on an exercise chip of the Strength board", async () => {
+    const { page } = await open(browser, pageFile(), { hash: "#strengthTraining" });
+    const chip = ".ex-tools .chip >> nth=1";
+    const name = await page.textContent(chip);
+    await page.focus(chip);
+    await page.keyboard.press("Enter");
+    expect(await focused(page)).toBe(name);
+  });
+
+  it("closes the settings menu when focus leaves it", async () => {
+    const { page } = await open(browser, pageFile());
+    await page.click(".account summary");
+    await page.focus("#theme");
+    await page.keyboard.press("Tab");
+    expect(await page.$(".account[open]")).toBeNull();
+  });
+});
+
 describe("chart legends", () => {
   it("shows only the clicked series, and all of them on a second click", async () => {
     const { page, errors } = await open(browser, pageFile());
