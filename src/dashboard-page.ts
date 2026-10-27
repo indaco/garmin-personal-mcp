@@ -6,6 +6,7 @@ import * as z from "zod/v4";
 import { type Digest, digest } from "./digest";
 import { GROUPS } from "./page/calc";
 import { CATALOGUE } from "./page/catalogue";
+import { ABOUT } from "./page/catalogue-about";
 import { en } from "./page/i18n/en";
 import { add, boardOf, type Layout, parseLayout, type Span, withBoard } from "./page/layout";
 import { preset } from "./page/presets";
@@ -95,10 +96,11 @@ export function readBlock(page: string, block: Block): unknown {
 
 /**
  * The page with the block set to `value`. `<` is written as \u003c, so no value can close the script,
- * and `/` as \u002f, so no value can hold marker text and end its block early.
+ * and `*` as \u002a, so no value can hold marker text (a marker needs a slash next to an asterisk)
+ * and end its block early. A `/` stays as it is: the data has many (`5:07/km`), and `*` is rare.
  */
 export function writeBlock(page: string, block: Block, value: unknown): string {
-  const json = JSON.stringify(value).replaceAll("<", "\\u003c").replaceAll("/", "\\u002f");
+  const json = JSON.stringify(value).replaceAll("<", "\\u003c").replaceAll("*", "\\u002a");
   return page.replace(
     marker(block),
     () => `/* garmin-${block}:start */${json}/* garmin-${block}:end */`,
@@ -300,7 +302,7 @@ export class DashboardWriter {
         title: en[c.title],
         ...(c.types ? { types: c.types } : {}),
         span: c.span,
-        about: c.about,
+        about: ABOUT[c.id],
       })),
       widgetApi: WIDGET_API,
       ...(o.englishTexts ? { englishTexts: en } : {}),

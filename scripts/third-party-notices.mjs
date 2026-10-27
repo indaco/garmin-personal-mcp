@@ -1,11 +1,16 @@
 // Writes THIRD-PARTY-NOTICES.md: the license of every package that tsdown bundled into dist/index.js
 // and into the dashboard page. The build runs it last, so the file follows each dependency update.
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const bundle = ["dist/index.js", "dist/dashboard.html"]
-  .map((f) => readFileSync(f, "utf8"))
-  .join("\n");
+// the minified page has no module paths: the build lists them in dist/page-modules.json
+const pageModules = JSON.parse(readFileSync("dist/page-modules.json", "utf8")).join("\n");
+rmSync("dist/page-modules.json");
+const bundle = [
+  readFileSync("dist/index.js", "utf8"),
+  readFileSync("dist/dashboard.html", "utf8"),
+  pageModules,
+].join("\n");
 
 // tsdown marks each bundled module with its path, e.g. node_modules/.pnpm/zod@4.6.7/node_modules/zod/...
 const dirs = [

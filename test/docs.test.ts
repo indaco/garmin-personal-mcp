@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { CATALOGUE } from "../src/page/catalogue";
+import { ABOUT } from "../src/page/catalogue-about";
 import { en } from "../src/page/i18n/en";
 import { preset } from "../src/page/presets";
 import { WIDGET_API } from "../src/page/widget-api";
@@ -31,7 +32,8 @@ function widgetsDoc(): string {
     "| Widget | Id | Shows | Types | Width |",
     "| ------ | -- | ----- | ----- | ----- |",
     ...CATALOGUE.map(
-      (c) => `| ${en[c.title]} | \`${c.id}\` | ${cell(c.about)} | ${types(c.types)} | ${c.span} |`,
+      (c) =>
+        `| ${en[c.title]} | \`${c.id}\` | ${cell(ABOUT[c.id])} | ${types(c.types)} | ${c.span} |`,
     ),
     "",
     "_Types_ are the types that the widget can show. A widget without types shows the same thing on",

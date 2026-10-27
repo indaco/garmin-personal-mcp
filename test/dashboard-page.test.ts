@@ -159,6 +159,17 @@ describe("writeDashboard", () => {
     expect((readBlock(s, "data") as typeof data).activities[0].name).toBe(name);
   });
 
+  it("writes the slashes of the data as they are, so paces cost no extra bytes", async () => {
+    const paced = { ...data, activities: [{ ...data.activities[0], pace: "5:07/km" }] };
+    writer = new DashboardWriter(
+      async () => JSON.stringify(paced),
+      dir,
+      async () => templateText,
+    );
+    await writer.write({});
+    expect(page()).toContain('"pace":"5:07/km"');
+  });
+
   it("updates only the data block of an existing page", async () => {
     await writer.write({});
     // a change the user asked for, and their layout and widget

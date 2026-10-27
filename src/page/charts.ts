@@ -1,6 +1,41 @@
-import { Chart, type ChartConfiguration } from "chart.js/auto";
+import {
+  ArcElement,
+  BarController,
+  BarElement,
+  CategoryScale,
+  Chart,
+  type ChartConfiguration,
+  DoughnutController,
+  Filler,
+  Legend,
+  LinearScale,
+  LineController,
+  LineElement,
+  PieController,
+  PointElement,
+  ScatterController,
+  Tooltip,
+} from "chart.js";
 import { h } from "./dom";
 import { token } from "./theme";
+
+// only the parts the page uses: chart.js/auto would bring every chart type, scale and plugin
+Chart.register(
+  BarController,
+  LineController,
+  ScatterController,
+  DoughnutController,
+  PieController,
+  BarElement,
+  LineElement,
+  PointElement,
+  ArcElement,
+  CategoryScale,
+  LinearScale,
+  Tooltip,
+  Legend,
+  Filler,
+);
 
 const live: Chart[] = [];
 
@@ -22,7 +57,16 @@ export function themeCharts(): void {
   tip.borderWidth = 1;
 }
 
+export const CHART_TYPES = ["bar", "line", "scatter", "doughnut", "pie"];
+
 export function chart(el: HTMLElement, config: ChartConfiguration, height = 220): Chart {
+  // Chart.js builds the chart only when the canvas is in the page, after the widget's try/catch:
+  // check the types now, so a wrong type shows in the widget's tile
+  const types = [config.type, ...config.data.datasets.map((d) => d.type)].filter(Boolean);
+  const unknown = types.find((t) => !CHART_TYPES.includes(String(t)));
+  if (unknown) {
+    throw new Error(`Chart type ${unknown} is not available: use ${CHART_TYPES.join(", ")}`);
+  }
   const canvas = h("canvas", { role: "img" });
   el.append(h("div", { class: "chart", style: `height:${height}px` }, canvas));
   const c = new Chart(canvas, config);

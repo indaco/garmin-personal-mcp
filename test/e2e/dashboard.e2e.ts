@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
 import type { Browser, Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { data, launch, open, pageFile } from "./page";
@@ -94,6 +94,11 @@ async function chartsWithoutTooltip(page: Page): Promise<string[]> {
 }
 
 describe("the page", () => {
+  it("keeps the template small", () => {
+    // minified, with only the Chart.js parts the page uses: Chart.js is most of it
+    expect(statSync("dist/dashboard.html").size).toBeLessThan(300 * 1024);
+  });
+
   it("shows the preset widgets of the All board and no errors", async () => {
     const { page, errors } = await open(browser, pageFile());
     expect(await page.textContent("h1")).toBe("Training + Recovery");
@@ -608,6 +613,10 @@ const on = (...ids: string[]) => ({
   boards: { all: ids.map((id) => ({ id, widget: id, span: 1 })) },
 });
 
+/** A custom widget that draws a chart of `type`. */
+const chartOf = (type: string) =>
+  `ctx.chart(el, { type: "${type}", data: { labels: ["a", "b"], datasets: [{ data: [1, 2] }] } });`;
+
 describe("custom widgets and languages", () => {
   it("runs a custom widget with the widget API, chart and all", async () => {
     const code = `
@@ -640,6 +649,25 @@ describe("custom widgets and languages", () => {
     expect(await page.textContent("[data-id=broken] .error")).toContain("no data here");
     expect(await page.textContent("[data-id=bad] .error")).toContain("This widget failed");
     expect(await page.textContent("[data-id=coachNotes] .notes")).toContain("Load");
+    expect(errors).toEqual([]);
+  });
+
+  it("draws doughnut and pie charts, and shows an error for a chart type the page does not have", async () => {
+    const { page, errors } = await open(
+      browser,
+      pageFile({
+        widgets: [
+          custom("donut", chartOf("doughnut")),
+          custom("cake", chartOf("pie")),
+          custom("radar", chartOf("radar")),
+        ],
+        layout: on("donut", "cake", "radar"),
+      }),
+    );
+    expect(
+      await page.$$eval("[data-id=donut] canvas, [data-id=cake] canvas", (c) => c.length),
+    ).toBe(2);
+    expect(await page.textContent("[data-id=radar] .error")).toContain("radar");
     expect(errors).toEqual([]);
   });
 

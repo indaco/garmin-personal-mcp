@@ -45,7 +45,7 @@ ctx gives:
 - ctx.t(key, params): a page text; ctx.lang: the page language.
 - ctx.fmt: num(v, digits), pct(v), day("yyyy-MM-dd"), longDay(d), hms(seconds), hours(seconds), na (the text for a missing value).
 - ctx.calc: groupOf(typeKey), sportOf(typeKey), seconds("1:02:03"), sessionSeconds(activity), dayOf(activity), mondayOf(day), weekly(activities, weeks, a => value), loadOf(activity, maxHR), loadRatio(activities, day, maxHR), dailyLoads(activities, from, to, maxHR), mean, sd, rolling(values, n), change(now, before), zonesOf(ctx.data.zones), zoneSeconds(activity, floors), paceSeconds(activity), efficiency(activity), epley(kg, reps), riegel(seconds, km, km), exerciseStats(activities), muscleSets(activities, weeks), swimPace(activity), verticalPerHour(activity).
-- ctx.chart(el, config, heightPx): a Chart.js 4 chart that follows the theme, with tooltips.
+- ctx.chart(el, config, heightPx): a Chart.js 4 chart that follows the theme, with tooltips. Chart types: bar, line, scatter, doughnut, pie, with the category and linear scales.
 - ctx.color(token): a theme colour: text, muted, accent, good, bad, warn, line, panel, panel2, or a group (run, strength, walk, hike, bike, swim, racket, other).
 - ctx.empty(el, message): a short message in place of the content.
 
