@@ -27,6 +27,11 @@ Two ready-made prompts do more:
 - **training-dashboard-update** adds the new data to a dashboard that you have. The code, the
   layout and the styles stay the same.
 
+![The training dashboard: the All tab, load against recovery, the Run tab, strength trends, and the light and high-contrast themes](assets/dashboard.gif)
+
+_The training dashboard with demo data. Claude writes the dashboard each time, so your dashboard
+can look different._
+
 The server works with Claude Desktop, Claude Code and all other MCP clients that use stdio.
 
 ## Contents

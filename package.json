@@ -2,7 +2,13 @@
   "name": "@indaco/garmin-personal-mcp",
   "version": "0.1.0",
   "description": "MCP server for the official Garmin Connect Personal API",
+  "homepage": "https://github.com/indaco/garmin-personal-mcp#readme",
+  "bugs": "https://github.com/indaco/garmin-personal-mcp/issues",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/indaco/garmin-personal-mcp.git"
+  },
   "bin": {
     "garmin-personal-mcp": "dist/index.js"
   },
