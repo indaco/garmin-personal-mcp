@@ -29,63 +29,68 @@ function stackedWeeks(ctx: Ctx, value: (a: Activity) => number) {
   }));
 }
 
+/** Weekly bars by type, with a picker for the metric and a 4-week average line. */
+export function renderVolume(el: HTMLElement, ctx: Ctx, only?: string[]): void {
+  const { t, fmt, calc } = ctx;
+  const max = maxHR(ctx);
+  const metrics: Record<string, [label: string, unit: string, value: (a: Activity) => number]> = {
+    time: [t("m.time"), "h", (a) => sessionSeconds(a) / 3600],
+    distance: [t("m.distance"), "km", (a) => (typeof a.km === "number" ? a.km : 0)],
+    sessions: [t("m.sessions"), "", () => 1],
+    load: [t("m.load"), "", (a) => calc.loadOf(a, max)?.value ?? 0],
+  };
+  const [metric, bar] = picker(
+    ctx,
+    "metric",
+    Object.entries(metrics)
+      .filter(([k]) => !only || only.includes(k))
+      .map(([k, [label]]) => [k, label]),
+  );
+  const [, unit, value] = metrics[metric];
+  const total = calc.weekly(ctx.activities, ctx.weeks, value);
+  append(el, bar);
+  if (ctx.activities.length === 0) {
+    ctx.empty(el);
+    return;
+  }
+  ctx.chart(el, {
+    type: "bar",
+    data: {
+      labels: ctx.weeks.map((w) => weekLabel(ctx, w)),
+      datasets: [
+        ...stackedWeeks(ctx, value),
+        {
+          type: "line",
+          label: t("vol.avg"),
+          data: calc.rolling(total, 4),
+          borderColor: ctx.color("text"),
+          borderDash: [4, 3],
+          pointRadius: 2,
+        },
+      ],
+    },
+    options: {
+      scales: {
+        x: { stacked: true },
+        y: { stacked: true, title: { display: !!unit, text: unit } },
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: (c) => `${c.dataset.label}: ${fmt.num(c.parsed.y ?? undefined, 1)} ${unit}`,
+          },
+        },
+      },
+    },
+  });
+}
+
 register({
   id: "weeklyVolume",
   title: (t) => t("w.weeklyVolume"),
   types: ANY,
   span: 2,
-  render(el, ctx) {
-    const { t, fmt, calc } = ctx;
-    const max = maxHR(ctx);
-    const metrics: Record<string, [label: string, unit: string, value: (a: Activity) => number]> = {
-      time: [t("m.time"), "h", (a) => sessionSeconds(a) / 3600],
-      distance: [t("m.distance"), "km", (a) => (typeof a.km === "number" ? a.km : 0)],
-      sessions: [t("m.sessions"), "", () => 1],
-      load: [t("m.load"), "", (a) => calc.loadOf(a, max)?.value ?? 0],
-    };
-    const [metric, bar] = picker(
-      ctx,
-      "metric",
-      Object.entries(metrics).map(([k, [label]]) => [k, label]),
-    );
-    const [, unit, value] = metrics[metric];
-    const total = calc.weekly(ctx.activities, ctx.weeks, value);
-    append(el, bar);
-    if (ctx.activities.length === 0) {
-      ctx.empty(el);
-      return;
-    }
-    ctx.chart(el, {
-      type: "bar",
-      data: {
-        labels: ctx.weeks.map((w) => weekLabel(ctx, w)),
-        datasets: [
-          ...stackedWeeks(ctx, value),
-          {
-            type: "line",
-            label: t("vol.avg"),
-            data: calc.rolling(total, 4),
-            borderColor: ctx.color("text"),
-            borderDash: [4, 3],
-            pointRadius: 2,
-          },
-        ],
-      },
-      options: {
-        scales: {
-          x: { stacked: true },
-          y: { stacked: true, title: { display: !!unit, text: unit } },
-        },
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: (c) => `${c.dataset.label}: ${fmt.num(c.parsed.y ?? undefined, 1)} ${unit}`,
-            },
-          },
-        },
-      },
-    });
-  },
+  render: (el, ctx) => renderVolume(el, ctx),
 });
 
 register({

@@ -739,3 +739,14 @@ table.data .num {
 .more {
   margin-top: 10px;
 }
+.multiples {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+.multiple h3 {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  margin: 0 0 4px;
+}

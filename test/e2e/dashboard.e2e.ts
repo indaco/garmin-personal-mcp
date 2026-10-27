@@ -364,3 +364,63 @@ describe("overview widgets", () => {
     expect(errors).toEqual([]);
   });
 });
+
+describe("type boards", () => {
+  it("draws every board without errors, with a tooltip on every chart", async () => {
+    const { page, errors } = await open(browser, pageFile());
+    for (const tab of ["run", "strength", "walk", "bike", "padel"]) {
+      await page.click(`[data-tab=${tab}]`);
+      expect([tab, await chartsWithoutTooltip(page)]).toEqual([tab, []]);
+    }
+    expect(errors).toEqual([]);
+  });
+
+  it("fits every board on a phone", async () => {
+    const { page } = await open(browser, pageFile(), { viewport: { width: 390, height: 844 } });
+    for (const tab of ["all", "run", "strength", "walk", "bike", "padel"]) {
+      await page.click(`[data-tab=${tab}]`);
+      expect([
+        tab,
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      ]).toEqual([tab, true]);
+    }
+  });
+
+  it("shows the Run widgets", async () => {
+    const { page } = await open(browser, pageFile(), { hash: "#run" });
+    expect(await tiles(page)).toEqual([
+      "typeKpis",
+      "typeWeekly",
+      "hrZones",
+      "bestEfforts",
+      "races",
+      "aerobicFitness",
+      "intensityShare",
+      "runningForm",
+      "runWalk",
+      "trainingEffect",
+      "racePredictor",
+      "longRuns",
+      "activities",
+    ]);
+    const races = await page.$$eval("[data-id=races] tbody tr", (r) =>
+      r.map((x) => x.children[1].textContent),
+    );
+    expect(races).toEqual(["Riverside Half Marathon", "City 10K"]);
+    expect(await page.$$eval("[data-id=racePredictor] .kpi", (k) => k.length)).toBe(4);
+    expect(await page.textContent("[data-id=racePredictor]")).toContain("Estimate (Riegel)");
+    // a small multiple for each running form metric in the data
+    expect(await page.$$eval("[data-id=runningForm] .multiple", (m) => m.length)).toBe(7);
+  });
+
+  it("says one session so far instead of a trend", async () => {
+    const ride = data.activities.find((a: { type: string }) => a.type === "cycling");
+    const { page } = await open(
+      browser,
+      pageFile({ data: { ...data, activities: [ride], v: 3 } }),
+      { hash: "#bike" },
+    );
+    expect(await page.textContent("[data-id=typeWeekly]")).toContain("One session so far");
+    expect(await page.textContent("[data-id=typeKpis]")).toContain("One session so far");
+  });
+});

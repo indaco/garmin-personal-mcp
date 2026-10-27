@@ -3,4 +3,6 @@ import "./activities";
 import "./notes";
 import "./overview";
 import "./recovery";
+import "./run";
+import "./types";
 import "./volume";
