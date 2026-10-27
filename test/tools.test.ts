@@ -405,7 +405,7 @@ const shape = (t: {
 describe("MCP tools", () => {
   it("has the names, descriptions and parameters of the Java server's tools", async () => {
     const { tools: listed } = await (await connect()).listTools();
-    const expected = javaTools.filter((t) => t.name !== "getDashboardData").map(shape);
+    const expected = javaTools.map(shape);
     expect(listed.map(shape).toSorted((a, b) => a.name.localeCompare(b.name))).toEqual(expected);
   });
 
