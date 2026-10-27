@@ -14,7 +14,7 @@ import {
 import { fitFile } from "./fit-file";
 
 const types = Profile.types as Record<string, Record<string, string> | undefined>;
-import javaNames from "./fixtures/java-fit-names.json";
+import fitNames from "./fixtures/fit-constant-names.json";
 
 /** Raw value of a FIT profile enum, e.g. value("exerciseCategory", "benchPress") = 0 */
 function value(type: string, name: string): number {
@@ -60,9 +60,9 @@ describe("exercise names", () => {
     expect(exerciseName(undefined, undefined, undefined)).toBe("Unknown exercise");
   });
 
-  it("gives the Java SDK constant for every exercise category and name", () => {
+  it("gives the FIT profile constant for every exercise category and name", () => {
     const mismatches: string[] = [];
-    for (const [num, { const: cat, names }] of Object.entries(javaNames.exerciseCategories)) {
+    for (const [num, { const: cat, names }] of Object.entries(fitNames.exerciseCategories)) {
       const camel = types.exerciseCategory?.[num] ?? "";
       if (toConst(camel) !== cat) mismatches.push(`${num}: ${camel} vs ${cat}`);
       for (const [sub, name] of Object.entries(names)) {
@@ -72,12 +72,12 @@ describe("exercise names", () => {
       }
     }
     expect(mismatches).toEqual([]);
-    expect(Object.keys(javaNames.exerciseCategories)).toHaveLength(53);
+    expect(Object.keys(fitNames.exerciseCategories)).toHaveLength(53);
   });
 
-  it("gives the Java SDK constant for every sport, intensity and lap trigger", () => {
+  it("gives the FIT profile constant for every sport, intensity and lap trigger", () => {
     const mismatches: string[] = [];
-    for (const [type, values] of Object.entries(javaNames.enums)) {
+    for (const [type, values] of Object.entries(fitNames.enums)) {
       for (const [num, name] of Object.entries(values)) {
         if (name === "INVALID") continue;
         const js = types[type]?.[num];
@@ -264,7 +264,7 @@ describe("FIT files", () => {
     );
   });
 
-  // The JS SDK returns the messages it read along with the error; Java throws, so no partial sets.
+  // The SDK returns the messages it read along with the error: a damaged file must give no partial sets.
   it.each([
     ["a wrong CRC", (b: Uint8Array) => b.map((v, i) => (i === b.length - 1 ? v ^ 0xff : v))],
     ["a cut file", (b: Uint8Array) => b.slice(0, b.length - 10)],

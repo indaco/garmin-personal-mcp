@@ -209,7 +209,7 @@ function firstText(json: Record<string, unknown>, ...names: string[]): string | 
   return undefined;
 }
 
-/** Jackson's asLong: a number within the long range, or text of digits with an optional sign; undefined otherwise. */
+/** A whole number: a number within the 64-bit range, or text of digits with an optional sign; undefined otherwise. */
 function asLong(v: unknown): number | undefined {
   const n =
     typeof v === "number" ? v : typeof v === "string" && /^[+-]?\d+$/.test(v) ? Number(v) : NaN;

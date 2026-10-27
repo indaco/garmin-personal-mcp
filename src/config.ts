@@ -10,7 +10,7 @@ export interface Config {
   dataDir: string;
 }
 
-/** Defaults are the Java server's, so its API key and cached data are reused. */
+/** Defaults reuse an existing ~/.config/garmin-mcp/api-key and ~/workspace/garmin-data. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     baseUrl: env.GARMIN_BASE_URL || "https://personal.connectapi.garmin.com",

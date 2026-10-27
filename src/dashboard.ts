@@ -26,11 +26,11 @@ interface Sync {
 
 /**
  * All the data of the training dashboard in one call, with a local cache in `<data-dir>/dashboard-cache.json`
- * (the Java server's format, so both can share one data dir): each call fetches from Garmin only the days it
- * does not have yet, plus the last two days, which can still change.
+ * (keep its format: other servers on the same data dir read it): each call fetches from Garmin only the days
+ * it does not have yet, plus the last two days, which can still change.
  */
 export class GarminDashboard {
-  /** Calls run one at a time, like the Java server's synchronized method, so the cache file has one writer. */
+  /** Calls run one at a time, so the cache file has one writer. */
   #queue: Promise<unknown> = Promise.resolve();
 
   constructor(
@@ -180,7 +180,7 @@ export class GarminDashboard {
     // the cache keeps only what a dashboard can show
     const keepFrom = addDays(from, -RECOVERY_DAYS);
     for (const day of Object.keys(byDate)) {
-      // intentional difference: Java fails the whole call on a key that is not a date; here the key is dropped
+      // a key that is not a date is dropped too
       if (date(day) === undefined || day < keepFrom) {
         delete byDate[day];
       }
@@ -364,7 +364,7 @@ function between(byDate: Json, from: string, to: string): unknown[] {
   return out;
 }
 
-/** The object at `key`, created when missing (Jackson's withObjectProperty). */
+/** The object at `key`, created when missing. */
 function objectAt(o: Json, key: string): Json {
   if (!isObject(o[key])) {
     o[key] = {};
@@ -393,7 +393,7 @@ function addDays(day: string, n: number): string {
   return new Date(Date.parse(`${day}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);
 }
 
-/** Today in the system time zone, like Java's LocalDate.now(). */
+/** Today in the system time zone. */
 function localToday(): string {
   const d = new Date();
   return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
@@ -425,12 +425,12 @@ function field(v: unknown, name: string): unknown {
   return isObject(v) ? v[name] : undefined;
 }
 
-/** Jackson's asString(): text, or a number as text; "" for anything else. */
+/** Text, or a number as text; "" for anything else. */
 function asString(v: unknown): string {
   return typeof v === "string" ? v : typeof v === "number" ? String(v) : "";
 }
 
-/** Jackson's asLong(): a number without decimals, or text of digits; 0 otherwise. */
+/** A number without decimals, or text of digits; 0 otherwise. */
 function asLong(v: unknown): number {
   if (typeof v === "number") return Math.trunc(v);
   return typeof v === "string" && /^[+-]?\d+$/.test(v) ? Number(v) : 0;
@@ -438,7 +438,7 @@ function asLong(v: unknown): number {
 
 // ------------------------------------------------------------------ MCP registration
 
-/** Registers getDashboardData with the Java server's name, description and parameter. */
+/** Registers getDashboardData. */
 export function registerDashboard(server: McpServer, dashboard: GarminDashboard): void {
   server.registerTool(
     "getDashboardData",

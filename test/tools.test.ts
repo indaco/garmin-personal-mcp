@@ -10,7 +10,7 @@ import { GarminApiError, type GarminApiClient } from "../src/api-client";
 import { createServer } from "../src/server";
 import { GarminTools, summarize } from "../src/tools";
 import { fitFile } from "./fit-file";
-import javaTools from "./fixtures/java-tools.json";
+import toolList from "./fixtures/tool-list.json";
 
 vi.mock("../src/log", () => ({ log: vi.fn() }));
 
@@ -138,7 +138,7 @@ describe("summarize", () => {
     expect(s.strokes).toBe(980);
   });
 
-  // Jackson's asDouble: numeric text counts, but not with spaces, hex, NaN or Infinity
+  // numeric text counts as a number, but not with spaces, hex, NaN or Infinity
   it.each([
     ["5000", 5],
     ["+5000", 5],
@@ -149,11 +149,11 @@ describe("summarize", () => {
     ["Infinity", undefined],
     ["NaN", undefined],
     [true, undefined],
-  ])("reads the distance %j like Jackson", (distance, km) => {
+  ])("reads the distance %j", (distance, km) => {
     expect(summarize({ distance }).km).toBe(km);
   });
 
-  it("keeps the summary fields in the Java order", () => {
+  it("keeps the summary fields in a fixed order", () => {
     const s = summarize({
       activityId: 4,
       activityName: "Run",
@@ -250,7 +250,7 @@ describe("activities", () => {
     expect(api.getJson).toHaveBeenCalledWith(path, query);
   });
 
-  it("garminGet splits the query string like the Java server", async () => {
+  it("garminGet splits the query string into parameters", async () => {
     api.getJson.mockResolvedValue([]);
     await tools.garminGet("/x", "a=1&b=2=3&=skip&noValue&a=4&c=");
     expect(api.getJson).toHaveBeenCalledWith("/x", { a: "4", b: "2=3", c: "" });
@@ -380,7 +380,7 @@ async function connect() {
   return client;
 }
 
-// intentional difference: zod bounds integers to the safe range, Java declares a plain integer
+// zod bounds integers to the safe range; the reference list declares a plain integer
 const unbounded = (properties: unknown) =>
   JSON.parse(
     JSON.stringify(properties, (k, v) =>
@@ -390,7 +390,7 @@ const unbounded = (properties: unknown) =>
     ),
   );
 
-/** What the Java server and this one must agree on for each tool. */
+/** What the reference tool list and this server must agree on for each tool. */
 const shape = (t: {
   name: string;
   description?: string;
@@ -403,9 +403,9 @@ const shape = (t: {
 });
 
 describe("MCP tools", () => {
-  it("has the names, descriptions and parameters of the Java server's tools", async () => {
+  it("has the names, descriptions and parameters of the reference tool list", async () => {
     const { tools: listed } = await (await connect()).listTools();
-    const expected = javaTools.map(shape);
+    const expected = toolList.map(shape);
     expect(listed.map(shape).toSorted((a, b) => a.name.localeCompare(b.name))).toEqual(expected);
   });
 

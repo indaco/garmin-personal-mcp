@@ -313,14 +313,14 @@ function field(v: unknown, name: string): unknown {
   return isObject(v) ? v[name] : undefined;
 }
 
-/** Jackson's asDouble(default): a number, or text holding one; the default otherwise (null too). */
+/** A number, or text holding one; the default otherwise (null too). */
 function asDouble(v: unknown, d: number): number {
   if (typeof v === "number") return v;
   if (typeof v === "string" && /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(v)) return Number(v);
   return d;
 }
 
-/** Jackson's asString(null): text, or a number as text; null otherwise. */
+/** Text, or a number as text; null otherwise. */
 function asString(v: unknown): string | null {
   return typeof v === "string" ? v : typeof v === "number" ? String(v) : null;
 }
@@ -331,7 +331,7 @@ const activityId = z.number().int().describe("Garmin activity id");
 const date = z.string().describe("Date yyyy-MM-dd");
 const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 
-/** Registers the tools with the names, descriptions and parameters of the Java server. */
+/** Registers the 12 tools. */
 export function registerTools(server: McpServer, tools: GarminTools): void {
   server.registerTool(
     "listActivities",

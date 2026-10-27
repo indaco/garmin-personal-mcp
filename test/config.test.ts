@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { loadConfig } from "../src/config";
 
 describe("loadConfig", () => {
-  it("defaults to the Java server's paths, so its key and data are reused", () => {
+  it("defaults to ~/.config/garmin-mcp/api-key and ~/workspace/garmin-data", () => {
     expect(loadConfig({})).toEqual({
       baseUrl: "https://personal.connectapi.garmin.com",
       apiKeyFile: join(homedir(), ".config/garmin-mcp/api-key"),

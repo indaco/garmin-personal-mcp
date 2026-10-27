@@ -20,7 +20,7 @@ export interface Exercise {
   sets: Record<string, number>[];
 }
 
-/** Garmin's exercise catalogue: its "categories" object, keyed by Java SDK constants. */
+/** Garmin's exercise catalogue: its "categories" object, keyed by FIT profile constants. */
 export type Catalogue = Record<string, { exercises?: Record<string, unknown> } | undefined>;
 
 // oxlint-disable-next-line typescript/no-explicit-any -- decoded FIT messages are untyped records
@@ -31,9 +31,9 @@ const SET_TYPE_ACTIVE = 1;
 const types = Profile.types as Record<string, Record<string, string> | undefined>;
 
 /**
- * The Java FIT SDK constant of a JS SDK name: benchPress -> BENCH_PRESS,
+ * The FIT profile constant of an SDK name: benchPress -> BENCH_PRESS,
  * 3WayCalfRaise -> _3_WAY_CALF_RAISE, hangingLSit -> HANGING_L_SIT.
- * The tests check it against every exercise, sport, intensity and lap trigger name of the Java SDK.
+ * The tests check it against every exercise, sport, intensity and lap trigger name.
  */
 export function toConst(camel: string): string {
   const s = camel
@@ -54,19 +54,19 @@ export function words(constant: string): string {
     .join(" ");
 }
 
-/** The Java SDK constant of a raw enum value, in lower case (e.g. session_end), as the Java tools print it. */
+/** The constant of a raw enum value, in lower case (e.g. session_end), as the tools print it. */
 function enumName(type: string, value: unknown): string | undefined {
   const name = typeof value === "number" ? types[type]?.[value] : undefined;
   return name === undefined ? undefined : toConst(name).toLowerCase();
 }
 
-/** The Java SDK constant of a category, e.g. BENCH_PRESS; "" for an unknown value. */
+/** The constant of a category, e.g. BENCH_PRESS; "" for an unknown value. */
 function categoryConst(category: number | undefined): string {
   const name = category === undefined ? undefined : types.exerciseCategory?.[category];
   return name === undefined ? "" : toConst(name);
 }
 
-/** The Java SDK constant of an exercise, e.g. INCLINE_SMITH_MACHINE_BENCH_PRESS; "" when the SDK has no name for it. */
+/** The constant of an exercise, e.g. INCLINE_SMITH_MACHINE_BENCH_PRESS; "" when the SDK has no name for it. */
 function exerciseConst(category: number | undefined, subtype: number | undefined): string {
   const cat = category === undefined ? undefined : types.exerciseCategory?.[category];
   const name =
@@ -90,7 +90,7 @@ export function exerciseName(
   return words(exerciseConst(category, subtype) || cat);
 }
 
-/** Decodes a FIT file with raw enum values, as the Java SDK gives them. */
+/** Decodes a FIT file with raw enum values. */
 export function decodeFit(bytes: Uint8Array, activityId: number): Messages {
   const { messages, errors } = new Decoder(Stream.fromByteArray(bytes)).read({
     convertTypesToStrings: false,
@@ -223,7 +223,7 @@ function muscles(list: unknown): string[] {
     : [];
 }
 
-/** Java Number.longValue(): drops the decimals. */
+/** Drops the decimals. */
 function putIfSet(o: Record<string, unknown>, name: string, v: number | undefined): void {
   if (v != null) {
     o[name] = Math.trunc(v);
