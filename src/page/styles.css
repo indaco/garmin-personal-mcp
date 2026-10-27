@@ -370,6 +370,18 @@ select {
   color: var(--text);
   border-bottom-color: var(--accent);
 }
+.tabs.more {
+  mask-image: linear-gradient(90deg, #000 80%, transparent);
+}
+/* inside a box that scrolls, a ring outside the control would be cut */
+.tab:focus-visible,
+.tile-body :focus-visible {
+  outline-offset: -2px;
+}
+.window-toggle {
+  display: none;
+  justify-self: start;
+}
 .count {
   font-size: 11px;
   background: var(--panel2);
@@ -443,8 +455,43 @@ select {
   .span-3 {
     grid-column: span 1;
   }
+  /* a compact header that stays at the top; in edit mode the edit bar does */
+  .top {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    gap: 8px;
+    margin: -20px -16px 12px;
+    padding: 10px 16px 0;
+    background: var(--bg);
+  }
+  .page:has(> .edit-bar) .top {
+    position: static;
+  }
   h1 {
-    font-size: 26px;
+    font-size: 19px;
+    margin: 0;
+  }
+  .title-row {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  .title .logo {
+    display: none;
+  }
+  .title .muted {
+    font-size: 12px;
+    margin: 0;
+  }
+  .window {
+    display: grid;
+    gap: 8px;
+  }
+  .window-toggle {
+    display: inline-flex;
+  }
+  .window-bar:not(.open) {
+    display: none;
   }
 }
 .banner {
