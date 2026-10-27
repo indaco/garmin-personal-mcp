@@ -3,6 +3,7 @@ import type * as calc from "./calc";
 import type * as metrics from "./metrics";
 import type * as running from "./running";
 import type * as strength from "./strength";
+import type * as sports from "./sports";
 import type { Activity, Group } from "./calc";
 import type { Fmt, T } from "./i18n";
 import type { Span } from "./layout";
@@ -46,7 +47,7 @@ export interface Ctx {
   lang: string;
   t: T;
   fmt: Fmt;
-  calc: typeof calc & typeof metrics & typeof running & typeof strength;
+  calc: typeof calc & typeof metrics & typeof running & typeof strength & typeof sports;
   /** A Chart.js chart in `el` that follows the theme; `height` in px. */
   chart: (el: HTMLElement, config: ChartConfiguration, height?: number) => Chart;
   /** A colour token of the theme, e.g. "text", "good", or a group for its type colour. */

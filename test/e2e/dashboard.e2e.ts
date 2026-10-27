@@ -498,3 +498,86 @@ describe("strength board", () => {
     expect(await page.getAttribute(first, "open")).toBeNull();
   });
 });
+
+describe("walk, hike, bike, swim and padel boards", () => {
+  const hike = {
+    id: 9001,
+    name: "Ridge Hike",
+    type: "hiking",
+    start: "2026-10-25 09:00:00",
+    km: 12,
+    duration: "3:00:00",
+    ascentM: 900,
+    avgHR: 120,
+    maxHR: 150,
+    trainingLoad: 120,
+  };
+  const swim = {
+    id: 9002,
+    name: "Pool Swim",
+    type: "lap_swimming",
+    start: "2026-10-24 07:00:00",
+    km: 1.5,
+    duration: "30:00",
+    swolf: 38,
+    lengths: 60,
+    strokes: 900,
+    poolLengthM: 25,
+    avgHR: 130,
+    trainingLoad: 40,
+  };
+  const yoga = {
+    id: 9003,
+    name: "Yoga",
+    type: "yoga",
+    start: "2026-10-23 19:00:00",
+    duration: "45:00",
+    avgHR: 90,
+  };
+  const more = () =>
+    pageFile({ data: { ...data, v: 3, activities: [hike, swim, yoga, ...data.activities] } });
+
+  it("adds the Hike, Swim and Other tabs only when the data has them", async () => {
+    const { page } = await open(browser, more());
+    expect((await tabs(page)).map(([tab]) => tab)).toEqual([
+      "all",
+      "run",
+      "strength",
+      "walk",
+      "hike",
+      "bike",
+      "swim",
+      "padel",
+      "other",
+    ]);
+  });
+
+  it("draws every extra board without errors, with a tooltip on every chart", async () => {
+    const { page, errors } = await open(browser, more());
+    for (const tab of ["walk", "hike", "bike", "swim", "padel", "other"]) {
+      await page.click(`[data-tab=${tab}]`);
+      expect([tab, await chartsWithoutTooltip(page)]).toEqual([tab, []]);
+    }
+    expect(errors).toEqual([]);
+  });
+
+  it("gives the numbers of each sport", async () => {
+    const { page } = await open(browser, more(), { hash: "#hike" });
+    expect(await page.textContent("[data-id=hikeVertical]")).toContain("300 m/h");
+    await page.click("[data-tab=swim]");
+    expect(await page.textContent("[data-id=swimDetails]")).toContain("2:00/100 m");
+    await page.click("[data-tab=bike]");
+    expect(await page.textContent("[data-id=bikeDetails] .kpis")).toContain("3 rides");
+    await page.click("[data-tab=padel]");
+    expect(await page.$$eval("[data-id=padelDetails] tbody tr", (r) => r.length)).toBe(3);
+    await page.click("[data-tab=walk]");
+    expect(await tiles(page)).toEqual([
+      "typeKpis",
+      "typeWeekly",
+      "hrZones",
+      "walkDetails",
+      "steps",
+      "activities",
+    ]);
+  });
+});
