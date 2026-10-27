@@ -1143,6 +1143,15 @@ table.data .num {
   display: grid;
   gap: 4px;
 }
+.menu-sep {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+.board-empty .btn {
+  margin-top: 12px;
+}
 
 /* Footer */
 .foot {

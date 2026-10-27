@@ -230,7 +230,7 @@ function header(data: Data): HTMLElement {
           ),
         ),
       ),
-      h("div", { class: "menus" }, !editing && editButton(), accountMenu()),
+      h("div", { class: "menus" }, accountMenu()),
     ),
     windowBar(inProgress),
     tabBar(data),
@@ -241,8 +241,16 @@ function accountMenu(): HTMLElement {
   return h(
     "details",
     { class: "account", open: accountOpen },
-    h("summary", { "aria-label": t("menu.settings"), title: t("menu.settings") }, icon("user")),
-    h("div", { class: "account-panel" }, languageMenu(), themeMenu()),
+    h("summary", { "aria-label": t("menu.settings"), title: t("menu.settings") }, icon("settings")),
+    // the page settings: the layout first, then the choices of this browser
+    h(
+      "div",
+      { class: "account-panel" },
+      !editing && editButton(),
+      !editing && h("hr", { class: "menu-sep" }),
+      languageMenu(),
+      themeMenu(),
+    ),
   );
 }
 
@@ -294,19 +302,16 @@ function themeMenu(): HTMLElement {
 }
 
 function editButton(): HTMLElement {
-  return h(
-    "button",
-    {
-      class: "btn edit-start",
-      onclick: () => {
-        editing = true;
-        draft = layout;
-        render();
-        document.querySelector<HTMLElement>(".edit-bar .btn")?.focus();
-      },
-    },
-    t("edit.start"),
-  );
+  return h("button", { class: "btn edit-start", onclick: startEdit }, t("edit.start"));
+}
+
+function startEdit(): void {
+  // the settings menu closes: render keeps it as it finds it
+  document.querySelector<HTMLDetailsElement>(".account[open]")?.removeAttribute("open");
+  editing = true;
+  draft = layout;
+  render();
+  document.querySelector<HTMLElement>(".edit-bar .btn")?.focus();
 }
 
 /** Edit mode has changes that Done would save. */
@@ -314,12 +319,12 @@ function dirty(): boolean {
   return draft !== null && JSON.stringify(draft) !== JSON.stringify(layout);
 }
 
-/** Leaves edit mode; focus goes back to the Edit layout button. */
+/** Leaves edit mode; focus goes back to the settings menu, where Edit layout is. */
 function leaveEdit(): void {
   editing = false;
   draft = null;
   render();
-  document.querySelector<HTMLElement>(".edit-start")?.focus();
+  document.querySelector<HTMLElement>(".account summary")?.focus();
 }
 
 function done(): void {
@@ -493,7 +498,15 @@ function boardView(data: Data): HTMLElement {
     grid.append(tile(data, inst, def));
   }
   if (grid.childElementCount === 0) {
-    grid.append(h("p", { class: "board-empty" }, t("board.empty")));
+    // an empty board offers edit mode itself: the menu is not the only way in
+    grid.append(
+      h(
+        "div",
+        { class: "board-empty" },
+        h("p", {}, t(editing ? "board.emptyEdit" : "board.empty")),
+        !editing && h("button", { class: "btn primary", onclick: startEdit }, t("edit.start")),
+      ),
+    );
   }
   // one caption for the board instead of the same note under each recovery widget
   const caption = view.tab === "recovery" && h("p", { class: "muted board-note" }, t("rec.board"));

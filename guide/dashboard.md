@@ -97,7 +97,8 @@ series again. Shift-click, or Cmd-click on a Mac, hides or shows only that serie
 
 ## Change the layout
 
-Select **Edit layout**. Each widget then has these controls:
+Open the settings menu (the sliders button at the top right) and select **Edit layout**. An empty
+board has its own **Edit layout** button. Each widget then has these controls:
 
 | Control             | Action                                                                                                                                                          |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -128,7 +129,7 @@ To make your own widget, see [Custom widgets](custom-widgets.md).
 
 ## Themes and languages
 
-The **Theme** menu has 11 themes: System, five dark themes, three light themes and two
+The settings menu has **Language** and **Theme**. The **Theme** menu has 11 themes: System, five dark themes, three light themes and two
 high-contrast themes. Midnight is the default.
 
 The **Language** menu has English, Italian and the languages that you add. _Auto_ follows the

@@ -19,6 +19,11 @@ const tabs = (page: Page) =>
 const tiles = (page: Page) =>
   page.$$eval(".tile", (els) => els.map((e) => (e as HTMLElement).dataset.id));
 const hash = (page: Page) => page.evaluate(() => location.hash);
+/** Opens edit mode from the settings menu. */
+async function startEdit(page: Page): Promise<void> {
+  await page.click(".account summary");
+  await page.click(".account-panel >> text=Edit layout");
+}
 
 const ALL_PRESET = [
   "kpis",
@@ -202,7 +207,7 @@ describe("edit mode", () => {
 
   it("hides a widget, and shows it again from the Add widget dialog", async () => {
     const { page } = await open(browser, pageFile({ layout: one }));
-    await page.click("text=Edit layout");
+    await startEdit(page);
     await page.click("[aria-label='Hide Coach notes']");
     // a hidden widget leaves the grid; the dialog lists it
     expect(await tiles(page)).toEqual([]);
@@ -219,7 +224,7 @@ describe("edit mode", () => {
 
   it("moves a widget with the keyboard from its grip", async () => {
     const { page } = await open(browser, pageFile({ layout: two }));
-    await page.click("text=Edit layout");
+    await startEdit(page);
     await page.focus("[aria-label='Move Coach notes']");
     await page.keyboard.press("Space");
     expect(await page.textContent("#announce")).toContain("Coach notes picked up, position 1 of 2");
@@ -240,7 +245,7 @@ describe("edit mode", () => {
 
   it("drags a widget: the tile lifts, a slot shows where it lands", async () => {
     const { page } = await open(browser, pageFile({ layout: two }));
-    await page.click("text=Edit layout");
+    await startEdit(page);
     const from = (await page.locator("[aria-label='Move Coach notes']").boundingBox())!;
     await page.mouse.move(from.x + 5, from.y + 5);
     await page.mouse.down();
@@ -258,7 +263,7 @@ describe("edit mode", () => {
 
   it("resizes a widget by its handle, snapped to the columns", async () => {
     const { page } = await open(browser, pageFile({ layout: two }));
-    await page.click("text=Edit layout");
+    await startEdit(page);
     const handle = page.locator("[aria-label='Width of Coach notes']");
     expect(await handle.getAttribute("aria-valuenow")).toBe("3");
     const box = (await handle.boundingBox())!;
@@ -283,7 +288,7 @@ describe("edit mode", () => {
 
   it("keeps a widget at its narrowest width", async () => {
     const { page } = await open(browser, pageFile());
-    await page.click("text=Edit layout");
+    await startEdit(page);
     const handle = page.locator("[aria-label='Width of Activities']");
     expect(await handle.getAttribute("aria-valuemin")).toBe("2");
     await handle.focus();
@@ -293,7 +298,7 @@ describe("edit mode", () => {
 
   it("removes a widget, adds it back from the catalogue, and resets to the preset", async () => {
     const { page } = await open(browser, pageFile({ layout: two }));
-    await page.click("text=Edit layout");
+    await startEdit(page);
     await page.click("[aria-label='Hide Coach notes']");
     await page.click(".edit-bar >> text=Add widget");
     await page.click("dialog >> text=Remove Coach notes");
@@ -310,7 +315,7 @@ describe("edit mode", () => {
   it("keeps a browser edit after a reload, until the page gets a new layout", async () => {
     const file = pageFile({ layout: two });
     const { page } = await open(browser, file);
-    await page.click("text=Edit layout");
+    await startEdit(page);
     await page.click("[aria-label='Hide Coach notes']");
     await page.click("text=Done");
     await page.reload();
@@ -336,7 +341,7 @@ describe("edit mode", () => {
 
   it("saves the edits only on Done", async () => {
     const { page } = await open(browser, pageFile({ layout: two }));
-    await page.click("text=Edit layout");
+    await startEdit(page);
     await page.focus("[aria-label='Move Coach notes']");
     for (const key of ["Space", "ArrowRight", "Space"]) await page.keyboard.press(key);
     expect(await page.textContent(".edit-bar")).toContain("Unsaved changes");
@@ -346,12 +351,12 @@ describe("edit mode", () => {
       JSON.parse((await saved(page))!).layout.boards.all.map((i: { id: string }) => i.id),
     ).toEqual(["x", "coachNotes"]);
     expect(await page.textContent("#announce")).toBe("Layout saved");
-    expect(await focused(page)).toBe("Edit layout");
+    expect(await focused(page)).toBe("Settings");
   });
 
   it("asks before it discards the edits, and puts the layout back", async () => {
     const { page } = await open(browser, pageFile({ layout: two }));
-    await page.click("text=Edit layout");
+    await startEdit(page);
     await page.click("[aria-label='Hide Coach notes']");
     await page.click(".edit-bar >> text=Discard");
     await page.click("dialog >> text=Keep editing");
@@ -365,7 +370,7 @@ describe("edit mode", () => {
 
   it("leaves edit mode without a question when nothing changed", async () => {
     const { page } = await open(browser, pageFile({ layout: two }));
-    await page.click("text=Edit layout");
+    await startEdit(page);
     await page.keyboard.press("Escape");
     expect(await page.$(".edit-bar")).toBeNull();
     expect(await page.$("dialog")).toBeNull();
@@ -373,7 +378,7 @@ describe("edit mode", () => {
 
   it("keeps the edit bar in view while you scroll", async () => {
     const { page } = await open(browser, pageFile());
-    await page.click("text=Edit layout");
+    await startEdit(page);
     await page.evaluate(() => window.scrollTo(0, 2000));
     const top = await page.$eval(".edit-bar", (el) => el.getBoundingClientRect().top);
     expect(top).toBe(0);
@@ -382,7 +387,7 @@ describe("edit mode", () => {
   it("uses the new layout from Claude when you choose it", async () => {
     const file = pageFile({ layout: two });
     const { page } = await open(browser, file);
-    await page.click("text=Edit layout");
+    await startEdit(page);
     await page.click("[aria-label='Hide Coach notes']");
     await page.click("text=Done");
     writeFileSync(file, readFileSync(file, "utf8").replace('"rev":"r1"', '"rev":"r2"'));
@@ -399,7 +404,7 @@ describe("edit mode", () => {
 
   it("copies the layout as text that Claude can save", async () => {
     const { page } = await open(browser, pageFile({ layout: two }));
-    await page.click("text=Edit layout");
+    await startEdit(page);
     await page.click("text=Copy layout");
     const text = await page.inputValue(".layout-text");
     expect(JSON.parse(text)).toEqual({ base: "preset", boards: two.boards });
@@ -411,7 +416,20 @@ describe("edit mode", () => {
       pageFile({ layout: { rev: "b", base: "blank", boards: {} } }),
     );
     expect(await tiles(page)).toEqual([]);
+    // an empty board has its own way into edit mode
+    expect(await page.textContent(".board-empty")).toContain("no widgets");
+    await page.click(".board-empty >> text=Edit layout");
+    expect(await page.$(".edit-bar")).not.toBeNull();
     expect(await page.textContent(".board-empty")).toContain("Add widget");
+  });
+
+  it("opens edit mode from the settings menu, and closes the menu", async () => {
+    const { page } = await open(browser, pageFile());
+    expect(await page.$(".menus > .btn")).toBeNull();
+    await startEdit(page);
+    expect(await page.$(".account[open]")).toBeNull();
+    expect(await page.$(".account-panel .edit-start")).toBeNull();
+    expect(await focused(page)).toBe("Add widget");
   });
 });
 
@@ -480,7 +498,7 @@ describe("accessibility", () => {
       expect([tab, await problems(page)]).toEqual([tab, []]);
     }
     await page.click("[data-tab=all]");
-    await page.click("text=Edit layout");
+    await startEdit(page);
     expect(["edit", await problems(page)]).toEqual(["edit", []]);
     await page.click(".edit-bar >> text=Done");
     await page.click(".account summary");
@@ -533,7 +551,7 @@ describe("focus", () => {
 
   it("stays on an edit tool, and says what changed", async () => {
     const { page } = await open(browser, pageFile());
-    await page.click("text=Edit layout");
+    await startEdit(page);
     await page.focus("[aria-label='Move Weekly volume']");
     for (const key of ["Space", "ArrowRight", "Space"]) await page.keyboard.press(key);
     expect(await focused(page)).toBe("Move Weekly volume");
@@ -1069,7 +1087,7 @@ describe("custom widgets and languages", () => {
       browser,
       pageFile({ widgets: [custom("mine", "el.textContent = 'mine';")], layout: on("coachNotes") }),
     );
-    await page.click("text=Edit layout");
+    await startEdit(page);
     await page.click("text=Add widget");
     await page.click(".catalogue li:has-text('Custom mine') button");
     expect(await tiles(page)).toEqual(["coachNotes", "mine"]);

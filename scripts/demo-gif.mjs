@@ -36,6 +36,12 @@ async function shot(page) {
   frames.push(file);
 }
 
+/** Opens edit mode from the settings menu. */
+async function startEdit(page) {
+  await page.click(".account summary");
+  await page.click(".account-panel >> text=Edit layout");
+}
+
 /** Scrolls the widget to the top of the window. */
 const scrollTo = (page, id) =>
   page.$eval(`[data-id=${id}]`, (el) =>
@@ -57,7 +63,7 @@ await shot(page);
 
 // Edit mode: drag Consistency before Readiness, widen Readiness, then hide it
 page = await open(pageFile("edit", null));
-await page.click("text=Edit layout");
+await startEdit(page);
 const from = await page.locator("[aria-label='Move Consistency']").boundingBox();
 await page.mouse.move(from.x + 5, from.y + 5);
 await page.mouse.down();
@@ -78,7 +84,7 @@ await shot(page);
 
 // A blank board: the catalogue, then the board with the added widgets
 page = await open(pageFile("blank", { rev: "demo", base: "blank", boards: {} }));
-await page.click("text=Edit layout");
+await startEdit(page);
 const addWidget = async (title) => {
   await page.click("text=Add widget");
   await page.click(`.catalogue li:has(span:text-is('${title}')) button`);
