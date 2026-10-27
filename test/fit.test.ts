@@ -113,6 +113,41 @@ describe("sets", () => {
     ]);
   });
 
+  it("drops the empty set the watch opens when the workout ends", () => {
+    const unknown = value("exerciseCategory", "unknown");
+    const stray: FitSet = { setType: ACTIVE, repetitions: 0, duration: 17.5, category: [unknown] };
+    const out = groupSets(
+      [
+        set(ACTIVE, 5, 60, 20),
+        set(REST, undefined, undefined, 25),
+        stray,
+        set(REST, undefined, undefined, 2),
+      ],
+      new Map(),
+      undefined,
+    );
+    expect(out).toHaveLength(1);
+    // the rest after the empty set does not replace the real rest before it
+    expect(out[0].sets).toEqual([{ reps: 5, kg: 60, seconds: 20, restSec: 25 }]);
+  });
+
+  it("keeps an unknown set that has reps, a weight or a real set after it", () => {
+    const unknown = value("exerciseCategory", "unknown");
+    const out = groupSets(
+      [
+        { setType: ACTIVE, repetitions: 0, duration: 30, category: [unknown] },
+        set(ACTIVE, 5, 60, 20),
+        { setType: ACTIVE, repetitions: 8, duration: 30, category: [unknown] },
+      ],
+      new Map(),
+      undefined,
+    );
+    expect(out.map((e) => [e.exercise, e.sets.length])).toEqual([
+      ["Unknown exercise", 2],
+      ["Barbell Box Squat", 1],
+    ]);
+  });
+
   it("reads the muscles from the exercise catalogue", () => {
     const catalogue = {
       SQUAT: {

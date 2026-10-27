@@ -171,17 +171,29 @@ export function groupSets(
   catalogue: Catalogue | undefined,
 ): Exercise[] {
   const exercises = new Map<string, Exercise>();
+  const keyOf = (s: FitSet) => `${s.category?.[0]}/${s.categorySubtype?.[0]}`;
+  // the watch opens one more set when the workout ends: no exercise, no reps, no weight, nothing after it
+  const isEmpty = (s: FitSet) =>
+    s.setType === SET_TYPE_ACTIVE &&
+    exerciseName(s.category?.[0], s.categorySubtype?.[0], stepNames.get(keyOf(s))) ===
+      "Unknown exercise" &&
+    !((s.repetitions ?? 0) > 0) &&
+    !((s.weight ?? 0) > 0);
+  const lastReal = sets.findLastIndex((s) => s.setType === SET_TYPE_ACTIVE && !isEmpty(s));
   let previous: Record<string, number> | undefined;
-  for (const s of sets) {
+  for (const [i, s] of sets.entries()) {
     if (s.setType !== SET_TYPE_ACTIVE) {
       if (previous && s.setType === SET_TYPE_REST && s.duration != null) {
         previous.restSec = Math.round(s.duration);
       }
       continue;
     }
+    if (i > lastReal) {
+      break; // the set the watch opened at the end: what follows it is not part of the workout
+    }
     const category = s.category?.[0];
     const subtype = s.categorySubtype?.[0];
-    const key = `${category}/${subtype}`;
+    const key = keyOf(s);
     let exercise = exercises.get(key);
     if (!exercise) {
       const cat = categoryConst(category);
