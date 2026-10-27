@@ -23,7 +23,8 @@ export default defineConfig([
     platform: "node",
     dts: false,
     fixedExtension: false,
-    deps: { alwaysBundle: [/.*/] },
+    // everything is bundled on purpose: no hint about bundled dependencies
+    deps: { alwaysBundle: [/.*/], onlyBundle: false },
   },
   // The dashboard page script, with Chart.js inside: scripts/build-template.mjs puts it into dist/dashboard.html.
   {
@@ -34,8 +35,8 @@ export default defineConfig([
     dts: false,
     minify: true,
     // the license banners of the bundled libraries stay in the minified page
-    outputOptions: { legalComments: "inline" },
-    deps: { alwaysBundle: [/.*/] },
+    outputOptions: { comments: { legal: true } },
+    deps: { alwaysBundle: [/.*/], onlyBundle: false },
     plugins: [moduleList],
   },
 ]);
