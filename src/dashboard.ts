@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { type GarminApiClient, GarminApiError } from "./api-client";
+import { addDays, localToday } from "./dates";
 import { log } from "./log";
 import { type GarminTools, firstArray, summarize, writeAtomically } from "./tools";
 
@@ -16,7 +17,6 @@ const RECOVERY_DAYS = 14;
 /** The last days of a cached range are fetched again: Garmin can still add activities or finish a night's data. */
 const REFRESH_DAYS = 2;
 const PAGE = 200;
-const DAY_MS = 24 * 3600_000;
 
 /** What one getDashboardData call counts. */
 interface Sync {
@@ -387,16 +387,6 @@ function date(v: unknown): string | undefined {
   if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return undefined;
   const t = Date.parse(`${v}T00:00:00Z`);
   return !Number.isNaN(t) && new Date(t).toISOString().startsWith(v) ? v : undefined;
-}
-
-function addDays(day: string, n: number): string {
-  return new Date(Date.parse(`${day}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);
-}
-
-/** Today in the system time zone. */
-function localToday(): string {
-  const d = new Date();
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 }
 
 function copy(from: unknown, to: Json, name: string, as: string): void {
