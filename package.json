@@ -23,6 +23,7 @@
     "test": "vitest run --passWithNoTests",
     "test:page": "vitest run --config vitest.page.config.ts",
     "guide": "UPDATE_DOCS=1 vitest run test/docs.test.ts",
+    "demo": "node scripts/demo-gif.mjs",
     "lint": "oxlint --deny-warnings && oxfmt --check",
     "fmt": "oxfmt",
     "typecheck": "tsc --noEmit"

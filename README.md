@@ -29,7 +29,7 @@ Ready-made prompts do more:
 - **dashboard-widget** makes a new widget from your idea.
 - **dashboard-language** adds a language to the dashboard.
 
-![The training dashboard: the All board, load against recovery, the Run board, strength trends, edit mode, and the light and high-contrast themes](assets/dashboard.gif)
+![The training dashboard: the All board, load against recovery, the Run board, strength trends, edit mode (drag a widget to a new place, hide a widget, add widgets from the catalogue to an empty board), and the light and high-contrast themes](assets/dashboard.gif)
 
 _The training dashboard with demo data._
 
@@ -462,6 +462,7 @@ In the client configuration, use `node` with the absolute path of `dist/index.js
 pnpm test          # Vitest
 pnpm test:page     # the dashboard page in headless Chromium (run pnpm build first)
 pnpm guide         # writes the generated parts of guide/
+pnpm demo          # records assets/dashboard.gif (run pnpm build first; needs ImageMagick)
 pnpm lint          # Oxlint, then an Oxfmt check
 pnpm fmt           # Oxfmt
 pnpm typecheck     # tsc --noEmit
