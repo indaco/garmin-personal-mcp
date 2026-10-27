@@ -136,6 +136,12 @@ export const en = {
   "edit.show": "Show {title}",
   "edit.remove": "Remove {title}",
   "edit.hidden": "Hidden",
+  "said.moved": "{title} moved to position {n} of {count}",
+  "said.width": "{title}: width {n}",
+  "said.hidden": "{title} hidden",
+  "said.shown": "{title} shown",
+  "said.removed": "{title} removed",
+  "said.added": "{title} added",
 
   "add.title": "Add a widget",
   "add.type": "Type",

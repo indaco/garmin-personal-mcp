@@ -5,7 +5,7 @@ import * as strength from "./strength";
 import * as sports from "./sports";
 import { type Activity, activitiesIn, GROUPS, groupOf, weeksOf } from "./calc";
 import { Chart, chart, destroyCharts, themeCharts } from "./charts";
-import { h } from "./dom";
+import { announce, h, keepFocus } from "./dom";
 import { icon } from "./icons";
 import {
   addLanguages,
@@ -108,6 +108,12 @@ export function start(): void {
     menu.open = false;
     menu.querySelector("summary")!.focus();
   });
+  // and when focus leaves it, so an open panel never covers the control that has focus
+  document.addEventListener("focusin", (e) => {
+    const menu = document.querySelector<HTMLDetailsElement>(".account[open]");
+    if (menu && !menu.contains(e.target as Node)) menu.open = false;
+  });
+  announce("");
   render();
 }
 
@@ -133,7 +139,10 @@ function render(): void {
   history.replaceState(null, "", formatHash(view));
   // a theme or language change renders again; the account menu stays as it was
   accountOpen = document.querySelector(".account[open]") !== null;
-  app.replaceChildren(h("div", { class: "page" }, header(G.data), boardView(G.data), footer()));
+  const data = G.data;
+  keepFocus(() =>
+    app.replaceChildren(h("div", { class: "page" }, header(data), boardView(data), footer())),
+  );
 }
 
 // ------------------------------------------------------------------ footer
@@ -535,30 +544,48 @@ function btn(
 function tools(inst: Instance, title: string): HTMLElement {
   const board = currentBoard();
   const i = board.findIndex((x) => x.id === inst.id);
+  const moveTo = (to: number) => {
+    const next = move(board, inst.id, to);
+    saveBoard(next);
+    const n = next.findIndex((x) => x.id === inst.id) + 1;
+    announce(t("said.moved", { title, n, count: next.length }));
+  };
   const handle = btn(t("edit.drag", { title }), "⠿", () => {}, { class: "tool handle" });
   handle.addEventListener("pointerdown", (e) => drag(e, inst.id, handle));
   return h(
     "div",
     { class: "tools" },
     handle,
-    btn(t("edit.earlier", { title }), "←", () => saveBoard(move(board, inst.id, i - 1)), {
+    btn(t("edit.earlier", { title }), "←", () => moveTo(i - 1), {
       disabled: i === 0,
     }),
-    btn(t("edit.later", { title }), "→", () => saveBoard(move(board, inst.id, i + 1)), {
+    btn(t("edit.later", { title }), "→", () => moveTo(i + 1), {
       disabled: i === board.length - 1,
     }),
     ...([1, 2, 3] as Span[]).map((n) =>
-      btn(t("edit.span", { n, title }), String(n), () => saveBoard(setSpan(board, inst.id, n)), {
-        "aria-pressed": String(inst.span === n),
-      }),
+      btn(
+        t("edit.span", { n, title }),
+        String(n),
+        () => {
+          saveBoard(setSpan(board, inst.id, n));
+          announce(t("said.width", { title, n }));
+        },
+        { "aria-pressed": String(inst.span === n) },
+      ),
     ),
     btn(
       t(inst.hidden ? "edit.show" : "edit.hide", { title }),
       inst.hidden ? "◌" : "◉",
-      () => saveBoard(toggleHidden(board, inst.id)),
+      () => {
+        saveBoard(toggleHidden(board, inst.id));
+        announce(t(inst.hidden ? "said.shown" : "said.hidden", { title }));
+      },
       { "aria-pressed": String(!!inst.hidden) },
     ),
-    btn(t("edit.remove", { title }), "✕", () => saveBoard(remove(board, inst.id))),
+    btn(t("edit.remove", { title }), "✕", () => {
+      saveBoard(remove(board, inst.id));
+      announce(t("said.removed", { title }));
+    }),
   );
 }
 
@@ -634,6 +661,7 @@ function addDialog(): void {
   const addOne = (def: WidgetDef, type: string | undefined) => {
     d.close();
     saveBoard(add(board, def.id, { type: type === own ? undefined : type, span: def.span ?? 1 }));
+    announce(t("said.added", { title: def.title(t) }));
   };
   const defs = allWidgets()
     .filter((def) => def.types !== undefined || !board.some((x) => x.widget === def.id))

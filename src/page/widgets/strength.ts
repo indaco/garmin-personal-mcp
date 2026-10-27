@@ -1,4 +1,4 @@
-import { append, h } from "../dom";
+import { append, h, keepFocus } from "../dom";
 import type { Key } from "../i18n";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
@@ -133,38 +133,40 @@ register({
       draw();
     });
     const drawChips = () =>
-      chips.replaceChildren(
-        h(
-          "button",
-          {
-            class: "chip",
-            "aria-pressed": String(st.group === null),
-            onclick: () => {
-              st.group = null;
-              drawChips();
-              draw();
-            },
-          },
-          t("type.all"),
-        ),
-        ...groups.map((g) =>
+      keepFocus(() =>
+        chips.replaceChildren(
           h(
             "button",
             {
               class: "chip",
-              "aria-pressed": String(st.group === g),
+              "aria-pressed": String(st.group === null),
               onclick: () => {
-                st.group = st.group === g ? null : g;
+                st.group = null;
                 drawChips();
                 draw();
               },
             },
-            t(mg(g)),
+            t("type.all"),
+          ),
+          ...groups.map((g) =>
+            h(
+              "button",
+              {
+                class: "chip",
+                "aria-pressed": String(st.group === g),
+                onclick: () => {
+                  st.group = st.group === g ? null : g;
+                  drawChips();
+                  draw();
+                },
+              },
+              t(mg(g)),
+            ),
           ),
         ),
       );
     drawChips();
-    const draw = () => box.replaceChildren(exerciseTable(ctx, stats, st, draw));
+    const draw = () => keepFocus(() => box.replaceChildren(exerciseTable(ctx, stats, st, draw)));
     draw();
     append(el, h("div", { class: "ex-tools" }, chips, search), box);
 
