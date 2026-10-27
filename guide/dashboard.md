@@ -98,13 +98,14 @@ series again. Shift-click, or Cmd-click on a Mac, hides or shows only that serie
 
 Select **Edit layout**. Each widget then has these controls:
 
-| Control | Action                                                              |
-| ------- | ------------------------------------------------------------------- |
-| ⠿       | Drag the widget to a new place. This works with touch too.          |
-| ← and → | Move the widget one place earlier or later.                         |
-| 1, 2, 3 | Set the width in columns.                                           |
-| ◉ and ◌ | Hide the widget, or show it again. A hidden widget keeps its place. |
-| ✕       | Remove the widget.                                                  |
+| Control             | Action                                                                                                                                                          |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ⠿                   | Drag the widget to a new place. A dashed slot shows where it lands, and the page scrolls near the top or the bottom. This works with touch too. Escape cancels. |
+| ⠿ from the keyboard | Press Space to pick the widget up, the arrow keys, Home or End to move it, and Space to drop it. Escape puts it back.                                           |
+| The right edge      | Drag it to set the width: it snaps to 1, 2 or 3 columns. From the keyboard it is a slider: the arrow keys, Home and End. A tablet has 2 columns, a phone 1.     |
+| The eye             | Hide the widget. **Add widget** lists the hidden widgets: show one again, or remove it.                                                                         |
+
+Some widgets have a narrowest width: Activities and Period comparison need 2 columns.
 
 The edit bar stays at the top of the window while you scroll. It has:
 

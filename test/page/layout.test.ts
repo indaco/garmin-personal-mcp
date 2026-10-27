@@ -5,12 +5,14 @@ import {
   type Instance,
   type Layout,
   merge,
-  move,
+  moveBefore,
   parseLayout,
   remove,
   resetBoard,
   setSpan,
+  snapSpan,
   stale,
+  storedSpan,
   toggleHidden,
   withBoard,
 } from "../../src/page/layout";
@@ -54,14 +56,6 @@ describe("boards", () => {
 describe("edits", () => {
   const board = preset("all");
 
-  it("moves a widget to another place", () => {
-    expect(ids(move(board, "notes", 0))).toEqual(["notes", "kpis", "hrv"]);
-    expect(ids(move(board, "kpis", 2))).toEqual(["hrv", "notes", "kpis"]);
-    // out of range stays inside the board
-    expect(ids(move(board, "kpis", 9))).toEqual(["hrv", "notes", "kpis"]);
-    expect(ids(move(board, "missing", 0))).toEqual(ids(board));
-  });
-
   it("sets the column span to 1, 2 or 3", () => {
     expect(setSpan(board, "hrv", 3)[1]).toMatchObject({ id: "hrv", span: 3 });
   });
@@ -100,7 +94,7 @@ describe("edits", () => {
 
   it("never changes the board it gets", () => {
     const copy = structuredClone(board);
-    move(board, "notes", 0);
+    moveBefore(board, "notes", "kpis");
     setSpan(board, "hrv", 3);
     toggleHidden(board, "hrv");
     add(board, "hrv", {});
@@ -185,5 +179,50 @@ describe("stale", () => {
     expect(stale({ ...mine, rev: "r2" }, { baseRev: "r1", layout: mine })).toBeNull();
     expect(stale(layout({ rev: "r2" }), null)).toBeNull();
     expect(stale(layout({ rev: "r2" }), { baseRev: "r1", layout: "broken" })).toBeNull();
+  });
+});
+
+describe("moveBefore", () => {
+  const b: Instance[] = [
+    { id: "a", widget: "a", span: 1 },
+    { id: "h", widget: "h", span: 1, hidden: true },
+    { id: "c", widget: "c", span: 1 },
+    { id: "d", widget: "d", span: 1 },
+  ];
+
+  it("moves a widget before another, and a hidden one keeps its place", () => {
+    expect(ids(moveBefore(b, "d", "c"))).toEqual(["a", "h", "d", "c"]);
+    expect(ids(moveBefore(b, "a", "d"))).toEqual(["h", "c", "a", "d"]);
+  });
+
+  it("moves to the end with null or an unknown widget, and keeps the board for itself", () => {
+    expect(ids(moveBefore(b, "a", null))).toEqual(["h", "c", "d", "a"]);
+    expect(ids(moveBefore(b, "a", "nope"))).toEqual(["h", "c", "d", "a"]);
+    expect(moveBefore(b, "a", "a")).toBe(b);
+    expect(moveBefore(b, "nope", "a")).toBe(b);
+  });
+});
+
+describe("resize", () => {
+  // 3 columns of 400 px with 16 px gaps
+  it("snaps a width to the nearest number of columns", () => {
+    expect(snapSpan(400, 3, 400, 16)).toBe(1);
+    expect(snapSpan(600, 3, 400, 16)).toBe(1);
+    expect(snapSpan(640, 3, 400, 16)).toBe(2);
+    expect(snapSpan(1232, 3, 400, 16)).toBe(3);
+  });
+
+  it("keeps the span inside the minimum and the columns", () => {
+    expect(snapSpan(10, 3, 400, 16)).toBe(1);
+    expect(snapSpan(10, 3, 400, 16, 2)).toBe(2);
+    expect(snapSpan(5000, 2, 400, 16)).toBe(2);
+    expect(snapSpan(10, 1, 400, 16, 2)).toBe(1);
+  });
+
+  it("keeps a wider saved span for full width on a narrower grid", () => {
+    expect(storedSpan(2, 3, 2)).toBe(3);
+    expect(storedSpan(2, 1, 2)).toBe(2);
+    expect(storedSpan(1, 3, 2)).toBe(1);
+    expect(storedSpan(2, 3, 3)).toBe(2);
   });
 });

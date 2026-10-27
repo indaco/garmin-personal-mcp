@@ -68,6 +68,8 @@ export interface WidgetDef {
   /** The types the widget can show; undefined for a widget that has no type. */
   types?: readonly string[];
   span?: Span;
+  /** The narrowest width that the widget fits in. */
+  minSpan?: Span;
   render: (el: HTMLElement, ctx: Ctx) => void;
   /** Written by Claude and stored in the page, not built in. */
   custom?: boolean;
@@ -79,7 +81,13 @@ const widgets = new Map<string, WidgetDef>();
 export function register(def: Pick<WidgetDef, "id" | "render">): void {
   const meta = CATALOGUE.find((c) => c.id === def.id);
   if (!meta) throw new Error(`widget ${def.id} is not in the catalogue`);
-  widgets.set(def.id, { ...def, title: (t) => t(meta.title), types: meta.types, span: meta.span });
+  widgets.set(def.id, {
+    ...def,
+    title: (t) => t(meta.title),
+    types: meta.types,
+    span: meta.span,
+    minSpan: meta.minSpan,
+  });
 }
 
 /** A custom widget: Claude wrote it, the page block keeps it. A built-in id is never replaced. */

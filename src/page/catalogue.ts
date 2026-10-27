@@ -12,6 +12,8 @@ export interface CatalogueEntry {
   title: Key;
   types?: readonly string[];
   span: Span;
+  /** The narrowest width that the widget fits in; 1 when not set. */
+  minSpan?: Span;
 }
 
 export const CATALOGUE: readonly CatalogueEntry[] = [
@@ -36,6 +38,7 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
     title: "w.periodComparison",
     types: ["all", ...GROUPS],
     span: 3,
+    minSpan: 2,
   },
   {
     id: "records",
@@ -103,6 +106,7 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
     title: "w.activities",
     types: ["all", ...GROUPS],
     span: 3,
+    minSpan: 2,
   },
   {
     id: "coachNotes",

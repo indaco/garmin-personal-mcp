@@ -6,6 +6,7 @@ import * as sports from "./sports";
 import { type Activity, activitiesIn, GROUPS, groupOf, weeksOf } from "./calc";
 import { Chart, chart, destroyCharts, themeCharts } from "./charts";
 import { announce, h, keepFocus } from "./dom";
+import { dragTile, keyMove, resizeTile } from "./edit-drag";
 import { icon } from "./icons";
 import {
   addLanguages,
@@ -23,13 +24,14 @@ import {
   type Layout,
   type LocalLayout,
   merge,
-  move,
+  moveBefore,
   parseLayout,
   remove,
   resetBoard,
   setSpan,
   type Span,
   stale,
+  storedSpan,
   toggleHidden,
   withBoard,
 } from "./layout";
@@ -437,7 +439,8 @@ function boardView(data: Data): HTMLElement {
   const grid = h("div", { class: `grid${editing ? " editing" : ""}` });
   for (const inst of board) {
     const def = widget(inst.widget);
-    if (!editing && (inst.hidden || !def)) continue;
+    // a hidden widget leaves the grid; Add widget lists it to show it again
+    if (inst.hidden || (!editing && !def)) continue;
     grid.append(tile(data, inst, def));
   }
   if (grid.childElementCount === 0) {
@@ -499,7 +502,8 @@ function tile(data: Data, inst: Instance, def: WidgetDef | undefined): HTMLEleme
   const el = h(
     "section",
     {
-      class: `tile span-${inst.span}${inst.hidden ? " is-hidden" : ""}`,
+      // never narrower than the widget fits in, also for a layout that Claude wrote
+      class: `tile span-${Math.max(inst.span, def?.minSpan ?? 1)}`,
       "data-id": inst.id,
       "data-widget": inst.widget,
       "aria-labelledby": headingId,
@@ -511,6 +515,7 @@ function tile(data: Data, inst: Instance, def: WidgetDef | undefined): HTMLEleme
       editing && tools(inst, title),
     ),
     body,
+    editing && resizer(inst, title, def),
   );
   if (def) {
     try {
@@ -591,106 +596,118 @@ function readLocal(): LocalLayout | null {
   }
 }
 
-/** A small edit button; its label is also its tooltip. */
-function btn(
-  label: string,
-  text: string,
-  onclick: () => void,
-  attrs: Record<string, unknown> = {},
-) {
-  return h("button", { class: "tool", "aria-label": label, title: label, onclick, ...attrs }, text);
-}
-
+/** The edit tools of a tile: the grip that moves it and the button that hides it. */
 function tools(inst: Instance, title: string): HTMLElement {
-  const board = currentBoard();
-  const i = board.findIndex((x) => x.id === inst.id);
-  const moveTo = (to: number) => {
-    const next = move(board, inst.id, to);
-    saveBoard(next);
-    const n = next.findIndex((x) => x.id === inst.id) + 1;
-    announce(t("said.moved", { title, n, count: next.length }));
-  };
-  const handle = btn(t("edit.drag", { title }), "⠿", () => {}, { class: "tool handle" });
-  handle.addEventListener("pointerdown", (e) => drag(e, inst.id, handle));
+  const grip = h(
+    "button",
+    {
+      class: "tool grip",
+      "aria-label": t("edit.move", { title }),
+      title: t("edit.moveHint"),
+      "aria-pressed": "false",
+    },
+    "⠿",
+  );
+  grip.addEventListener("pointerdown", (e) =>
+    dragTile(e, grip, (before) => moveTile(inst.id, title, before)),
+  );
+  grip.addEventListener("keydown", (e) =>
+    keyMove(e, grip, {
+      picked: (n, count) => announce(t("said.picked", { title, n, count })),
+      moved: (n, count) => announce(t("said.position", { n, count })),
+      drop: (before) => moveTile(inst.id, title, before),
+      cancel: () => {
+        render();
+        announce(t("said.cancelled", { title }));
+      },
+    }),
+  );
+  const hide = t("edit.hide", { title });
   return h(
     "div",
     { class: "tools" },
-    handle,
-    btn(t("edit.earlier", { title }), "←", () => moveTo(i - 1), {
-      disabled: i === 0,
-    }),
-    btn(t("edit.later", { title }), "→", () => moveTo(i + 1), {
-      disabled: i === board.length - 1,
-    }),
-    ...([1, 2, 3] as Span[]).map((n) =>
-      btn(
-        t("edit.span", { n, title }),
-        String(n),
-        () => {
-          saveBoard(setSpan(board, inst.id, n));
-          announce(t("said.width", { title, n }));
+    grip,
+    h(
+      "button",
+      {
+        class: "tool",
+        "aria-label": hide,
+        title: hide,
+        onclick: () => {
+          saveBoard(toggleHidden(currentBoard(), inst.id));
+          announce(t("said.hidden", { title }));
         },
-        { "aria-pressed": String(inst.span === n) },
-      ),
-    ),
-    btn(
-      t(inst.hidden ? "edit.show" : "edit.hide", { title }),
-      inst.hidden ? "◌" : "◉",
-      () => {
-        saveBoard(toggleHidden(board, inst.id));
-        announce(t(inst.hidden ? "said.shown" : "said.hidden", { title }));
       },
-      { "aria-pressed": String(!!inst.hidden) },
+      icon("eye"),
     ),
-    btn(t("edit.remove", { title }), "✕", () => {
-      saveBoard(remove(board, inst.id));
-      announce(t("said.removed", { title }));
-    }),
   );
 }
 
-/** Drag with pointer events, so mouse, pen and touch all work; the arrow buttons do the same from the keyboard. */
-function drag(e: PointerEvent, id: string, handle: HTMLElement): void {
-  e.preventDefault();
-  handle.setPointerCapture(e.pointerId);
-  const source = handle.closest(".tile");
-  source?.classList.add("dragging");
-  let target: string | undefined;
-  const over = (ev: PointerEvent) => {
-    const el = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>(".tile");
-    document.querySelectorAll(".drop-target").forEach((x) => x.classList.remove("drop-target"));
-    target = el?.dataset.id;
-    if (target && target !== id) el!.classList.add("drop-target");
+function moveTile(id: string, title: string, before: string | null): void {
+  const next = moveBefore(currentBoard(), id, before);
+  saveBoard(next);
+  const shown = next.filter((x) => !x.hidden);
+  const n = shown.findIndex((x) => x.id === id) + 1;
+  announce(t("said.moved", { title, n, count: shown.length }));
+}
+
+/** The columns of the grid at this window width: the breakpoints of .grid in styles.css. */
+const columns = () =>
+  matchMedia("(max-width: 700px)").matches ? 1 : matchMedia("(max-width: 1100px)").matches ? 2 : 3;
+
+/** The resize handle on the right edge of a tile; from the keyboard it is a slider. */
+function resizer(inst: Instance, title: string, def: WidgetDef | undefined): HTMLElement {
+  const min = def?.minSpan ?? 1;
+  const cols = columns();
+  const now = Math.min(inst.span, cols);
+  const setWidth = (span: number, at: number) => {
+    const stored = storedSpan(span, inst.span, at);
+    if (stored === inst.span) return;
+    saveBoard(setSpan(currentBoard(), inst.id, stored));
+    announce(t("said.width", { title, n: span, cols: at }));
   };
-  const end = () => {
-    handle.removeEventListener("pointermove", over);
-    source?.classList.remove("dragging");
-    document.querySelectorAll(".drop-target").forEach((x) => x.classList.remove("drop-target"));
-    if (target && target !== id) {
-      const board = currentBoard();
-      saveBoard(
-        move(
-          board,
-          id,
-          board.findIndex((x) => x.id === target),
-        ),
-      );
-    }
-  };
-  handle.addEventListener("pointermove", over);
-  handle.addEventListener("pointerup", end, { once: true });
-  handle.addEventListener("pointercancel", end, { once: true });
+  const handle = h("div", {
+    class: "resize",
+    role: "slider",
+    tabindex: "0",
+    "aria-label": t("edit.width", { title }),
+    "aria-valuemin": Math.min(min, cols),
+    "aria-valuemax": cols,
+    "aria-valuenow": now,
+    "aria-valuetext": t("edit.widthValue", { n: now, cols }),
+    title: t("edit.width", { title }),
+    onkeydown: (e: KeyboardEvent) => {
+      const steps: Record<string, number> = {
+        ArrowRight: now + 1,
+        ArrowUp: now + 1,
+        ArrowLeft: now - 1,
+        ArrowDown: now - 1,
+        Home: min,
+        End: cols,
+      };
+      if (!(e.key in steps)) return;
+      e.preventDefault();
+      setWidth(Math.max(Math.min(min, cols), Math.min(cols, steps[e.key])), cols);
+    },
+  });
+  handle.addEventListener("pointerdown", (e) => resizeTile(e, handle, min, setWidth));
+  return handle;
 }
 
 /** The edit bar stays at the top of the window while you scroll the board. */
 function editBar(): HTMLElement {
+  const hidden = currentBoard().filter((x) => x.hidden).length;
   return h(
     "div",
     { class: "edit-bar", role: "toolbar", "aria-label": t("edit.bar") },
     h("strong", {}, t("edit.editing", { board: typeName(t, view.tab) })),
     dirty() && h("span", { class: "unsaved muted small" }, t("edit.unsaved")),
     h("span", { class: "spacer" }),
-    h("button", { class: "btn", onclick: addDialog }, t("edit.add")),
+    h(
+      "button",
+      { class: "btn", onclick: addDialog },
+      hidden > 0 ? t("edit.addHidden", { n: hidden }) : t("edit.add"),
+    ),
     h(
       "button",
       {
@@ -751,7 +768,15 @@ function addDialog(): void {
         {},
         h("span", {}, def.title(t)),
         pick,
-        h("button", { class: "btn", onclick: () => addOne(def, pick?.value) }, t("add.add")),
+        h(
+          "button",
+          {
+            class: "btn",
+            "aria-label": t("add.addOne", { title: def.title(t) }),
+            onclick: () => addOne(def, pick?.value),
+          },
+          t("add.add"),
+        ),
       ),
     );
   }
@@ -772,9 +797,22 @@ function addDialog(): void {
               onclick: () => {
                 d.close();
                 saveBoard(toggleHidden(board, inst.id));
+                announce(t("said.shown", { title }));
               },
             },
             t("edit.show", { title }),
+          ),
+          h(
+            "button",
+            {
+              class: "btn",
+              onclick: () => {
+                d.close();
+                saveBoard(remove(board, inst.id));
+                announce(t("said.removed", { title }));
+              },
+            },
+            t("edit.remove", { title }),
           ),
         ),
       );
