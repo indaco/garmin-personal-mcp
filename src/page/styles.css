@@ -424,6 +424,10 @@ select {
     font-size: 26px;
   }
 }
+.board-note {
+  margin: 0 0 12px;
+  font-size: 13px;
+}
 .board-empty {
   grid-column: 1 / -1;
   color: var(--muted);

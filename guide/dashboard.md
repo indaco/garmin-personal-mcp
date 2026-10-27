@@ -51,15 +51,18 @@ Reload the page in the browser to see the new data.
 Each tab is a board: a grid of widgets with up to 3 columns. A board has 2 columns on a tablet and 1
 column on a phone. Each widget is 1, 2 or 3 columns wide.
 
-The All board shows all types. Each type board shows one sport. The board of an activity is its
+The All board shows all types. The Recovery board shows readiness, fitness age, load against
+recovery and the 14-day recovery widgets: HRV, resting HR, sleep, sleep need, bedtime and Body
+Battery. Each type board shows one sport. The board of an activity is its
 sport in the Garmin FIT SDK. Garmin sends that sport as a number with each activity. The server
 gives it the SDK name, for example `running` or `racket`.
 
-The Run, Strength, Walk, Bike and Racket sports tabs are always there. The Hike, Swim and Other
+The All, Recovery, Run, Strength, Walk, Bike and Racket sports tabs are always there. The Hike, Swim and Other
 tabs show only when you have activities of that sport.
 
 | Tab           | Board key          | Activities                                       |
 | ------------- | ------------------ | ------------------------------------------------ |
+| Recovery      | `recovery`         | all; its widgets show the days, not activities   |
 | Run           | `running`          | SDK sport `running`                              |
 | Strength      | `strengthTraining` | Garmin type `strength_training`                  |
 | Walk          | `walking`          | SDK sport `walking`                              |

@@ -82,6 +82,13 @@ describe("editDashboard", () => {
     expect(run.at(-1)).toEqual({ id: "weeklyVolume", widget: "weeklyVolume", span: 2 });
   });
 
+  it("places a widget on the Recovery board, after its preset", async () => {
+    await writer.edit({ place: [{ board: "recovery", widget: "calendar", span: 1 }] });
+    const recovery = layout().boards.recovery as { widget: string }[];
+    expect(recovery.at(0)).toMatchObject({ widget: "readiness" });
+    expect(recovery.at(-1)).toMatchObject({ widget: "calendar", span: 1 });
+  });
+
   it("places a widget on the board of any SDK sport", async () => {
     await writer.edit({
       widgets: [{ ...widget, types: ["alpineSkiing"] }],

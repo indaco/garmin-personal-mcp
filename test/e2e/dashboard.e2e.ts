@@ -29,13 +29,6 @@ const ALL_PRESET = [
   "intensityMinutes",
   "loadSafety",
   "loadVsRecovery",
-  "fitnessAge",
-  "hrv",
-  "restingHr",
-  "sleep",
-  "sleepNeed",
-  "bedtime",
-  "bodyBattery",
   "activities",
   "coachNotes",
 ];
@@ -112,6 +105,7 @@ describe("the page", () => {
     const { page } = await open(browser, pageFile());
     expect(await tabs(page)).toEqual([
       ["all", "75"],
+      ["recovery", undefined],
       ["running", "36"],
       ["strengthTraining", "24"],
       ["walking", "9"],
@@ -360,7 +354,7 @@ describe("focus", () => {
     await page.focus("[aria-label='Move Weekly volume later']");
     await page.keyboard.press("Enter");
     expect(await focused(page)).toBe("Move Weekly volume later");
-    expect(await page.textContent("#announce")).toBe("Weekly volume moved to position 7 of 18");
+    expect(await page.textContent("#announce")).toBe("Weekly volume moved to position 7 of 11");
     // a removed tile gives focus to the tile in its place
     await page.focus("[aria-label='Remove Weekly volume']");
     await page.keyboard.press("Enter");
@@ -388,7 +382,7 @@ describe("focus", () => {
 
 describe("chart legends", () => {
   it("shows only the clicked series, and all of them on a second click", async () => {
-    const { page, errors } = await open(browser, pageFile());
+    const { page, errors } = await open(browser, pageFile(), { hash: "#recovery" });
     // the legend of the HRV chart: band, nightly, 7-day average; the band's low edge is not in it
     expect(await clickLegend(page, "hrv", 1)).toEqual(["Range low", "Nightly HRV"]);
     expect(await clickLegend(page, "hrv", 1)).toEqual([
@@ -401,7 +395,7 @@ describe("chart legends", () => {
   });
 
   it("hides just the clicked series with Shift", async () => {
-    const { page } = await open(browser, pageFile());
+    const { page } = await open(browser, pageFile(), { hash: "#recovery" });
     expect(await clickLegend(page, "hrv", 1, "Shift")).toEqual([
       "Range low",
       "Balanced range",
@@ -414,7 +408,7 @@ describe("overview widgets", () => {
   it("shows a tooltip on every chart", async () => {
     const { page, errors } = await open(browser, pageFile());
     expect(await page.evaluate(() => Object.keys(window.Chart!.instances).length)).toBeGreaterThan(
-      8,
+      3,
     );
     expect(await chartsWithoutTooltip(page)).toEqual([]);
     expect(errors).toEqual([]);
@@ -490,11 +484,30 @@ describe("overview widgets", () => {
 describe("type boards", () => {
   it("draws every board without errors, with a tooltip on every chart", async () => {
     const { page, errors } = await open(browser, pageFile());
-    for (const tab of ["running", "strengthTraining", "walking", "cycling", "racket"]) {
+    for (const tab of ["recovery", "running", "strengthTraining", "walking", "cycling", "racket"]) {
       await page.click(`[data-tab=${tab}]`);
       expect([tab, await chartsWithoutTooltip(page)]).toEqual([tab, []]);
     }
     expect(errors).toEqual([]);
+  });
+
+  it("has a Recovery board with one note for its 14-day widgets", async () => {
+    const { page } = await open(browser, pageFile(), { hash: "#recovery" });
+    expect(await tiles(page)).toEqual([
+      "readiness",
+      "fitnessAge",
+      "loadVsRecovery",
+      "hrv",
+      "restingHr",
+      "sleep",
+      "sleepNeed",
+      "bedtime",
+      "bodyBattery",
+    ]);
+    expect(await page.textContent(".board-note")).toContain("last 14 days");
+    expect(await page.$$eval(".tile .note", (els) => els.map((e) => e.textContent))).not.toContain(
+      "Last 14 days: the week window does not change it.",
+    );
   });
 
   it("fits every board on a phone", async () => {
@@ -690,6 +703,7 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     const { page } = await open(browser, more());
     expect((await tabs(page)).map(([tab]) => tab)).toEqual([
       "all",
+      "recovery",
       "running",
       "strengthTraining",
       "walking",

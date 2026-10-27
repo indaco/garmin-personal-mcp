@@ -85,6 +85,7 @@ export function start(): void {
     const others = [...present].filter((g) => !GROUPS.includes(g)).toSorted();
     tabs = [
       "all",
+      "recovery",
       ...[...GROUPS.slice(0, -1), ...others, "generic"].filter(
         (g) => ALWAYS.includes(g) || present.has(g),
       ),
@@ -371,7 +372,7 @@ function tabBar(data: Data): HTMLElement {
         },
         icon(tab),
         h("span", {}, typeName(t, tab)),
-        h("span", { class: "count" }, count(tab)),
+        tab !== "recovery" && h("span", { class: "count" }, count(tab)),
       ),
     ),
   );
@@ -379,7 +380,7 @@ function tabBar(data: Data): HTMLElement {
 
 /** The type chips of the All board: a click shows only that type, a second click (or "All") shows every type. */
 function chips(): HTMLElement {
-  const groups = tabs.filter((x) => x !== "all");
+  const groups = tabs.filter((x) => x !== "all" && x !== "recovery");
   return h(
     "div",
     { class: "chips", role: "group", "aria-label": t("chips.label") },
@@ -426,11 +427,14 @@ function boardView(data: Data): HTMLElement {
   if (grid.childElementCount === 0) {
     grid.append(h("p", { class: "board-empty" }, t("board.empty")));
   }
-  return h("main", {}, grid);
+  // one caption for the board instead of the same note under each recovery widget
+  const caption = view.tab === "recovery" && h("p", { class: "muted board-note" }, t("rec.board"));
+  return h("main", {}, caption, grid);
 }
 
+/** The type a board shows: the Recovery board shows all types, like All. */
 function boardType(): string {
-  return view.tab === "all" ? "all" : view.tab;
+  return view.tab === "recovery" ? "all" : view.tab;
 }
 
 function titleOf(inst: Instance, def: WidgetDef | undefined): string {
