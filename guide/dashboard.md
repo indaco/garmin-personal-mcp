@@ -134,6 +134,16 @@ high-contrast themes. Midnight is the default.
 The **Language** menu has English, Italian and the languages that you add. _Auto_ follows the
 language of the browser. [Languages](languages.md) tells how to add a language.
 
+## Keyboard and screen readers
+
+- The first Tab gives **Skip to the board**.
+- On the tabs, the arrow keys, Home and End select a board.
+- The consistency calendar is one Tab stop: the arrow keys move one day (up and down) or one week
+  (left and right). Escape closes the day details.
+- Each chart has its data as a table that screen readers read instead of the picture.
+- In edit mode the grip and the right edge of a widget work from the keyboard too: see
+  [Change the layout](#change-the-layout).
+
 ## How the page keeps your changes
 
 The page keeps its state in four blocks of the file: the data, the layout, the custom widgets and the

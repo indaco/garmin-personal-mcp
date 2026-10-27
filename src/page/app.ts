@@ -159,7 +159,15 @@ function render(): void {
   const data = G.data;
   keepFocus(() =>
     app.replaceChildren(
-      h("div", { class: "page" }, header(data), editing && editBar(), boardView(data), footer()),
+      h(
+        "div",
+        { class: "page" },
+        h("a", { class: "skip", href: "#board" }, t("skip")),
+        header(data),
+        editing && editBar(),
+        boardView(data),
+        footer(),
+      ),
     ),
   );
 }
@@ -252,7 +260,7 @@ function languageMenu(): HTMLElement {
     },
     h("option", { value: "auto", selected: langChoice === "auto" }, t("lang.auto")),
     ...Object.entries(LANGUAGE_NAMES).map(([code, name]) =>
-      h("option", { value: code, selected: langChoice === code }, name),
+      h("option", { value: code, lang: code, selected: langChoice === code }, name),
     ),
   );
   return h("label", { class: "menu" }, h("span", {}, t("menu.language")), select);
@@ -440,6 +448,10 @@ function tabBar(data: Data): HTMLElement {
         const i = tabs.indexOf(view.tab);
         if (e.key === "ArrowRight") select(tabs[(i + 1) % tabs.length]);
         else if (e.key === "ArrowLeft") select(tabs[(i - 1 + tabs.length) % tabs.length]);
+        else if (e.key === "Home") select(tabs[0]);
+        else if (e.key === "End") select(tabs.at(-1)!);
+        else return;
+        e.preventDefault();
       },
     },
     ...tabs.map((tab) =>
@@ -447,6 +459,8 @@ function tabBar(data: Data): HTMLElement {
         "button",
         {
           role: "tab",
+          id: `tab-${tab}`,
+          "aria-controls": "board",
           "data-tab": tab,
           "aria-selected": String(tab === view.tab),
           tabindex: tab === view.tab ? "0" : "-1",
@@ -483,7 +497,13 @@ function boardView(data: Data): HTMLElement {
   }
   // one caption for the board instead of the same note under each recovery widget
   const caption = view.tab === "recovery" && h("p", { class: "muted board-note" }, t("rec.board"));
-  return h("main", {}, mine && !editing && staleBanner(mine), caption, grid);
+  return h(
+    "main",
+    { id: "board", role: "tabpanel", "aria-labelledby": `tab-${view.tab}`, tabindex: "-1" },
+    mine && !editing && staleBanner(mine),
+    caption,
+    grid,
+  );
 }
 
 /** Claude wrote a new layout after this browser saved one: keep yours, or use the new one. */

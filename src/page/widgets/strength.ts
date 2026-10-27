@@ -254,24 +254,36 @@ function exerciseTable(
     for (const s of rows) {
       const last = s.sessions.at(-1)!;
       const selected = ctx.item === calc.slug(s.name);
-      const toggle = () => ctx.setItem(selected ? undefined : calc.slug(s.name));
+      const toggle = () => {
+        ctx.setItem(selected ? undefined : calc.slug(s.name));
+        // the detail opens after the table: take the focus there
+        if (!selected) document.querySelector<HTMLElement>("#ex-detail h3")?.focus();
+      };
       body.append(
         h(
           "tr",
           {
             class: `ex-row${selected ? " selected" : ""}`,
-            tabindex: "0",
-            "aria-selected": String(selected),
             "data-exercise": calc.slug(s.name),
             onclick: toggle,
-            onkeydown: (e: KeyboardEvent) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                toggle();
-              }
-            },
           },
-          h("td", {}, s.name),
+          h(
+            "td",
+            {},
+            h(
+              "button",
+              {
+                class: "linkish",
+                "aria-expanded": String(selected),
+                "aria-controls": "ex-detail",
+                onclick: (e: Event) => {
+                  e.stopPropagation(); // the row would toggle it again
+                  toggle();
+                },
+              },
+              s.name,
+            ),
+          ),
           h("td", { class: "num" }, String(s.sessions.length)),
           h("td", { class: "num" }, fmt.day(last.date)),
           h("td", { class: "num" }, topText(ctx, s, last)),
@@ -334,11 +346,11 @@ function detail(ctx: Ctx, s: ExerciseStats): HTMLElement {
   const { t, fmt } = ctx;
   const panel = h(
     "section",
-    { class: "detail", "aria-label": s.name },
+    { class: "detail", id: "ex-detail", "aria-label": s.name },
     h(
       "header",
       { class: "detail-head" },
-      h("h3", {}, s.name),
+      h("h3", { tabindex: "-1" }, s.name),
       h(
         "span",
         { class: "muted small" },

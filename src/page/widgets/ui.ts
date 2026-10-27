@@ -165,13 +165,14 @@ export function picker(
   ctx: Ctx,
   name: string,
   options: [value: string, label: string][],
+  label: string,
 ): [string, HTMLElement] {
   const key = `${ctx.board}/${ctx.id}/${name}`;
   const value = choices.get(key) ?? options[0][0];
   const bar = h(
     "div",
-    { class: "picker", role: "group" },
-    ...options.map(([v, label]) =>
+    { class: "picker", role: "group", "aria-label": label },
+    ...options.map(([v, text]) =>
       h(
         "button",
         {
@@ -182,7 +183,7 @@ export function picker(
             ctx.refresh();
           },
         },
-        label,
+        text,
       ),
     ),
   );

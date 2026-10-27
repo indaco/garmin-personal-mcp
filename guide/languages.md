@@ -297,6 +297,11 @@ A built-in language is in every page. To add one:
 | `w.calendar` | Consistency |
 | `cal.minutes` | {n} min |
 | `cal.rest` | Rest day |
+| `cal.label` | Training days, by week; the arrow keys move |
+| `cal.less` | Less |
+| `cal.more` | More |
+| `m.label` | Measure |
+| `skip` | Skip to the board |
 | `w.hrv` | HRV |
 | `hrv.low` | Range low |
 | `hrv.band` | Balanced range |
