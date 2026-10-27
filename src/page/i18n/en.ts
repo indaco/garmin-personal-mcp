@@ -6,7 +6,13 @@ export const en = {
   period: "{from} to {to}",
   inProgress: "* week in progress",
 
+  "menu.settings": "Settings",
   "menu.theme": "Theme",
+  "footer.links": "Project links",
+  "footer.source": "Source on GitHub",
+  "footer.issues": "Report an issue",
+  "footer.releases": "Releases",
+  "footer.license": "MIT License",
   "menu.language": "Language",
   "lang.auto": "Auto",
   "themeGroup.auto": "Auto",

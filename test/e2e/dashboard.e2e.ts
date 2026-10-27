@@ -155,8 +155,15 @@ describe("the page", () => {
     );
     expect(themes).toHaveLength(11);
     expect(await page.inputValue("#theme")).toBe("midnight");
+    // the menu stays open while the page renders again for each theme
+    await page.click(".account summary");
     for (const theme of themes) await page.selectOption("#theme", theme);
     await page.selectOption("#theme", "paper");
+    await page.keyboard.press("Escape");
+    expect(await page.$(".account[open]")).toBeNull();
+    await page.click(".account summary");
+    await page.click("h1");
+    expect(await page.$(".account[open]")).toBeNull();
     await page.reload();
     expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe("paper");
     expect(errors).toEqual([]);
@@ -166,6 +173,7 @@ describe("the page", () => {
     const { page } = await open(browser, pageFile(), { locale: "it-IT" });
     expect(await page.textContent("h1")).toBe("Allenamento + Recupero");
     expect(await page.textContent("[data-tab=running]")).toContain("Corsa");
+    await page.click(".account summary");
     await page.selectOption("#lang", "en");
     expect(await page.textContent("h1")).toBe("Training + Recovery");
     expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
@@ -717,6 +725,7 @@ describe("custom widgets and languages", () => {
     expect(await page.$$eval("#lang option", (o) => o.map((x) => x.textContent))).toContain(
       "Deutsch",
     );
+    await page.click(".account summary");
     await page.selectOption("#lang", "de");
     expect(await page.textContent("h1")).toBe("Training + Erholung");
     expect(await page.textContent("[data-id=readiness] h2")).toBe("Readiness today");

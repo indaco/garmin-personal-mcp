@@ -7,7 +7,13 @@ export const it: Catalogue = {
   period: "dal {from} al {to}",
   inProgress: "* settimana in corso",
 
+  "menu.settings": "Impostazioni",
   "menu.theme": "Tema",
+  "footer.links": "Link del progetto",
+  "footer.source": "Codice su GitHub",
+  "footer.issues": "Segnala un problema",
+  "footer.releases": "Versioni",
+  "footer.license": "Licenza MIT",
   "menu.language": "Lingua",
   "lang.auto": "Automatica",
   "themeGroup.auto": "Automatico",

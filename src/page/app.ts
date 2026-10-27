@@ -67,6 +67,7 @@ let layout: Layout = merge(pageLayout, readLocal());
 let view: View;
 let only: string | null = null;
 let editing = false;
+let accountOpen = false;
 let tabs: string[] = [];
 let weeks: string[] = [];
 
@@ -96,6 +97,17 @@ export function start(): void {
     render();
   });
   matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => render());
+  // the account menu closes on a click outside it or on Escape
+  document.addEventListener("click", (e) => {
+    const menu = document.querySelector<HTMLDetailsElement>(".account[open]");
+    if (menu && !menu.contains(e.target as Node)) menu.open = false;
+  });
+  document.addEventListener("keydown", (e) => {
+    const menu = document.querySelector<HTMLDetailsElement>(".account[open]");
+    if (e.key !== "Escape" || !menu) return;
+    menu.open = false;
+    menu.querySelector("summary")!.focus();
+  });
   render();
 }
 
@@ -114,12 +126,47 @@ function render(): void {
   document.title = t("title");
   if (!G.data) {
     app.replaceChildren(
-      h("main", { class: "page" }, h("h1", {}, t("title")), h("p", {}, t("noData"))),
+      h("main", { class: "page" }, h("h1", {}, t("title")), h("p", {}, t("noData")), footer()),
     );
     return;
   }
   history.replaceState(null, "", formatHash(view));
-  app.replaceChildren(h("div", { class: "page" }, header(G.data), boardView(G.data)));
+  // a theme or language change renders again; the account menu stays as it was
+  accountOpen = document.querySelector(".account[open]") !== null;
+  app.replaceChildren(h("div", { class: "page" }, header(G.data), boardView(G.data), footer()));
+}
+
+// ------------------------------------------------------------------ footer
+
+const REPO = "https://github.com/indaco/garmin-personal-mcp";
+
+function footer(): HTMLElement {
+  const links: [Key, string][] = [
+    ["footer.source", REPO],
+    ["footer.issues", `${REPO}/issues`],
+    ["footer.releases", `${REPO}/releases`],
+    ["footer.license", `${REPO}/blob/main/LICENSE`],
+  ];
+  return h(
+    "footer",
+    { class: "foot" },
+    // shortcut: placeholder name; the logo is styled once in .logo
+    h(
+      "a",
+      { class: "brand", href: REPO },
+      h("span", { class: "logo", "aria-hidden": "true" }),
+      "garmin-personal-mcp",
+    ),
+    h(
+      "nav",
+      { "aria-label": t("footer.links") },
+      h(
+        "ul",
+        {},
+        ...links.map(([key, href]) => h("li", {}, h("a", { href, rel: "noopener" }, t(key)))),
+      ),
+    ),
+  );
 }
 
 // ------------------------------------------------------------------ header
@@ -134,20 +181,34 @@ function header(data: Data): HTMLElement {
       { class: "title-row" },
       h(
         "div",
-        {},
-        h("h1", {}, t("title")),
+        { class: "title" },
+        h("span", { class: "logo", "aria-hidden": "true" }),
         h(
-          "p",
-          { class: "muted" },
-          t("period", { from: fmt.longDay(data.start), to: fmt.longDay(data.end) }),
+          "div",
+          {},
+          h("h1", {}, t("title")),
+          h(
+            "p",
+            { class: "muted" },
+            t("period", { from: fmt.longDay(data.start), to: fmt.longDay(data.end) }),
+          ),
         ),
       ),
-      h("div", { class: "menus" }, languageMenu(), themeMenu(), editButton()),
+      h("div", { class: "menus" }, editButton(), accountMenu()),
     ),
     windowBar(inProgress),
     tabBar(data),
     view.tab === "all" && chips(),
     editing && editBar(),
+  );
+}
+
+function accountMenu(): HTMLElement {
+  return h(
+    "details",
+    { class: "account", open: accountOpen },
+    h("summary", { "aria-label": t("menu.settings"), title: t("menu.settings") }, icon("user")),
+    h("div", { class: "account-panel" }, languageMenu(), themeMenu()),
   );
 }
 
