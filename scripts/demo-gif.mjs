@@ -6,26 +6,13 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
+import { fillPage } from "./fill-dashboard-fixture.mjs";
 
 const dir = mkdtempSync(join(tmpdir(), "dashboard-demo-"));
 const data = JSON.parse(readFileSync("test/fixtures/dashboard-data.json", "utf8"));
 
-// the block format of writeBlock in src/dashboard-page.ts
-const fill = (page, block, value) =>
-  page.replace(
-    new RegExp(
-      `/\\*\\s*garmin-${block}:start\\s*\\*/[\\s\\S]*?/\\*\\s*garmin-${block}:end\\s*\\*/`,
-    ),
-    () =>
-      `/* garmin-${block}:start */${JSON.stringify(value).replaceAll("<", "\\u003c").replaceAll("*", "\\u002a")}/* garmin-${block}:end */`,
-  );
-
 function pageFile(name, layout) {
-  let page = readFileSync("dist/dashboard.html", "utf8");
-  page = fill(page, "data", data);
-  page = fill(page, "layout", layout);
-  page = fill(page, "widgets", []);
-  page = fill(page, "i18n", {});
+  const page = fillPage(readFileSync("dist/dashboard.html", "utf8"), data, layout);
   const file = join(dir, `${name}.html`);
   writeFileSync(file, page);
   return file;
