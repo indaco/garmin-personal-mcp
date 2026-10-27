@@ -55,7 +55,7 @@ To use your build in a client, follow "Run from source" in the README.
 
 ## Before you submit
 
-Run these commands before you open the PR. CI runs the same commands on Node 22 and 24.
+Run these commands before you open the PR. CI runs the same commands on Node 22, 24 and 26.
 
 ```bash
 pnpm lint                # Oxlint, then an Oxfmt check
