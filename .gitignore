@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+*.tgz
+.claude/
+.env
+api-key
+*.fit
+*.zip
+garmin-dashboard.html
