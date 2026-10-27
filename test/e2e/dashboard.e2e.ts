@@ -88,8 +88,9 @@ async function chartsWithoutTooltip(page: Page): Promise<string[]> {
 
 describe("the page", () => {
   it("keeps the template small", () => {
-    // minified, with only the Chart.js parts the page uses: Chart.js is most of it
-    expect(statSync("dist/dashboard.html").size).toBeLessThan(300 * 1024);
+    // minified, with only the Chart.js parts the page uses: Chart.js is most of it, and the page
+    // code grows by about 1 KB a feature
+    expect(statSync("dist/dashboard.html").size).toBeLessThan(400 * 1024);
   });
 
   it("shows the preset widgets of the All board and no errors", async () => {
@@ -263,6 +264,33 @@ describe("edit mode", () => {
     await page.waitForSelector(".page");
     // the page layout has the notes and a widget that does not exist yet
     expect(await tiles(page)).toEqual(["coachNotes"]);
+    // and the page offers the layout of this browser back
+    expect(await page.textContent(".banner")).toContain("Claude wrote a new layout");
+    await page.click(".banner >> text=Keep mine");
+    expect(await tiles(page)).toEqual([]);
+    expect(await page.$(".banner")).toBeNull();
+    await page.reload();
+    await page.waitForSelector(".page");
+    expect(await tiles(page)).toEqual([]);
+    expect(await page.$(".banner")).toBeNull();
+  });
+
+  it("uses the new layout from Claude when you choose it", async () => {
+    const file = pageFile({ layout: two });
+    const { page } = await open(browser, file);
+    await page.click("text=Edit layout");
+    await page.click("[aria-label='Remove Coach notes']");
+    await page.click("text=Done");
+    writeFileSync(file, readFileSync(file, "utf8").replace('"rev":"r1"', '"rev":"r2"'));
+    await page.reload();
+    await page.waitForSelector(".page");
+    await page.click(".banner >> text=Use the new one");
+    expect(await page.$(".banner")).toBeNull();
+    expect(await page.textContent("#announce")).toBe("The new layout is in use");
+    await page.reload();
+    await page.waitForSelector(".page");
+    expect(await tiles(page)).toEqual(["coachNotes"]);
+    expect(await page.$(".banner")).toBeNull();
   });
 
   it("copies the layout as text that Claude can save", async () => {

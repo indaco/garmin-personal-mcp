@@ -124,6 +124,16 @@ export function merge(page: Layout, local: LocalLayout | null): Layout {
   return { ...parseLayout(local.layout), rev: page.rev };
 }
 
+/**
+ * The browser's layout when Claude wrote a new page layout after it, and the two differ; null
+ * otherwise. The page shows the new layout and asks which one to keep.
+ */
+export function stale(page: Layout, local: LocalLayout | null): Layout | null {
+  if (!local || local.baseRev === page.rev || !isObject(local.layout)) return null;
+  const mine = { ...parseLayout(local.layout), rev: page.rev };
+  return JSON.stringify(mine) === JSON.stringify(page) ? null : mine;
+}
+
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }

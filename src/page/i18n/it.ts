@@ -143,6 +143,13 @@ export const it: Catalogue = {
   "said.shown": "{title} visibile",
   "said.removed": "{title} rimosso",
   "said.added": "{title} aggiunto",
+  "stale.label": "Nuovo layout",
+  "stale.text":
+    "Claude ha scritto un nuovo layout per questa dashboard. Il layout che hai fatto in questo browser resta finché non scegli.",
+  "stale.keep": "Tieni il mio",
+  "stale.new": "Usa il nuovo",
+  "stale.used": "Ora usi il nuovo layout",
+  "stale.kept": "Ora usi il tuo layout",
 
   "add.title": "Aggiungi un widget",
   "add.type": "Tipo",

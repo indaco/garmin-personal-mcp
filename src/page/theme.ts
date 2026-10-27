@@ -34,6 +34,13 @@ export const store = {
       // storage blocked: the choice lasts for this visit only
     }
   },
+  remove(key: string): void {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // storage blocked: nothing was saved
+    }
+  },
 };
 
 /** The value of a theme token (`--text`, `--running`...) as the page shows it now. */

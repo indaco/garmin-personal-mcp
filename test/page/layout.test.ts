@@ -10,6 +10,7 @@ import {
   remove,
   resetBoard,
   setSpan,
+  stale,
   toggleHidden,
   withBoard,
 } from "../../src/page/layout";
@@ -163,5 +164,26 @@ describe("merge", () => {
   it("uses the page layout when the browser has none or a broken one", () => {
     expect(merge(page, null)).toEqual(page);
     expect(merge(page, { baseRev: "r1", layout: "broken" })).toEqual(page);
+  });
+});
+
+describe("stale", () => {
+  const mine = layout({ rev: "r1", boards: { all: [{ id: "hrv", widget: "hrv", span: 1 }] } });
+
+  it("gives the browser's layout when Claude wrote a new one that differs", () => {
+    expect(stale(layout({ rev: "r2" }), { baseRev: "r1", layout: mine })).toEqual({
+      ...mine,
+      rev: "r2",
+    });
+  });
+
+  it("gives nothing while the page layout is the one the browser started from", () => {
+    expect(stale(layout({ rev: "r1" }), { baseRev: "r1", layout: mine })).toBeNull();
+  });
+
+  it("gives nothing when the new page layout is the same, or the browser has none", () => {
+    expect(stale({ ...mine, rev: "r2" }, { baseRev: "r1", layout: mine })).toBeNull();
+    expect(stale(layout({ rev: "r2" }), null)).toBeNull();
+    expect(stale(layout({ rev: "r2" }), { baseRev: "r1", layout: "broken" })).toBeNull();
   });
 });
