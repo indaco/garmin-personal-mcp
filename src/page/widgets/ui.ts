@@ -1,5 +1,5 @@
 import { addDays } from "../../dates";
-import { type Activity, groupOf, sportName, mondayOf, sessionSeconds } from "../calc";
+import { type Activity, groupOf, mondayOf, sessionSeconds } from "../calc";
 import { h } from "../dom";
 import { en } from "../i18n/en";
 import type { Key, T } from "../i18n";
@@ -8,9 +8,8 @@ import type { Ctx } from "../registry";
 
 /** Small building blocks that the built-in widgets share. */
 
-/** The name of a board: its text, or the SDK sport's name for a sport without one. */
-export const typeName = (t: T, g: string) =>
-  `type.${g}` in en ? t(`type.${g}` as Key) : sportName(g);
+/** The name of a board in the page language; every SDK sport has a text, so the key shows only for unknown data. */
+export const typeName = (t: T, g: string) => (`type.${g}` in en ? t(`type.${g}` as Key) : g);
 
 /** A KPI tile: label, big value, and an optional line under it. */
 export function kpi(

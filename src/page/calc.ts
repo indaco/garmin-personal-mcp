@@ -66,12 +66,6 @@ export function groupOf(a: Activity): string {
   return TYPE_BOARD.get(a.type ?? "") ?? sport;
 }
 
-/** The name of a board without a text of its own: the SDK sport "alpineSkiing" is "Alpine skiing". */
-export function sportName(sport: string): string {
-  const words = sport.replace(/[A-Z]/g, (c) => ` ${c.toLowerCase()}`);
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
 export const isIndoor = (key: string) =>
   ["indoor_cycling", "virtual_ride", "treadmill_running", "indoor_rowing"].includes(key);
 
