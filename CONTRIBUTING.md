@@ -53,6 +53,26 @@ pnpm build               # writes dist/index.js, dist/dashboard.html and THIRD-P
 
 To use your build in a client, follow "Run from source" in the README.
 
+## Code map
+
+Where each part of the server and the page is.
+
+| File                                 | Content                                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------ |
+| `src/index.ts`                       | the stdio entry point                                                    |
+| `src/server.ts`                      | the MCP server with its tools and prompts                                |
+| `src/api-client.ts`                  | HTTP, the token and the retries                                          |
+| `src/tools.ts`, `src/fit.ts`         | the tools and the .FIT decoder                                           |
+| `src/dashboard.ts`                   | the `getDashboardData` tool and its cache                                |
+| `src/dashboard-page.ts`              | `writeDashboard` and `editDashboard`: the page file and its blocks       |
+| `src/digest.ts`                      | the digest of the data for the coach notes                               |
+| `src/page/`                          | the dashboard page: app, layout, calculations, widgets, themes and texts |
+| `src/prompts.ts`                     | the prompts. The prompt texts are in `prompts/`.                         |
+| `src/config.ts`, `src/log.ts`        | the settings and the log                                                 |
+| `scripts/build-template.mjs`         | writes `dist/dashboard.html`                                             |
+| `scripts/third-party-notices.mjs`    | writes `THIRD-PARTY-NOTICES.md` after each build                         |
+| `scripts/fill-dashboard-fixture.mjs` | fills `dist/dashboard.html` with a data file, for screenshots and checks |
+
 ## Before you submit
 
 Run these commands before you open the PR. CI runs the same commands on Node 22, 24 and 26.

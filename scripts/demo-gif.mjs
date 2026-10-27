@@ -93,7 +93,10 @@ await shot(page);
 // The light and high-contrast themes
 page = await open(pageFile("themes", null));
 for (const theme of ["light", "hcDark"]) {
+  // the theme menu is in the settings menu
+  await page.click(".account summary");
   await page.selectOption("#theme", theme);
+  await page.keyboard.press("Escape");
   await shot(page);
 }
 await browser.close();
