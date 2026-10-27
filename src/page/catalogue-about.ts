@@ -4,11 +4,11 @@ export const ABOUT: Record<string, string> = {
   readiness:
     "Today's verdict (go easy, normal, ready to push) from HRV status, sleep score, resting HR and the load ratio. The dashboard's own rule.",
   fitnessAge:
-    "Garmin fitness age against actual age, the achievable age, and its components with Garmin's targets.",
+    "Garmin fitness age against actual age, the achievable age, and, under Details, its components with Garmin's targets.",
   periodComparison:
     "Sessions, distance, time and load of the window against the same number of weeks before it, per type and in total.",
   records:
-    "Best efforts, longest run and ride, heaviest set and the best estimated 1RM of each exercise in the window.",
+    "Best efforts, longest run and ride, heaviest set and the best estimated 1RM of each exercise in the window: 4 first, the others under Show all.",
   weeklyVolume:
     "Time, distance, sessions or load of each week, stacked by type, with a 4-week average line.",
   intensityMinutes:
@@ -37,7 +37,7 @@ export const ABOUT: Record<string, string> = {
     "Pace against HR of each run (older runs paler), and weekly pace and efficiency (metres per heartbeat).",
   intensityShare: "The share of running time in Z1-2 (easy) and Z4-5 (hard) each week.",
   runningForm:
-    "Weekly cadence, stride, ground contact, vertical oscillation and ratio, and power, one small chart for each.",
+    "Weekly cadence, ground contact, stride, vertical oscillation and ratio, and power, one small chart for each: cadence and ground contact first, the others under Show all.",
   runWalk:
     "Run Walk Run sessions: the pace of the run segments, the overall pace and the walk time.",
   trainingEffect:
@@ -50,7 +50,8 @@ export const ABOUT: Record<string, string> = {
   muscleBalance: "Average weekly sets of each muscle group against 10-20, and the push:pull ratio.",
   exercises:
     "Each exercise by muscle group, with sort, search and group filter; a row opens its trend and its sessions.",
-  strengthSessions: "Each strength session with its exercises and sets in order.",
+  strengthSessions:
+    "Each strength session with its exercises and sets in order, the last 6 first, the others under Show all.",
   walkDetails:
     "Weekly pace and average HR, and steps, cadence and body battery change of each walk.",
   steps: "Daily steps against the goal, and floors, for the last 14 days.",

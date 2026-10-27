@@ -559,9 +559,16 @@ describe("overview widgets", () => {
   it("lists the activities, and opens and closes their laps", async () => {
     const { page } = await open(browser, pageFile());
     const rows = () =>
-      page.$$eval("[data-id=activities] table.data > tbody > tr:not(.laps-row)", (r) => r.length);
+      page.$$eval(
+        "[data-id=activities] table.data > tbody > tr:not(.laps-row):not([hidden])",
+        (r) => r.length,
+      );
     expect(await rows()).toBe(15);
     await page.click("text=Show all 75");
+    expect(await rows()).toBe(75);
+    // the browser keeps the choice
+    await page.reload();
+    await page.waitForSelector(".page");
     expect(await rows()).toBe(75);
     await page.click("text=Show fewer");
     expect(await rows()).toBe(15);
@@ -570,6 +577,30 @@ describe("overview widgets", () => {
     expect(await page.$$eval(".laps-row", (r) => r.length)).toBe(1);
     await page.click(`${button}[aria-expanded=true]`);
     expect(await page.$$eval(".laps-row", (r) => r.length)).toBe(0);
+  });
+
+  it("shows four records, and all of them on Show all", async () => {
+    const { page } = await open(browser, pageFile());
+    const shown = () =>
+      page.$$eval("[data-id=records] .badge:not([hidden]) .kpi-label", (b) =>
+        b.map((x) => x.textContent),
+      );
+    expect(await shown()).toEqual([
+      "Fastest half marathon",
+      "Longest run",
+      "Longest ride",
+      "Best est. 1RM · Barbell Back Squat",
+    ]);
+    await page.click("[data-id=records] >> text=Show all 16");
+    expect(await shown()).toHaveLength(16);
+    expect(await page.getAttribute("[data-id=records] .more", "aria-expanded")).toBe("true");
+  });
+
+  it("shows the fitness age components behind Details", async () => {
+    const { page } = await open(browser, pageFile(), { hash: "#recovery" });
+    expect(await page.isVisible("[data-id=fitnessAge] table")).toBe(false);
+    await page.click("[data-id=fitnessAge] summary");
+    expect(await page.isVisible("[data-id=fitnessAge] table")).toBe(true);
   });
 
   it("switches the weekly volume between time, distance, sessions and load", async () => {
@@ -744,6 +775,19 @@ describe("strength board", () => {
     expect(await page.getAttribute(first, "open")).toBe("");
     await page.click(`${first} >> summary`);
     expect(await page.getAttribute(first, "open")).toBeNull();
+  });
+
+  it("shows the last six sessions first, newest on top", async () => {
+    const { page } = await open(browser, pageFile(), { hash: "#strengthTraining" });
+    const summaries = () =>
+      page.$$eval("[data-id=strengthSessions] details:not([hidden]) summary", (s) =>
+        s.map((x) => x.textContent),
+      );
+    const shown = await summaries();
+    expect(shown).toHaveLength(6);
+    expect(shown[0]).toMatch(/^Oct 23/);
+    await page.click("[data-id=strengthSessions] >> text=Show all 24");
+    expect(await summaries()).toHaveLength(24);
   });
 });
 

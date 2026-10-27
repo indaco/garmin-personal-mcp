@@ -5,6 +5,7 @@ import { en } from "../i18n/en";
 import type { Key, T } from "../i18n";
 import { icon } from "../icons";
 import type { Ctx } from "../registry";
+import { store } from "../theme";
 
 /** Small building blocks that the built-in widgets share. */
 
@@ -27,6 +28,30 @@ export function kpi(
 }
 
 export const kpiRow = (...tiles: HTMLElement[]) => h("div", { class: "kpis" }, ...tiles);
+
+/**
+ * "Show all" for a long widget: `extra` stays hidden until the button opens it, without drawing the
+ * page again. The choice stays in this browser, for each board and widget.
+ */
+export function showAll(ctx: Ctx, extra: HTMLElement[], total: number): HTMLElement | false {
+  if (extra.length === 0) return false;
+  const key = `garmin-open:${ctx.board}:${ctx.id}`;
+  const ids = extra.map((el, i) => (el.id ||= `open-${ctx.board}-${ctx.id}-${i}`));
+  const button = h("button", { class: "btn more", "aria-controls": ids.join(" ") });
+  const set = (open: boolean) => {
+    for (const el of extra) el.hidden = !open;
+    button.setAttribute("aria-expanded", String(open));
+    button.textContent = open ? ctx.t("act.less") : ctx.t("act.more", { n: total });
+  };
+  button.addEventListener("click", () => {
+    const open = button.getAttribute("aria-expanded") !== "true";
+    set(open);
+    if (open) store.set(key, "1");
+    else store.remove(key);
+  });
+  set(store.get(key) === "1");
+  return button;
+}
 
 /** A change in %, coloured: better is green, worse is red, no change is grey. */
 export function delta(ctx: Ctx, pct: number | null, higherIsBetter = true): HTMLElement {

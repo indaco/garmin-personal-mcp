@@ -215,6 +215,7 @@ export const it: Catalogue = {
   "fa.age": "Età fitness",
   "fa.actual": "Età reale",
   "fa.achievable": "Raggiungibile",
+  "fa.details": "Dettagli",
   "fa.component": "Componente",
   "fa.value": "Ora",
   "fa.target": "Obiettivo Garmin",
