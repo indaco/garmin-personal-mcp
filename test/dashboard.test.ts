@@ -28,30 +28,30 @@ const TO = "2026-10-26";
 const ranges = (r: [string, string][]) => r.map(([a, b]) => `${a}..${b}`);
 
 describe("toFetch and covered", () => {
-  it("emptyCacheFetchesTheWholeRange", () => {
+  it("fetches the whole range when the cache is empty", () => {
     expect(ranges(toFetch(undefined, undefined, FROM, TO))).toEqual(["2026-08-03..2026-10-26"]);
   });
 
-  it("warmCacheFetchesOnlyTheLastTwoDaysAndTheNewOnes", () => {
+  it("fetches only the last two cached days and the new ones", () => {
     // last sync on 20 Oct: refetch 19-20 Oct (they could still change) and everything after
     expect(ranges(toFetch(FROM, "2026-10-20", FROM, TO))).toEqual(["2026-10-19..2026-10-26"]);
     expect(ranges(toFetch(FROM, TO, FROM, TO))).toEqual(["2026-10-25..2026-10-26"]);
   });
 
-  it("longerWindowAlsoFetchesTheMissingStart", () => {
+  it("also fetches the missing start of a longer window", () => {
     expect(ranges(toFetch(FROM, TO, "2026-05-04", TO))).toEqual([
       "2026-05-04..2026-08-02",
       "2026-10-25..2026-10-26",
     ]);
   });
 
-  it("cacheOutsideTheRangeIsIgnored", () => {
+  it("ignores a cached range outside the window", () => {
     expect(ranges(toFetch("2025-01-01", "2025-03-01", FROM, TO))).toEqual([
       "2026-08-03..2026-10-26",
     ]);
   });
 
-  it("coveredRangeNeverClaimsDaysThatWereNotFetched", () => {
+  it("never counts days that were not fetched as covered", () => {
     // three weeks without calls, then a 1-week window: only the new range is fetched and covered
     const from = "2026-11-16";
     const to = "2026-11-23";
@@ -65,13 +65,13 @@ describe("toFetch and covered", () => {
     ]);
   });
 
-  it("coveredRangeJoinsTouchingAndOverlappingRanges", () => {
+  it("joins touching and overlapping ranges", () => {
     expect(covered(FROM, TO, "2026-10-27", "2026-11-02")).toEqual(["2026-08-03", "2026-11-02"]);
     expect(covered(FROM, TO, "2026-07-01", TO)).toEqual(["2026-07-01", "2026-10-26"]);
     expect(covered(undefined, undefined, FROM, TO)).toEqual(["2026-08-03", "2026-10-26"]);
   });
 
-  it("recoveryIsRefreshedFromTheLastSyncNotFromToday", () => {
+  it("refreshes recovery from the last sync, not from today", () => {
     // last call on Monday 19 Oct, next on Monday 26 Oct: 18 and 19 Oct may be incomplete
     expect(recoveryRefreshFrom("2026-10-19", TO)).toBe("2026-10-18");
     expect(recoveryRefreshFrom(undefined, TO)).toBe("2026-10-25");
@@ -80,7 +80,7 @@ describe("toFetch and covered", () => {
 });
 
 describe("cache file", () => {
-  it("cacheWithTheWrongShapeStartsAgain", async () => {
+  it("starts again from an empty cache when the file has the wrong shape", async () => {
     const dir = mkdtempSync(join(tmpdir(), "garmin-dash-"));
     const d = new GarminDashboard({} as GarminTools, {} as GarminApiClient, dir);
     writeFileSync(join(dir, "dashboard-cache.json"), '{"activities":[1,2],"activitiesFrom":"x"}');
@@ -91,7 +91,7 @@ describe("cache file", () => {
     expect(await d.load()).toEqual({});
   });
 
-  it("atomicWriteLeavesNoTempFile", async () => {
+  it("writes the file atomically and leaves no temp file", async () => {
     const f = join(mkdtempSync(join(tmpdir(), "garmin-dash-")), "sub", "a.fit");
     await writeAtomically(f, new Uint8Array([1, 2, 3]));
     await writeAtomically(f, new Uint8Array([4]));
@@ -101,7 +101,7 @@ describe("cache file", () => {
 });
 
 describe("recoveryRow", () => {
-  it("recoveryRowKeepsTheDashboardFields", () => {
+  it("keeps the dashboard fields of sleep and the daily summary", () => {
     const row = recoveryRow(
       "2026-10-25",
       {
@@ -420,6 +420,23 @@ describe("getDashboardData", () => {
     expect(JSON.parse(a).sync.newActivities).toBe(1);
     expect(JSON.parse(b).sync.newActivities).toBe(0);
     expect(existsSync(`${cacheFile()}.tmp`)).toBe(false);
+  });
+
+  it("skips HRV entries without a valid date", async () => {
+    api.getJson.mockImplementation(async (path, q) =>
+      path.startsWith("/hrv-service")
+        ? {
+            hrvSummaries: [
+              { lastNightAvg: 1 },
+              { calendarDate: "2026-13-01", lastNightAvg: 2 },
+              { calendarDate: "2026-10-26", lastNightAvg: 3 },
+            ],
+          }
+        : fakeGarmin(path, q),
+    );
+    const out = JSON.parse(await dashboard.getDashboardData(1));
+    expect(out.hrv).toEqual([{ date: "2026-10-26", hrv: 3 }]);
+    expect(Object.keys(readCache().hrv)).toEqual(["2026-10-26"]);
   });
 
   it("drops recovery rows older than the window from the cache", async () => {

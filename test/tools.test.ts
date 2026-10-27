@@ -35,7 +35,7 @@ afterEach(() => {
 });
 
 describe("summarize", () => {
-  it("summaryShowsElapsedTimeWhenMovingTimeIsShort", () => {
+  it("shows the elapsed time when the moving time is short", () => {
     const s = summarize({
       activityId: 1,
       activityName: "Padel",
@@ -72,7 +72,7 @@ describe("summarize", () => {
     expect(s).not.toHaveProperty("runWalk");
   });
 
-  it("summaryOfARaceHasBestEffortsAndRunWalkSegments", () => {
+  it("gives a race its best efforts and run/walk segments", () => {
     const s = summarize({
       activityId: 2,
       activityName: "Half Marathon",
@@ -116,7 +116,7 @@ describe("summarize", () => {
     expect(s.vertOscCm).toBe(8.9);
   });
 
-  it("summaryHasIntensityMinutesAndSwimFields", () => {
+  it("has intensity minutes and swim fields", () => {
     const s = summarize({
       activityId: 3,
       activityType: { typeKey: "lap_swimming" },
@@ -138,19 +138,24 @@ describe("summarize", () => {
     expect(s.strokes).toBe(980);
   });
 
-  // numeric text counts as a number, but not with spaces, hex, NaN or Infinity
+  // numeric text counts as a number, also with spaces around it, but not hex, NaN or Infinity
   it.each([
     ["5000", 5],
     ["+5000", 5],
     ["5e3", 5],
     ["5000.", 5],
-    [" 5000 ", undefined],
+    [" 5000 ", 5],
     ["0x1388", undefined],
     ["Infinity", undefined],
     ["NaN", undefined],
     [true, undefined],
   ])("reads the distance %j", (distance, km) => {
     expect(summarize({ distance }).km).toBe(km);
+  });
+
+  it("leaves the type out when Garmin gives no type key", () => {
+    expect(summarize({ activityId: 1, activityType: { typeId: 3 } })).toEqual({ id: 1 });
+    expect(summarize({ activityId: 1, activityType: null })).toEqual({ id: 1 });
   });
 
   it("keeps the summary fields in a fixed order", () => {
@@ -250,10 +255,17 @@ describe("activities", () => {
     expect(api.getJson).toHaveBeenCalledWith(path, query);
   });
 
-  it("garminGet splits the query string into parameters", async () => {
+  it("garminGet decodes the query string into parameters", async () => {
     api.getJson.mockResolvedValue([]);
-    await tools.garminGet("/x", "a=1&b=2=3&=skip&noValue&a=4&c=");
-    expect(api.getJson).toHaveBeenCalledWith("/x", { a: "4", b: "2=3", c: "" });
+    await tools.garminGet("/x", "?a=1&b=2=3&=skip&noValue&a=4&c=&name=a%20b+c&d%C3%A9j%C3%A0=vu");
+    expect(api.getJson).toHaveBeenCalledWith("/x", {
+      a: "4",
+      b: "2=3",
+      noValue: "",
+      c: "",
+      name: "a b c",
+      "d\u00e9j\u00e0": "vu",
+    });
     await tools.garminGet("/y");
     expect(api.getJson).toHaveBeenLastCalledWith("/y", {});
   });

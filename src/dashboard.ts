@@ -145,13 +145,17 @@ export class GarminDashboard {
         const json = await call(sync, () => this.api.getJson(path, {}));
         const summaries = field(json, "hrvSummaries");
         for (const h of Array.isArray(summaries) ? summaries : []) {
-          const o: Json = { date: asString(field(h, "calendarDate")) };
+          const day = date(field(h, "calendarDate"));
+          if (day === undefined) {
+            continue;
+          }
+          const o: Json = { date: day };
           copy(h, o, "lastNightAvg", "hrv");
           copy(h, o, "weeklyAvg", "weeklyAvg");
           copy(h, o, "status", "status");
           copy(field(h, "baseline"), o, "balancedLow", "low");
           copy(field(h, "baseline"), o, "balancedUpper", "high");
-          byDate[o.date as string] = o;
+          byDate[day] = o;
         }
       }
     }

@@ -132,14 +132,15 @@ describe("token", () => {
     expect(calls.filter((c) => c.url === TOKEN_URL)).toHaveLength(2);
   });
 
-  // expires_in: digits with an optional sign, or a number within the 64-bit range; anything else falls back
+  // expires_in: a number, or numeric text with spaces around it; hex, booleans and absurd values fall back
   it.each([
     ["the text 600", "600", 540_000],
     ["the text +600", "+600", 540_000],
     ["the number 600.9", 600.9, 540_000],
-    ["the text 600.5", "600.5", 23 * 3600_000],
-    ["the text ' 600 '", " 600 ", 23 * 3600_000],
-    ["the text 6e2", "6e2", 23 * 3600_000],
+    ["the text 600.5", "600.5", 540_000],
+    ["the text ' 600 '", " 600 ", 540_000],
+    ["the text 6e2", "6e2", 540_000],
+    ["the text 0x258", "0x258", 23 * 3600_000],
     ["the boolean true", true, 23 * 3600_000],
     ["the number 1e30", 1e30, 23 * 3600_000],
   ])("reads expires_in given as %s", async (_, expiresIn, renewAt) => {
@@ -156,7 +157,7 @@ describe("token", () => {
     expect(calls.filter((c) => c.url === TOKEN_URL)).toHaveLength(2);
   });
 
-  it("falls back to expiresIn when expires_in is not a whole number", async () => {
+  it("falls back to expiresIn when expires_in is not a number", async () => {
     vi.useFakeTimers({ now: 0 });
     mockFetch(tokenJson({ access_token: "tok", expires_in: "soon", expiresIn: 600 }), ok({}));
     const api = client();

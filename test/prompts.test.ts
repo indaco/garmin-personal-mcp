@@ -50,7 +50,7 @@ const shape = (p: { name: string; description?: string; arguments?: unknown[] })
 });
 
 describe("prompts", () => {
-  it("buildAndUpdateShareTheDashboardVersion", async () => {
+  it("gives the build and the update the same dashboard version", async () => {
     const v = `"v": ${DASHBOARD_VERSION}`;
     const build = await render("training-dashboard", { weeks: "12" });
     const update = await render("training-dashboard-update");
@@ -59,7 +59,7 @@ describe("prompts", () => {
     expect(build.includes("{{") || update.includes("{{")).toBe(false);
   });
 
-  it("updateNumbersTheBuildSectionsB1ToB3", async () => {
+  it("numbers the build sections B1 to B3 in the update", async () => {
     const update = await render("training-dashboard-update", { weeks: "8" });
     expect(update).toContain("### B1. Collect the data");
     expect(update).toContain("### B3. Build the dashboard");
@@ -105,7 +105,7 @@ describe("prompts", () => {
     ["99", 52],
     ["eight", 12],
     ["8.5", 12],
-    ["99999999999", 12],
+    ["99999999999", 52],
   ])("reads weeks %j as %i", async (weeks, expected) => {
     expect(await render("training-dashboard", { weeks })).toContain(`last **${expected} weeks**`);
   });
@@ -116,10 +116,12 @@ describe("prompts", () => {
     expect(update).toContain("2026-10-28");
   });
 
-  it("strips control characters and spaces around an argument, not other whitespace", async () => {
+  it("trims any whitespace and control characters around an argument", async () => {
     expect(await render("training-dashboard", { weeks: "\u00018\t" })).toContain(
       "last **8 weeks**",
     );
-    expect(await render("training-dashboard", { weeks: "\u00a08" })).toContain("last **12 weeks**");
+    expect(await render("training-dashboard", { weeks: "\u00a08\u2003" })).toContain(
+      "last **8 weeks**",
+    );
   });
 });

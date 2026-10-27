@@ -38,7 +38,7 @@ function set(setType: number, repetitions?: number, weight?: number, duration?: 
 }
 
 describe("exercise names", () => {
-  it("exerciseNameFromTheSdkNameList", () => {
+  it("names the exercise from the SDK name list", () => {
     expect(
       exerciseName(
         value("exerciseCategory", "benchPress"),
@@ -48,14 +48,14 @@ describe("exercise names", () => {
     ).toBe("Incline Smith Machine Bench Press");
   });
 
-  it("exerciseNameFallsBackToTheCategory", () => {
+  it("falls back to the category name", () => {
     expect(exerciseName(value("exerciseCategory", "legRaise"), undefined, undefined)).toBe(
       "Leg Raise",
     );
     expect(exerciseName(value("exerciseCategory", "curl"), 9999, undefined)).toBe("Curl");
   });
 
-  it("customExerciseUsesTheWorkoutStepName", () => {
+  it("names a custom exercise after its workout step", () => {
     expect(exerciseName(value("exerciseCategory", "unknown"), 3, "My Press")).toBe("My Press");
     expect(exerciseName(undefined, undefined, undefined)).toBe("Unknown exercise");
   });
@@ -90,7 +90,7 @@ describe("exercise names", () => {
 });
 
 describe("sets", () => {
-  it("restPeriodBecomesRestSecOnThePreviousSet", () => {
+  it("turns a rest period into restSec on the set before it", () => {
     const out = groupSets(
       [
         set(ACTIVE, 12, 35, 206),
@@ -113,7 +113,7 @@ describe("sets", () => {
     ]);
   });
 
-  it("musclesComeFromTheExerciseCatalogue", () => {
+  it("reads the muscles from the exercise catalogue", () => {
     const catalogue = {
       SQUAT: {
         exercises: {

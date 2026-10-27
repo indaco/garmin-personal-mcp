@@ -102,13 +102,11 @@ export class GarminTools {
   // ------------------------------------------------------------------ generic
 
   async garminGet(path: string, query?: string): Promise<string> {
+    // decoded here, so the client encodes each value once; a repeated name keeps its last value
     const q: Record<string, string> = {};
-    if (query?.trim()) {
-      for (const pair of query.split("&")) {
-        const i = pair.indexOf("=");
-        if (i > 0) {
-          q[pair.slice(0, i)] = pair.slice(i + 1);
-        }
+    for (const [name, value] of new URLSearchParams(query ?? "")) {
+      if (name) {
+        q[name] = value;
       }
     }
     return JSON.stringify(await this.api.getJson(path, q));
@@ -179,8 +177,9 @@ export function summarize(a: Json): Json {
   const o: Json = {};
   copy(a, o, "activityId", "id");
   copy(a, o, "activityName", "name");
-  if ("activityType" in a) {
-    o.type = asString(field(a.activityType, "typeKey"));
+  const typeKey = asString(field(a.activityType, "typeKey"));
+  if (typeKey !== null) {
+    o.type = typeKey;
   }
   copy(a, o, "startTimeLocal", "start");
   const distM = asDouble(a.distance, 0);
@@ -313,10 +312,11 @@ function field(v: unknown, name: string): unknown {
   return isObject(v) ? v[name] : undefined;
 }
 
-/** A number, or text holding one; the default otherwise (null too). */
+/** A number, or text holding one (spaces around it allowed); the default otherwise (null too). */
 function asDouble(v: unknown, d: number): number {
   if (typeof v === "number") return v;
-  if (typeof v === "string" && /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(v)) return Number(v);
+  if (typeof v === "string" && /^\s*[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?\s*$/.test(v))
+    return Number(v);
   return d;
 }
 

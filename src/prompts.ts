@@ -98,16 +98,16 @@ function render(template: string, values: Record<string, string>): string {
   return text;
 }
 
-/** The argument with control characters and spaces stripped at both ends; "" when missing. */
+/** The argument without whitespace or control characters at either end; "" when missing. */
 function arg(v: string | undefined): string {
   // oxlint-disable-next-line no-control-regex -- the control characters are what is stripped
-  return (v ?? "").replace(/^[\u0000- ]+|[\u0000- ]+$/g, "");
+  return (v ?? "").replace(/^[\s\u0000-\u001f]+|[\s\u0000-\u001f]+$/g, "");
 }
 
-/** weeks clamped to 1..52; the default when empty or not a 32-bit integer. */
+/** weeks clamped to 1..52; the default when empty or not a whole number. */
 function weeks(v: string | undefined): number {
   const s = arg(v);
-  if (!/^[+-]?\d+$/.test(s) || Math.abs(Number(s)) > 2 ** 31 - 1) {
+  if (!/^[+-]?\d+$/.test(s)) {
     return DEFAULT_WEEKS;
   }
   return Math.min(Math.max(Number(s), 1), MAX_WEEKS);

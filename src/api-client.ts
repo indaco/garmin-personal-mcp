@@ -209,11 +209,11 @@ function firstText(json: Record<string, unknown>, ...names: string[]): string | 
   return undefined;
 }
 
-/** A whole number: a number within the 64-bit range, or text of digits with an optional sign; undefined otherwise. */
+/** A number or numeric text (spaces around it allowed), without its decimals; undefined otherwise or when absurd. */
 function asLong(v: unknown): number | undefined {
-  const n =
-    typeof v === "number" ? v : typeof v === "string" && /^[+-]?\d+$/.test(v) ? Number(v) : NaN;
-  return Math.abs(n) < 2 ** 63 ? Math.trunc(n) : undefined;
+  const numeric = typeof v === "string" && /^\s*[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?\s*$/.test(v);
+  const n = Math.trunc(typeof v === "number" ? v : numeric ? Number(v) : NaN);
+  return Number.isSafeInteger(n) ? n : undefined;
 }
 
 function preview(body: Uint8Array | string): string {
