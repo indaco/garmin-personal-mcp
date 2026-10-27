@@ -74,6 +74,8 @@ let editing = false;
 // edit mode works on a copy: Done saves it, Discard drops it
 let draft: Layout | null = null;
 let accountOpen = false;
+// on a phone the week window folds into one control
+let windowOpen = false;
 let tabs: string[] = [];
 let weeks: string[] = [];
 
@@ -353,9 +355,35 @@ function windowBar(inProgress: boolean): HTMLElement {
       { id, onchange: (e: Event) => onChange((e.target as HTMLSelectElement).value) },
       ...weeks.map((w, i) => h("option", { value: w, selected: w === value }, label(w, i))),
     );
-  return h(
+  const shown = presets.find(isLast);
+  const current =
+    shown !== undefined
+      ? t("window.last", { n: shown })
+      : view.from === weeks[0] && view.to === weeks.at(-1)
+        ? t("window.all")
+        : `${fmt.day(view.from)} – ${fmt.day(view.to)}`;
+  const toggle = h(
+    "button",
+    {
+      class: "chip window-toggle",
+      "aria-expanded": String(windowOpen),
+      "aria-controls": "window-bar",
+      onclick: () => {
+        windowOpen = !windowOpen;
+        render();
+      },
+    },
+    `${t("window.label")}: ${current}`,
+    h("span", { "aria-hidden": "true" }, " ▾"),
+  );
+  const bar = h(
     "div",
-    { class: "window-bar", role: "group", "aria-label": t("window.label") },
+    {
+      id: "window-bar",
+      class: `window-bar${windowOpen ? " open" : ""}`,
+      role: "group",
+      "aria-label": t("window.label"),
+    },
     ...presets.map((n) =>
       h(
         "button",
@@ -390,6 +418,7 @@ function windowBar(inProgress: boolean): HTMLElement {
     ),
     inProgress && h("span", { class: "muted small" }, t("inProgress")),
   );
+  return h("div", { class: "window" }, toggle, bar);
 }
 
 function tabBar(data: Data): HTMLElement {
@@ -401,7 +430,7 @@ function tabBar(data: Data): HTMLElement {
     render();
     document.querySelector<HTMLElement>(`[role=tab][data-tab="${tab}"]`)?.focus();
   };
-  return h(
+  const nav = h(
     "nav",
     {
       class: "tabs",
@@ -430,6 +459,12 @@ function tabBar(data: Data): HTMLElement {
       ),
     ),
   );
+  // the bar fades at its end while more tabs are out of view
+  const more = () =>
+    nav.classList.toggle("more", nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 4);
+  nav.addEventListener("scroll", more);
+  new ResizeObserver(more).observe(nav);
+  return nav;
 }
 
 // ------------------------------------------------------------------ boards

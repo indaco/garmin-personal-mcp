@@ -457,6 +457,35 @@ const focused = (page: Page) =>
     return el.getAttribute("aria-label") ?? (el.id || el.textContent?.trim());
   });
 
+describe("phone", () => {
+  const phone = { viewport: { width: 390, height: 844 } };
+
+  it("folds the week window into one control", async () => {
+    const { page } = await open(browser, pageFile(), phone);
+    expect(await page.isVisible(".window-bar")).toBe(false);
+    expect(await page.textContent(".window-toggle")).toBe("Weeks: All ▾");
+    await page.click(".window-toggle");
+    expect(await page.getAttribute(".window-toggle", "aria-expanded")).toBe("true");
+    await page.click(".window-bar .chip >> text=Last 4");
+    expect(await page.textContent(".window-toggle")).toBe("Weeks: Last 4 ▾");
+  });
+
+  it("keeps the header at the top, and fades the tabs that are out of view", async () => {
+    const { page } = await open(browser, pageFile(), phone);
+    expect(await page.getAttribute(".tabs", "class")).toContain("more");
+    await page.evaluate(() => window.scrollTo(0, 2000));
+    expect(await page.$eval(".top", (el) => el.getBoundingClientRect().top)).toBe(0);
+    await page.$eval(".tabs", (el) => el.scrollTo({ left: el.scrollWidth }));
+    await page.waitForFunction(() => !document.querySelector(".tabs")!.classList.contains("more"));
+  });
+
+  it("shows the whole week window on a desktop", async () => {
+    const { page } = await open(browser, pageFile());
+    expect(await page.isVisible(".window-bar")).toBe(true);
+    expect(await page.isVisible(".window-toggle")).toBe(false);
+  });
+});
+
 describe("focus", () => {
   it("stays on a window preset and on the theme menu after the page draws again", async () => {
     const { page } = await open(browser, pageFile());
