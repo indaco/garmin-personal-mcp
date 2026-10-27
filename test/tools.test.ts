@@ -138,6 +138,21 @@ describe("summarize", () => {
     expect(s.strokes).toBe(980);
   });
 
+  // Jackson's asDouble: numeric text counts, but not with spaces, hex, NaN or Infinity
+  it.each([
+    ["5000", 5],
+    ["+5000", 5],
+    ["5e3", 5],
+    ["5000.", 5],
+    [" 5000 ", undefined],
+    ["0x1388", undefined],
+    ["Infinity", undefined],
+    ["NaN", undefined],
+    [true, undefined],
+  ])("reads the distance %j like Jackson", (distance, km) => {
+    expect(summarize({ distance }).km).toBe(km);
+  });
+
   it("keeps the summary fields in the Java order", () => {
     const s = summarize({
       activityId: 4,

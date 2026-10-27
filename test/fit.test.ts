@@ -263,4 +263,32 @@ describe("FIT files", () => {
       /^Cannot decode the \.FIT file of 6: /,
     );
   });
+
+  // The JS SDK returns the messages it read along with the error; Java throws, so no partial sets.
+  it.each([
+    ["a wrong CRC", (b: Uint8Array) => b.map((v, i) => (i === b.length - 1 ? v ^ 0xff : v))],
+    ["a cut file", (b: Uint8Array) => b.slice(0, b.length - 10)],
+  ])("fails on a file with %s instead of returning part of it", (_, damage) => {
+    const fit = fitFile(
+      [
+        Profile.MesgNum.SET,
+        {
+          setType: ACTIVE,
+          repetitions: 5,
+          category: [SQUAT],
+          categorySubtype: [BARBELL_BOX_SQUAT],
+        },
+      ],
+      [
+        Profile.MesgNum.SET,
+        {
+          setType: ACTIVE,
+          repetitions: 6,
+          category: [SQUAT],
+          categorySubtype: [BARBELL_BOX_SQUAT],
+        },
+      ],
+    );
+    expect(() => decodeFit(damage(fit), 8)).toThrow(/^Cannot decode the \.FIT file of 8: /);
+  });
 });

@@ -209,10 +209,11 @@ function firstText(json: Record<string, unknown>, ...names: string[]): string | 
   return undefined;
 }
 
-/** Jackson's asLong: a number, or a string holding one; undefined otherwise. */
+/** Jackson's asLong: a number within the long range, or text of digits with an optional sign; undefined otherwise. */
 function asLong(v: unknown): number | undefined {
-  const n = typeof v === "number" ? v : typeof v === "string" && v.trim() ? Number(v) : NaN;
-  return Number.isFinite(n) ? Math.trunc(n) : undefined;
+  const n =
+    typeof v === "number" ? v : typeof v === "string" && /^[+-]?\d+$/.test(v) ? Number(v) : NaN;
+  return Math.abs(n) < 2 ** 63 ? Math.trunc(n) : undefined;
 }
 
 function preview(body: Uint8Array | string): string {

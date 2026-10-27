@@ -132,6 +132,41 @@ describe("token", () => {
     expect(calls.filter((c) => c.url === TOKEN_URL)).toHaveLength(2);
   });
 
+  // Jackson's asLong: digits with an optional sign, or a number within the long range, else the default
+  it.each([
+    ["the text 600", "600", 540_000],
+    ["the text +600", "+600", 540_000],
+    ["the number 600.9", 600.9, 540_000],
+    ["the text 600.5", "600.5", 23 * 3600_000],
+    ["the text ' 600 '", " 600 ", 23 * 3600_000],
+    ["the text 6e2", "6e2", 23 * 3600_000],
+    ["the boolean true", true, 23 * 3600_000],
+    ["the number 1e30", 1e30, 23 * 3600_000],
+  ])("reads expires_in given as %s like Jackson", async (_, expiresIn, renewAt) => {
+    vi.useFakeTimers({ now: 0 });
+    mockFetch(tokenJson({ access_token: "tok", expires_in: expiresIn }), ok({}));
+    const api = client();
+    await api.getJson("/x");
+    vi.setSystemTime(renewAt - 1);
+    replies.push(ok({}));
+    await api.getJson("/x");
+    vi.setSystemTime(renewAt);
+    replies.push(tokenJson({ access_token: "tok" }), ok({}));
+    await api.getJson("/x");
+    expect(calls.filter((c) => c.url === TOKEN_URL)).toHaveLength(2);
+  });
+
+  it("falls back to expiresIn when expires_in is not a whole number", async () => {
+    vi.useFakeTimers({ now: 0 });
+    mockFetch(tokenJson({ access_token: "tok", expires_in: "soon", expiresIn: 600 }), ok({}));
+    const api = client();
+    await api.getJson("/x");
+    vi.setSystemTime(540_000);
+    replies.push(tokenJson({ access_token: "tok" }), ok({}));
+    await api.getJson("/x");
+    expect(calls.filter((c) => c.url === TOKEN_URL)).toHaveLength(2);
+  });
+
   it("shares one token request between concurrent calls", async () => {
     mockFetch(tokenJson({ access_token: "tok" }), ok({ n: 1 }), ok({ n: 2 }));
     const api = client();

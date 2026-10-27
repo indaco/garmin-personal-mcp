@@ -316,8 +316,7 @@ function field(v: unknown, name: string): unknown {
 /** Jackson's asDouble(default): a number, or text holding one; the default otherwise (null too). */
 function asDouble(v: unknown, d: number): number {
   if (typeof v === "number") return v;
-  if (typeof v === "string" && /^\s*[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?\s*$/.test(v))
-    return Number(v);
+  if (typeof v === "string" && /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(v)) return Number(v);
   return d;
 }
 
