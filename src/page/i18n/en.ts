@@ -194,6 +194,8 @@ export const en = {
   "kpi.distance": "Distance · last 7 days",
   "kpi.time": "Time · last 7 days",
   "kpi.vs4w": "vs 4-week average",
+  "delta.good": "better",
+  "delta.bad": "worse",
   "kpi.ratio": "Load ratio 7:28",
   "kpi.band": "Band 0.8-1.3",
   "kpi.ratioAll": "Uses all activities, also with a type filter",

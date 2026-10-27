@@ -76,6 +76,8 @@
 
 /* Bright type colours for the dark themes. */
 :root {
+  /* the edge of a form control: at least 3:1 against the panel in every theme */
+  --control-border: color-mix(in srgb, var(--muted) 80%, var(--panel));
   --running: #ff7a45;
   --strengthTraining: #a78bfa;
   --walking: #34d399;
@@ -95,9 +97,9 @@
   --text: #1a2230;
   --muted: #5d6878;
   --accent: #1f6feb;
-  --good: #1a7f4b;
+  --good: #187545;
   --bad: #c62828;
-  --warn: #9a6700;
+  --warn: #8e5f00;
 }
 :root[data-theme="paper"] {
   --bg: #f5f1e8;
@@ -107,9 +109,9 @@
   --text: #2a2419;
   --muted: #6e6352;
   --accent: #8a5a00;
-  --good: #2f7a3c;
+  --good: #2b7037;
   --bad: #b3261e;
-  --warn: #8a6100;
+  --warn: #7f5900;
 }
 :root[data-theme="mist"] {
   --bg: #eef2f6;
@@ -119,9 +121,9 @@
   --text: #1c2733;
   --muted: #566474;
   --accent: #2d6a9f;
-  --good: #1f7a4d;
+  --good: #1d7047;
   --bad: #b83232;
-  --warn: #8c6200;
+  --warn: #815a00;
 }
 :root[data-theme="hcLight"] {
   --bg: #fff;
@@ -144,9 +146,9 @@
     --text: #1a2230;
     --muted: #5d6878;
     --accent: #1f6feb;
-    --good: #1a7f4b;
+    --good: #187545;
     --bad: #c62828;
-    --warn: #9a6700;
+    --warn: #8e5f00;
   }
 }
 
@@ -236,6 +238,9 @@ h2 {
 .same {
   color: var(--muted);
 }
+.delta {
+  white-space: nowrap;
+}
 .warn {
   color: var(--warn);
 }
@@ -285,7 +290,7 @@ textarea {
 }
 select {
   background: var(--panel2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-border);
   border-radius: 8px;
   padding: 5px 8px;
 }
@@ -307,6 +312,8 @@ select {
 .chip[aria-pressed="true"],
 .btn[aria-pressed="true"] {
   border-color: var(--accent);
+  /* a 2 px edge and a fill: not only a change of colour */
+  box-shadow: inset 0 0 0 1px var(--accent);
   background: color-mix(in srgb, var(--accent) 18%, var(--panel2));
 }
 .edit-bar {
@@ -589,7 +596,7 @@ html.resizing * {
 }
 .tool {
   background: var(--panel2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-border);
   border-radius: 6px;
   min-width: 26px;
   height: 26px;
@@ -728,14 +735,15 @@ html.resizing * {
   font-weight: 700;
   margin: 0 0 10px;
 }
+/* "Go easy" is a caution, not an alarm; "Normal" is no signal at all */
 .verdict-easy {
-  color: var(--bad);
+  color: var(--warn);
 }
 .verdict-push {
   color: var(--good);
 }
 .verdict-normal {
-  color: var(--warn);
+  color: var(--text);
 }
 .badges {
   display: grid;
@@ -917,7 +925,7 @@ table.data .num {
 }
 .search {
   background: var(--panel2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-border);
   border-radius: 8px;
   padding: 5px 10px;
   color: var(--text);

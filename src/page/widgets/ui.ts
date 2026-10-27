@@ -53,13 +53,21 @@ export function showAll(ctx: Ctx, extra: HTMLElement[], total: number): HTMLElem
   return button;
 }
 
-/** A change in %, coloured: better is green, worse is red, no change is grey. */
-export function delta(ctx: Ctx, pct: number | null, higherIsBetter = true): HTMLElement {
+/**
+ * A change in %, with an arrow. Only a metric where one direction is better (HRV up, resting HR down)
+ * is green or red, with "better" or "worse" for screen readers; a change of volume is neither.
+ */
+export function delta(ctx: Ctx, pct: number | null, better?: "up" | "down"): HTMLElement {
   // no base to compare with (e.g. no sessions before) is not missing data: show nothing
+  if (pct === null) return h("span", {});
+  const cls = better ? ctx.calc.changeClass(pct, better === "up") : "same";
+  const flat = Math.abs(pct) < 0.5;
   return h(
     "span",
-    { class: ctx.calc.changeClass(pct, higherIsBetter) },
-    pct === null ? "" : ctx.fmt.pct(pct),
+    { class: `delta ${better ? cls : ""}` },
+    flat ? "" : pct > 0 ? "▲ " : "▼ ",
+    ctx.fmt.pct(Math.abs(pct)).replace("+", ""),
+    cls !== "same" && h("span", { class: "sr-only" }, ` (${ctx.t(`delta.${cls}`)})`),
   );
 }
 

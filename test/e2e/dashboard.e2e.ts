@@ -579,6 +579,22 @@ describe("overview widgets", () => {
     expect(await page.$$eval(".laps-row", (r) => r.length)).toBe(0);
   });
 
+  it("colours a change only when one direction is better", async () => {
+    const { page } = await open(browser, pageFile());
+    const deltas = await page.$$eval("[data-id=kpis] .delta", (els) =>
+      els.map((e) => [e.className.trim(), e.textContent]),
+    );
+    // distance and time: an arrow, no colour; HRV: lower is worse, and says so
+    expect(deltas).toEqual([
+      ["delta", "▼ 11%"],
+      ["delta", "▲ 8%"],
+      ["delta bad", "▼ 4% (worse)"],
+    ]);
+    // "Normal" readiness is no warning
+    const color = (sel: string) => page.$eval(sel, (e) => getComputedStyle(e).color);
+    expect(await color(".verdict-normal")).toBe(await color("h1"));
+  });
+
   it("shows four records, and all of them on Show all", async () => {
     const { page } = await open(browser, pageFile());
     const shown = () =>

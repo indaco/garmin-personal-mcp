@@ -1,7 +1,7 @@
 import { append } from "../dom";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
-import { kpi, kpiRow, note } from "./ui";
+import { alpha, kpi, kpiRow, note } from "./ui";
 
 /** The recovery widgets show the last 14 days of the data: today's state, so the week window does not change them. */
 
@@ -244,7 +244,14 @@ register({
         labels: labels(ctx, rows),
         datasets: [
           { label: t("bb.high"), data: series(rows, "bbHigh"), backgroundColor: ctx.color("good") },
-          { label: t("bb.low"), data: series(rows, "bbLow"), backgroundColor: ctx.color("bad") },
+          // a light fill with an edge: not told apart from the high bars by colour alone
+          {
+            label: t("bb.low"),
+            data: series(rows, "bbLow"),
+            backgroundColor: alpha(ctx.color("bad"), 0.35),
+            borderColor: ctx.color("bad"),
+            borderWidth: 1.5,
+          },
         ],
       },
       options: { scales: { y: { min: 0, max: 100 } } },
