@@ -92,6 +92,9 @@ Above the boards:
 The URL keeps the board, the window and an open exercise. A reload or a shared link opens the same
 view.
 
+In a chart, a click on a legend item shows only that series. A second click on it shows all the
+series again. Shift-click, or Cmd-click on a Mac, hides or shows only that series.
+
 ## Change the layout
 
 Select **Edit layout**. Each widget then has these controls:
