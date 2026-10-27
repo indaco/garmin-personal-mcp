@@ -158,7 +158,15 @@ A built-in language is in every page. To add one:
 | `edit.start` | Edit layout |
 | `edit.done` | Done |
 | `edit.add` | Add widget |
-| `edit.reset` | Reset to preset |
+| `edit.reset` | Reset board |
+| `edit.discard` | Discard |
+| `edit.bar` | Edit layout |
+| `edit.editing` | Editing · {board} |
+| `edit.unsaved` | Unsaved changes |
+| `discard.title` | Discard your changes? |
+| `discard.text` | The layout goes back to how it was before you selected Edit layout, on every board. |
+| `discard.keep` | Keep editing |
+| `discard.confirm` | Discard changes |
 | `edit.copy` | Copy layout |
 | `edit.drag` | Drag to move {title} |
 | `edit.earlier` | Move {title} earlier |
@@ -174,6 +182,9 @@ A built-in language is in every page. To add one:
 | `said.shown` | {title} shown |
 | `said.removed` | {title} removed |
 | `said.added` | {title} added |
+| `said.saved` | Layout saved |
+| `said.unchanged` | No changes to save |
+| `said.discarded` | Changes discarded |
 | `stale.label` | New layout |
 | `stale.text` | Claude wrote a new layout for this dashboard. The layout you made in this browser stays until you choose. |
 | `stale.keep` | Keep mine |

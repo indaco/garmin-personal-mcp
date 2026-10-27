@@ -106,14 +106,18 @@ Select **Edit layout**. Each widget then has these controls:
 | ◉ and ◌ | Hide the widget, or show it again. A hidden widget keeps its place. |
 | ✕       | Remove the widget.                                                  |
 
-Above the board:
+The edit bar stays at the top of the window while you scroll. It has:
 
-- **Add widget** opens the catalogue: the built-in widgets, your custom widgets and the hidden
+- **Add widget**: opens the catalogue: the built-in widgets, your custom widgets and the hidden
   widgets of the board.
-- **Reset to preset** puts the preset widgets back on the board.
-- **Copy layout** gives the layout as text.
+- **Reset board**: puts the preset widgets back on the board.
+- **Copy layout**: gives the layout as text.
+- **Discard**: puts the layout back as it was before you selected **Edit layout**, on every board.
+  When you have changes, the page asks first. Escape does the same.
+- **Done**: saves the changes and shows the board.
 
-Select **Done** to see the board.
+Your changes are a draft until you select **Done**. The bar says "Unsaved changes" when you have
+some, and the browser asks before you close the page with them.
 
 You can also ask Claude to change the layout, for example "hide the bedtime widget and move HRV to
 the top". Claude uses the `editDashboard` tool.
@@ -133,7 +137,7 @@ language of the browser. [Languages](languages.md) tells how to add a language.
 The page keeps its state in four blocks of the file: the data, the layout, the custom widgets and the
 languages. An update replaces only the data block.
 
-The browser saves a layout change at once, but only in that browser. To keep the layout in the page,
+The browser saves the layout when you select **Done**, but only in that browser. To keep the layout in the page,
 select **Copy layout** and give the text to Claude. Claude saves it with `editDashboard`. When Claude
 saves a layout, the page shows the new layout and asks which one to use: **Keep mine** goes back to
 the layout of the browser, **Use the new one** deletes it from the browser.

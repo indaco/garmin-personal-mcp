@@ -69,6 +69,8 @@ let layout: Layout = merge(pageLayout, readLocal());
 let mine: Layout | null = stale(pageLayout, readLocal());
 let view: View;
 let editing = false;
+// edit mode works on a copy: Done saves it, Discard drops it
+let draft: Layout | null = null;
 let accountOpen = false;
 let tabs: string[] = [];
 let weeks: string[] = [];
@@ -106,10 +108,18 @@ export function start(): void {
     if (menu && !menu.contains(e.target as Node)) menu.open = false;
   });
   document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
     const menu = document.querySelector<HTMLDetailsElement>(".account[open]");
-    if (e.key !== "Escape" || !menu) return;
-    menu.open = false;
-    menu.querySelector("summary")!.focus();
+    if (menu) {
+      menu.open = false;
+      menu.querySelector("summary")!.focus();
+    } else if (editing && !document.querySelector("dialog[open]")) {
+      e.preventDefault(); // else the same key closes the dialog that discard opens
+      discard();
+    }
+  });
+  window.addEventListener("beforeunload", (e) => {
+    if (dirty()) e.preventDefault();
   });
   // and when focus leaves it, so an open panel never covers the control that has focus
   document.addEventListener("focusin", (e) => {
@@ -144,7 +154,9 @@ function render(): void {
   accountOpen = document.querySelector(".account[open]") !== null;
   const data = G.data;
   keepFocus(() =>
-    app.replaceChildren(h("div", { class: "page" }, header(data), boardView(data), footer())),
+    app.replaceChildren(
+      h("div", { class: "page" }, header(data), editing && editBar(), boardView(data), footer()),
+    ),
   );
 }
 
@@ -206,11 +218,10 @@ function header(data: Data): HTMLElement {
           ),
         ),
       ),
-      h("div", { class: "menus" }, editButton(), accountMenu()),
+      h("div", { class: "menus" }, !editing && editButton(), accountMenu()),
     ),
     windowBar(inProgress),
     tabBar(data),
-    editing && editBar(),
   );
 }
 
@@ -274,15 +285,55 @@ function editButton(): HTMLElement {
   return h(
     "button",
     {
-      class: "btn",
-      "aria-pressed": String(editing),
+      class: "btn edit-start",
       onclick: () => {
-        editing = !editing;
+        editing = true;
+        draft = layout;
         render();
+        document.querySelector<HTMLElement>(".edit-bar .btn")?.focus();
       },
     },
-    editing ? t("edit.done") : t("edit.start"),
+    t("edit.start"),
   );
+}
+
+/** Edit mode has changes that Done would save. */
+function dirty(): boolean {
+  return draft !== null && JSON.stringify(draft) !== JSON.stringify(layout);
+}
+
+/** Leaves edit mode; focus goes back to the Edit layout button. */
+function leaveEdit(): void {
+  editing = false;
+  draft = null;
+  render();
+  document.querySelector<HTMLElement>(".edit-start")?.focus();
+}
+
+function done(): void {
+  const changed = dirty();
+  if (changed) setLayout(draft!);
+  leaveEdit();
+  announce(t(changed ? "said.saved" : "said.unchanged"));
+}
+
+/** Drops the changes of edit mode; asks first when there are any. */
+function discard(): void {
+  if (!dirty()) return leaveEdit();
+  const keep = h("button", { class: "btn" }, t("discard.keep"));
+  const drop = h("button", { class: "btn primary" }, t("discard.confirm"));
+  const d = dialog(
+    t("discard.title"),
+    h("p", {}, t("discard.text")),
+    h("div", { class: "dialog-actions" }, keep, drop),
+  );
+  keep.addEventListener("click", () => d.close());
+  drop.addEventListener("click", () => {
+    d.close();
+    leaveEdit();
+    announce(t("said.discarded"));
+  });
+  keep.focus();
 }
 
 function windowBar(inProgress: boolean): HTMLElement {
@@ -382,7 +433,7 @@ function tabBar(data: Data): HTMLElement {
 // ------------------------------------------------------------------ boards
 
 function boardView(data: Data): HTMLElement {
-  const board = boardOf(layout, view.tab, preset);
+  const board = boardOf(draft ?? layout, view.tab, preset);
   const grid = h("div", { class: `grid${editing ? " editing" : ""}` });
   for (const inst of board) {
     const def = widget(inst.widget);
@@ -394,7 +445,7 @@ function boardView(data: Data): HTMLElement {
   }
   // one caption for the board instead of the same note under each recovery widget
   const caption = view.tab === "recovery" && h("p", { class: "muted board-note" }, t("rec.board"));
-  return h("main", {}, mine && staleBanner(mine), caption, grid);
+  return h("main", {}, mine && !editing && staleBanner(mine), caption, grid);
 }
 
 /** Claude wrote a new layout after this browser saved one: keep yours, or use the new one. */
@@ -510,13 +561,20 @@ function ctxFor(data: Data, inst: Instance): Ctx {
 // ------------------------------------------------------------------ edit mode
 
 function currentBoard(): Instance[] {
-  return boardOf(layout, view.tab, preset);
+  return boardOf(draft ?? layout, view.tab, preset);
 }
 
+/** An edit changes the draft only; Done saves it. */
 function saveBoard(board: Instance[]): void {
-  setLayout(withBoard(layout, view.tab, board));
+  setDraft(withBoard(draft ?? layout, view.tab, board));
 }
 
+function setDraft(next: Layout): void {
+  draft = next;
+  render();
+}
+
+/** Saves a layout in this browser. */
 function setLayout(next: Layout): void {
   layout = next;
   mine = null; // saving a layout chooses it
@@ -624,17 +682,26 @@ function drag(e: PointerEvent, id: string, handle: HTMLElement): void {
   handle.addEventListener("pointercancel", end, { once: true });
 }
 
+/** The edit bar stays at the top of the window while you scroll the board. */
 function editBar(): HTMLElement {
   return h(
     "div",
-    { class: "edit-bar" },
+    { class: "edit-bar", role: "toolbar", "aria-label": t("edit.bar") },
+    h("strong", {}, t("edit.editing", { board: typeName(t, view.tab) })),
+    dirty() && h("span", { class: "unsaved muted small" }, t("edit.unsaved")),
+    h("span", { class: "spacer" }),
     h("button", { class: "btn", onclick: addDialog }, t("edit.add")),
     h(
       "button",
-      { class: "btn", onclick: () => setLayout(resetBoard(layout, view.tab, preset)) },
+      {
+        class: "btn",
+        onclick: () => setDraft(resetBoard(draft ?? layout, view.tab, preset)),
+      },
       t("edit.reset"),
     ),
     h("button", { class: "btn", onclick: copyDialog }, t("edit.copy")),
+    h("button", { class: "btn", onclick: discard }, t("edit.discard")),
+    h("button", { class: "btn primary", onclick: done }, t("edit.done")),
   );
 }
 
@@ -717,7 +784,8 @@ function addDialog(): void {
 }
 
 function copyDialog(): void {
-  const text = JSON.stringify({ base: layout.base, boards: layout.boards });
+  const shown = draft ?? layout;
+  const text = JSON.stringify({ base: shown.base, boards: shown.boards });
   const area = h("textarea", { class: "layout-text", readonly: true, rows: 6 }, text);
   const copy = h("button", { class: "btn" }, t("copy.copy"));
   copy.addEventListener("click", async () => {
