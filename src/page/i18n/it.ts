@@ -39,6 +39,7 @@ export const it: Catalogue = {
   "window.to": "Alla settimana",
 
   "type.all": "Tutte",
+  "type.recovery": "Recupero",
   "type.running": "Corsa",
   "type.strengthTraining": "Forza",
   "type.walking": "Camminata",
@@ -257,6 +258,8 @@ export const it: Catalogue = {
   "hrv.nightly": "HRV notturna",
   "hrv.avg": "Media di 7 giorni",
   rec14: "Ultimi 14 giorni: la finestra di settimane non li cambia.",
+  "rec.board":
+    "I widget di recupero mostrano gli ultimi 14 giorni: la finestra di settimane non li cambia.",
   "w.restingHr": "FC a riposo",
   "w.sleep": "Sonno",
   "sl.deep": "Profondo",

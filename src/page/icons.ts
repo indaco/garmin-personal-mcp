@@ -1,6 +1,8 @@
 /** Decorative type icons, inline SVG. */
 const ICONS: Record<string, string> = {
   all: "M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z",
+  recovery:
+    "M8 13.5S2.5 10 2.5 6.25A2.75 2.75 0 0 1 8 5a2.75 2.75 0 0 1 5.5 1.25C13.5 10 8 13.5 8 13.5z",
   running: "M10 2.5a1.5 1.5 0 1 1 0 .1M7 5l3 1 1 3 2 1M8 6l-2 4-3 1M9 9l-1 3 2 2",
   strengthTraining: "M1 7h2v2H1zM13 7h2v2h-2zM3 5h2v6H3zM11 5h2v6h-2zM5 7.25h6v1.5H5z",
   walking: "M8 2.5a1.5 1.5 0 1 1 0 .1M8 5v5l-2 4M8 10l2 4M8 6l-3 2M8 6l3 2",

@@ -262,7 +262,7 @@ export class DashboardWriter {
     for (const p of o.place ?? []) {
       if (!TYPES.has(p.board))
         throw new Error(
-          `Unknown board ${p.board}: use all, ${GROUPS.join(", ")} or another SDK sport name`,
+          `Unknown board ${p.board}: use all, recovery, ${GROUPS.join(", ")} or another SDK sport name`,
         );
       if (!known.has(p.widget)) throw new Error(`Unknown widget ${p.widget}`);
       const board = boardOf(layout, p.board, preset);
@@ -331,8 +331,13 @@ export class DashboardWriter {
   }
 }
 
-/** The boards and widget types: All, the type boards, and a board for any other SDK sport. */
-const TYPES = new Set<string>(["all", ...GROUPS, ...Object.values(Profile.types.sport)]);
+/** The boards: All, Recovery, the type boards, and a board for any other SDK sport. */
+const TYPES = new Set<string>([
+  "all",
+  "recovery",
+  ...GROUPS,
+  ...Object.values(Profile.types.sport),
+]);
 const spanOf = (v: unknown): Span => Math.min(3, Math.max(1, Math.round(Number(v) || 1))) as Span;
 
 /** A custom widget that the page can run; throws with what is wrong. */
@@ -481,7 +486,7 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
               board: z
                 .string()
                 .describe(
-                  "all, running, strengthTraining, walking, hiking, cycling, swimming, racket, generic (Other), or another SDK sport name",
+                  "all, recovery, running, strengthTraining, walking, hiking, cycling, swimming, racket, generic (Other), or another SDK sport name",
                 ),
               widget: z.string().describe("A widget id of the catalogue or a custom widget"),
               type: z

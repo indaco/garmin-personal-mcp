@@ -134,11 +134,13 @@ is one HTML file, `garmin-dashboard.html` in the data folder. It works offline.
 
 Claude gives you the path of the page and the command to open it. The page has:
 
-- a board for each sport: All, Run, Strength, Walk, Bike and Racket sports. Hike, Swim, Other
-  and each other sport have a board when you have them;
+- the All and Recovery boards, and a board for each sport: Run, Strength, Walk, Bike and Racket
+  sports. Hike, Swim, Other and each other sport have a board when you have them;
 - on the All board: an overview, readiness for today next to a consistency calendar, a period
-  comparison, records, weekly volume, intensity minutes, load safety, load against recovery, fitness
-  age, the recovery widgets and the coach notes;
+  comparison, records, weekly volume, intensity minutes, load safety, load against recovery and the
+  coach notes;
+- on the Recovery board: readiness, fitness age, load against recovery and the 14-day recovery
+  widgets (HRV, resting HR, sleep, sleep need, bedtime and Body Battery);
 - on each type board: a summary, the weekly chart, the time in HR zones and the widgets of that
   sport, for example best efforts and a race predictor for Run, and each exercise with its trend
   for Strength;

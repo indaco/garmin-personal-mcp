@@ -1,4 +1,4 @@
-import { append, h } from "../dom";
+import { append } from "../dom";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
 import { kpi, kpiRow, note } from "./ui";
@@ -20,6 +20,11 @@ function labels(ctx: Ctx, rows: Row[]): string[] {
 function noRows(el: HTMLElement, ctx: Ctx, rows: Row[]): boolean {
   if (rows.length === 0) ctx.empty(el, ctx.fmt.na);
   return rows.length === 0;
+}
+
+/** The 14-day note; the Recovery board says it once for all its widgets. */
+function rec14(el: HTMLElement, ctx: Ctx): void {
+  if (ctx.board !== "recovery") append(el, note(ctx.t("rec14")));
 }
 
 const clock = (m: number) =>
@@ -73,7 +78,7 @@ register({
         plugins: { legend: { labels: { filter: (i) => i.text !== t("hrv.low") } } },
       },
     });
-    append(el, note(t("rec14")));
+    rec14(el, ctx);
   },
 });
 
@@ -98,7 +103,7 @@ register({
       },
       options: { scales: { y: { title: { display: true, text: "bpm" } } } },
     });
-    append(el, note(ctx.t("rec14")));
+    rec14(el, ctx);
   },
 });
 
@@ -144,7 +149,7 @@ register({
         },
       },
     });
-    append(el, note(t("rec14")));
+    rec14(el, ctx);
   },
 });
 
@@ -186,7 +191,7 @@ register({
       },
       180,
     );
-    append(el, note(t("rec14")));
+    rec14(el, ctx);
   },
 });
 
@@ -223,7 +228,7 @@ register({
       },
       180,
     );
-    append(el, note(t("rec14")));
+    rec14(el, ctx);
   },
 });
 
@@ -244,6 +249,6 @@ register({
       },
       options: { scales: { y: { min: 0, max: 100 } } },
     });
-    append(el, h("p", { class: "muted small note" }, t("rec14")));
+    rec14(el, ctx);
   },
 });

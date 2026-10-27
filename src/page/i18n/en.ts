@@ -38,6 +38,7 @@ export const en = {
   "window.to": "To week",
 
   "type.all": "All",
+  "type.recovery": "Recovery",
   "type.running": "Run",
   "type.strengthTraining": "Strength",
   "type.walking": "Walk",
@@ -255,6 +256,7 @@ export const en = {
   "hrv.nightly": "Nightly HRV",
   "hrv.avg": "7-day average",
   rec14: "Last 14 days: the week window does not change it.",
+  "rec.board": "The recovery widgets show the last 14 days: the week window does not change them.",
   "w.restingHr": "Resting HR",
   "w.sleep": "Sleep",
   "sl.deep": "Deep",
