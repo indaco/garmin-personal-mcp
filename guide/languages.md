@@ -174,6 +174,12 @@ A built-in language is in every page. To add one:
 | `said.shown` | {title} shown |
 | `said.removed` | {title} removed |
 | `said.added` | {title} added |
+| `stale.label` | New layout |
+| `stale.text` | Claude wrote a new layout for this dashboard. The layout you made in this browser stays until you choose. |
+| `stale.keep` | Keep mine |
+| `stale.new` | Use the new one |
+| `stale.used` | The new layout is in use |
+| `stale.kept` | Your layout is in use |
 | `add.title` | Add a widget |
 | `add.type` | Type |
 | `add.add` | Add |

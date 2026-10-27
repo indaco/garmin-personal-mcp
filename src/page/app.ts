@@ -29,6 +29,7 @@ import {
   resetBoard,
   setSpan,
   type Span,
+  stale,
   toggleHidden,
   withBoard,
 } from "./layout";
@@ -64,6 +65,8 @@ let t: T = translator("en");
 let fmt = formatter("en");
 const pageLayout = parseLayout(G.layout);
 let layout: Layout = merge(pageLayout, readLocal());
+// the browser's layout, kept until you choose it or the new one that Claude wrote
+let mine: Layout | null = stale(pageLayout, readLocal());
 let view: View;
 let editing = false;
 let accountOpen = false;
@@ -391,7 +394,40 @@ function boardView(data: Data): HTMLElement {
   }
   // one caption for the board instead of the same note under each recovery widget
   const caption = view.tab === "recovery" && h("p", { class: "muted board-note" }, t("rec.board"));
-  return h("main", {}, caption, grid);
+  return h("main", {}, mine && staleBanner(mine), caption, grid);
+}
+
+/** Claude wrote a new layout after this browser saved one: keep yours, or use the new one. */
+function staleBanner(local: Layout): HTMLElement {
+  return h(
+    "div",
+    { class: "banner", role: "region", "aria-label": t("stale.label") },
+    h("p", {}, t("stale.text")),
+    h(
+      "button",
+      {
+        class: "btn",
+        onclick: () => {
+          setLayout(local);
+          announce(t("stale.kept"));
+        },
+      },
+      t("stale.keep"),
+    ),
+    h(
+      "button",
+      {
+        class: "btn",
+        onclick: () => {
+          store.remove(LAYOUT_KEY);
+          mine = null;
+          render();
+          announce(t("stale.used"));
+        },
+      },
+      t("stale.new"),
+    ),
+  );
 }
 
 /** The type a board shows: the Recovery board shows all types, like All. */
@@ -483,6 +519,7 @@ function saveBoard(board: Instance[]): void {
 
 function setLayout(next: Layout): void {
   layout = next;
+  mine = null; // saving a layout chooses it
   store.set(LAYOUT_KEY, JSON.stringify({ baseRev: pageLayout.rev, layout } satisfies LocalLayout));
   render();
 }

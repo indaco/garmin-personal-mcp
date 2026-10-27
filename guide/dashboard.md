@@ -135,6 +135,7 @@ languages. An update replaces only the data block.
 
 The browser saves a layout change at once, but only in that browser. To keep the layout in the page,
 select **Copy layout** and give the text to Claude. Claude saves it with `editDashboard`. When Claude
-saves a layout, the page layout replaces the layout that the browser saved.
+saves a layout, the page shows the new layout and asks which one to use: **Keep mine** goes back to
+the layout of the browser, **Use the new one** deletes it from the browser.
 
 The choice of theme and language stays in the browser.
