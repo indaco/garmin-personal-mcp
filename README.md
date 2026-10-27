@@ -43,6 +43,7 @@ The server works with Claude Desktop, Claude Code and all other MCP clients that
 - [Configuration](#configuration)
 - [Coming from garmin-mcp](#coming-from-garmin-mcp)
 - [How it works](#how-it-works)
+- [Why the server writes the dashboard](#why-the-server-writes-the-dashboard)
 - [Security](#security)
 - [Problems and solutions](#problems-and-solutions)
 - [Development](#development)
@@ -147,7 +148,8 @@ The dashboard uses the training load, HR zones and training effect from Garmin. 
 value that it calculates as an estimate. It does not invent missing values: a missing value shows
 as "n/a".
 
-[The dashboard guide](guide/dashboard.md) tells how to change the layout, and
+[Why the server writes the dashboard](#why-the-server-writes-the-dashboard) gives the reasons and
+the measurements. [The dashboard guide](guide/dashboard.md) tells how to change the layout, and
 [the widget catalogue](guide/widgets.md) lists every widget.
 
 ### training-dashboard-update
@@ -320,6 +322,61 @@ flowchart LR
   next call asks Garmin only for the days after the last call. It also asks again for the last two
   days, because Garmin can still add data to them. The sets and laps come from the .FIT files in
   the `fit` folder, so they need no new download.
+
+## Why the server writes the dashboard
+
+In garmin-mcp, Claude writes the whole dashboard page: the code, the design and the data. This
+server uses a different method. The server writes the page from a tested template, and Claude
+writes only the coach notes. We measured the two methods before we made this change.
+
+### What makes a page expensive
+
+The cost of a model is mostly the tokens that it writes. A page that Claude writes has three
+parts:
+
+- **The page code**: about 90 KB of HTML, CSS and JavaScript for the charts, tabs and themes.
+- **The data**: the `getDashboardData` result is about 150 KB. Claude must copy it into the page,
+  character by character.
+- **The thinking**: Claude plans the page from a description of about 300 lines.
+
+Claude writes such a page in many parts. Each part sends the conversation again, so the input
+tokens also grow.
+
+The data causes two more problems:
+
+- Claude Code saves a large tool result to a file. The Read tool shows only the first 37,000
+  characters of a file that is one line long. Without Bash, Claude cannot read the rest.
+- Claude Desktop has no Bash. Also, one reply has an output limit: 128,000 tokens in our runs. A
+  whole page probably does not fit in one reply.
+
+### The measurements
+
+We used Claude Code (`claude -p`) with Opus, on synthetic data: 75 activities in 12 weeks. The
+costs are list prices. With a subscription, the runs count against your usage limits.
+
+| Task                     | Claude writes the page                                    | The server writes the page      |
+| ------------------------ | --------------------------------------------------------- | ------------------------------- |
+| First build              | 24 to 35 min, 191k to 280k output tokens, $6.6 to $9.2    | 34 s, 2.4k output tokens, $0.16 |
+| Update                   | 75 s and $0.41 to $0.46 with Bash. It fails without Bash. | 13 s, $0.15, no Bash needed     |
+| Data in the page         | the same as the tool output in all 5 runs                 | the same as the tool output     |
+| Pages from the same data | 3 different layouts, 1 with a phone layout error          | one tested page                 |
+| New widget               | Claude edits the page code (not measured)                 | 17 s, $0.15                     |
+| New language (325 texts) | Claude edits the page code (not measured)                 | 64 s, $0.48                     |
+
+In one run where Claude wrote the page, Claude also gave wrong totals in chat, because it did not
+see all the data. With the template, Claude reads a digest of about 7 KB that has every number for
+the notes. A check of each run found no invented number in the notes.
+
+### The cost of this method
+
+- **We maintain the page**: the template, the widgets and their tests are part of this project. A
+  change to the page needs a new release.
+- **One design**: each build gives the same page. You change it with the edit mode, custom widgets
+  and languages, not with a new design.
+- **No inline artifact**: in Claude Desktop, the dashboard is a file that you open in the browser.
+
+To let Claude design the whole page as before, use `layout` = `freeform`. The server then puts
+the data into the page, so Claude does not copy it. The page code still takes time and tokens.
 
 ## Security
 
