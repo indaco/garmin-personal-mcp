@@ -1,15 +1,19 @@
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
-// stdio transport: stdout carries MCP messages only, so the log goes to a file.
-const LOG_FILE = join(homedir(), ".cache/garmin-personal-mcp/garmin-personal-mcp.log");
+/** Past this size the log moves to `<file>.1`, replacing the one before, and a new log starts. */
+const MAX_BYTES = 1_000_000;
 
-// shortcut: no rotation, the log grows by a few KB a week; add it if the file gets large.
+// stdio transport: stdout carries MCP messages only, so the log goes to a file.
 export function log(level: "INFO" | "WARN", message: string): void {
+  const file = join(homedir(), ".cache/garmin-personal-mcp/garmin-personal-mcp.log");
   try {
-    mkdirSync(dirname(LOG_FILE), { recursive: true });
-    appendFileSync(LOG_FILE, `${new Date().toISOString()} ${level} ${message}\n`);
+    mkdirSync(dirname(file), { recursive: true });
+    if ((statSync(file, { throwIfNoEntry: false })?.size ?? 0) > MAX_BYTES) {
+      renameSync(file, `${file}.1`);
+    }
+    appendFileSync(file, `${new Date().toISOString()} ${level} ${message}\n`);
   } catch {
     // a log that cannot be written must never break the server
   }
