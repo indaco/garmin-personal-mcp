@@ -35,8 +35,7 @@ register({
     const hrv = last(ctx.data.hrv.filter((r) => String(r.date) <= end));
     const hrvNow = num(hrv?.hrv);
     const hrvBase = num(hrv?.weeklyAvg);
-    const filtered =
-      ctx.type !== "all" || ctx.ofType(ctx.allActivities).length !== ctx.allActivities.length;
+    const filtered = ctx.type !== "all";
     append(
       el,
       h(

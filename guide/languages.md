@@ -155,7 +155,6 @@ A built-in language is in every page. To add one:
 | `type.geocaching` | Geocaching |
 | `type.canoeing` | Canoeing |
 | `tabs.label` | Activity types |
-| `chips.label` | Show types |
 | `edit.start` | Edit layout |
 | `edit.done` | Done |
 | `edit.add` | Add widget |

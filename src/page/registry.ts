@@ -39,9 +39,9 @@ export interface Ctx {
   from: string;
   to: string;
   weeks: string[];
-  /** The activities of the window and of the widget's type (and of the type chips on the All board). */
+  /** The activities of the window and of the widget's type. */
   activities: Activity[];
-  /** The type filter of the widget (its type, or the type chips on the All board) for any list of activities. */
+  /** The type filter of the widget for any list of activities. */
   ofType: <A extends Activity>(acts: A[]) => A[];
   /** The activities of the window, every type: for numbers that always use all activities, like the load ratio. */
   allActivities: Activity[];

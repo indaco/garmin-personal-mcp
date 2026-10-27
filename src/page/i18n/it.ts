@@ -123,7 +123,6 @@ export const it: Catalogue = {
   "type.geocaching": "Geocaching",
   "type.canoeing": "Canoa",
   "tabs.label": "Tipi di attività",
-  "chips.label": "Mostra i tipi",
 
   "edit.start": "Modifica layout",
   "edit.done": "Fine",

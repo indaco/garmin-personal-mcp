@@ -355,36 +355,28 @@ select {
   stroke-linejoin: round;
   flex: none;
 }
-.tab-running .icon,
-.chip-running .icon {
+.tab-running .icon {
   color: var(--running);
 }
-.tab-strengthTraining .icon,
-.chip-strengthTraining .icon {
+.tab-strengthTraining .icon {
   color: var(--strengthTraining);
 }
-.tab-walking .icon,
-.chip-walking .icon {
+.tab-walking .icon {
   color: var(--walking);
 }
-.tab-hiking .icon,
-.chip-hiking .icon {
+.tab-hiking .icon {
   color: var(--hiking);
 }
-.tab-cycling .icon,
-.chip-cycling .icon {
+.tab-cycling .icon {
   color: var(--cycling);
 }
-.tab-swimming .icon,
-.chip-swimming .icon {
+.tab-swimming .icon {
   color: var(--swimming);
 }
-.tab-racket .icon,
-.chip-racket .icon {
+.tab-racket .icon {
   color: var(--racket);
 }
-.tab-generic .icon,
-.chip-generic .icon {
+.tab-generic .icon {
   color: var(--generic);
 }
 
