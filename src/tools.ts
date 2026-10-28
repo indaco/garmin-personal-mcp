@@ -1,4 +1,5 @@
-import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { Profile } from "@garmin/fitsdk";
 import type { McpServer } from "@modelcontextprotocol/server";
@@ -18,6 +19,7 @@ const DAY_MS = 24 * 3600_000;
 export class GarminTools {
   #catalogue: Catalogue | undefined;
   #catalogueRetryAt = 0;
+  #downloads = new Map<number, Promise<string>>();
 
   constructor(
     private readonly api: GarminApiClient,
@@ -115,8 +117,17 @@ export class GarminTools {
 
   // ------------------------------------------------------------------ FIT
 
-  /** Downloads the original .FIT file once and keeps it in `<data-dir>/fit`. */
-  async fetchFit(activityId: number): Promise<string> {
+  /** Downloads the original .FIT file once and keeps it in `<data-dir>/fit`; parallel calls share the download. */
+  fetchFit(activityId: number): Promise<string> {
+    let run = this.#downloads.get(activityId);
+    if (!run) {
+      run = this.#fetchFit(activityId).finally(() => this.#downloads.delete(activityId));
+      this.#downloads.set(activityId, run);
+    }
+    return run;
+  }
+
+  async #fetchFit(activityId: number): Promise<string> {
     const target = join(this.dataDir, "fit", `${activityId}.fit`);
     const cached = await stat(target).catch(() => undefined);
     if (cached?.isFile() && cached.size > 0) {
@@ -293,9 +304,15 @@ export function firstArray(json: unknown): unknown[] | undefined {
 /** Writes a temp file and moves it into place, so a stopped process never leaves a half-written file. */
 export async function writeAtomically(target: string, data: Uint8Array | string): Promise<void> {
   await mkdir(dirname(resolve(target)), { recursive: true });
-  const tmp = `${target}.tmp`;
-  await writeFile(tmp, data);
-  await rename(tmp, target);
+  // a unique name: two writers of one file never share a temp file
+  const tmp = `${target}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
+  try {
+    await writeFile(tmp, data);
+    await rename(tmp, target);
+  } catch (e) {
+    await rm(tmp, { force: true });
+    throw e;
+  }
 }
 
 function putRounded(from: Json, to: Json, name: string, as: string, decimals: number): void {

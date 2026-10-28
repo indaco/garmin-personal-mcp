@@ -1,4 +1,11 @@
-import { mkdtempSync, readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -305,6 +312,33 @@ describe("FIT tools", () => {
     await tools.getActivitySets(77);
     await tools.getActivityLaps(77);
     expect(api.getBytes).toHaveBeenCalledTimes(1);
+  });
+
+  it("shares one download between parallel calls for the same activity", async () => {
+    api.getBytes.mockResolvedValue(strengthFit());
+    api.getExerciseCatalogue.mockRejectedValue(new GarminApiError("offline"));
+    await Promise.all([
+      tools.getActivityLaps(80),
+      tools.getActivitySets(80),
+      tools.downloadActivityFit(80),
+    ]);
+    expect(api.getBytes).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a download that is not a .FIT file and caches nothing", async () => {
+    api.getBytes.mockResolvedValue(new TextEncoder().encode("<html>maintenance</html>"));
+    await expect(tools.getActivityLaps(81)).rejects.toThrow(/is not a \.FIT file/);
+    expect(existsSync(join(dataDir, "fit", "81.fit"))).toBe(false);
+    api.getBytes.mockResolvedValue(strengthFit());
+    await expect(tools.getActivityLaps(81)).resolves.toBeDefined();
+  });
+
+  it("lets a new call download again after a failed download", async () => {
+    api.getBytes.mockRejectedValueOnce(new GarminApiError("down"));
+    await expect(tools.getActivityLaps(82)).rejects.toThrow("down");
+    api.getBytes.mockResolvedValue(strengthFit());
+    await expect(tools.getActivityLaps(82)).resolves.toBeDefined();
+    expect(api.getBytes).toHaveBeenCalledTimes(2);
   });
 
   it("downloads again when the cached file is empty", async () => {

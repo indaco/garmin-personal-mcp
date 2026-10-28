@@ -101,15 +101,25 @@ export function decodeFit(bytes: Uint8Array, activityId: number): Messages {
   return messages as Messages;
 }
 
+/** A .FIT file has ".FIT" at bytes 8-11 of its header. */
+const isFit = (b: Uint8Array) =>
+  b.length >= 12 && b[8] === 0x2e && b[9] === 0x46 && b[10] === 0x49 && b[11] === 0x54;
+
 /** The .FIT file of a download, which is sometimes a zip. */
 export function unzipFit(data: Uint8Array, activityId: number): Uint8Array {
-  if (!(data.length > 4 && data[0] === 0x50 && data[1] === 0x4b)) {
-    return data;
+  let fit = data;
+  if (data.length > 4 && data[0] === 0x50 && data[1] === 0x4b) {
+    const entries = unzipSync(data, { filter: (f) => f.name.toLowerCase().endsWith(".fit") });
+    const entry = Object.values(entries)[0];
+    if (!entry) {
+      throw new GarminApiError(
+        `The download of activity ${activityId} is a zip without a .fit file`,
+      );
+    }
+    fit = entry;
   }
-  const entries = unzipSync(data, { filter: (f) => f.name.toLowerCase().endsWith(".fit") });
-  const fit = Object.values(entries)[0];
-  if (!fit) {
-    throw new GarminApiError(`The download of activity ${activityId} is a zip without a .fit file`);
+  if (!isFit(fit)) {
+    throw new GarminApiError(`The download of activity ${activityId} is not a .FIT file`);
   }
   return fit;
 }
