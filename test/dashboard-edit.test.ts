@@ -134,6 +134,12 @@ describe("editDashboard", () => {
     await expect(writer.edit({ place: [{ board: "chess", widget: "kpis" }] })).rejects.toThrow(
       /chess/,
     );
+    await expect(
+      writer.edit({ place: [{ board: "all", widget: "kpis", type: "paddle" }] }),
+    ).rejects.toThrow(/paddle/);
+    await expect(
+      writer.edit({ place: [{ board: "all", widget: "kpis", type: "running" }] }),
+    ).resolves.toBeDefined();
   });
 
   it("adds a language, and lists the texts it still misses", async () => {

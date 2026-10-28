@@ -12,8 +12,9 @@ Answer in my language.
    its layout.
 
 Use only numbers of the digest. **Never invent, interpolate or estimate missing values.** If a value
-is missing, write "n/a". If `sync.failedDays` is more than 0, name the dates in `sync.failedDates`. If
-a call fails, say which one and why in one line.
+is missing, write "n/a". If `sync.failedDays` is more than 0, name the dates in `sync.failedDates`.
+If `sync.failedSections` is not empty, name those sections (HR zones, fitness age, HRV) and say that
+they show as "n/a". If a call fails, say which one and why in one line.
 
 Do not write or change the page yourself, and do not call `getDashboardData`: the digest has what the
 notes need.

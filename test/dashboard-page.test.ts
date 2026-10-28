@@ -260,6 +260,12 @@ describe("writeDashboard", () => {
   });
 });
 
+const damageSettings = () =>
+  writeFileSync(
+    file,
+    page().replace(/garmin-settings:start \*\/[\s\S]*?\/\*/, "garmin-settings:start */{bad/*"),
+  );
+
 describe("writeDashboard settings", () => {
   /** A template with the blocks, the title and the theme CSS of the real one. */
   const styledTemplate = `<!doctype html>
@@ -352,6 +358,20 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
     await writer.write({ settings: {} });
     expect(readBlock(page(), "settings")).toBeNull();
     expect(page()).toContain("<title>Training + Recovery</title>");
+  });
+
+  it("names a damaged settings block and the file", async () => {
+    await writer.write({ settings: { exclude: ["zones"] } });
+    damageSettings();
+    await expect(writer.write({})).rejects.toThrow(/settings/);
+    await expect(writer.write({})).rejects.toThrow(file);
+  });
+
+  it("replaces a damaged settings block when new settings are given", async () => {
+    await writer.write({ settings: { exclude: ["zones"] } });
+    damageSettings();
+    await writer.write({ settings: { title: "Coach" } });
+    expect(readBlock(page(), "settings")).toEqual({ title: "Coach" });
   });
 
   it("writes the title escaped, and only the CSS of the chosen themes", async () => {

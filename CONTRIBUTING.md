@@ -113,7 +113,8 @@ Where each part of the server and the page is.
 
 ## Before you submit
 
-Run these commands before you open the PR. CI runs the same commands on Node 22, 24 and 26.
+Run these commands before you open the PR. CI runs lint, typecheck, test and build on Node 22, 24
+and 26, and the page tests one time on Node 26.
 
 ```bash
 pnpm lint                # Oxlint, then an Oxfmt check
@@ -170,14 +171,15 @@ module that they test (`test/tools.test.ts` for `src/tools.ts`).
 
 ## Add a widget
 
-1. Add the widget to `src/page/catalogue.ts`: its id, the key of its title, its types, its width
-   and a short English description.
-2. Add the title to every catalogue in `src/page/i18n/`.
-3. Put its calculations in a module of `src/page/` (for example `metrics.ts`), with a test in
+1. Add the widget to `src/page/catalogue.ts`: its id, the key of its title, its types and its width.
+2. Add an English description of more than 20 characters to `ABOUT` in
+   `src/page/catalogue-about.ts`. Claude and the widget guide read it.
+3. Add the title to every catalogue in `src/page/i18n/`.
+4. Put its calculations in a module of `src/page/` (for example `metrics.ts`), with a test in
    `test/page/`.
-4. Register it in a file of `src/page/widgets/` with `register({ id, render })`.
-5. Add a page test in `test/e2e/` if it has controls or a chart.
-6. Run `pnpm guide` to write the widget catalogue in `guide/widgets.md`.
+5. Register it in a file of `src/page/widgets/` with `register({ id, render })`.
+6. Add a page test in `test/e2e/` if it has controls or a chart.
+7. Run `pnpm guide` to write the widget catalogue in `guide/widgets.md`.
 
 ## Add a language
 

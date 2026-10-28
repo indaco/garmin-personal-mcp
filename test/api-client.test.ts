@@ -319,6 +319,22 @@ describe("requests", () => {
     await expect(api.getJson("/x")).rejects.toBeInstanceOf(GarminApiError);
   });
 
+  it("wraps a network error while reading the body", async () => {
+    mockFetch(tokenJson({ access_token: "tok" }));
+    const api = client();
+    await api.getJson("/warm").catch(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        arrayBuffer: () => Promise.reject(new TypeError("terminated")),
+      }),
+    );
+    await expect(api.getJson("/x")).rejects.toThrow("Network error reading /x: terminated");
+    await expect(api.getJson("/x")).rejects.toBeInstanceOf(GarminApiError);
+  });
+
   it("fetches the exercise catalogue without the token", async () => {
     mockFetch(ok({ categories: {} }));
     const body = await client().getExerciseCatalogue();
@@ -356,5 +372,57 @@ describe("secrets", () => {
       expect(String(error)).not.toContain(secret);
     }
     expect(logged).toContain("401 from /x");
+  });
+
+  it("refuses a key with a line break inside, without showing it", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "abc-key\nsecond-line");
+    mockFetch();
+    const error = await client()
+      .getJson("/x")
+      .catch((e: Error) => e);
+    expect(error).toBeInstanceOf(GarminApiError);
+    expect((error as Error).message).toMatch(/GARMIN_PERSONAL_API_KEY/);
+    expect(String(error)).not.toContain("abc-key");
+    expect(String(error)).not.toContain("second-line");
+    expect(calls).toEqual([]);
+  });
+
+  it("refuses a key file with a second line, naming only the file", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), "garmin-key-")), "api-key");
+    writeFileSync(file, "abc-key\nnote: my key\n");
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    mockFetch();
+    const error = await client(file)
+      .getJson("/x")
+      .catch((e: Error) => e);
+    expect(error).toBeInstanceOf(GarminApiError);
+    expect((error as Error).message).toContain(file);
+    expect(String(error)).not.toContain("abc-key");
+    expect(calls).toEqual([]);
+  });
+
+  it("refuses a plain-text token with a line break inside", async () => {
+    mockFetch({ body: "tok-a\ntok-b", contentType: "text/plain" });
+    const error = await client()
+      .getJson("/x")
+      .catch((e: Error) => e);
+    expect(error).toBeInstanceOf(GarminApiError);
+    expect(String(error)).not.toContain("tok-a");
+    expect(calls).toHaveLength(1);
+  });
+
+  it("removes the key and the token from network error messages", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError(`boom ${KEY}`)));
+    await expect(client().getJson("/x")).rejects.toThrow(
+      new GarminApiError("Network error obtaining token: boom ***"),
+    );
+
+    mockFetch(tokenJson({ access_token: "tok-secret" }), ok({}));
+    const api = client();
+    await api.getJson("/warm");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("bad tok-secret")));
+    await expect(api.getJson("/x")).rejects.toThrow(
+      new GarminApiError("Network error calling /x: bad ***"),
+    );
   });
 });

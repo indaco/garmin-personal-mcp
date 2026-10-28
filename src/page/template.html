@@ -2,8 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <!-- the page sends no background request, also not from a custom widget; navigation is not covered -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'"
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="garmin-template" content="6" />
+    <meta name="garmin-template" content="7" />
     <title>Training + Recovery</title>
     <link
       rel="icon"

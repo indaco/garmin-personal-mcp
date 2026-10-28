@@ -8,10 +8,20 @@ export interface View {
   item?: string;
 }
 
+/** The decoded item; undefined for text that is not valid URI encoding, such as a cut link. */
+function itemOf(item: string | undefined): string | undefined {
+  try {
+    return item ? decodeURIComponent(item) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function parseHash(hash: string, tabs: string[], weeks: string[]): View {
   const m =
     /^#?([a-zA-Z]+)?(?:@(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2}))?(?:\/(.+))?$/.exec(hash) ?? [];
   const [, tab, from, to, item] = m;
+  const decoded = itemOf(item);
   const window =
     from && to && from <= to && weeks.includes(from) && weeks.includes(to)
       ? { from, to }
@@ -19,7 +29,7 @@ export function parseHash(hash: string, tabs: string[], weeks: string[]): View {
   return {
     tab: tab && tabs.includes(tab) ? tab : "all",
     ...window,
-    ...(item ? { item: decodeURIComponent(item) } : {}),
+    ...(decoded !== undefined ? { item: decoded } : {}),
   };
 }
 

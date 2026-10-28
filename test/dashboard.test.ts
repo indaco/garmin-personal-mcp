@@ -148,6 +148,8 @@ let dashboard: GarminDashboard;
 let garminActivities: Record<string, unknown>[];
 /** Days whose sleep call fails. */
 let failingSleep: Set<string>;
+/** Path prefixes whose calls fail. */
+let failing: Set<string>;
 
 const cacheFile = () => join(dataDir, "dashboard-cache.json");
 const readCache = () => JSON.parse(readFileSync(cacheFile(), "utf8"));
@@ -170,6 +172,8 @@ const callsTo = (prefix: string) =>
   api.getJson.mock.calls.filter(([path]) => String(path).startsWith(prefix));
 
 function fakeGarmin(path: string, q: Record<string, string>) {
+  if ([...failing].some((p) => path.startsWith(p)))
+    throw new GarminApiError(`GET ${path} -> HTTP 500: down`);
   if (path === "/activitylist-service/activities/search/activities") {
     const rows = garminActivities.filter((a) => {
       const day = String(a.startTimeLocal).slice(0, 10);
@@ -211,6 +215,7 @@ beforeEach(() => {
   dataDir = mkdtempSync(join(tmpdir(), "garmin-dash-"));
   garminActivities = [];
   failingSleep = new Set();
+  failing = new Set();
   api.getJson.mockImplementation(async (path, q) => fakeGarmin(path, q));
   api.getBytes.mockResolvedValue(
     fitFile(
@@ -275,6 +280,7 @@ describe("getDashboardData", () => {
       newActivities: 1,
       failedDays: 0,
       failedDates: [],
+      failedSections: [],
       cachedActivities: 1,
     });
 
@@ -342,12 +348,45 @@ describe("getDashboardData", () => {
     expect(out.sync.cachedActivities).toBe(450);
   });
 
+  it("asks for the sleep and the summary of a day together", async () => {
+    const log: string[] = [];
+    api.getJson.mockImplementation(async (path, q) => {
+      log.push(`start ${path}`);
+      await Promise.resolve();
+      log.push(`end ${path}`);
+      return fakeGarmin(path, q);
+    });
+    await dashboard.getDashboardData(1);
+    const sleep = log.indexOf("start /sleep-service/sleep/dailySleep");
+    expect(log[sleep + 1]).toBe("start /usersummary-service/usersummary/daily");
+  });
+
   it("keeps the old recovery row of a day that fails and reports the day", async () => {
     await dashboard.getDashboardData(1);
     failingSleep.add("2026-10-26");
     const out = JSON.parse(await dashboard.getDashboardData(1));
     expect(out.sync).toMatchObject({ failedDays: 1, failedDates: ["2026-10-26"] });
     expect(out.recovery.at(-1)).toEqual({ date: "2026-10-26", sleepH: 7.5, rhr: 50 });
+  });
+
+  it("builds the dashboard without zones and fitness age when they fail", async () => {
+    failing.add("/biometric-service/heartRateZones");
+    failing.add("/fitnessage-service/");
+    const out = JSON.parse(await dashboard.getDashboardData(2));
+    expect(out.zones).toBeNull();
+    expect(out.fitnessAge).toBeNull();
+    expect(out.sync.failedSections).toEqual(["zones", "fitnessAge"]);
+    expect(Array.isArray(out.activities)).toBe(true);
+  });
+
+  it("builds the dashboard without HRV when a range fails, and fetches it again next time", async () => {
+    failing.add("/hrv-service/");
+    const out = JSON.parse(await dashboard.getDashboardData(2));
+    expect(out.hrv).toEqual([]);
+    expect(out.sync.failedSections).toEqual(["hrv"]);
+    failing.clear();
+    const again = JSON.parse(await dashboard.getDashboardData(2));
+    expect(again.hrv.length).toBeGreaterThan(0);
   });
 
   it("keeps the previous weeks compact, most recent first", async () => {

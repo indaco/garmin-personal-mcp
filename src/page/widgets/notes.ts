@@ -11,8 +11,7 @@ register({
     }
     const list = h("ul", { class: "notes" });
     for (const note of notes) {
-      // the server escapes each note, so it is safe as HTML
-      list.append(Object.assign(h("li"), { innerHTML: note }));
+      list.append(h("li", {}, note));
     }
     append(
       el,

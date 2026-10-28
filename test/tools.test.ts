@@ -1,4 +1,11 @@
-import { mkdtempSync, readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -197,6 +204,9 @@ describe("summarize", () => {
   });
 });
 
+const refused = () =>
+  new GarminApiError("GET /activitylist-service/activities/search/activities -> HTTP 400: bad");
+
 describe("activities", () => {
   it("lists activities as summaries, limit 20 by default and 200 at most", async () => {
     api.getJson.mockResolvedValue([
@@ -224,6 +234,31 @@ describe("activities", () => {
     });
     await tools.listActivities(undefined, undefined, undefined, 0);
     expect(api.getJson.mock.lastCall?.[1]).toMatchObject({ limit: "20" });
+  });
+
+  it("filters by type itself when Garmin refuses activityType", async () => {
+    api.getJson.mockRejectedValueOnce(refused()).mockResolvedValueOnce([
+      { activityId: 1, activityType: { typeKey: "running" } },
+      { activityId: 2, activityType: { typeKey: "cycling" } },
+      { activityId: 3, activityType: { typeKey: "running" } },
+    ]);
+    const rows = JSON.parse(await tools.listActivities(undefined, undefined, "running", 1));
+    expect(rows.map((r: { id: number }) => r.id)).toEqual([1]);
+    expect(api.getJson.mock.lastCall?.[1]).toMatchObject({ activityType: undefined, limit: "200" });
+  });
+
+  it("does not hide other errors", async () => {
+    api.getJson.mockRejectedValueOnce(
+      new GarminApiError("GET /activitylist-service/activities/search/activities -> HTTP 500: x"),
+    );
+    await expect(tools.listActivities(undefined, undefined, "running")).rejects.toThrow(/HTTP 500/);
+    expect(api.getJson).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a 400 without activityType", async () => {
+    api.getJson.mockRejectedValueOnce(refused());
+    await expect(tools.listActivities()).rejects.toThrow(/HTTP 400/);
+    expect(api.getJson).toHaveBeenCalledTimes(1);
   });
 
   it("returns Garmin's raw JSON with raw=true", async () => {
@@ -305,6 +340,33 @@ describe("FIT tools", () => {
     await tools.getActivitySets(77);
     await tools.getActivityLaps(77);
     expect(api.getBytes).toHaveBeenCalledTimes(1);
+  });
+
+  it("shares one download between parallel calls for the same activity", async () => {
+    api.getBytes.mockResolvedValue(strengthFit());
+    api.getExerciseCatalogue.mockRejectedValue(new GarminApiError("offline"));
+    await Promise.all([
+      tools.getActivityLaps(80),
+      tools.getActivitySets(80),
+      tools.downloadActivityFit(80),
+    ]);
+    expect(api.getBytes).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a download that is not a .FIT file and caches nothing", async () => {
+    api.getBytes.mockResolvedValue(new TextEncoder().encode("<html>maintenance</html>"));
+    await expect(tools.getActivityLaps(81)).rejects.toThrow(/is not a \.FIT file/);
+    expect(existsSync(join(dataDir, "fit", "81.fit"))).toBe(false);
+    api.getBytes.mockResolvedValue(strengthFit());
+    await expect(tools.getActivityLaps(81)).resolves.toBeDefined();
+  });
+
+  it("lets a new call download again after a failed download", async () => {
+    api.getBytes.mockRejectedValueOnce(new GarminApiError("down"));
+    await expect(tools.getActivityLaps(82)).rejects.toThrow("down");
+    api.getBytes.mockResolvedValue(strengthFit());
+    await expect(tools.getActivityLaps(82)).resolves.toBeDefined();
+    expect(api.getBytes).toHaveBeenCalledTimes(2);
   });
 
   it("downloads again when the cached file is empty", async () => {

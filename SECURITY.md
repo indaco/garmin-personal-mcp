@@ -11,6 +11,10 @@
   to get the token.
 - **Exercise catalogue**: the server gets the catalogue from `connect.garmin.com` without your
   token.
+- **Dashboard page**: the page has a Content-Security-Policy. It blocks the requests that the page
+  and its custom widgets send in the background (fetch, and images, scripts and styles from the
+  web). It cannot stop code that opens another web address, so add only custom widgets that you
+  asked for.
 - **Local data**: the data folder has your .FIT files. A .FIT file can have your GPS track, so
   keep the data folder private. `.gitignore` excludes `api-key`, `*.fit` and `*.zip` files.
 - **Paths**: `garminGet` accepts only a relative API path. It refuses a full URL and `..`, so

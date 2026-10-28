@@ -78,7 +78,9 @@ export function seconds(v: unknown): number {
 /** Strength and racket sports have little moving time: their session lasts the elapsed time. */
 export function sessionSeconds(a: Activity): number {
   const g = groupOf(a);
-  const whole = (g === "strengthTraining" || g === "racket") && typeof a.elapsed === "string";
+  const whole =
+    (g === "strengthTraining" || g === "racket" || sportOf(a.type ?? "") !== undefined) &&
+    typeof a.elapsed === "string";
   return seconds(whole ? a.elapsed : a.duration);
 }
 

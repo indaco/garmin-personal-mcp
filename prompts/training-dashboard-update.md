@@ -16,4 +16,5 @@ is missing, write "n/a". If a call fails, say which one and why in one line.
 
 Finish with two lines in chat: the period that the dashboard covers now, with the number of new
 activities (`sync.newActivities`), and anything that was missing. If `sync.failedDays` is more than
-0, name the dates in `sync.failedDates`.
+0, name the dates in `sync.failedDates`. If `sync.failedSections` is not empty, name those sections
+(HR zones, fitness age, HRV) and say that they show as "n/a".

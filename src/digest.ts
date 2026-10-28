@@ -1,5 +1,6 @@
 import { addDays } from "./dates";
 import { round } from "./fit";
+import { type Activity, dayOf, mondayOf, sessionSeconds, seconds } from "./page/calc";
 
 type Json = Record<string, unknown>;
 
@@ -44,7 +45,7 @@ export interface Digest {
  * browser. Every number in it comes straight from the data, so a coach note can quote it.
  */
 export function digest(data: Json): Digest {
-  const acts = list(data.activities).filter((a) => dayOf(a) !== undefined);
+  const acts = list(data.activities).filter((a) => dayOf(a as Activity) !== undefined);
   const end = typeof data.end === "string" ? data.end : "";
 
   const totals: Record<string, Totals> = {};
@@ -52,9 +53,15 @@ export function digest(data: Json): Digest {
   for (const a of acts) {
     const type = typeOf(a);
     const t = (totals[type] ??= { sessions: 0, km: 0, hours: 0, load: 0 });
-    const w = (weekly[monday(dayOf(a)!)] ??= { sessions: 0, km: 0, runKm: 0, hours: 0, load: 0 });
+    const w = (weekly[mondayOf(dayOf(a as Activity)!)] ??= {
+      sessions: 0,
+      km: 0,
+      runKm: 0,
+      hours: 0,
+      load: 0,
+    });
     const km = num(a.km);
-    const hours = sessionSeconds(a) / 3600;
+    const hours = sessionSeconds(a as Activity) / 3600;
     const load = num(a.trainingLoad);
     t.sessions++;
     t.km! += km;
@@ -79,7 +86,7 @@ export function digest(data: Json): Digest {
 
   const loadFrom = (from: string) =>
     acts
-      .filter((a) => dayOf(a)! >= from && dayOf(a)! <= end)
+      .filter((a) => dayOf(a as Activity)! >= from && dayOf(a as Activity)! <= end)
       .reduce((s, a) => s + num(a.trainingLoad), 0);
   const acute = loadFrom(addDays(end, -6));
   const chronic = loadFrom(addDays(end, -27)) / 4;
@@ -89,7 +96,7 @@ export function digest(data: Json): Digest {
     for (const [distance, time] of Object.entries(isObject(a.best) ? a.best : {})) {
       const known = bestEfforts[distance];
       if (typeof time === "string" && (!known || seconds(time) < seconds(known.time))) {
-        bestEfforts[distance] = { time, date: dayOf(a)!, name: a.name };
+        bestEfforts[distance] = { time, date: dayOf(a as Activity)!, name: a.name };
       }
     }
   }
@@ -103,7 +110,7 @@ export function digest(data: Json): Digest {
       x.sessions++;
       const top = topSet(list(e.sets));
       if (top) {
-        const set = { date: dayOf(a)!, top };
+        const set = { date: dayOf(a as Activity)!, top };
         x.last ??= set;
         x.first = set;
       }
@@ -128,22 +135,16 @@ export function digest(data: Json): Digest {
     bestEfforts,
     races: acts
       .filter((a) => a.race === true)
-      .map((a) => ({ date: dayOf(a), ...pick(a, ["name", "km", "duration", "pace", "avgHR"]) })),
+      .map((a) => ({
+        date: dayOf(a as Activity),
+        ...pick(a, ["name", "km", "duration", "pace", "avgHR"]),
+      })),
     strengthExercises,
     hrvLast14: list(data.hrv).slice(-14),
     recovery: data.recovery,
     fitnessAge: pick(age, ["fitnessAge", "chronologicalAge", "achievableFitnessAge"]),
     sync: data.sync,
   };
-}
-
-/** Strength and racket sports have little moving time: their session lasts the elapsed time. */
-function sessionSeconds(a: Json): number {
-  const type = typeOf(a);
-  const whole =
-    /strength|tennis|padel|paddel|pickleball|racquetball|racketball|squash|badminton/.test(type) &&
-    typeof a.elapsed === "string";
-  return seconds(whole ? a.elapsed : a.duration);
 }
 
 /** The heaviest completed set, as "70 kg x 6"; undefined for sets without weight. */
@@ -172,24 +173,6 @@ function roundTotals(t: Totals): Totals {
     ...(t.hours === undefined ? {} : { hours: round(t.hours, 1) }),
     load: round(t.load, 1),
   };
-}
-
-/** "1:02:03" or "2:03" in seconds; 0 for anything else. */
-function seconds(v: unknown): number {
-  if (typeof v !== "string" || !/^\d+(:\d{1,2}){1,2}$/.test(v)) return 0;
-  return v.split(":").reduce((s, x) => s * 60 + Number(x), 0);
-}
-
-/** The Monday of the week of a yyyy-MM-dd date. */
-function monday(day: string): string {
-  const weekday = (new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7;
-  return addDays(day, -weekday);
-}
-
-function dayOf(a: Json): string | undefined {
-  return typeof a.start === "string" && /^\d{4}-\d{2}-\d{2}/.test(a.start)
-    ? a.start.slice(0, 10)
-    : undefined;
 }
 
 function typeOf(a: Json): string {
