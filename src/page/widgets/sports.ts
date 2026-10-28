@@ -5,7 +5,7 @@ import type { Key } from "../i18n";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
 import { oneSession } from "./types";
-import { everyActivity, kpi, kpiRow, note, table, weekLabel } from "./ui";
+import { everyActivity, kpi, kpiRow, note, table, weekLabel, withUnit } from "./ui";
 
 /** The extras of the Walk, Hike, Bike, Swim and Racket sports boards. */
 
@@ -161,9 +161,9 @@ register({
         list.map((a) => [
           fmt.day(day(a)),
           a.name ?? "",
-          `${fmt.num(num(a.km), 1)} km`,
-          `${fmt.num(num(a.ascentM))} m`,
-          `${fmt.num(calc.verticalPerHour(a))} m/h`,
+          withUnit(ctx, fmt.num(num(a.km), 1), " km"),
+          withUnit(ctx, fmt.num(num(a.ascentM)), " m"),
+          withUnit(ctx, fmt.num(calc.verticalPerHour(a)), " m/h"),
         ]),
         [2, 3, 4],
       ),
@@ -250,9 +250,9 @@ register({
         rides.map((a) => [
           fmt.day(day(a)),
           a.name ?? "",
-          `${fmt.num(num(a.km), 1)} km`,
-          `${fmt.num(speed(a), 1)} km/h`,
-          `${fmt.num(num(a.ascentM))} m`,
+          withUnit(ctx, fmt.num(num(a.km), 1), " km"),
+          withUnit(ctx, fmt.num(speed(a), 1), " km/h"),
+          withUnit(ctx, fmt.num(num(a.ascentM)), " m"),
           isIndoor(a.type ?? "") ? t("bd.indoor") : t("bd.outdoor"),
         ]),
         [2, 3, 4],
@@ -282,12 +282,12 @@ register({
         ctx.activities.map((a) => [
           fmt.day(day(a)),
           a.name ?? "",
-          `${fmt.num(num(a.km), 2)} km`,
-          `${fmt.hms(calc.swimPace(a))}/100 m`,
+          withUnit(ctx, fmt.num(num(a.km), 2), " km"),
+          withUnit(ctx, fmt.hms(calc.swimPace(a)), "/100 m"),
           fmt.num(num(a.swolf)),
           fmt.num(num(a.lengths)),
           fmt.num(num(a.strokes)),
-          num(a.poolLengthM) === undefined ? fmt.na : `${fmt.num(num(a.poolLengthM))} m`,
+          withUnit(ctx, fmt.num(num(a.poolLengthM)), " m"),
         ]),
         [2, 3, 4, 5, 6, 7],
       ),
@@ -339,7 +339,7 @@ register({
           t("pd.load"),
         ],
         rows,
-        [2, 3, 4, 5, 6, 7, 8, 9],
+        [3, 4, 5, 6, 7, 8, 9, 10],
       ),
       note(t("pd.note")),
       approximate && note(t("zones.approximate")),

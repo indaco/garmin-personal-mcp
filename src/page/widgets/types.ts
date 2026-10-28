@@ -14,6 +14,7 @@ import {
   totals,
   weekLabel,
   windowEnd,
+  withUnit,
 } from "./ui";
 
 /** The widgets that every type board has: KPIs, the weekly chart and the time in HR zones. */
@@ -71,7 +72,7 @@ register({
       ctx.type === "cycling" && kpi(t("tk.ascent"), `${fmt.num(ascent)} m`),
       kpi(
         t("tk.hr"),
-        `${fmt.num(calc.mean(hr) ?? undefined)} bpm`,
+        withUnit(ctx, fmt.num(calc.mean(hr) ?? undefined), " bpm"),
         peak > 0 && t("tk.peak", { v: fmt.num(peak) }),
       ),
       kpi(

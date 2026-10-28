@@ -742,6 +742,36 @@ describe("overview widgets", () => {
     expect(await page.isVisible(".cal-tip")).toBe(true);
   });
 
+  it("keeps one tab stop in the calendar of an older window", async () => {
+    const { page } = await open(browser, pageFile(), { hash: "#all@2026-08-03_2026-08-31" });
+    const stops = await page.$$eval("[data-id=calendar] .cal-cell[tabindex='0']", (c) =>
+      c.map((x) => x.getAttribute("data-date")),
+    );
+    // the Sunday of the window's last week
+    expect(stops).toEqual(["2026-09-06"]);
+  });
+
+  it("shows n/a without a unit for a missing distance", async () => {
+    const swim = {
+      id: 9200,
+      name: "Open water, no distance",
+      type: "open_water_swimming",
+      sport: "swimming",
+      start: "2026-10-24 07:00:00",
+      duration: "30:00",
+    };
+    const { page } = await open(
+      browser,
+      pageFile({ data: { ...data, v: 3, activities: [swim, ...data.activities] } }),
+      { hash: "#swimming" },
+    );
+    const cells = await page.$$eval("[data-id=swimDetails] tbody tr:first-child td", (c) =>
+      c.map((x) => x.textContent),
+    );
+    expect(cells[2]).toBe("n/a");
+    expect(cells[3]).toBe("n/a");
+  });
+
   it("lists the activities, and opens and closes their laps", async () => {
     const { page } = await open(browser, pageFile());
     const rows = () =>
@@ -1140,6 +1170,10 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     );
     // in the order of the data, where the test puts tennis first
     expect(sports).toEqual(["Tennis", "Padel", "Padel", "Padel"]);
+    const numeric = await page.$$eval("[data-id=racketDetails] thead th", (th) =>
+      th.map((x) => x.classList.contains("num")),
+    );
+    expect(numeric).toEqual([false, false, false, true, true, true, true, true, true, true, true]);
     expect(await page.textContent("[data-tab=racket] .count")).toBe("4");
     await page.click("[data-tab=walking]");
     expect(await tiles(page)).toEqual([

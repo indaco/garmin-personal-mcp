@@ -5,7 +5,7 @@ import type { Key } from "../i18n";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
 import { oneSession } from "./types";
-import { alpha, kpi, kpiRow, note, showAll, table, weekLabel } from "./ui";
+import { alpha, kpi, kpiRow, note, showAll, table, weekLabel, withUnit } from "./ui";
 
 /** The Run board: best efforts, races, aerobic fitness, intensity, form, run/walk, training effect, predictions, long runs. */
 
@@ -75,7 +75,7 @@ register({
         races.map((a) => [
           fmt.day(day(a)),
           a.name ?? "",
-          `${fmt.num(num(a.km), 2)} km`,
+          withUnit(ctx, fmt.num(num(a.km), 2), " km"),
           fmt.hms(ctx.calc.seconds(a.duration)),
           String(a.pace ?? ""),
           fmt.num(num(a.avgHR)),

@@ -273,10 +273,7 @@ register({
     const weekday = new Intl.DateTimeFormat(ctx.lang, { weekday: "short", timeZone: "UTC" });
     const tip = h("div", { class: "cal-tip", role: "status", hidden: true });
     // the last day of the window takes the tab stop
-    const last = [...ctx.weeks.map((w) => addDays(w, 6)), ctx.data.end]
-      .filter((d) => d <= ctx.data.end)
-      .toSorted()
-      .at(-1);
+    const last = windowEnd(ctx);
     const show = (cell: HTMLElement, d: string) => {
       const acts = byDay.get(d) ?? [];
       tip.replaceChildren(
