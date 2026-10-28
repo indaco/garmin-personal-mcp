@@ -25,3 +25,14 @@ export function icon(name: string): SVGElement {
   svg.append(path);
   return svg;
 }
+
+/** The logo, inline so that its colours follow the theme; assets/logo.svg is the same mark on a tile. */
+export function logo(): SVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 32 32");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", "logo");
+  svg.innerHTML =
+    '<circle class="logo-track" cx="16" cy="16" r="10"/><path class="logo-arc" d="M16 6a10 10 0 1 1-10 10"/><circle class="logo-dot" cx="16" cy="16" r="3.4"/>';
+  return svg;
+}

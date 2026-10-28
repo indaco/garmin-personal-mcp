@@ -1088,13 +1088,24 @@ table.data .num {
   align-items: center;
   gap: 12px;
 }
-/* shortcut: placeholder mark, replace the background with the real logo once it exists */
 .logo {
   flex: none;
   width: 44px;
   height: 44px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--accent), var(--good));
+  fill: none;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+}
+.logo-track {
+  stroke: var(--accent);
+  opacity: 0.3;
+}
+.logo-arc {
+  stroke: var(--good);
+}
+.logo-dot {
+  fill: var(--accent);
+  stroke: none;
 }
 
 /* Account menu */
@@ -1184,7 +1195,6 @@ table.data .num {
 .foot .logo {
   width: 20px;
   height: 20px;
-  border-radius: 6px;
 }
 .foot ul {
   display: flex;
