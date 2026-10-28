@@ -195,6 +195,42 @@
     }
   },
   {
+    "name": "getActivityWorkouts",
+    "description": "The planned workout that an activity followed, as created in Garmin Connect: its steps in\norder, each with its intensity (warmup/active/rest/recovery/cooldown), its duration (time in\nseconds, reps, or open), its target (cadence, heart rate, pace, or open, with low and high\nvalues), the exercise for strength steps, and the coach's notes. A step with durationType\nREPEAT_UNTIL_STEPS_CMPLT repeats the steps from stepIndex durationValue up to it, targetValue\ntimes in all. Compare it with getActivitySets or getActivityLaps for plan against done.\nAn empty list means the activity followed no planned workout. Null fields are left out.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "activityId": {
+          "type": "integer",
+          "description": "Garmin activity id"
+        }
+      },
+      "required": ["activityId"]
+    }
+  },
+  {
+    "name": "getBodyBattery",
+    "description": "Body Battery for up to 14 days, yyyy-MM-dd: for each day how much it charged and drained,\nits readings through the day, and the events that changed it (sleep, activities, stress,\nnaps) with their impact.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "fromDate": {
+          "type": "string",
+          "description": "From date yyyy-MM-dd"
+        },
+        "toDate": {
+          "type": "string",
+          "description": "To date yyyy-MM-dd"
+        }
+      },
+      "required": ["fromDate", "toDate"]
+    }
+  },
+  {
     "name": "getDailyHeartRate",
     "description": "Daily heart rate for one date (includes resting heart rate), yyyy-MM-dd.",
     "inputSchema": {
@@ -317,6 +353,30 @@
           "description": "Last date yyyy-MM-dd, with fromDate"
         }
       }
+    }
+  },
+  {
+    "name": "getWeight",
+    "description": "Weight for a date range, yyyy-MM-dd: the latest weight of each day (with body fat, muscle\nand bone mass, BMI and body water when a scale records them), the average of the range, and\nthe last weight before and the first after the range. Set includeAll=true for every entry\nof each day. Weight, muscle mass and bone mass are in grams.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "fromDate": {
+          "type": "string",
+          "description": "From date yyyy-MM-dd"
+        },
+        "toDate": {
+          "type": "string",
+          "description": "To date yyyy-MM-dd"
+        },
+        "includeAll": {
+          "type": "boolean",
+          "description": "Every weight entry of each day, not only the latest"
+        }
+      },
+      "required": ["fromDate", "toDate"]
     }
   },
   {
