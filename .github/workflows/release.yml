@@ -129,7 +129,10 @@ jobs:
           '
 
       - name: Pack
-        run: npm pack --pack-destination out
+        # npm pack does not create the destination folder
+        run: |
+          mkdir -p out
+          npm pack --pack-destination out
 
       - uses: actions/upload-artifact@v7
         with:
