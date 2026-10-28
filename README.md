@@ -16,6 +16,7 @@
 <p align="center">
   <b><a href="#quick-start">Quick start</a></b> &middot;
   <b><a href="#prompts">Prompts</a></b> &middot;
+  <b><a href="#dashboard-setup">Dashboard setup</a></b> &middot;
   <b><a href="#tools">Tools</a></b> &middot;
   <b><a href="#presets-or-freeform">Presets or freeform</a></b> &middot;
   <b><a href="guide/dashboard.md">Dashboard guide</a></b> &middot;
@@ -40,6 +41,9 @@ MCP server for the official Garmin Connect Personal API.
   [let Claude design the whole page](#presets-or-freeform).
 - **Your layout stays**: [training-dashboard-update](#training-dashboard-update) adds only the
   new data.
+- **A page for you or for your coach**: [dashboard-setup](#dashboard-setup) makes a personal page,
+  or a page to share with your coach or personal trainer. You select the sports and the data. The
+  data that you do not select is not in the file.
 - **Extend it**: [dashboard-widget](#dashboard-widget) makes a new widget from your idea.
   [dashboard-language](#dashboard-language) adds a language.
 - **All stdio clients**: Claude Desktop, Claude Code and all other MCP clients that use stdio.
@@ -156,6 +160,28 @@ new data.
 
 The first call sends approximately 35 requests to Garmin. Later calls use the local cache and send
 approximately 8.
+
+### dashboard-setup
+
+Claude asks you some questions, then writes a page with your answers. First, it asks who the page
+is for:
+
+- **Personal**: a page for you, with all your data.
+- **Shared**: a page for your coach or personal trainer. You select each type of data to include,
+  for example HR zones yes, fitness age and sleep no.
+
+Then Claude asks for the file (any name or path), the title, the headline, the sports, the
+languages and the themes. The server writes only the data that you select into the file. Other data
+is not in the file, so you can send the file safely. A personal page and a shared page can be two
+files side by side. Each page keeps its settings on each update. The argument `weeks` is optional
+(default 12).
+
+| Client         | How to run it                                        |
+| -------------- | ---------------------------------------------------- |
+| Claude Desktop | **+** → _garmin-personal_ → `dashboard-setup` → send |
+| Claude Code    | `/garmin-personal:dashboard-setup`                   |
+
+[Page settings](guide/dashboard.md#page-settings) tells more.
 
 ### dashboard-widget
 

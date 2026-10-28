@@ -332,7 +332,7 @@
   },
   {
     "name": "writeDashboard",
-    "description": "Writes the training dashboard page (default <data-dir>/garmin-dashboard.html) with the data of the\nlast `weeks` weeks, and returns its path and a short digest of the data (totals, weekly sums, load,\nbest efforts, races, strength top sets, HRV, recovery, fitness age, sync) for the coach notes.\nAn existing page keeps all its code, layout and widgets: only its data is replaced. A page from an\nolder template gets the new template and keeps its layout and widgets. `layout` writes a new page\nfrom the template: `preset` (the default widgets) or `blank` (empty boards). `page` writes your own\npage code instead; it must contain /* garmin-data:start */null/* garmin-data:end */. A replaced\npage is kept as <file>.bak. `notes`: at most 5 plain-text coach notes; the server escapes them.",
+    "description": "Writes the training dashboard page (default <data-dir>/garmin-dashboard.html) with the data of the\nlast `weeks` weeks, and returns its path and a short digest of the data (totals, weekly sums, load,\nbest efforts, races, strength top sets, HRV, recovery, fitness age, sync) for the coach notes.\nAn existing page keeps all its code, layout and widgets: only its data is replaced. A page from an\nolder template gets the new template and keeps its layout and widgets. `layout` writes a new page\nfrom the template: `preset` (the default widgets) or `blank` (empty boards). `page` writes your own\npage code instead; it must contain /* garmin-data:start */null/* garmin-data:end */. A replaced\npage is kept as <file>.bak. `notes`: at most 5 plain-text coach notes; the server escapes them.\n`settings` replace the page's settings (title, headline, sports, data to leave out, languages,\nthemes); without them the page keeps its own. The page holds only the data, languages and themes\nthey keep. `preview: true` writes nothing: it returns the digest and the activities of each board.",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -361,6 +361,61 @@
         "path": {
           "type": "string",
           "description": "The .html file; relative paths are inside the data dir"
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "Replaces the title in every language"
+            },
+            "headline": {
+              "type": "string",
+              "description": "A line under the title"
+            },
+            "sports": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "The boards to keep, e.g. running, cycling; all when not set"
+            },
+            "exclude": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["recovery", "fitnessAge", "zones", "names", "notes"]
+              },
+              "description": "The data to leave out of the page"
+            },
+            "languages": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Languages to keep: en, it"
+            },
+            "language": {
+              "type": "string",
+              "description": "Default language: auto or a code"
+            },
+            "themes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Themes to keep: system, midnight, graphite, ocean, forest, plum, light, paper, mist, hcDark, hcLight"
+            },
+            "theme": {
+              "type": "string",
+              "description": "Default theme"
+            }
+          },
+          "description": "The page settings; replaces the page's own"
+        },
+        "preview": {
+          "type": "boolean",
+          "description": "Write nothing: return the digest and the activities of each board"
         }
       }
     }

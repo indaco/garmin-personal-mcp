@@ -43,7 +43,10 @@ import {
   registerCustom,
   widget,
   type WidgetDef,
+  withheld,
+  withhold,
 } from "./registry";
+import type { Settings } from "./settings";
 import { formatHash, parseHash, type View } from "./state";
 import { typeName } from "./widgets/ui";
 import { DEFAULT_THEME, store, THEMES, themeKey, token } from "./theme";
@@ -52,16 +55,25 @@ import "./widgets";
 declare global {
   interface Window {
     /** The page blocks, set by the inline script that the server fills. */
-    GARMIN?: { data: Data | null; layout: unknown; widgets: unknown; i18n?: unknown };
+    GARMIN?: {
+      data: Data | null;
+      layout: unknown;
+      widgets: unknown;
+      languages?: unknown;
+      i18n?: unknown;
+    };
+    /** The page settings, set by the first script of the page. */
+    GARMIN_SETTINGS?: Settings | null;
     Chart?: typeof Chart;
   }
 }
 
 const G = window.GARMIN ?? { data: null, layout: null, widgets: [] };
+const S: Settings = window.GARMIN_SETTINGS ?? {};
 const LAYOUT_KEY = `garmin-layout:${location.pathname}`;
 const ALWAYS: readonly string[] = ["running", "strengthTraining", "walking", "cycling", "racket"];
 
-let langChoice = store.get("garmin-lang") ?? "auto";
+let langChoice = store.get("garmin-lang") ?? S.language ?? "auto";
 let lang = "en";
 let t: T = translator("en");
 let fmt = formatter("en");
@@ -81,7 +93,11 @@ let weeks: string[] = [];
 
 export function start(): void {
   window.Chart = Chart; // for custom widgets and the page tests
+  addLanguages(G.languages);
   addLanguages(G.i18n);
+  // English stays in the script for missing texts, but a page can leave it out of the menu
+  if (S.languages && !S.languages.includes("en")) delete LANGUAGE_NAMES.en;
+  withhold(S.exclude ?? []);
   for (const w of Array.isArray(G.widgets) ? G.widgets : []) {
     const def = compile(w);
     if (def) registerCustom(def);
@@ -91,11 +107,12 @@ export function start(): void {
   if (data) {
     const present = new Set(data.activities.map(groupOf));
     const others = [...present].filter((g) => !GROUPS.includes(g)).toSorted();
+    const kept = S.sports;
     tabs = [
       "all",
-      "recovery",
-      ...[...GROUPS.slice(0, -1), ...others, "generic"].filter(
-        (g) => ALWAYS.includes(g) || present.has(g),
+      ...(S.exclude?.includes("recovery") ? [] : ["recovery"]),
+      ...[...GROUPS.slice(0, -1), ...others, "generic"].filter((g) =>
+        kept ? kept.includes(g) : ALWAYS.includes(g) || present.has(g),
       ),
     ];
     weeks = weeksOf(data.start, data.end);
@@ -137,6 +154,8 @@ export function start(): void {
 function setLanguage(choice: string): void {
   langChoice = choice;
   lang = pickLang(choice, navigator.languages ?? [navigator.language]);
+  // a language the page does not offer (English left out) gives its first language
+  if (!(lang in LANGUAGE_NAMES)) lang = Object.keys(LANGUAGE_NAMES)[0];
   t = translator(lang);
   fmt = formatter(lang);
   document.documentElement.lang = lang;
@@ -146,10 +165,10 @@ function render(): void {
   const app = document.getElementById("app")!;
   destroyCharts();
   themeCharts();
-  document.title = t("title");
+  document.title = pageTitle();
   if (!G.data) {
     app.replaceChildren(
-      h("main", { class: "page" }, h("h1", {}, t("title")), h("p", {}, t("noData")), footer()),
+      h("main", { class: "page" }, h("h1", {}, pageTitle()), h("p", {}, t("noData")), footer()),
     );
     return;
   }
@@ -201,6 +220,9 @@ function footer(): HTMLElement {
 
 // ------------------------------------------------------------------ header
 
+/** The title of the settings, else the title in the page language. */
+const pageTitle = () => S.title ?? t("title");
+
 function header(data: Data): HTMLElement {
   const inProgress = new Date(`${data.end}T00:00:00Z`).getUTCDay() !== 0;
   return h(
@@ -216,7 +238,8 @@ function header(data: Data): HTMLElement {
         h(
           "div",
           {},
-          h("h1", {}, t("title")),
+          h("h1", {}, pageTitle()),
+          h("h2", { class: "headline" }, S.headline ?? t("headline")),
           h(
             "p",
             { class: "muted" },
@@ -242,8 +265,9 @@ function accountMenu(): HTMLElement {
       { class: "account-panel" },
       !editing && editButton(),
       !editing && h("hr", { class: "menu-sep" }),
-      languageMenu(),
-      themeMenu(),
+      // one language needs no menu
+      Object.keys(LANGUAGE_NAMES).length > 1 && languageMenu(),
+      shownThemes().length > 1 && themeMenu(),
     ),
   );
 }
@@ -268,9 +292,15 @@ function languageMenu(): HTMLElement {
   return h("label", { class: "menu" }, h("span", {}, t("menu.language")), select);
 }
 
+/** The themes of the page: the ones the settings keep. */
+const shownThemes = () => THEMES.filter((x) => !S.themes || S.themes.includes(x.id));
+
 function themeMenu(): HTMLElement {
   const current = document.documentElement.dataset.theme ?? DEFAULT_THEME;
-  const groups = ["auto", "dark", "light", "accessible"] as const;
+  const themes = shownThemes();
+  const groups = (["auto", "dark", "light", "accessible"] as const).filter((g) =>
+    themes.some((x) => x.group === g),
+  );
   const select = h(
     "select",
     {
@@ -286,9 +316,9 @@ function themeMenu(): HTMLElement {
       h(
         "optgroup",
         { label: t(`themeGroup.${g}` as Key) },
-        ...THEMES.filter((x) => x.group === g).map((x) =>
-          h("option", { value: x.id, selected: x.id === current }, t(themeKey(x.id))),
-        ),
+        ...themes
+          .filter((x) => x.group === g)
+          .map((x) => h("option", { value: x.id, selected: x.id === current }, t(themeKey(x.id)))),
       ),
     ),
   );
@@ -488,7 +518,7 @@ function boardView(data: Data): HTMLElement {
   for (const inst of board) {
     const def = widget(inst.widget);
     // a hidden widget leaves the grid; Add widget lists it to show it again
-    if (inst.hidden || (!editing && !def)) continue;
+    if (inst.hidden || (!def && (!editing || withheld.has(inst.widget)))) continue;
     grid.append(tile(data, inst, def));
   }
   if (grid.childElementCount === 0) {

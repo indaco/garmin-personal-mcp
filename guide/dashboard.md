@@ -8,6 +8,7 @@ heart rate. The server writes the file, and Claude writes the coach notes.
 - [Boards and widgets](#boards-and-widgets)
 - [Change the layout](#change-the-layout)
 - [Themes and languages](#themes-and-languages)
+- [Page settings](#page-settings)
 - [How the page keeps your changes](#how-the-page-keeps-your-changes)
 
 ## Make the dashboard
@@ -25,6 +26,9 @@ Run the `training-dashboard` prompt. It has two optional arguments:
 | `blank`    | An empty grid on each board. You add the widgets that you want.                                                            |
 | `freeform` | Claude designs the whole page from a long description. A build can take 25 minutes or more, and each page looks different. |
 
+To set the title, the sports and the data of the page first, for example for a page that you share
+with your coach, run `dashboard-setup`. See [Page settings](#page-settings).
+
 With `preset` and `blank`, Claude does not write the page. The server writes the page from its
 template, and Claude writes only the coach notes. The page is the same in Claude Code and Claude
 Desktop.
@@ -38,11 +42,12 @@ The page works offline. It has Chart.js inside, and it sends no requests.
 ## Update the dashboard
 
 Run the `training-dashboard-update` prompt. The server replaces only the data and the coach notes.
-Your layout, your custom widgets and your languages stay. Leave `weeks` empty to keep the weeks of
+Your layout, your custom widgets, your languages and your page settings stay. Leave `weeks` empty to keep the weeks of
 the page.
 
 When a new version of the server has a newer page template, the update writes the new template. It
-keeps your layout, custom widgets and languages, and it keeps the old page as a `.bak` file.
+keeps your layout, custom widgets, languages and page settings, and it keeps the old page as a
+`.bak` file.
 
 Reload the page in the browser to see the new data.
 
@@ -58,7 +63,8 @@ sport in the Garmin FIT SDK. Garmin sends that sport as a number with each activ
 gives it the SDK name, for example `running` or `racket`.
 
 The All, Recovery, Run, Strength, Walk, Bike and Racket sports tabs are always there. The Hike, Swim and Other
-tabs show only when you have activities of that sport.
+tabs show only when you have activities of that sport. [Page settings](#page-settings) can keep
+fewer sport tabs, and remove the Recovery tab.
 
 | Tab           | Board key          | Activities                                       |
 | ------------- | ------------------ | ------------------------------------------------ |
@@ -132,8 +138,43 @@ To make your own widget, see [Custom widgets](custom-widgets.md).
 The settings menu has **Language** and **Theme**. The **Theme** menu has 11 themes: System, five dark themes, three light themes and two
 high-contrast themes. Midnight is the default.
 
-The **Language** menu has English, Italian and the languages that you add. _Auto_ follows the
+The **Language** menu has English, Italian and the languages that you add. The
+[page settings](#page-settings) can keep fewer themes and languages in the file. _Auto_ follows the
 language of the browser. [Languages](languages.md) tells how to add a language.
+
+## Page settings
+
+The `dashboard-setup` prompt asks you questions and writes a page with your answers. You can also ask
+Claude directly, for example "make a dashboard for my coach without my sleep data". Claude calls
+`writeDashboard` with `settings`:
+
+| Setting     | What it does                                                               | Default               |
+| ----------- | -------------------------------------------------------------------------- | --------------------- |
+| `title`     | replaces the title in every language                                       | the built-in title    |
+| `headline`  | replaces the line under the title in every language                        | the built-in headline |
+| `sports`    | the boards to keep, for example `running` and `cycling`                    | all                   |
+| `exclude`   | the data to leave out: `recovery`, `fitnessAge`, `zones`, `names`, `notes` | none                  |
+| `languages` | the built-in languages to keep: `en`, `it`                                 | all                   |
+| `language`  | the language that the page opens in: `auto` or a language code             | `auto`                |
+| `themes`    | the themes to keep                                                         | all                   |
+| `theme`     | the theme that the page opens in                                           | `midnight`            |
+
+The server leaves the excluded data and sports out of the file, and out of the digest for the coach
+notes. A widget whose data is left out does not show. With `recovery` excluded, the page has no
+Recovery board. `names` removes the names of the activities; the sport stays. The file holds only
+the chosen languages and the CSS of the chosen themes. A page without English (`["it"]`) opens in
+Italian for every reader; English stays in the file only for a text that has no translation. With
+one language or one theme, the page has no menu to choose it.
+
+Each page keeps its own settings, so a personal page and a page for your coach can be two files, for
+example `garmin-dashboard.html` and `garmin-dashboard-coach.html`. In the `dashboard-setup`
+questions, you can type any file name or path, for example `~/Desktop/coach.html`. A name or
+relative path is in the data folder. An update without `settings` keeps the settings of the page. To
+update a page with another file name, give its file: "update my dashboard
+garmin-dashboard-coach.html". New settings replace all the old settings, and the old page is kept as
+`.bak`.
+
+Settings need a page from the template: a page that Claude designed (`freeform`) cannot keep them.
 
 ## Keyboard and screen readers
 
@@ -147,8 +188,9 @@ language of the browser. [Languages](languages.md) tells how to add a language.
 
 ## How the page keeps your changes
 
-The page keeps its state in four blocks of the file: the data, the layout, the custom widgets and the
-languages. An update replaces only the data block.
+The page keeps its state in blocks of the file: the data, the layout, the custom widgets, the
+languages that you add and the [page settings](#page-settings). An update replaces only the data
+block and the block of the built-in languages.
 
 The browser saves the layout when you select **Done**, but only in that browser. To keep the layout in the page,
 select **Copy layout** and give the text to Claude. Claude saves it with `editDashboard`. When Claude

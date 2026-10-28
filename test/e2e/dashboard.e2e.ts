@@ -102,6 +102,9 @@ describe("the page", () => {
   it("shows the preset widgets of the All board and no errors", async () => {
     const { page, errors } = await open(browser, pageFile());
     expect(await page.textContent("h1")).toBe("Training + Recovery");
+    expect(await page.textContent("h2.headline")).toBe(
+      "Training load, recovery and progress from Garmin Connect",
+    );
     expect(await tiles(page)).toEqual(ALL_PRESET);
     // the server escaped the note: it shows as text
     expect(await page.textContent(".notes li")).toBe("Load <b>1.2");
@@ -168,6 +171,48 @@ describe("the page", () => {
     await page.selectOption("#lang", "en");
     expect(await page.textContent("h1")).toBe("Training + Recovery");
     expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
+  });
+
+  it("shows the title, the sports, the data and the menus of its settings", async () => {
+    const { page, errors } = await open(
+      browser,
+      pageFile({
+        settings: {
+          title: "For my coach",
+          headline: "Running block, autumn",
+          sports: ["running", "cycling"],
+          exclude: ["recovery", "notes"],
+          languages: ["en"],
+          themes: ["paper"],
+          theme: "paper",
+        },
+      }),
+      { locale: "it-IT" },
+    );
+    expect(await page.textContent("h1")).toBe("For my coach");
+    expect(await page.title()).toBe("For my coach");
+    expect(await page.textContent("h2.headline")).toBe("Running block, autumn");
+    expect((await tabs(page)).map(([tab]) => tab)).toEqual(["all", "running", "cycling"]);
+    expect(await tiles(page)).not.toContain("hrv");
+    expect(await tiles(page)).not.toContain("coachNotes");
+    // English only, one theme: no menus to choose them
+    expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
+    expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe("paper");
+    expect(await page.$("#lang")).toBeNull();
+    expect(await page.$("#theme")).toBeNull();
+    expect(errors).toEqual([]);
+  });
+
+  it("shows only Italian on a page that leaves English out, also for an English browser", async () => {
+    const { page, errors } = await open(browser, pageFile({ settings: { languages: ["it"] } }), {
+      locale: "en-US",
+    });
+    expect(await page.textContent("h1")).toBe("Allenamento + Recupero");
+    expect(await page.textContent("h2.headline")).toBe(
+      "Carico di allenamento, recupero e progressi da Garmin Connect",
+    );
+    expect(await page.$("#lang")).toBeNull();
+    expect(errors).toEqual([]);
   });
 
   it("shows a message without data", async () => {

@@ -11,7 +11,7 @@ import { GarminTools, registerTools } from "./tools";
 /** The page template; the build writes it next to dist/index.js. */
 const template = () => readFile(new URL("./dashboard.html", import.meta.url), "utf8");
 
-/** The garmin-personal MCP server with its 15 tools and 4 prompts. */
+/** The garmin-personal MCP server with its 15 tools and 5 prompts. */
 export function createServer(config: Config): McpServer {
   const server = new McpServer({ name: "garmin-personal", version });
   const api = new GarminApiClient(config);

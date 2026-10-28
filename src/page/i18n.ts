@@ -1,14 +1,16 @@
 import { type Catalogue, en, type Key } from "./i18n/en";
-import { it } from "./i18n/it";
-
-/** The built-in languages. A new language is one more catalogue file with the keys of `en`. */
-export const CATALOGUES: Record<string, Catalogue> = { en, it };
-/** Each language by its own name, for the language menu. */
-export const LANGUAGE_NAMES: Record<string, string> = { en: "English", it: "Italiano" };
 
 /**
- * The languages of the page's i18n block: new languages, or texts that replace built-in ones. A missing
- * text shows in English.
+ * English, and the languages of the page's blocks. The other built-in languages are in i18n/built-in.ts:
+ * the server writes them into the page, so a page holds only the languages it shows.
+ */
+export const CATALOGUES: Record<string, Catalogue> = { en };
+/** Each language by its own name, for the language menu. */
+export const LANGUAGE_NAMES: Record<string, string> = { en: "English" };
+
+/**
+ * The languages of a page block (the built-in ones, then the i18n block): new languages, or texts that
+ * replace those it has. A missing text shows in English.
  */
 export function addLanguages(extra: unknown): void {
   if (!extra || typeof extra !== "object") return;

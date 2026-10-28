@@ -11,6 +11,17 @@
     ]
   },
   {
+    "name": "dashboard-setup",
+    "description": "Set up a dashboard: title, sports, the data it shows (e.g. for a coach), languages, themes, file",
+    "arguments": [
+      {
+        "name": "weeks",
+        "description": "Number of weeks to cover, default 12",
+        "required": false
+      }
+    ]
+  },
+  {
     "name": "dashboard-widget",
     "description": "Make a new widget for the training dashboard from your idea",
     "arguments": [

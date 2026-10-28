@@ -1,21 +1,35 @@
 import { Profile } from "@garmin/fitsdk";
-import { describe, expect, it } from "vitest";
-import { CATALOGUES, formatter, pickLang, translator } from "../../src/page/i18n";
+import { describe, expect, it, vi } from "vitest";
+import { addLanguages, formatter, pickLang, translator } from "../../src/page/i18n";
+import { BUILT_IN } from "../../src/page/i18n/built-in";
 import { en } from "../../src/page/i18n/en";
 import { typeName } from "../../src/page/widgets/ui";
 
 const names = (s: string) => (s.match(/\{\w+\}/g) ?? []).toSorted();
+const ALL = { en, ...BUILT_IN };
+// the built-in languages come from the page's languages block, as the server writes it
+addLanguages(BUILT_IN);
 
 describe("catalogues", () => {
-  it.each(Object.entries(CATALOGUES))(
-    "%s has exactly the keys of en, none empty",
-    (_, catalogue) => {
-      expect(Object.keys(catalogue).toSorted()).toEqual(Object.keys(en).toSorted());
-      expect(Object.values(catalogue).filter((v) => v.trim() === "")).toEqual([]);
-    },
-  );
+  it("has only English in the page script", async () => {
+    vi.resetModules();
+    const fresh = await import("../../src/page/i18n");
+    expect(Object.keys(fresh.CATALOGUES)).toEqual(["en"]);
+  });
 
-  it.each(Object.entries(CATALOGUES))("%s keeps every {placeholder} of en", (_, catalogue) => {
+  it("names a language of a block by its own name, and keeps a block's texts over the built-in ones", () => {
+    addLanguages({ it: { title: "Il mio allenamento" } });
+    expect(translator("it")("title")).toBe("Il mio allenamento");
+    expect(translator("it")("na")).toBe("n/d");
+    addLanguages(BUILT_IN);
+  });
+
+  it.each(Object.entries(ALL))("%s has exactly the keys of en, none empty", (_, catalogue) => {
+    expect(Object.keys(catalogue).toSorted()).toEqual(Object.keys(en).toSorted());
+    expect(Object.values(catalogue).filter((v) => v.trim() === "")).toEqual([]);
+  });
+
+  it.each(Object.entries(ALL))("%s keeps every {placeholder} of en", (_, catalogue) => {
     for (const [key, text] of Object.entries(en)) {
       expect([key, names(catalogue[key as keyof typeof en])]).toEqual([key, names(text)]);
     }

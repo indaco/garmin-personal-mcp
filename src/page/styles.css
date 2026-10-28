@@ -211,6 +211,15 @@ h2 {
   font-size: 15px;
   margin: 0;
 }
+/* the headline of the page settings: a line under the title, lighter than a widget title */
+.title .headline {
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.title .headline + .muted {
+  margin-top: 6px;
+}
 .muted {
   color: var(--muted);
 }
@@ -499,6 +508,9 @@ select {
   .title .muted {
     font-size: 12px;
     margin: 0;
+  }
+  .title .headline {
+    font-size: 13px;
   }
   .window {
     display: grid;

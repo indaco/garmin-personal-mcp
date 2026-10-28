@@ -90,6 +90,18 @@ describe("prompts", () => {
     expect(keep.includes("{{")).toBe(false);
   });
 
+  it("asks the setup questions with the built-in languages and themes, and the weeks", async () => {
+    const text = await render("dashboard-setup", { weeks: "8" });
+    expect(text).toContain("last **8 weeks** (today is 2026-10-28)");
+    expect(text).toContain('"English and Italian, opens in the browser language" (default)');
+    expect(text).toContain("the codes to keep: en, it");
+    expect(text).toContain('options "Training + Recovery" (default) and "Type my own"');
+    expect(text).toContain("system, midnight, graphite");
+    expect(text).toContain("`preview` = true");
+    expect(text.includes("{{")).toBe(false);
+    expect(await render("dashboard-setup")).toContain("last **12 weeks**");
+  });
+
   it("has the names, descriptions and arguments of the reference prompt list", async () => {
     const { prompts } = await client.listPrompts();
     expect(prompts.map(shape).toSorted((a, b) => a.name.localeCompare(b.name))).toEqual(

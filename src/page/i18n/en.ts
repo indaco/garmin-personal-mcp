@@ -1,6 +1,7 @@
 /** The page texts in English: the source of the keys. Every other catalogue has exactly these keys. */
 export const en = {
   title: "Training + Recovery",
+  headline: "Training load, recovery and progress from Garmin Connect",
   na: "n/a",
   noData: "This page has no data yet. Ask Claude to write the dashboard.",
   period: "{from} to {to}",
