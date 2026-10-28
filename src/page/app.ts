@@ -181,7 +181,19 @@ function render(): void {
       h(
         "div",
         { class: "page" },
-        h("a", { class: "skip", href: "#board" }, t("skip")),
+        h(
+          "a",
+          {
+            class: "skip",
+            href: "#board",
+            // the hash is the view: a fragment jump would reset the tab and the window
+            onclick: (e: Event) => {
+              e.preventDefault();
+              document.getElementById("board")?.focus();
+            },
+          },
+          t("skip"),
+        ),
         header(data),
         editing && editBar(),
         boardView(data),

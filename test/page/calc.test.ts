@@ -129,6 +129,14 @@ describe("URL hash", () => {
     });
   });
 
+  it("drops an item that is not valid URI text", () => {
+    expect(parseHash("#strengthTraining/%E0", tabs, weeks)).toEqual({
+      tab: "strengthTraining",
+      from: "2026-10-05",
+      to: "2026-10-19",
+    });
+  });
+
   it("falls back to the All tab and every week", () => {
     const all = { tab: "all", from: "2026-10-05", to: "2026-10-19" };
     expect(parseHash("", tabs, weeks)).toEqual(all);

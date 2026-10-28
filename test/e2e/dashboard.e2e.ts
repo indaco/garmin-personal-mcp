@@ -141,6 +141,22 @@ describe("the page", () => {
     expect(await again.page.inputValue("#from")).toBe("2026-10-05");
   });
 
+  it("moves focus to the board with the skip link and keeps the view", async () => {
+    const { page } = await open(browser, pageFile(), {
+      hash: "#strengthTraining@2026-10-05_2026-10-26",
+    });
+    await page.keyboard.press("Tab"); // the skip link is the first focusable element
+    await page.keyboard.press("Enter");
+    expect(await hash(page)).toBe("#strengthTraining@2026-10-05_2026-10-26");
+    expect(await page.evaluate(() => document.activeElement?.id)).toBe("board");
+  });
+
+  it("opens a link with a broken item", async () => {
+    const { page, errors } = await open(browser, pageFile(), { hash: "#strengthTraining/%E0" });
+    expect(await page.getAttribute("[data-tab=strengthTraining]", "aria-selected")).toBe("true");
+    expect(errors).toEqual([]);
+  });
+
   it("switches between the 11 themes and keeps the choice", async () => {
     const file = pageFile();
     const { page, errors } = await open(browser, file);
