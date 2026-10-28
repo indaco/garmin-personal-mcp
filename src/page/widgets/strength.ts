@@ -288,7 +288,7 @@ function exerciseTable(
           h("td", { class: "num" }, String(s.sessions.length)),
           h("td", { class: "num" }, fmt.day(last.date)),
           h("td", { class: "num" }, topText(ctx, s, last)),
-          h("td", { class: "num" }, s.best1rm === undefined ? "" : `${fmt.num(s.best1rm, 1)} kg`),
+          h("td", { class: "num" }, s.best1rm === undefined ? "" : fmt.mass(s.best1rm)),
           h(
             "td",
             { class: "num" },
@@ -309,14 +309,14 @@ function exerciseTable(
 }
 
 function topText(ctx: Ctx, s: ExerciseStats, x: ExerciseStats["sessions"][number]): string {
-  if (s.kind === "weight") return x.top ? `${ctx.fmt.num(x.top.kg, 1)} kg × ${x.top.reps}` : "";
+  if (s.kind === "weight") return x.top ? `${ctx.fmt.mass(x.top.kg)} × ${x.top.reps}` : "";
   if (s.kind === "reps") return ctx.t("ex.reps", { n: x.maxReps });
   return `${x.longest} s`;
 }
 
 /** One set as "62.5 × 10", "45 s" or "12 reps". */
 function setText(ctx: Ctx, set: StrengthSet): string {
-  if (set.kg) return `${ctx.fmt.num(set.kg, 1)} × ${set.reps ?? 0}`;
+  if (set.kg) return `${ctx.fmt.num(ctx.fmt.to.mass(set.kg), 1)} × ${set.reps ?? 0}`;
   if (ctx.calc.timed(set)) return `${set.seconds} s`;
   return ctx.t("ex.reps", { n: set.reps ?? 0 });
 }
@@ -378,19 +378,19 @@ function detail(ctx: Ctx, s: ExerciseStats): HTMLElement {
       s.kind === "weight"
         ? [
             line(
-              t("ex.weight"),
-              s.sessions.map((x) => x.top?.kg ?? null),
+              t("ex.weight", { unit: fmt.unit.mass }),
+              s.sessions.map((x) => (x.top ? fmt.to.mass(x.top.kg) : null)),
               "strengthTraining",
             ),
             line(
-              t("ex.e1rm"),
-              s.sessions.map((x) => x.e1rm ?? null),
+              t("ex.e1rm", { unit: fmt.unit.mass }),
+              s.sessions.map((x) => (x.e1rm === undefined ? null : fmt.to.mass(x.e1rm))),
               "accent",
             ),
             {
               type: "bar" as const,
-              label: t("ex.volume"),
-              data: s.sessions.map((x) => x.volume),
+              label: t("ex.volume", { unit: fmt.unit.mass }),
+              data: s.sessions.map((x) => fmt.to.mass(x.volume)),
               backgroundColor: `${ctx.color("muted")}55`,
               yAxisID: "y1",
             },

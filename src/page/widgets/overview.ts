@@ -43,12 +43,18 @@ register({
       h(
         "p",
         { class: "totals" },
-        t("kpi.totals", { km: fmt.num(sum.km, 1), time: fmt.hours(sum.seconds), n: sum.sessions }),
+        t("kpi.totals", {
+          distance: fmt.dist(sum.km),
+          // a language added before units keeps "{km} km": give it the metric number
+          km: fmt.num(sum.km, 1),
+          time: fmt.hours(sum.seconds),
+          n: sum.sessions,
+        }),
       ),
       kpiRow(
         kpi(
           t("kpi.distance"),
-          `${fmt.num(week.km, 1)} km`,
+          fmt.dist(week.km),
           h("span", {}, delta(ctx, calc.change(week.km, base.km / 4)), " ", t("kpi.vs4w")),
         ),
         kpi(
@@ -190,7 +196,7 @@ register({
       return [
         label,
         cell(fmt.num(x.sessions), calc.change(x.sessions, y.sessions)),
-        x.km > 0 || y.km > 0 ? cell(`${fmt.num(x.km, 1)} km`, calc.change(x.km, y.km)) : "",
+        x.km > 0 || y.km > 0 ? cell(fmt.dist(x.km), calc.change(x.km, y.km)) : "",
         cell(fmt.hours(x.seconds), calc.change(x.seconds, y.seconds)),
         cell(loadText(ctx, x), x.loadKnown && y.loadKnown ? calc.change(x.load, y.load) : null),
       ];
@@ -257,10 +263,9 @@ register({
         .filter((a) => groupOf(a) === g && typeof a.km === "number")
         .toSorted((x, y) => (y.km ?? 0) - (x.km ?? 0))[0];
     const run = longest("running");
-    if (run) badges.push((top[1] = badge(t("rec.longestRun"), `${fmt.num(run.km, 1)} km`, run)));
+    if (run) badges.push((top[1] = badge(t("rec.longestRun"), fmt.dist(run.km), run)));
     const ride = longest("cycling");
-    if (ride)
-      badges.push((top[2] = badge(t("rec.longestRide"), `${fmt.num(ride.km, 1)} km`, ride)));
+    if (ride) badges.push((top[2] = badge(t("rec.longestRide"), fmt.dist(ride.km), ride)));
 
     let heaviest: { kg: number; reps: number; name: string; a: Activity } | undefined;
     const best1rm = new Map<string, { v: number; a: Activity }>();
@@ -282,12 +287,12 @@ register({
       badges.push(
         badge(
           t("rec.topSet"),
-          `${heaviest.name}: ${fmt.num(heaviest.kg, 1)} kg × ${heaviest.reps}`,
+          `${heaviest.name}: ${fmt.mass(heaviest.kg)} × ${heaviest.reps}`,
           heaviest.a,
         ),
       );
     for (const [name, { v, a }] of [...best1rm].toSorted((x, y) => y[1].v - x[1].v)) {
-      badges.push(badge(t("rec.e1rm", { name }), `${fmt.num(v, 1)} kg`, a));
+      badges.push(badge(t("rec.e1rm", { name }), fmt.mass(v), a));
       top[3] ??= badges.at(-1);
     }
     if (badges.length === 0) {

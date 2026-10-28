@@ -67,10 +67,10 @@ describe("translator", () => {
 
 describe("plurals", () => {
   it("picks the singular or plural form of a text with {n}", () => {
-    expect(translator("en")("kpi.totals", { km: "5", time: "1h", n: 1 })).toBe(
+    expect(translator("en")("kpi.totals", { distance: "5 km", time: "1h", n: 1 })).toBe(
       "5 km · 1h · 1 session",
     );
-    expect(translator("en")("kpi.totals", { km: "5", time: "1h", n: 2 })).toBe(
+    expect(translator("en")("kpi.totals", { distance: "5 km", time: "1h", n: 2 })).toBe(
       "5 km · 1h · 2 sessions",
     );
     expect(translator("it")("ss.count", { n: 1 })).toBe("1 esercizio");
