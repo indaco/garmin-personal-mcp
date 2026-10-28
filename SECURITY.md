@@ -1,5 +1,23 @@
 # Security Policy
 
+## How the server protects your data
+
+- **API key**: the server reads the key from an environment variable or from a file. Give the
+  file the permission `600`, so that only you can read it. The server sends the key only to the
+  Garmin token endpoint.
+- **Access token**: the server keeps the token in memory only. It never writes the key or the
+  token to the log, and no tool returns them.
+- **Read-only**: the server sends only GET requests to the Personal API. It sends one POST request
+  to get the token.
+- **Exercise catalogue**: the server gets the catalogue from `connect.garmin.com` without your
+  token.
+- **Local data**: the data folder has your .FIT files. A .FIT file can have your GPS track, so
+  keep the data folder private. `.gitignore` excludes `api-key`, `*.fit` and `*.zip` files.
+- **Paths**: `garminGet` accepts only a relative API path. It refuses a full URL and `..`, so
+  the token goes only to the Personal API host.
+- **Revoke the key**: you can revoke the key at any time on the Garmin Connect page where you
+  created it.
+
 ## Reporting a Vulnerability
 
 Report a vulnerability in private through GitHub:
@@ -30,5 +48,3 @@ examples of problems in scope:
 - a tool argument makes the server send the token to a different host
 - the server reads or writes a file other than the key file, the log and the files in the data folder
 - the server sends a request that changes data in Garmin Connect
-
-The README section "Security" describes how the server protects the key, the token and your data.
