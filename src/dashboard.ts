@@ -14,6 +14,10 @@ type Range = [string, string];
 const DEFAULT_WEEKS = 12;
 const MAX_WEEKS = 52;
 const RECOVERY_DAYS = 14;
+
+/** The weeks that getDashboardData covers for an asked number: 12 by default, 1 to 52. */
+export const weeksCovered = (weeks: number | undefined): number =>
+  weeks == null ? DEFAULT_WEEKS : Math.min(Math.max(weeks, 1), MAX_WEEKS);
 /** The last days of a cached range are fetched again: Garmin can still add activities or finish a night's data. */
 const REFRESH_DAYS = 2;
 const PAGE = 200;
@@ -47,7 +51,7 @@ export class GarminDashboard {
   }
 
   async #build(weeks: number | undefined): Promise<string> {
-    const w = weeks == null ? DEFAULT_WEEKS : Math.min(Math.max(weeks, 1), MAX_WEEKS);
+    const w = weeksCovered(weeks);
     const today = localToday();
     const start = addDays(today, -7 * w);
     // one extra week before: the dashboard shows whole Monday-Sunday weeks

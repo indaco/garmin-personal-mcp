@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { resolve } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
+import { weeksCovered } from "./dashboard";
 import { type Digest, digest } from "./digest";
 import { Profile } from "@garmin/fitsdk";
 import { type Activity, GROUPS, groupOf } from "./page/calc";
@@ -277,7 +278,7 @@ export class DashboardWriter {
   /** Writes run one at a time, so two calls never mix their pages. */
   #queue: Promise<unknown> = Promise.resolve();
   /** The data of the last call: a second call soon after (to add the notes) uses the same snapshot. */
-  #last: { weeks: number | undefined; at: number; json: string } | undefined;
+  #last: { weeks: number; at: number; json: string } | undefined;
 
   constructor(
     private readonly getData: (weeks?: number) => Promise<string>,
@@ -419,19 +420,22 @@ export class DashboardWriter {
     if (old === undefined) {
       throw new Error(`${target} does not exist: call writeDashboard first`);
     }
-    if (readBlock(old, "layout") === undefined) {
-      throw new Error(
-        "This page has no widget layout: it is a page that Claude wrote, not the template",
-      );
-    }
     let page = old;
     let layout: ReturnType<typeof parseLayout>;
     let widgets: CustomWidget[];
     let texts: Record<string, Record<string, string>>;
+    let settings: Settings;
     try {
-      layout = parseLayout(readBlock(page, "layout"));
-      widgets = (readBlock(page, "widgets") as CustomWidget[] | undefined) ?? [];
-      texts = (readBlock(page, "i18n") as Record<string, Record<string, string>> | undefined) ?? {};
+      const saved = readBlock(old, "layout");
+      if (saved === undefined) {
+        throw new Error(
+          "This page has no widget layout: it is a page that Claude wrote, not the template",
+        );
+      }
+      layout = parseLayout(saved);
+      widgets = (readBlock(old, "widgets") as CustomWidget[] | undefined) ?? [];
+      texts = (readBlock(old, "i18n") as Record<string, Record<string, string>> | undefined) ?? {};
+      settings = settingsOf(old);
     } catch (e) {
       throw new Error(`${(e as Error).message} in ${target}`, { cause: e });
     }
@@ -478,7 +482,7 @@ export class DashboardWriter {
       texts[lang] = { ...texts[lang], ...checkTexts(lang, entries) };
     }
     for (const lang of o.removeLanguages ?? []) {
-      if (!(lang in texts)) {
+      if (!Object.hasOwn(texts, lang)) {
         throw new Error(
           `The page has no added texts for ${lang}: built-in languages are chosen with writeDashboard settings.languages`,
         );
@@ -513,15 +517,15 @@ export class DashboardWriter {
       })),
       languages: missingTexts(page),
       // a widget whose data the page leaves out shows nothing there
-      catalogue: CATALOGUE.filter(
-        (c) => !c.needs || !settingsOf(page).exclude?.includes(c.needs),
-      ).map((c) => ({
-        id: c.id,
-        title: en[c.title],
-        ...(c.types ? { types: c.types } : {}),
-        span: c.span,
-        about: ABOUT[c.id],
-      })),
+      catalogue: CATALOGUE.filter((c) => !c.needs || !settings.exclude?.includes(c.needs)).map(
+        (c) => ({
+          id: c.id,
+          title: en[c.title],
+          ...(c.types ? { types: c.types } : {}),
+          span: c.span,
+          about: ABOUT[c.id],
+        }),
+      ),
       widgetApi: WIDGET_API,
       ...(o.englishTexts ? { englishTexts: en } : {}),
     };
@@ -529,10 +533,11 @@ export class DashboardWriter {
 
   /** The data for `weeks`; the same snapshot for 15 minutes, so the notes match the digest they come from. */
   async #data(weeks: number | undefined): Promise<string> {
+    const covered = weeksCovered(weeks);
     const last = this.#last;
-    if (last && last.weeks === weeks && Date.now() - last.at < REUSE_MS) return last.json;
+    if (last && last.weeks === covered && Date.now() - last.at < REUSE_MS) return last.json;
     const json = await this.getData(weeks);
-    this.#last = { weeks, at: Date.now(), json };
+    this.#last = { weeks: covered, at: Date.now(), json };
     return json;
   }
 
@@ -593,7 +598,7 @@ function checkTexts(lang: string, entries: Record<string, string>): Record<strin
   }
   const problems: string[] = [];
   for (const [key, text] of Object.entries(entries)) {
-    if (!(key in en)) problems.push(`unknown text ${key}`);
+    if (!Object.hasOwn(en, key)) problems.push(`unknown text ${key}`);
     else if (typeof text !== "string" || !text.trim() || text.length > 500)
       problems.push(`${key}: 1 to 500 characters`);
     else if (placeholders(text) !== placeholders(en[key as keyof typeof en])) {

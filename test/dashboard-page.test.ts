@@ -127,6 +127,12 @@ describe("writeDashboard", () => {
     expect(asked).toEqual([12, 6, 6]);
   });
 
+  it("reuses the snapshot when the first call has no weeks and the page is new", async () => {
+    await writer.write({});
+    await writer.write({ notes: ["n"] });
+    expect(asked).toEqual([undefined]);
+  });
+
   it("returns the digest of the data, not the data", async () => {
     const r = await writer.write({});
     expect(r.digest).toEqual(digest(data));
