@@ -1,0 +1,247 @@
+name: Release
+
+# Release from an up-to-date main: sley bump auto && sley changelog merge && sley tag create --push
+on:
+  push:
+    tags: ["v*"]
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  # Cheap gate: a wrong tag stops here, before anything is published.
+  tag-validate:
+    name: Validate tag
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # full history with all branches, so that origin/main exists
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate tag shape, versions, changelog and branch
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          expected="${TAG_NAME#v}"
+
+          # the v* trigger also matches "vfoo"
+          case "$TAG_NAME" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) fail "tag '$TAG_NAME' is not vX.Y.Z" ;;
+          esac
+
+          version_file="$(tr -d '[:space:]' <.version)"
+          if [ "$version_file" != "$expected" ]; then
+            fail ".version is '$version_file' but tag is '$TAG_NAME' (expected '$expected'). Run 'sley bump' before tagging."
+          fi
+
+          pkg_version="$(node -p 'require("./package.json").version')"
+          if [ "$pkg_version" != "$expected" ]; then
+            fail "package.json version is '$pkg_version' but tag is '$TAG_NAME' (expected '$expected'). Run 'sley bump' before tagging."
+          fi
+
+          notes=".changes/${TAG_NAME}.md"
+          if [ ! -s "$notes" ]; then
+            fail "missing or empty changelog at $notes. Run 'sley changelog merge' before tagging."
+          fi
+
+          # the tagged commit must be on main (an exact check, not a branch-name match)
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            fail "tag '$TAG_NAME' points to a commit that is not on main. Refusing to release."
+          fi
+
+          echo "tag $TAG_NAME passed all checks"
+
+  # Builds and checks the package. It has no id-token, so it cannot publish.
+  build:
+    name: Build package
+    needs: tag-validate
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # reads the pnpm version from packageManager in package.json
+      - uses: pnpm/action-setup@v6
+
+      # a release builds from scratch: no cache in a job of the release
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+
+      # the same checks as ci.yml; keep them in step
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint and format check
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      # stdout carries MCP messages only: one initialize request, one JSON line back
+      - name: Smoke test
+        run: |
+          out=$(echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+            | timeout 10 node dist/index.js)
+          test "$(printf '%s\n' "$out" | wc -l)" -eq 1
+          printf '%s' "$out" | node -e 'JSON.parse(require("fs").readFileSync(0, "utf8"))'
+
+      - name: Package contents
+        run: |
+          npm pack --dry-run --json | node -e '
+            const files = JSON.parse(require("fs").readFileSync(0, "utf8"))[0].files.map((f) => f.path);
+            const allowed = ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "package.json"];
+            const extra = files.filter((p) => !/^(dist|prompts)\//.test(p) && !allowed.includes(p));
+            if (extra.length) { console.error("unexpected files in the package:", extra); process.exit(1); }
+            if (!files.includes("dist/dashboard.html")) { console.error("the dashboard template is missing"); process.exit(1); }
+            console.log(`${files.length} files in the package`);
+          '
+
+      - name: Pack
+        run: npm pack --pack-destination out
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: package
+          path: out/*.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  # It can publish, so it runs no third-party action, no dependency install and no repo script.
+  publish:
+    name: Publish to npm
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: Release
+    permissions:
+      # the OIDC token for npm trusted publishing (no npm token anywhere)
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          registry-url: https://registry.npmjs.org
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: package
+          path: out
+
+      # 0.1.0 is published by hand, and a re-run must not fail on a published version
+      - name: Check whether this version is on npm
+        id: exists
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          if npm view "@indaco/garmin-personal-mcp@${TAG_NAME#v}" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # trusted publishing needs npm 11.5.1 or newer
+      - name: Update npm
+        if: steps.exists.outputs.published != 'true'
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      - name: Publish
+        if: steps.exists.outputs.published != 'true'
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(out/*.tgz)
+          [ "${#files[@]}" -eq 1 ] || { echo "::error::expected one tarball, got ${#files[@]}"; exit 1; }
+          npm publish "${files[0]}" --access public
+
+  release-notes:
+    name: GitHub Release
+    needs: publish
+    runs-on: ubuntu-24.04
+    environment:
+      name: Release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          notes=".changes/${TAG_NAME}.md"
+          if [ ! -s "$notes" ]; then
+            echo "::error::missing or empty changelog at $notes"
+            exit 1
+          fi
+          # edit when the release exists, so that a re-run is safe
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release edit "$TAG_NAME" --title "$TAG_NAME" --latest --notes-file "$notes"
+          else
+            gh release create "$TAG_NAME" --verify-tag --title "$TAG_NAME" --latest --notes-file "$notes"
+          fi
+
+  # Last check: install the published version the way a user does.
+  install-smoke:
+    name: Install smoke test
+    needs: release-notes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+
+      - name: Install and start the published package
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG_NAME#v}"
+          pkg="@indaco/garmin-personal-mcp@${version}"
+
+          # the registry can lag behind the publish
+          for i in $(seq 1 30); do
+            if [ "$(npm view "$pkg" version 2>/dev/null || true)" = "$version" ]; then break; fi
+            if [ "$i" -eq 30 ]; then echo "::error::$pkg is not on the registry"; exit 1; fi
+            sleep 10
+          done
+
+          out=$(echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+            | timeout 60 npx -y "$pkg")
+          test "$(printf '%s\n' "$out" | wc -l)" -eq 1
+          printf '%s' "$out" | VERSION="$version" node -e '
+            const r = JSON.parse(require("fs").readFileSync(0, "utf8"));
+            const s = r.result.serverInfo;
+            if (s.name !== "garmin-personal" || s.version !== process.env.VERSION) {
+              console.error("unexpected serverInfo:", s);
+              process.exit(1);
+            }
+          '
