@@ -43,9 +43,9 @@ such a tool, ask the questions in chat as numbered lists, with the default first
 Use only numbers of the digest. **Never invent, interpolate or estimate missing values.** If a value
 is missing, write "n/a". If a call fails, say which one and why in one line.
 
-Do not write or change the page yourself. Settings need a page from the template: a page that Claude
-designed (layout freeform) cannot keep them.
+Do not write or change the page yourself. Settings need a page from the template: a page designed with
+layout freeform cannot keep them.
 
 Finish with two lines in chat: the path of the page with the command to open it (`open` on macOS,
 `xdg-open` on Linux, `start` on Windows), and the settings that the page keeps. Later updates keep
-the settings: for a page with another file name, ask Claude to update that file.
+the settings: for a page with another file name, ask your assistant to update that file.
