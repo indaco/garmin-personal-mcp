@@ -291,7 +291,7 @@
   },
   {
     "name": "getSleep",
-    "description": "Sleep data for one night, yyyy-MM-dd (the date of the morning you woke up).",
+    "description": "Sleep data for one night (date: the morning you woke up), or for up to 31 nights (fromDate and toDate), yyyy-MM-dd.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
@@ -300,9 +300,16 @@
         "date": {
           "type": "string",
           "description": "Date yyyy-MM-dd"
+        },
+        "fromDate": {
+          "type": "string",
+          "description": "First date yyyy-MM-dd, with toDate"
+        },
+        "toDate": {
+          "type": "string",
+          "description": "Last date yyyy-MM-dd, with fromDate"
         }
-      },
-      "required": ["date"]
+      }
     }
   },
   {

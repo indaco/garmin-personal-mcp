@@ -227,7 +227,7 @@ without a translation shows in English. To remove an added language, ask Claude 
 | `downloadActivityFit` | saves the .FIT file of an activity in the data folder                  |
 | `getHrvRange`         | HRV during the night                                                   |
 | `getDailyHeartRate`   | the heart rate of a day, with the resting HR                           |
-| `getSleep`            | the sleep of a night                                                   |
+| `getSleep`            | the sleep of a night, or of up to 31 nights                            |
 | `getHeartRateZones`   | your HR zones                                                          |
 | `getFitnessAge`       | fitness age against actual age                                         |
 | `getDailySummary`     | steps, stress and Body Battery                                         |

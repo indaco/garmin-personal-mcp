@@ -322,6 +322,38 @@ describe("activities", () => {
     await tools.garminGet("/y");
     expect(api.getJson).toHaveBeenLastCalledWith("/y", {});
   });
+
+  it("getSleepRange asks for the nights between two dates in one request", async () => {
+    api.getJson.mockResolvedValue([{ calendarDate: "2026-10-27" }]);
+    expect(await tools.getSleepRange("2026-10-21", "2026-10-27")).toBe(
+      '[{"calendarDate":"2026-10-27"}]',
+    );
+    expect(api.getJson).toHaveBeenCalledOnce();
+    expect(api.getJson).toHaveBeenCalledWith("/sleep-service/sleep/dailySleepSummariesByDate", {
+      startDate: "2026-10-21",
+      endDate: "2026-10-27",
+    });
+  });
+
+  it("getSleepRange accepts 31 days and refuses 32", async () => {
+    api.getJson.mockResolvedValue([]);
+    await tools.getSleepRange("2026-10-01", "2026-10-31");
+    expect(api.getJson).toHaveBeenCalledOnce();
+    await expect(tools.getSleepRange("2026-10-01", "2026-11-01")).rejects.toThrow(
+      "A range has at most 31 days; this one has 32",
+    );
+    expect(api.getJson).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["from after to", "2026-10-27", "2026-10-01"],
+    ["a bad from date", "27-10-2026", "2026-10-27"],
+    ["a bad to date", "2026-10-01", "2026-10-27T00:00"],
+  ])("range calls refuse %s without a request", async (_name, from, to) => {
+    const message = "fromDate and toDate must be yyyy-MM-dd with fromDate <= toDate";
+    await expect(tools.getSleepRange(from, to)).rejects.toThrow(message);
+    expect(api.getJson).not.toHaveBeenCalled();
+  });
 });
 
 const strengthFit = () =>
@@ -561,6 +593,35 @@ describe("MCP tools", () => {
     const result = await client.callTool({ name: tool, arguments: args });
     expect(textOf(result)).toBe('{"ok":1}');
     expect(api.getJson).toHaveBeenCalledWith(path, query);
+  });
+
+  it("getSleep with fromDate and toDate takes the range path", async () => {
+    api.getJson.mockResolvedValue({ ok: 1 });
+    const client = await connectHandlers();
+    const result = await client.callTool({
+      name: "getSleep",
+      arguments: { fromDate: "2026-10-21", toDate: "2026-10-27" },
+    });
+    expect(textOf(result)).toBe('{"ok":1}');
+    expect(api.getJson).toHaveBeenCalledWith("/sleep-service/sleep/dailySleepSummariesByDate", {
+      startDate: "2026-10-21",
+      endDate: "2026-10-27",
+    });
+  });
+
+  it("getSleep refuses a date together with a range, or neither, without a request", async () => {
+    const client = await connectHandlers();
+    for (const args of [
+      { date: "2026-10-27", fromDate: "2026-10-21", toDate: "2026-10-27" },
+      { date: "2026-10-27", toDate: "2026-10-27" },
+      { fromDate: "2026-10-21" },
+      {},
+    ]) {
+      const result = await client.callTool({ name: "getSleep", arguments: args });
+      expect(result).toMatchObject({ isError: true });
+      expect(textOf(result)).toBe("Give date, or fromDate and toDate");
+    }
+    expect(api.getJson).not.toHaveBeenCalled();
   });
 
   it("listActivities passes the dates, the type, the limit and raw in their places", async () => {

@@ -109,6 +109,16 @@ export class GarminTools {
     return JSON.stringify(await this.api.getJson("/sleep-service/sleep/dailySleep", { date }));
   }
 
+  async getSleepRange(fromDate: string, toDate: string): Promise<string> {
+    checkRange(fromDate, toDate, 31);
+    return JSON.stringify(
+      await this.api.getJson("/sleep-service/sleep/dailySleepSummariesByDate", {
+        startDate: fromDate,
+        endDate: toDate,
+      }),
+    );
+  }
+
   async getHeartRateZones(): Promise<string> {
     return JSON.stringify(await this.api.getJson("/biometric-service/heartRateZones/v2", {}));
   }
@@ -371,10 +381,40 @@ function asString(v: unknown): string | null {
   return typeof v === "string" ? v : typeof v === "number" ? String(v) : null;
 }
 
+/** Throws unless from and to are yyyy-MM-dd, from <= to, and the range has at most `max` days. */
+function checkRange(from: string, to: string, max: number): void {
+  const iso = /^\d{4}-\d{2}-\d{2}$/;
+  if (!iso.test(from) || !iso.test(to) || from > to) {
+    throw new Error("fromDate and toDate must be yyyy-MM-dd with fromDate <= toDate");
+  }
+  const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000 + 1;
+  if (days > max) throw new Error(`A range has at most ${max} days; this one has ${days}`);
+}
+
+/** A tool call for one date or for a range: `date` alone, or `fromDate` and `toDate` without it. */
+function dayOrRange(
+  a: { date?: string; fromDate?: string; toDate?: string },
+  day: (date: string) => Promise<string>,
+  range: (fromDate: string, toDate: string) => Promise<string>,
+): Promise<string> {
+  if (a.date !== undefined && a.fromDate === undefined && a.toDate === undefined) {
+    return day(a.date);
+  }
+  if (a.date === undefined && a.fromDate !== undefined && a.toDate !== undefined) {
+    return range(a.fromDate, a.toDate);
+  }
+  throw new Error("Give date, or fromDate and toDate");
+}
+
 // ------------------------------------------------------------------ MCP registration
 
 const activityId = z.number().int().describe("Garmin activity id");
 const date = z.string().describe("Date yyyy-MM-dd");
+const dayOrRangeInput = z.object({
+  date: date.optional(),
+  fromDate: z.string().describe("First date yyyy-MM-dd, with toDate").optional(),
+  toDate: z.string().describe("Last date yyyy-MM-dd, with fromDate").optional(),
+});
 const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 
 /** Registers the 12 tools. */
@@ -474,10 +514,18 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
   server.registerTool(
     "getSleep",
     {
-      description: "Sleep data for one night, yyyy-MM-dd (the date of the morning you woke up).",
-      inputSchema: z.object({ date }),
+      description:
+        "Sleep data for one night (date: the morning you woke up), or for up to 31 nights (fromDate and toDate), yyyy-MM-dd.",
+      inputSchema: dayOrRangeInput,
     },
-    async (a) => text(await tools.getSleep(a.date)),
+    async (a) =>
+      text(
+        await dayOrRange(
+          a,
+          (d) => tools.getSleep(d),
+          (f, t) => tools.getSleepRange(f, t),
+        ),
+      ),
   );
   server.registerTool(
     "getHeartRateZones",
