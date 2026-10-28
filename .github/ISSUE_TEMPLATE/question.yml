@@ -25,7 +25,6 @@ body:
         - Tools
         - Prompts and the dashboard
         - Configuration
-        - Coming from garmin-mcp
         - Other
     validations:
       required: true

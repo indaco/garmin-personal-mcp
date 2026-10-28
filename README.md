@@ -6,6 +6,16 @@
 [![MCP stdio server](https://img.shields.io/badge/MCP-stdio%20server-8a2be2.svg)](https://modelcontextprotocol.io)
 [![Garmin Connect Personal API](https://img.shields.io/badge/Garmin-Personal%20API-007cc3.svg)](https://developer.garmin.com/gc-developer-program/personal/)
 
+<p align="center">
+  <b><a href="#quick-start">Quick start</a></b> &middot;
+  <b><a href="#prompts">Prompts</a></b> &middot;
+  <b><a href="#tools">Tools</a></b> &middot;
+  <b><a href="#configuration">Configuration</a></b> &middot;
+  <b><a href="#presets-or-freeform">Presets or freeform</a></b> &middot;
+  <b><a href="#security">Security</a></b> &middot;
+  <b><a href="guide/dashboard.md">Dashboard guide</a></b>
+</p>
+
 **Your Garmin training in Claude, through the official Personal API. Read-only, nothing to
 install.**
 
@@ -24,7 +34,7 @@ Ready-made prompts do more:
 
 - **training-dashboard** writes a dashboard page in less than a minute. It shows your training
   load next to HRV, sleep and resting heart rate, in widgets that you can move, resize, hide and
-  add.
+  add. You can also let Claude design the whole page.
 - **training-dashboard-update** adds the new data to the dashboard. Your layout stays.
 - **dashboard-widget** makes a new widget from your idea.
 - **dashboard-language** adds a language to the dashboard.
@@ -34,21 +44,6 @@ Ready-made prompts do more:
 _The training dashboard with demo data._
 
 The server works with Claude Desktop, Claude Code and all other MCP clients that use stdio.
-
-## Contents
-
-- [Quick start](#quick-start)
-- [Prompts](#prompts)
-- [Tools](#tools)
-- [Configuration](#configuration)
-- [Coming from garmin-mcp](#coming-from-garmin-mcp)
-- [How it works](#how-it-works)
-- [Why the server writes the dashboard](#why-the-server-writes-the-dashboard)
-- [Security](#security)
-- [Problems and solutions](#problems-and-solutions)
-- [Development](#development)
-- [Credits](#credits)
-- [License](#license)
 
 ## Quick start
 
@@ -77,7 +72,7 @@ next to the keys that the file has, not in `preferences`:
 ```json
 {
   "mcpServers": {
-    "garmin": {
+    "garmin-personal": {
       "command": "npx",
       "args": ["-y", "@indaco/garmin-personal-mcp"]
     }
@@ -90,8 +85,8 @@ Then quit Claude Desktop **fully**, including the tray icon, and start it again.
 **Claude Code**: this command adds the server to all your projects:
 
 ```bash
-claude mcp add garmin --scope user -- npx -y @indaco/garmin-personal-mcp
-claude mcp list          # garmin: ... ✔ Connected
+claude mcp add garmin-personal --scope user -- npx -y @indaco/garmin-personal-mcp
+claude mcp list          # garmin-personal: ... ✔ Connected
 ```
 
 Use `--scope project` to write a `.mcp.json` file that you can share in the current repository.
@@ -101,13 +96,15 @@ procedure.
 
 ### 3. Ask Claude
 
-Ask "list my last 5 activities". The first time that a garmin tool asks for permission, answer
-**Allow always** in Claude Desktop. In Claude Code, use `/permissions` and add `mcp__garmin`.
+Ask "list my last 5 activities". The first time that a garmin-personal tool asks for permission, answer
+**Allow always** in Claude Desktop. In Claude Code, use `/permissions` and add `mcp__garmin-personal`.
 
 ## Prompts
 
-In Claude Desktop, the prompts are in the **+** menu of the message box, under _garmin_. In
-Claude Code, they are slash commands such as `/mcp__garmin__training-dashboard`.
+In Claude Desktop, the prompts are in the **+** menu of the message box, under _garmin-personal_. In
+Claude Code, they are slash commands such as `/mcp__garmin-personal__training-dashboard`.
+
+The prompts remove all spaces around an argument, also the no-break space from a phone keyboard.
 
 After an update of the server, the prompts and tools change only in a new Claude Code session. In
 Claude Desktop, they change after a full restart.
@@ -117,20 +114,23 @@ Claude Desktop, they change after a full restart.
 The server writes the dashboard page from its template, and Claude writes the coach notes. The page
 is one HTML file, `garmin-dashboard.html` in the data folder. It works offline.
 
-| Argument | Values                          | Default  |
-| -------- | ------------------------------- | -------- |
-| `weeks`  | 1 to 52                         | 12       |
-| `layout` | `preset`, `blank` or `freeform` | `preset` |
+| Argument | Values                            | Default  |
+| -------- | --------------------------------- | -------- |
+| `weeks`  | 1 to 52 (a larger value gives 52) | 12       |
+| `layout` | `preset`, `blank` or `freeform`   | `preset` |
 
 - `preset` gives the built-in widgets on each board.
 - `blank` gives empty boards: you add the widgets that you want.
 - `freeform` lets Claude design the whole page. This takes much longer, and each page looks
   different.
 
-| Client         | How to run it                                                      |
-| -------------- | ------------------------------------------------------------------ |
-| Claude Desktop | **+** → _garmin_ → `training-dashboard` → set the arguments → send |
-| Claude Code    | `/mcp__garmin__training-dashboard 8`                               |
+| Client         | How to run it                                                               |
+| -------------- | --------------------------------------------------------------------------- |
+| Claude Desktop | **+** → _garmin-personal_ → `training-dashboard` → set the arguments → send |
+| Claude Code    | `/mcp__garmin-personal__training-dashboard 8`                               |
+
+In Claude Code, the arguments are in order and separated by spaces: first `weeks`, then `layout`.
+To give `layout`, also give `weeks`: `/mcp__garmin-personal__training-dashboard 12 freeform`.
 
 Claude gives you the path of the page and the command to open it. The page has:
 
@@ -150,8 +150,7 @@ The dashboard uses the training load, HR zones and training effect from Garmin. 
 value that it calculates as an estimate. It does not invent missing values: a missing value shows
 as "n/a".
 
-[Why the server writes the dashboard](#why-the-server-writes-the-dashboard) gives the reasons and
-the measurements. [The dashboard guide](guide/dashboard.md) tells how to change the layout, and
+[Presets or freeform](#presets-or-freeform) compares the two methods, with measurements. [The dashboard guide](guide/dashboard.md) tells how to change the layout, and
 [the widget catalogue](guide/widgets.md) lists every widget.
 
 ### training-dashboard-update
@@ -160,10 +159,10 @@ This prompt replaces the data and the coach notes of the page. Your layout, your
 your languages stay. Leave `weeks` empty to keep the weeks of the page. Reload the page to see the
 new data.
 
-| Client         | How to run it                                         |
-| -------------- | ----------------------------------------------------- |
-| Claude Desktop | **+** → _garmin_ → `training-dashboard-update` → send |
-| Claude Code    | `/mcp__garmin__training-dashboard-update`             |
+| Client         | How to run it                                                  |
+| -------------- | -------------------------------------------------------------- |
+| Claude Desktop | **+** → _garmin-personal_ → `training-dashboard-update` → send |
+| Claude Code    | `/mcp__garmin-personal__training-dashboard-update`             |
 
 The first call sends approximately 35 requests to Garmin. Later calls use the local cache and send
 approximately 8.
@@ -189,7 +188,7 @@ language of the conversation. A text without a translation shows in English.
 | `listActivities`      | `/activitylist-service/activities/search/activities` | a compact summary of each activity: the Garmin type key and the FIT SDK sport name, km, moving and elapsed time, pace, HR, cadence, ascent, HR-zone seconds, Garmin training load and training effect, intensity minutes, race flag, best efforts, power, running form, run/walk segments, swim SWOLF, lengths and strokes. `raw=true` gives the full JSON. |
 | `getActivity`         | `/activity-service/activity/{id}`                    | summary, metadata and segments by type                                                                                                                                                                                                                                                                                                                      |
 | `getActivityLaps`     | `/download-service/files/activity/{id}`              | laps from the .FIT file: km, time, pace or speed, HR, cadence, ascent, power and intensity                                                                                                                                                                                                                                                                  |
-| `getActivitySets`     | `/download-service/files/activity/{id}`              | strength sets from the .FIT file: exercise, movement category, primary and secondary muscles, reps, weight (kg), set time and the rest after the set                                                                                                                                                                                                        |
+| `getActivitySets`     | `/download-service/files/activity/{id}`              | strength sets from the .FIT file: exercise, movement category, primary and secondary muscles, reps, weight (kg), set time and the rest after the set. The empty set that the watch adds at the end of a workout is not shown                                                                                                                                |
 | `downloadActivityFit` | `/download-service/files/activity/{id}`              | saves `{id}.fit` in the `fit` folder of the data folder. The server downloads each file one time only.                                                                                                                                                                                                                                                      |
 | `getHrvRange`         | `/hrv-service/hrv/daily/{from}/{to}`                 | HRV during the night                                                                                                                                                                                                                                                                                                                                        |
 | `getDailyHeartRate`   | `/wellness-service/wellness/dailyHeartRate`          | the heart rate of a day, with the resting HR                                                                                                                                                                                                                                                                                                                |
@@ -204,7 +203,8 @@ language of the conversation. A text without a translation shows in English.
 
 Dates use the format `yyyy-MM-dd`. The API reference does not always give the names of the query
 parameters. If an endpoint answers 400, Claude can use `garminGet` to try a different name.
-`listActivities` with `activityType` sometimes answers 400.
+`listActivities` with `activityType` sometimes answers 400. `garminGet` decodes the query string
+before it sends it, so an encoded value such as `calendarDate=2026%2D10%2D24` also works.
 API reference: <https://developer.garmin.com/gc-developer-program/personal/swagger-docs/>
 
 The Personal API does not have these Garmin Connect data, and their endpoints answer 404:
@@ -245,51 +245,6 @@ The data folder has:
 The server writes its log to `~/.cache/garmin-personal-mcp/garmin-personal-mcp.log`. When the log
 is larger than 1 MB, the server moves it to `garmin-personal-mcp.log.1` and starts a new log.
 
-## Coming from garmin-mcp
-
-This server is a new version of [garmin-mcp](https://github.com/indaco/garmin-mcp). The tools of
-garmin-mcp have the same names, arguments and output fields. The default key file and data folder
-are the same too, so the server uses the key and the data that you have. The two servers can use
-the same data folder, because the dashboard cache has the same format.
-
-The dashboard prompts have the same names, but they work differently:
-
-- The server writes the page. Claude writes only the coach notes. In garmin-mcp, Claude writes the
-  whole page, which takes 25 minutes or more.
-- The page is a file in the data folder, also in Claude Desktop. Claude Desktop does not show it as
-  an artifact.
-- To let Claude design the whole page as before, use `layout` = `freeform`.
-- A dashboard from garmin-mcp does not change: the update writes a new page in the data folder.
-
-This server does not have the `social-card` prompt.
-
-The settings have new names. Change them in the configuration of your client:
-
-| garmin-mcp                                     | garmin-personal-mcp                   |
-| ---------------------------------------------- | ------------------------------------- |
-| `GARMIN_DATADIR` or `--garmin.data-dir`        | `GARMIN_DATA_DIR`                     |
-| `GARMIN_BASEURL` or `--garmin.base-url`        | `GARMIN_BASE_URL`                     |
-| `GARMIN_APIKEYFILE` or `--garmin.api-key-file` | `GARMIN_API_KEY_FILE`                 |
-| `GARMIN_PERSONAL_API_KEY`                      | `GARMIN_PERSONAL_API_KEY` (no change) |
-
-These changes make the server better:
-
-- **Nothing to install**: the server runs with npx. It needs Node.js 22 or later, and no JVM.
-- **Encoded queries in `garminGet`**: the server decodes the query string before it sends it. In
-  garmin-mcp, an encoded value such as `calendarDate=2026%2D10%2D24` is encoded two times, and
-  Garmin answers 404.
-- **No empty set at the end of a workout**: at the end of a strength workout, the watch opens one
-  more set. This set has no exercise, reps or weight, and `getActivitySets` does not show it.
-- **Better input**: the prompts remove all spaces around an argument, also the no-break space from
-  a phone keyboard. A very large `weeks` value gives 52. Numbers from Garmin can have spaces
-  around them.
-- **Cleaner data**: the activity summary does not show `"type": null` when Garmin gives no type.
-  The dashboard cache does not keep HRV entries or recovery days without a valid date.
-- **One token request**: calls that start at the same time share one token request.
-- **A log with a size limit**: the log rotates at 1 MB.
-- **A dashboard that you can arrange**: widgets on a grid, an edit mode, custom widgets and more
-  languages. A build or an update takes less than a minute, with no Bash and no copied data.
-
 ## How it works
 
 ```mermaid
@@ -307,7 +262,8 @@ flowchart LR
 - **Authentication**: the server sends the API key to `POST .../personal-api-key/token` and gets
   an access token. The token is valid for 24 hours, and there is no refresh token. The server keeps
   the token in memory. It gets a new token before the token expires, and after a `401`. Garmin
-  can send the token as JSON or as plain text. The server accepts the two formats.
+  can send the token as JSON or as plain text. The server accepts the two formats. Calls that
+  start at the same time share one token request.
 - **Content type**: JSON calls send `Accept: application/json`. After a `406`, the server sends
   the call again one time with `*/*`.
 - **Laps and sets**: the Personal API has no endpoint for laps or exercise sets. For this reason,
@@ -325,11 +281,18 @@ flowchart LR
   days, because Garmin can still add data to them. The sets and laps come from the .FIT files in
   the `fit` folder, so they need no new download.
 
-## Why the server writes the dashboard
+## Presets or freeform
 
-In garmin-mcp, Claude writes the whole dashboard page: the code, the design and the data. This
-server uses a different method. The server writes the page from a tested template, and Claude
-writes only the coach notes. We measured the two methods before we made this change.
+Many setup guides for Claude and Garmin give all the work to Claude. Claude reads the data, then
+writes the whole dashboard page: the code, the design and the data. This server gives you two
+methods:
+
+- **Presets** (`preset` or `blank`): the server writes the page from a tested template. Claude
+  writes only the coach notes.
+- **Freeform** (`freeform`): Claude designs the whole page. The server puts the data into the
+  page, so Claude does not copy it.
+
+The presets are faster and use fewer tokens. We measured the two methods.
 
 ### What makes a page expensive
 
@@ -356,7 +319,7 @@ The data causes two more problems:
 We used Claude Code (`claude -p`) with Opus, on synthetic data: 75 activities in 12 weeks. The
 costs are list prices. With a subscription, the runs count against your usage limits.
 
-| Task                     | Claude writes the page                                    | The server writes the page      |
+| Task                     | Claude writes the whole page                              | Preset                          |
 | ------------------------ | --------------------------------------------------------- | ------------------------------- |
 | First build              | 24 to 35 min, 191k to 280k output tokens, $6.6 to $9.2    | 34 s, 2.4k output tokens, $0.16 |
 | Update                   | 75 s and $0.41 to $0.46 with Bash. It fails without Bash. | 13 s, $0.15, no Bash needed     |
@@ -369,7 +332,10 @@ In one run where Claude wrote the page, Claude also gave wrong totals in chat, b
 see all the data. With the template, Claude reads a digest of about 7 KB that has every number for
 the notes. A check of each run found no invented number in the notes.
 
-### The cost of this method
+In these runs, Claude also copied the data into the page. With `freeform`, the server puts the data
+in, so a build costs less. The page code still takes time and tokens.
+
+### The limits of the presets
 
 - **We maintain the page**: the template, the widgets and their tests are part of this project. A
   change to the page needs a new release.
@@ -377,8 +343,7 @@ the notes. A check of each run found no invented number in the notes.
   and languages, not with a new design.
 - **No inline artifact**: in Claude Desktop, the dashboard is a file that you open in the browser.
 
-To let Claude design the whole page as before, use `layout` = `freeform`. The server then puts
-the data into the page, so Claude does not copy it. The page code still takes time and tokens.
+For a different design, use `layout` = `freeform`.
 
 ## Security
 
@@ -406,14 +371,14 @@ does not endorse this project, and the project has no affiliation with Garmin.
 
 ## Problems and solutions
 
-| Problem                              | Solution                                                                                                                                                                                                                |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The server does not start            | Make sure that Node.js is version 22 or later: `node --version`.                                                                                                                                                        |
-| Claude Desktop does not find `npx`   | GUI apps do not read your shell profile. Use the absolute path of `npx` (`which npx`) as the `command`.                                                                                                                 |
-| Changes have no effect               | The client keeps the old server process. Start a new Claude Code session, or quit and start Claude Desktop again.                                                                                                       |
-| `Token request failed: HTTP 401/403` | The key is incorrect, expired or revoked. Create a new key. The error shows the Content-Type and the body from Garmin.                                                                                                  |
-| An endpoint answers 400              | A query parameter has a different name. Use `garminGet` with the correct query string.                                                                                                                                  |
-| You need more details                | Read the server log: `~/.cache/garmin-personal-mcp/garmin-personal-mcp.log`. Claude Desktop also writes `~/.config/Claude/logs/mcp-server-garmin.log` (Linux) or `~/Library/Logs/Claude/mcp-server-garmin.log` (macOS). |
+| Problem                              | Solution                                                                                                                                                                                                                                  |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The server does not start            | Make sure that Node.js is version 22 or later: `node --version`.                                                                                                                                                                          |
+| Claude Desktop does not find `npx`   | GUI apps do not read your shell profile. Use the absolute path of `npx` (`which npx`) as the `command`.                                                                                                                                   |
+| Changes have no effect               | The client keeps the old server process. Start a new Claude Code session, or quit and start Claude Desktop again.                                                                                                                         |
+| `Token request failed: HTTP 401/403` | The key is incorrect, expired or revoked. Create a new key. The error shows the Content-Type and the body from Garmin.                                                                                                                    |
+| An endpoint answers 400              | A query parameter has a different name. Use `garminGet` with the correct query string.                                                                                                                                                    |
+| You need more details                | Read the server log: `~/.cache/garmin-personal-mcp/garmin-personal-mcp.log`. Claude Desktop also writes `~/.config/Claude/logs/mcp-server-garmin-personal.log` (Linux) or `~/Library/Logs/Claude/mcp-server-garmin-personal.log` (macOS). |
 
 To test the key, run this command. It shows only the HTTP status, and `200` means that the key
 is correct:
@@ -450,7 +415,7 @@ In the client configuration, use `node` with the absolute path of `dist/index.js
 ```json
 {
   "mcpServers": {
-    "garmin": {
+    "garmin-personal": {
       "command": "node",
       "args": ["/absolute/path/to/garmin-personal-mcp/dist/index.js"]
     }
@@ -484,7 +449,7 @@ have GPS data. The page tests use synthetic data from `test/fixtures/dashboard-d
 
 This project is a TypeScript version of [indaco/garmin-mcp](https://github.com/indaco/garmin-mcp),
 which is a fork of [apratico/garmin-mcp](https://github.com/apratico/garmin-mcp) by Alessandro
-Praticò.
+Praticò. The two servers use the same key file and can share the same data folder.
 
 ## License
 
