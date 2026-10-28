@@ -143,6 +143,24 @@ The **Language** menu has English, Italian and the languages that you add. The
 [page settings](#page-settings) can keep fewer themes and languages in the file. _Auto_ follows the
 language of the browser. [Languages](languages.md) tells how to add a language.
 
+## Units
+
+The page uses the units of your Garmin profile (in Garmin Connect, the measurement units of your
+user settings). The server reads them each time it writes the page. There is no units menu on the
+page: change the setting in Garmin Connect, then update the dashboard.
+
+| Value     | Metric | Statute US | Statute UK |
+| --------- | ------ | ---------- | ---------- |
+| Distance  | km     | mi         | mi         |
+| Pace      | /km    | /mi        | /mi        |
+| Speed     | km/h   | mph        | mph        |
+| Elevation | m      | ft         | m          |
+| Weight    | kg     | lb         | lb         |
+| Swim pace | /100 m | /100 yd    | /100 m     |
+
+Race names such as 5 km and 10 km stay the same in every system. If Garmin does not answer with
+the setting, the page uses metric.
+
 ## Page settings
 
 The `dashboard-setup` prompt asks you questions and writes a page with your answers. You can also
