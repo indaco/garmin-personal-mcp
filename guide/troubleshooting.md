@@ -26,5 +26,5 @@ The server must answer with one JSON line:
 
 ```bash
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}' \
-  | npx -y @indaco/garmin-personal-mcp
+  | npx -y @indaco/garmin-personal-mcp@latest
 ```
