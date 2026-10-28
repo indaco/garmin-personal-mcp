@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   activitiesIn,
+  boardOrder,
   dayOf,
+  GROUPS,
   groupOf,
+  groupsIn,
   isIndoor,
   mondayOf,
   seconds,
@@ -160,5 +163,26 @@ describe("URL hash", () => {
     expect(formatHash({ tab: "all", from: "2026-10-05", to: "2026-10-19" })).toBe(
       "#all@2026-10-05_2026-10-19",
     );
+  });
+});
+
+describe("boards in tab order", () => {
+  it("puts other sports, sorted, between the type boards and Other", () => {
+    expect(boardOrder(new Set(["rowing", "running", "alpineSkiing"]))).toEqual([
+      ...GROUPS.slice(0, -1),
+      "alpineSkiing",
+      "rowing",
+      "generic",
+    ]);
+  });
+
+  it("lists the boards of the activities in tab order, other sports included", () => {
+    expect(
+      groupsIn([
+        { type: "yoga" },
+        { type: "rowing", sport: "rowing" },
+        { type: "running", sport: "running" },
+      ]),
+    ).toEqual(["running", "rowing", "generic"]);
   });
 });

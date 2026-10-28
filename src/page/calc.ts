@@ -66,6 +66,18 @@ export function groupOf(a: Activity): string {
   return TYPE_BOARD.get(a.type ?? "") ?? sport;
 }
 
+/** The type boards in tab order: the fixed groups, then the other SDK sports in `present` sorted, then Other. */
+export function boardOrder(present: ReadonlySet<string>): string[] {
+  const others = [...present].filter((g) => !GROUPS.includes(g)).toSorted();
+  return [...GROUPS.slice(0, -1), ...others, "generic"];
+}
+
+/** The boards that the activities have, in tab order. */
+export function groupsIn(acts: Activity[]): string[] {
+  const present = new Set(acts.map(groupOf));
+  return boardOrder(present).filter((g) => present.has(g));
+}
+
 export const isIndoor = (key: string) =>
   ["indoor_cycling", "virtual_ride", "treadmill_running", "indoor_rowing"].includes(key);
 

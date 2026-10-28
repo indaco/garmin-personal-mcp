@@ -1,5 +1,5 @@
 import { addDays } from "../../dates";
-import { type Activity, GROUPS, groupOf } from "../calc";
+import { type Activity, groupOf, groupsIn } from "../calc";
 import { append, h } from "../dom";
 import type { Key } from "../i18n";
 import { register } from "../registry";
@@ -182,7 +182,7 @@ register({
     const prev = calc.periodWindow(ctx.from, ctx.to, ctx.data.prevStart);
     const now = ctx.activities;
     const before = ctx.ofType(between(everyActivity(ctx), prev.from, prev.to));
-    const groups = GROUPS.filter((g) => [...now, ...before].some((a) => groupOf(a) === g));
+    const groups = groupsIn([...now, ...before]);
     const row = (label: Node | string, a: Activity[], b: Activity[]) => {
       const x = totals(ctx, a);
       const y = totals(ctx, b);

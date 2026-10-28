@@ -1060,6 +1060,36 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     expect(errors).toEqual([]);
   });
 
+  it("draws the bars and the period row of another sport", async () => {
+    // a board with a single session shows a note instead of the chart, so give it two
+    const two = pageFile({
+      data: {
+        ...data,
+        v: 3,
+        activities: [{ ...ski, id: 9006, start: "2026-10-14 10:00:00" }, ski, ...data.activities],
+      },
+    });
+    const { page, errors } = await open(browser, two, { hash: "#alpineSkiing" });
+    const bars = await page.evaluate(() => {
+      const c = Object.values(window.Chart!.instances).find((x) =>
+        x.canvas.closest("[data-widget=typeWeekly]"),
+      )!;
+      return c.data.datasets.filter((d) => d.type === "bar").map((d) => d.label);
+    });
+    expect(bars).toEqual(["Alpine skiing"]);
+    await page.click("[data-tab=all]");
+    expect(await page.textContent("[data-widget=periodComparison]")).toContain("Alpine skiing");
+    expect(errors).toEqual([]);
+  });
+
+  it("adds a widget to another sport's board with that sport as its type", async () => {
+    const { page } = await open(browser, more(), { hash: "#alpineSkiing" });
+    await startEdit(page);
+    await page.click(".edit-bar >> text=Add widget");
+    const select = page.locator(".catalogue li:has-text('Weekly volume') select");
+    expect(await select.inputValue()).toBe("alpineSkiing");
+  });
+
   it("draws every extra board without errors, with a tooltip on every chart", async () => {
     const { page, errors } = await open(browser, more());
     for (const tab of ["walking", "hiking", "cycling", "swimming", "racket", "generic"]) {
