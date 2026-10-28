@@ -204,7 +204,7 @@ const languagesOf = (s: Settings) =>
  * A page from the template with the settings: its settings block, its title, and the CSS of the chosen
  * themes. Only rules for one theme alone go: a rule that lists more selectors is kept as it is.
  */
-function styled(page: string, s: Settings): string {
+export function styled(page: string, s: Settings): string {
   let next = writeBlock(page, "settings", Object.keys(s).length > 0 ? s : null);
   if (s.title)
     next = next.replace(/<title>[^<]*<\/title>/, () => `<title>${escapeHtml(s.title!)}</title>`);
@@ -217,6 +217,17 @@ function styled(page: string, s: Settings): string {
     );
   }
   return next;
+}
+
+/** The page with the built-in languages and the data that the settings keep, and the escaped notes. */
+export function withData(page: string, data: Json, s: Settings, notes: readonly string[]): string {
+  const next = writeBlock(page, "languages", languagesOf(s));
+  const kept = s.exclude?.includes("notes") ? [] : notes;
+  return writeBlock(next, "data", {
+    ...filterData(data, s),
+    v: DASHBOARD_VERSION,
+    notes: kept.map(escapeHtml),
+  });
 }
 
 /** Settings that the page can use; throws with what is wrong. */
@@ -381,15 +392,8 @@ export class DashboardWriter {
       );
     }
     if (page === undefined && next !== old) next = styled(next, own);
-    next = writeBlock(next, "languages", languagesOf(own));
-
-    const data = filterData(JSON.parse(await this.#data(weeks ?? weeksOf(old))) as Json, own);
-    const kept = own.exclude?.includes("notes") ? [] : notes;
-    next = writeBlock(next, "data", {
-      ...data,
-      v: DASHBOARD_VERSION,
-      notes: kept.map(escapeHtml),
-    });
+    const raw = JSON.parse(await this.#data(weeks ?? weeksOf(old))) as Json;
+    next = withData(next, raw, own, notes);
 
     let backup: string | undefined;
     if (old !== undefined && kind !== "updated") {
@@ -401,8 +405,8 @@ export class DashboardWriter {
       path: target,
       page: kind,
       ...(backup ? { backup } : {}),
-      notes: kept.length,
-      digest: digest(data),
+      notes: own.exclude?.includes("notes") ? 0 : notes.length,
+      digest: digest(filterData(raw, own)),
       ...(hasLanguages(next) ? { languages: missingTexts(next) } : {}),
     };
   }

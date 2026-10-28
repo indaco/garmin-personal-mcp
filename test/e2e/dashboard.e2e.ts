@@ -3,6 +3,7 @@ import axe from "axe-core";
 import type { Browser, Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { THEMES } from "../../src/page/theme";
+import { DASHBOARD_VERSION } from "../../src/prompts";
 import { data, launch, open, pageFile } from "./page";
 
 let browser: Browser;
@@ -21,9 +22,13 @@ const tiles = (page: Page) =>
   page.$$eval(".tile", (els) => els.map((e) => (e as HTMLElement).dataset.id));
 /** The "Average pace" value of the running board for the given activities. */
 async function runningPace(activities: unknown[]): Promise<string | null> {
-  const { page } = await open(browser, pageFile({ data: { ...data, v: 3, activities } }), {
-    hash: "#running",
-  });
+  const { page } = await open(
+    browser,
+    pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }),
+    {
+      hash: "#running",
+    },
+  );
   return page
     .locator("[data-id=typeKpis] .kpi", {
       has: page.locator(".kpi-label", { hasText: "Average pace" }),
@@ -254,7 +259,9 @@ describe("the page", () => {
 
     const failed = await open(
       browser,
-      pageFile({ data: { ...data, v: 3, notes: [], sync: { ...data.sync, failedDays: 2 } } }),
+      pageFile({
+        data: { ...data, v: DASHBOARD_VERSION, notes: [], sync: { ...data.sync, failedDays: 2 } },
+      }),
     );
     expect(await failed.page.textContent("footer .gap")).toBe(
       "Days not read from Garmin: 2 (their values show n/a)",
@@ -853,7 +860,7 @@ describe("overview widgets", () => {
     };
     const { page } = await open(
       browser,
-      pageFile({ data: { ...data, v: 3, activities: [swim, ...data.activities] } }),
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: [swim, ...data.activities] } }),
       { hash: "#swimming" },
     );
     const cells = await page.$$eval("[data-id=swimDetails] tbody tr:first-child td", (c) =>
@@ -1019,7 +1026,7 @@ describe("type boards", () => {
     const ride = data.activities.find((a: { type: string }) => a.type === "cycling");
     const { page } = await open(
       browser,
-      pageFile({ data: { ...data, activities: [ride], v: 3 } }),
+      pageFile({ data: { ...data, activities: [ride], v: DASHBOARD_VERSION } }),
       { hash: "#cycling" },
     );
     expect(await page.textContent("[data-id=typeWeekly]")).toContain("One session so far");
@@ -1082,7 +1089,7 @@ describe("strength board", () => {
           }
         : a,
     );
-    const file = pageFile({ data: { ...data, v: 3, activities } });
+    const file = pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } });
     const { page, errors } = await open(browser, file, { hash: "#strengthTraining" });
     await page.click("[data-exercise='腹筋']");
     expect(await page.textContent(".detail h3")).toBe("腹筋");
@@ -1203,7 +1210,11 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
   };
   const more = () =>
     pageFile({
-      data: { ...data, v: 3, activities: [hike, swim, yoga, tennis, ski, ...data.activities] },
+      data: {
+        ...data,
+        v: DASHBOARD_VERSION,
+        activities: [hike, swim, yoga, tennis, ski, ...data.activities],
+      },
     });
 
   it("adds a tab for each other sport in the data, and the Other tab last", async () => {
@@ -1238,7 +1249,7 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     const two = pageFile({
       data: {
         ...data,
-        v: 3,
+        v: DASHBOARD_VERSION,
         activities: [{ ...ski, id: 9006, start: "2026-10-14 10:00:00" }, ski, ...data.activities],
       },
     });
@@ -1337,7 +1348,7 @@ describe("custom widgets and languages", () => {
     const { page, errors } = await open(
       browser,
       pageFile({
-        data: { ...data, v: 3, notes: ["Don&#39;t skip Z2 &amp; strides"] },
+        data: { ...data, v: DASHBOARD_VERSION, notes: ["Don&#39;t skip Z2 &amp; strides"] },
         widgets: [custom("note", "el.textContent = ctx.data.notes[0];")],
         layout: on("note"),
       }),
@@ -1367,7 +1378,7 @@ describe("custom widgets and languages", () => {
       zones: null,
       activities: data.activities.map(noLoad),
       previousActivities: data.previousActivities.map(noLoad),
-      v: 3,
+      v: DASHBOARD_VERSION,
       notes: [],
     };
     const { page, errors } = await open(browser, pageFile({ data: noLoadData }), {
