@@ -90,7 +90,7 @@ next to the keys that the file has, not in `preferences`:
   "mcpServers": {
     "garmin-personal": {
       "command": "npx",
-      "args": ["-y", "@indaco/garmin-personal-mcp"]
+      "args": ["-y", "@indaco/garmin-personal-mcp@latest"]
     }
   }
 }
@@ -101,7 +101,7 @@ Then quit Claude Desktop **fully**, including the tray icon, and start it again.
 **Claude Code**: this command adds the server to all your projects:
 
 ```bash
-claude mcp add garmin-personal --scope user -- npx -y @indaco/garmin-personal-mcp
+claude mcp add garmin-personal --scope user -- npx -y @indaco/garmin-personal-mcp@latest
 claude mcp list          # garmin-personal: ... ✔ Connected
 ```
 

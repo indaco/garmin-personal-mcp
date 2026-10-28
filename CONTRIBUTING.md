@@ -59,7 +59,7 @@ prek install             # the git hooks: format and lint on commit, typecheck a
 
 To try a change before a release, use your build in place of the npm package. In the client
 configuration, use `node` with the absolute path of `dist/index.js` in place of
-`npx -y @indaco/garmin-personal-mcp`:
+`npx -y @indaco/garmin-personal-mcp@latest`:
 
 ```json
 {
