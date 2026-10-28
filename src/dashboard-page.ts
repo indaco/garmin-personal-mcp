@@ -433,7 +433,7 @@ export class DashboardWriter {
       const saved = readBlock(old, "layout");
       if (saved === undefined) {
         throw new Error(
-          "This page has no widget layout: it is a page that Claude wrote, not the template",
+          "This page has no widget layout: it is a page that the assistant wrote, not the template",
         );
       }
       layout = parseLayout(saved);

@@ -4,7 +4,7 @@ export const it: Catalogue = {
   title: "Allenamento + Recupero",
   headline: "Carico di allenamento, recupero e progressi da Garmin Connect",
   na: "n/d",
-  noData: "Questa pagina non ha ancora dati. Chiedi a Claude di scrivere la dashboard.",
+  noData: "Questa pagina non ha ancora dati. Chiedi al tuo assistente di scrivere la dashboard.",
   period: "dal {from} al {to}",
   inProgress: "* settimana in corso",
 
@@ -160,7 +160,7 @@ export const it: Catalogue = {
   "said.discarded": "Modifiche annullate",
   "stale.label": "Nuovo layout",
   "stale.text":
-    "Claude ha scritto un nuovo layout per questa dashboard. Il layout che hai fatto in questo browser resta finché non scegli.",
+    "Il tuo assistente ha scritto un nuovo layout per questa dashboard. Il layout che hai fatto in questo browser resta finché non scegli.",
   "stale.keep": "Tieni il mio",
   "stale.new": "Usa il nuovo",
   "stale.used": "Ora usi il nuovo layout",
@@ -175,7 +175,7 @@ export const it: Catalogue = {
 
   "copy.title": "Copia layout",
   "copy.hint":
-    "Questo layout è salvato solo in questo browser. Per tenerlo nella pagina, incolla questo testo a Claude e chiedigli di salvare il layout della dashboard.",
+    "Questo layout è salvato solo in questo browser. Per tenerlo nella pagina, incolla questo testo al tuo assistente e chiedigli di salvare il layout della dashboard.",
   "copy.copy": "Copia",
   "copy.copied": "Copiato",
 

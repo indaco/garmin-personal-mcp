@@ -38,7 +38,7 @@ export function registerPrompts(server: McpServer): void {
         layout: z
           .string()
           .describe(
-            "preset (default): the built-in widgets; blank: an empty grid; freeform: Claude designs the whole page",
+            "preset (default): the built-in widgets; blank: an empty grid; freeform: the assistant designs the whole page",
           )
           .optional(),
       }),
@@ -144,7 +144,7 @@ export function registerPrompts(server: McpServer): void {
   );
 
   const languageDescription =
-    "Add a language to the training dashboard (Claude translates its texts)";
+    "Add a language to the training dashboard (the assistant translates its texts)";
   server.registerPrompt(
     "dashboard-language",
     {

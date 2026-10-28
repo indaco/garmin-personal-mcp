@@ -68,7 +68,7 @@ body:
     attributes:
       label: Steps to reproduce
       placeholder: |
-        1. Ask Claude "show the sets of my last strength workout"
+        1. Ask your assistant "show the sets of my last strength workout"
         2. Claude calls getActivitySets
         3. See the error...
     validations:

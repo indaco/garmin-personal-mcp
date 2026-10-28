@@ -22,7 +22,7 @@ it by hand.
 | Bedtime | `bedtime` | Bedtimes of the last 14 nights and their spread. | - | 1 |
 | Body battery | `bodyBattery` | Body battery high and low of the last 14 days. | - | 1 |
 | Activities | `activities` | The activities of the window, 15 rows first; activities with laps open to show them. | all and each type | 3 |
-| Coach notes | `coachNotes` | The coach notes that Claude writes for the data. | - | 3 |
+| Coach notes | `coachNotes` | The coach notes that the assistant writes for the data. | - | 3 |
 | Summary | `typeKpis` | Sessions, time, distance with pace or speed, HR, Garmin load and its share, and the last 7 days against the 4-week average. | all and each type | 3 |
 | Each week | `typeWeekly` | Time, distance or sessions of each week. | all and each type | 2 |
 | Time in HR zones | `hrZones` | Minutes in HR zones 1-5 each week. | all and each type | 1 |

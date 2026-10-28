@@ -462,7 +462,7 @@ describe("edit mode", () => {
     // the page layout has the notes and a widget that does not exist yet
     expect(await tiles(page)).toEqual(["coachNotes"]);
     // and the page offers the layout of this browser back
-    expect(await page.textContent(".banner")).toContain("Claude wrote a new layout");
+    expect(await page.textContent(".banner")).toContain("Your assistant wrote a new layout");
     await page.click(".banner >> text=Keep mine");
     expect(await tiles(page)).toEqual([]);
     expect(await page.$(".banner")).toBeNull();
