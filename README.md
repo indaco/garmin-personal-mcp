@@ -227,10 +227,10 @@ without a translation shows in English. To remove an added language, ask Claude 
 | `downloadActivityFit` | saves the .FIT file of an activity in the data folder                  |
 | `getHrvRange`         | HRV during the night                                                   |
 | `getDailyHeartRate`   | the heart rate of a day, with the resting HR                           |
-| `getSleep`            | the sleep of a night                                                   |
+| `getSleep`            | the sleep of a night, or of up to 14 nights                            |
 | `getHeartRateZones`   | your HR zones                                                          |
 | `getFitnessAge`       | fitness age against actual age                                         |
-| `getDailySummary`     | steps, stress and Body Battery                                         |
+| `getDailySummary`     | steps, stress and Body Battery, for a day or a range                   |
 | `getDashboardData`    | all the data of the dashboard in one call, with a local cache          |
 | `writeDashboard`      | writes the dashboard page                                              |
 | `editDashboard`       | changes the layout, the custom widgets and the languages of the page   |
