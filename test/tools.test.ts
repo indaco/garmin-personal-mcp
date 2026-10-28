@@ -239,15 +239,47 @@ describe("activities", () => {
     expect(api.getJson.mock.lastCall?.[1]).toMatchObject({ limit: "20" });
   });
 
-  it("filters by type itself when Garmin refuses activityType", async () => {
-    api.getJson.mockRejectedValueOnce(refused()).mockResolvedValueOnce([
-      { activityId: 1, activityType: { typeKey: "running" } },
-      { activityId: 2, activityType: { typeKey: "cycling" } },
-      { activityId: 3, activityType: { typeKey: "running" } },
-    ]);
+  it("asks again with activitySubType when Garmin refuses a subtype as activityType", async () => {
+    api.getJson
+      .mockRejectedValueOnce(refused())
+      .mockResolvedValueOnce([{ activityId: 5, activityType: { typeKey: "trail_running" } }]);
+    const rows = JSON.parse(await tools.listActivities(undefined, undefined, "trail_running", 5));
+    expect(rows.map((r: { id: number }) => r.id)).toEqual([5]);
+    expect(api.getJson).toHaveBeenCalledTimes(2);
+    expect(api.getJson.mock.lastCall?.[1]).toMatchObject({
+      activityType: undefined,
+      activitySubType: "trail_running",
+      limit: "5",
+    });
+  });
+
+  it("filters by type itself when Garmin refuses activityType and activitySubType", async () => {
+    api.getJson
+      .mockRejectedValueOnce(refused())
+      .mockRejectedValueOnce(refused())
+      .mockResolvedValueOnce([
+        { activityId: 1, activityType: { typeKey: "running" } },
+        { activityId: 2, activityType: { typeKey: "cycling" } },
+        { activityId: 3, activityType: { typeKey: "running" } },
+      ]);
     const rows = JSON.parse(await tools.listActivities(undefined, undefined, "running", 1));
     expect(rows.map((r: { id: number }) => r.id)).toEqual([1]);
-    expect(api.getJson.mock.lastCall?.[1]).toMatchObject({ activityType: undefined, limit: "200" });
+    expect(api.getJson).toHaveBeenCalledTimes(3);
+    expect(api.getJson.mock.lastCall?.[1]).toMatchObject({
+      activityType: undefined,
+      activitySubType: undefined,
+      limit: "200",
+    });
+  });
+
+  it("does not ask again for an error that is not a 400", async () => {
+    api.getJson
+      .mockRejectedValueOnce(refused())
+      .mockRejectedValueOnce(
+        new GarminApiError("GET /activitylist-service/activities/search/activities -> HTTP 500: x"),
+      );
+    await expect(tools.listActivities(undefined, undefined, "running")).rejects.toThrow(/HTTP 500/);
+    expect(api.getJson).toHaveBeenCalledTimes(2);
   });
 
   it("does not hide other errors", async () => {

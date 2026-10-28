@@ -36,26 +36,33 @@ export class GarminTools {
     raw?: boolean,
   ): Promise<string> {
     const asked = limit == null || limit <= 0 ? 20 : Math.min(limit, 200);
-    const search = (type: string | undefined, max: number) =>
+    const search = (max: number, type?: string, subType?: string) =>
       this.api.getJson("/activitylist-service/activities/search/activities", {
         start: "0",
         limit: String(max),
         startDate,
         endDate,
         activityType: type,
+        activitySubType: subType,
       });
+    const refused = (e: unknown) =>
+      activityType !== undefined && e instanceof GarminApiError && /-> HTTP 400\b/.test(e.message);
     let json: unknown;
     let local = false;
     try {
-      json = await search(activityType, asked);
+      json = await search(asked, activityType);
     } catch (e) {
-      // Garmin sometimes answers 400 to activityType: ask for the biggest page and filter here
-      if (!activityType || !(e instanceof GarminApiError) || !/-> HTTP 400\b/.test(e.message)) {
-        throw e;
+      if (!refused(e)) throw e;
+      // activityType takes parent types only; Garmin answers 400 to a subtype such as trail_running
+      try {
+        json = await search(asked, undefined, activityType);
+        log("INFO", `activityType ${activityType} refused, asked as activitySubType`);
+      } catch (e2) {
+        if (!refused(e2)) throw e2;
+        log("INFO", `activityType ${activityType} refused as type and subtype, filtering locally`);
+        json = await search(200);
+        local = true;
       }
-      log("INFO", `activityType ${activityType} refused, filtering locally`);
-      json = await search(undefined, 200);
-      local = true;
     }
     const list = Array.isArray(json) ? json : firstArray(json);
     if (!list) {
@@ -459,7 +466,12 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
       inputSchema: z.object({
         startDate: z.string().describe("Start date yyyy-MM-dd (optional)").optional(),
         endDate: z.string().describe("End date yyyy-MM-dd (optional)").optional(),
-        activityType: z.string().describe("Activity type key, e.g. running (optional)").optional(),
+        activityType: z
+          .string()
+          .describe(
+            "Activity type key (optional): a parent type such as running or cycling, or a subtype such as trail_running",
+          )
+          .optional(),
         limit: z.number().int().describe("Max number of activities, default 20").optional(),
         raw: z.boolean().describe("Return Garmin's raw JSON instead of the summary").optional(),
       }),

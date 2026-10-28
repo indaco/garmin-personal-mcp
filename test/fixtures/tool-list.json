@@ -337,7 +337,7 @@
         },
         "activityType": {
           "type": "string",
-          "description": "Activity type key, e.g. running (optional)"
+          "description": "Activity type key (optional): a parent type such as running or cycling, or a subtype such as trail_running"
         },
         "limit": {
           "type": "integer",

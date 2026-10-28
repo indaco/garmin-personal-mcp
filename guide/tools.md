@@ -23,10 +23,12 @@ yourself.
 
 Dates use the format `yyyy-MM-dd`. The API reference does not always give the names of the query
 parameters. If an endpoint answers 400, Claude can use `garminGet` to try a different name.
-When Garmin refuses `activityType` (HTTP 400), `listActivities` asks for the last 200 activities
-and keeps those whose type key is exactly `activityType`: `running` does not include
-`trail_running`. Ask for each type, or leave `activityType` out and filter the list. `garminGet`
-decodes the query string before it sends it, so an encoded value such as `calendarDate=2026%2D10%2D24` also works.
+`activityType` takes a parent type, such as `running` or `cycling`, or a subtype, such as
+`trail_running`. Garmin accepts a subtype only as `activitySubType`: when it refuses the type
+(HTTP 400), `listActivities` asks again with the subtype. When Garmin refuses both, it asks for
+the last 200 activities and keeps those whose type key is exactly `activityType`. `garminGet`
+decodes the query string before it sends it, so an encoded value such as
+`calendarDate=2026%2D10%2D24` also works.
 API reference: <https://developer.garmin.com/gc-developer-program/personal/swagger-docs/>
 
 The Personal API does not have these Garmin Connect data, and their endpoints answer 404:
