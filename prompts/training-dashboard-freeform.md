@@ -23,8 +23,9 @@ of `getDashboardData` with `weeks` = {{weeks}}, which has:
   `rem`, `awake`), `sleepScore`, sleep need `needH`, bedtime `bedMin` (minutes after midnight),
   `rhr`, body battery `bbHigh` and `bbLow`, `stress`, `steps`, `stepGoal`, `floors`.
 - `sync`: what the server fetched. The server keeps a local cache and asks Garmin only for the new
-  days. If `failedDays` is more than 0, name the dates in `failedDates` in chat. Their widgets show
-  "n/a".
+  days. If `failedDays` is more than 0, name the dates in `failedDates` in chat. If
+  `failedSections` is not empty, name those sections in chat: `zones` and `fitnessAge` are then null
+  and `hrv` can have no rows. Their widgets show "n/a".
 - `notes`: the coach notes, a list of strings. The server escapes them as HTML.
 
 You do not need to call `getDashboardData`: the field names above are all the page needs.

@@ -90,6 +90,17 @@ describe("prompts", () => {
     expect(keep.includes("{{")).toBe(false);
   });
 
+  it("asks Claude to name the failed days and the failed sections", async () => {
+    for (const text of [
+      await render("training-dashboard"),
+      await render("training-dashboard-update"),
+      await render("training-dashboard", { layout: "freeform" }),
+    ]) {
+      expect(text).toContain("failedDates");
+      expect(text).toContain("failedSections");
+    }
+  });
+
   it("asks the setup questions with the built-in languages and themes, and the weeks", async () => {
     const text = await render("dashboard-setup", { weeks: "8" });
     expect(text).toContain("last **8 weeks** (today is 2026-10-28)");
