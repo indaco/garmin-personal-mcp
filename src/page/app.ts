@@ -7,7 +7,7 @@ import { type Activity, activitiesIn, GROUPS, groupOf, weeksOf } from "./calc";
 import { Chart, chart, destroyCharts, themeCharts } from "./charts";
 import { announce, h, keepFocus } from "./dom";
 import { dragTile, keyMove, resizeTile } from "./edit-drag";
-import { icon } from "./icons";
+import { icon, logo } from "./icons";
 import {
   addLanguages,
   formatter,
@@ -186,13 +186,7 @@ function footer(): HTMLElement {
   return h(
     "footer",
     { class: "foot" },
-    // shortcut: placeholder name; the logo is styled once in .logo
-    h(
-      "a",
-      { class: "brand", href: REPO },
-      h("span", { class: "logo", "aria-hidden": "true" }),
-      "garmin-personal-mcp",
-    ),
+    h("a", { class: "brand", href: REPO }, logo(), "garmin-personal-mcp"),
     h(
       "nav",
       { "aria-label": t("footer.links") },
@@ -218,7 +212,7 @@ function header(data: Data): HTMLElement {
       h(
         "div",
         { class: "title" },
-        h("span", { class: "logo", "aria-hidden": "true" }),
+        logo(),
         h(
           "div",
           {},
