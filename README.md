@@ -3,7 +3,7 @@
   garmin-personal-mcp
 </h1>
 
-<p align="center"><b>Your Garmin training in Claude, through the official Personal API. Read-only, nothing to install.</b></p>
+<p align="center"><b>Your Garmin training in Claude, Codex or any MCP client, through the official Personal API. Read-only, nothing to install.</b></p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@indaco/garmin-personal-mcp"><img src="https://img.shields.io/npm/v/@indaco/garmin-personal-mcp.svg" alt="npm version" /></a>
@@ -44,7 +44,7 @@ MCP server for the official Garmin Connect Personal API.
 - **Recovery data**: HRV, sleep and heart rate.
 - **Dashboard in less than a minute**: [training-dashboard](#training-dashboard) shows your
   training load next to recovery, in widgets that you can move, resize, hide and add. You can also
-  [let Claude design the whole page](#presets-or-freeform).
+  [let the assistant design the whole page](#presets-or-freeform).
 - **Your layout stays**: [training-dashboard-update](#training-dashboard-update) adds only the
   new data.
 - **A page for you or for your coach**: [dashboard-setup](#dashboard-setup) makes a personal page,
@@ -52,9 +52,10 @@ MCP server for the official Garmin Connect Personal API.
   data that you do not select is not in the file.
 - **Extend it**: [dashboard-widget](#dashboard-widget) makes a new widget from your idea.
   [dashboard-language](#dashboard-language) adds a language.
-- **All stdio clients**: Claude Desktop, Claude Code, Codex and all other MCP clients that use stdio.
+- **All stdio clients**: Claude Desktop, Claude Code, Codex and all other MCP clients that use
+  stdio. Tested with Claude Desktop and Claude Code.
 
-With this server, you can ask Claude:
+With this server, you can ask your assistant:
 
 - "List my last 5 activities, with pace and heart rate."
 - "Show the laps of my last run."
@@ -130,7 +131,7 @@ Codex does not send your shell environment to the server. Use the key file, or a
 set the command `npx` and the arguments `-y @indaco/garmin-personal-mcp@latest`. Some clients do not
 show MCP prompts. In these clients, ask for the dashboard in your own words. The tools are the same.
 
-### 3. Ask Claude
+### 3. Ask your assistant
 
 Ask "list my last 5 activities". The first time that a garmin-personal tool asks for permission, answer
 **Allow always** in Claude Desktop. In Claude Code, use `/permissions` and add `mcp__garmin-personal`.
@@ -147,8 +148,8 @@ Claude Desktop, they change after a full restart.
 
 ### training-dashboard
 
-The server writes the dashboard page from its template, and Claude writes the coach notes. The page
-is one HTML file, `garmin-dashboard.html` in the data folder. It works offline.
+The server writes the dashboard page from its template, and the assistant writes the coach notes.
+The page is one HTML file, `garmin-dashboard.html` in the data folder. It works offline.
 
 | Argument | Values                            | Default  |
 | -------- | --------------------------------- | -------- |
@@ -157,7 +158,7 @@ is one HTML file, `garmin-dashboard.html` in the data folder. It works offline.
 
 - `preset` gives the built-in widgets on each board.
 - `blank` gives empty boards: you add the widgets that you want.
-- `freeform` lets Claude design the whole page. This takes much longer, and each page looks
+- `freeform` lets the assistant design the whole page. This takes much longer, and each page looks
   different.
 
 | Client         | How to run it                                                               |
@@ -168,10 +169,10 @@ is one HTML file, `garmin-dashboard.html` in the data folder. It works offline.
 In Claude Code, the arguments are in order and separated by spaces: first `weeks`, then `layout`.
 You can also give only the layout: `/garmin-personal:training-dashboard freeform`.
 
-Claude gives you the path of the page and the command to open it. The page has a board for all
-your training, a Recovery board and a board for each sport, with 11 themes and English and Italian
-texts. It uses the training load, HR zones and training effect from Garmin. It labels each value
-that it calculates as an estimate, and a missing value shows as "n/a".
+The assistant gives you the path of the page and the command to open it. The page has a board for
+all your training, a Recovery board and a board for each sport, with 11 themes and English and
+Italian texts. It uses the training load, HR zones and training effect from Garmin. It labels each
+value that it calculates as an estimate, and a missing value shows as "n/a".
 
 [The dashboard guide](guide/dashboard.md) tells what each board shows and how to change the layout.
 [The widget catalogue](guide/widgets.md) lists every widget.
@@ -199,14 +200,14 @@ approximately 8.
 
 ### dashboard-setup
 
-Claude asks you some questions, then writes a page with your answers. First, it asks who the page
-is for:
+The assistant asks you some questions, then writes a page with your answers. First, it asks who the
+page is for:
 
 - **Personal**: a page for you, with all your data.
 - **Shared**: a page for your coach or personal trainer. You select each type of data to include,
   for example HR zones yes, fitness age and sleep no.
 
-Then Claude asks for the file (any name or path), the title, the headline, the sports, the
+Then the assistant asks for the file (any name or path), the title, the headline, the sports, the
 languages and the themes. The server writes only the data that you select into the file. Other data
 is not in the file, so you can send the file safely. A personal page and a shared page can be two
 files side by side. Each page keeps its settings on each update. The argument `weeks` is optional
@@ -221,9 +222,9 @@ files side by side. Each page keeps its settings on each update. The argument `w
 
 ### dashboard-widget
 
-This prompt makes a new widget from your idea, for example "my longest ride of each month". Claude
-writes a small widget, and `editDashboard` stores it in the page. The widget stays after each
-update. The argument `idea` is required. The argument `path` is optional: it is the file of the
+This prompt makes a new widget from your idea, for example "my longest ride of each month". The
+assistant writes a small widget, and `editDashboard` stores it in the page. The widget stays after
+each update. The argument `idea` is required. The argument `path` is optional: it is the file of the
 page, for example `coach.html`. In Claude Code:
 `/garmin-personal:dashboard-widget my longest ride each month coach.html`. Reload the page to see
 the widget.
@@ -231,12 +232,12 @@ the widget.
 
 ### dashboard-language
 
-This prompt adds a language to the dashboard. Claude translates the texts of the page, and
+This prompt adds a language to the dashboard. The assistant translates the texts of the page, and
 `editDashboard` stores them in the page. The argument `language` is optional: the default is the
 language of the conversation. The argument `path` is optional: it is the file of the page, for
-example `coach.html`. In Claude Code: `/garmin-personal:dashboard-language German coach.html`. A text
-without a translation shows in English. To remove an added language, ask Claude to remove it:
-`editDashboard` with `removeLanguages`.
+example `coach.html`. In Claude Code: `/garmin-personal:dashboard-language German coach.html`. A
+text without a translation shows in English. To remove an added language, ask your assistant to
+remove it: `editDashboard` with `removeLanguages`.
 [Languages](guide/languages.md) tells more.
 
 ## Tools
@@ -288,7 +289,8 @@ log.
 
 In many setup guides for Claude and Garmin, Claude reads the data and writes the whole dashboard
 page. With a preset, the server writes the page from a tested template, and Claude writes only the
-coach notes. My measurements for a first build:
+coach notes. My measurements for a first build, with Claude Code and Opus
+(other clients and models give other times and costs):
 
 | First build            | Time         | Cost         |
 | ---------------------- | ------------ | ------------ |
@@ -315,11 +317,11 @@ does not endorse this project, and the project has no affiliation with Garmin.
 
 ## Problems and solutions
 
-| Problem                            | Solution                                                                                                          |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| The server does not start          | Make sure that Node.js is version 22 or later: `node --version`.                                                  |
-| Claude Desktop does not find `npx` | GUI apps do not read your shell profile. Use the absolute path of `npx` (`which npx`) as the `command`.           |
-| Changes have no effect             | The client keeps the old server process. Start a new Claude Code session, or quit and start Claude Desktop again. |
+| Problem                            | Solution                                                                                                                        |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| The server does not start          | Make sure that Node.js is version 22 or later: `node --version`.                                                                |
+| Claude Desktop does not find `npx` | GUI apps do not read your shell profile. Use the absolute path of `npx` (`which npx`) as the `command`.                         |
+| Changes have no effect             | The client keeps the old server process. Restart the client: a new Claude Code session, or quit and start Claude Desktop again. |
 
 [Problems and solutions](guide/troubleshooting.md) has more problems, the log files, and commands
 that test the key and the server.

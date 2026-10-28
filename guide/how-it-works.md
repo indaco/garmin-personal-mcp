@@ -2,7 +2,7 @@
 
 ```mermaid
 flowchart LR
-    C["Claude Desktop / Claude Code"] -- "MCP over stdio" --> S["garmin-personal-mcp (Node.js)"]
+    C["MCP client (Claude, Codex, ...)"] -- "MCP over stdio" --> S["garmin-personal-mcp (Node.js)"]
     S -- "API key → access token (24 h)" --> T["Garmin token endpoint"]
     S -- "Bearer token, GET" --> G["Garmin Connect Personal API"]
     S -- "exercise catalogue, no token" --> E["connect.garmin.com"]

@@ -4,10 +4,10 @@ The dashboard has English and Italian built in. You can add any language, and yo
 built-in texts. The [page settings](dashboard.md#page-settings) can keep only one built-in
 language in the page, for example Italian only.
 
-## Add a language through Claude
+## Add a language through your assistant
 
 Run the `dashboard-language` prompt. Give the language, for example "German". Without a language,
-Claude uses the language of the conversation. Claude:
+The assistant uses the language of the conversation. The assistant:
 
 1. gets the English texts from the `editDashboard` tool.
 2. translates them. Each `{placeholder}` stays as it is.
@@ -17,14 +17,14 @@ Reload the page. The **Language** menu shows the language by its own name, for e
 A text without a translation shows in English.
 
 The server accepts only the keys of the English texts, with the same placeholders. After a server
-update with new texts, the update prompt tells Claude which texts are missing.
+update with new texts, the update prompt tells the assistant which texts are missing.
 
-To remove a language that you added, ask Claude. For example: "Remove the German language from the
-page". Claude calls `editDashboard` with `removeLanguages`. Built-in languages stay: the
-[page settings](dashboard.md#page-settings) choose them.
+To remove a language that you added, ask your assistant. For example: "Remove the German language
+from the page". The assistant calls `editDashboard` with `removeLanguages`. Built-in languages stay:
+the [page settings](dashboard.md#page-settings) choose them.
 
-To change one text of a built-in language, ask Claude. For example: "In Italian, call the readiness
-widget _Forma di oggi_".
+To change one text of a built-in language, ask your assistant. For example: "In Italian, call the
+readiness widget _Forma di oggi_".
 
 ## Add a built-in language
 

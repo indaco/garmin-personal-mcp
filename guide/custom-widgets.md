@@ -1,23 +1,23 @@
 # Custom widgets
 
-A custom widget is a small piece of JavaScript that Claude writes for you. The server keeps it in
-the page, and each update keeps it.
+A custom widget is a small piece of JavaScript that your assistant writes for you. The server keeps
+it in the page, and each update keeps it.
 
 ## Make a widget
 
 Run the `dashboard-widget` prompt with your idea, for example "my longest ride of each month".
 The optional `path` argument, or a last word that ends in `.html`, picks the page file.
-Claude:
+The assistant:
 
-1. reads the widget catalogue. If a built-in widget shows the same thing, Claude adds that widget
-   instead.
+1. reads the widget catalogue. If a built-in widget shows the same thing, the assistant adds that
+   widget instead.
 2. writes the widget and saves it with the `editDashboard` tool.
 3. puts the widget on the board that fits the idea.
 
-Reload the page to see the widget. Claude cannot open the page, so Claude cannot test the widget.
+Reload the page to see the widget. The assistant cannot open the page, so it cannot test the widget.
 
-You can also ask Claude to change or remove a custom widget. The widget catalogue of the page
-(the settings menu, **Edit layout**, then **Add widget**) lists the custom widgets too.
+You can also ask your assistant to change or remove a custom widget. The widget catalogue of the
+page (the settings menu, **Edit layout**, then **Add widget**) lists the custom widgets too.
 
 ## When a widget fails
 
@@ -27,12 +27,12 @@ other widgets work. A widget with a syntax error shows the error the same way.
 ## Safety
 
 A custom widget runs in your page, as the built-in widgets do. It can read the data of the page and
-draw in its tile. Claude writes it only when you ask, and the server stores it only in your page.
-Read the code in the page file if you want to see it.
+draw in its tile. The assistant writes it only when you ask, and the server stores it only in your
+page. Read the code in the page file if you want to see it.
 
 ## The widget API
 
-Claude gets this text from `editDashboard`. It is the same text that the server sends.
+The assistant gets this text from `editDashboard`. It is the same text that the server sends.
 
 <!-- widget-api:start -->
 ```text

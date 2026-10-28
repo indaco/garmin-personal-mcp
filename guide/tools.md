@@ -1,7 +1,7 @@
 # Tools
 
-The server gives Claude these tools. Claude chooses and calls them. You do not call them
-yourself.
+The server gives your assistant these tools. The assistant chooses and calls them. You do not call
+them yourself.
 
 | Tool                  | Endpoint                                                                            | What it gives                                                                                                                                                                                                                                                                                                                                                                       |
 | --------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -22,7 +22,7 @@ yourself.
 | `garminGet`           | all other GET endpoints                                                             | a relative path and a query string                                                                                                                                                                                                                                                                                                                                                  |
 
 Dates use the format `yyyy-MM-dd`. The API reference does not always give the names of the query
-parameters. If an endpoint answers 400, Claude can use `garminGet` to try a different name.
+parameters. If an endpoint answers 400, the assistant can use `garminGet` to try a different name.
 `activityType` takes a parent type, such as `running` or `cycling`, or a subtype, such as
 `trail_running`. Garmin accepts a subtype only as `activitySubType`: when it refuses the type
 (HTTP 400), `listActivities` asks again with the subtype. When Garmin refuses both, it asks for

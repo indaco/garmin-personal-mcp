@@ -176,7 +176,7 @@ module that they test (`test/tools.test.ts` for `src/tools.ts`).
 
 1. Add the widget to `src/page/catalogue.ts`: its id, the key of its title, its types and its width.
 2. Add an English description of more than 20 characters to `ABOUT` in
-   `src/page/catalogue-about.ts`. Claude and the widget guide read it.
+   `src/page/catalogue-about.ts`. The assistant and the widget guide read it.
 3. Add the title to every catalogue in `src/page/i18n/`.
 4. Put its calculations in a module of `src/page/` (for example `metrics.ts`), with a test in
    `test/page/`.
