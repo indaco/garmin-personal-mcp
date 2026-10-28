@@ -10,10 +10,8 @@ export const it: Catalogue = {
 
   "menu.settings": "Impostazioni",
   "menu.theme": "Tema",
-  "footer.links": "Link del progetto",
-  "footer.source": "Codice su GitHub",
-  "footer.issues": "Segnala un problema",
-  "footer.releases": "Versioni",
+  "footer.updated": "Dati da Garmin Connect, aggiornati il {date}",
+  "footer.failed": "Giorni non letti da Garmin: {n} (i loro valori mostrano n/d)",
   "footer.license": "Licenza MIT",
   "menu.language": "Lingua",
   "lang.auto": "Automatica",

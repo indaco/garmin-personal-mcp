@@ -185,7 +185,7 @@ function render(): void {
         header(data),
         editing && editBar(),
         boardView(data),
-        footer(),
+        footer(data),
       ),
     ),
   );
@@ -195,25 +195,29 @@ function render(): void {
 
 const REPO = "https://github.com/indaco/garmin-personal-mcp";
 
-function footer(): HTMLElement {
-  const links: [Key, string][] = [
-    ["footer.source", REPO],
-    ["footer.issues", `${REPO}/issues`],
-    ["footer.releases", `${REPO}/releases`],
-    ["footer.license", `${REPO}/blob/main/LICENSE`],
-  ];
+/**
+ * Where the data comes from and when it was written, the days that Garmin did not give (their values
+ * show n/a), then the project and its license.
+ */
+function footer(data?: Data): HTMLElement {
+  const failed = Number(data?.sync?.failedDays) || 0;
   return h(
     "footer",
     { class: "foot" },
-    h("a", { class: "brand", href: REPO }, logo(), "garmin-personal-mcp"),
-    h(
-      "nav",
-      { "aria-label": t("footer.links") },
+    data &&
       h(
-        "ul",
-        {},
-        ...links.map(([key, href]) => h("li", {}, h("a", { href, rel: "noopener" }, t(key)))),
+        "div",
+        { class: "source" },
+        // no date in the data, no date in the footer
+        data.generated && h("p", {}, t("footer.updated", { date: fmt.longDay(data.generated) })),
+        failed > 0 && h("p", { class: "gap" }, t("footer.failed", { n: failed })),
       ),
+    h(
+      "p",
+      { class: "made" },
+      h("a", { class: "brand", href: REPO }, logo(), "garmin-personal-mcp"),
+      "·",
+      h("a", { href: `${REPO}/blob/main/LICENSE`, rel: "noopener" }, t("footer.license")),
     ),
   );
 }

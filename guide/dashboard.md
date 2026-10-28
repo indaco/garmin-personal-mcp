@@ -37,7 +37,9 @@ The server writes `garmin-dashboard.html` in the data folder. Claude gives you t
 command to open the file. An existing page stays as `garmin-dashboard.html.bak`. To write the page in
 a different place, ask Claude for a path. A relative path is in the data folder.
 
-The page works offline. It has Chart.js inside, and it sends no requests.
+The page works offline. It has Chart.js inside, and it sends no requests. Its footer tells when the
+data was written. When Garmin did not give some days, the footer also gives their number: their
+values show "n/a".
 
 ## Update the dashboard
 

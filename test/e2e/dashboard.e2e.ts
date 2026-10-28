@@ -215,6 +215,24 @@ describe("the page", () => {
     expect(errors).toEqual([]);
   });
 
+  it("tells in the footer when the data was written, and the days that Garmin did not give", async () => {
+    const { page, errors } = await open(browser, pageFile());
+    expect(await page.textContent("footer .source")).toBe(
+      "Data from Garmin Connect, updated Oct 26, 2026",
+    );
+    expect(await page.$("footer .gap")).toBeNull();
+    expect(await page.getAttribute("footer a >> text=MIT License", "href")).toContain("LICENSE");
+
+    const failed = await open(
+      browser,
+      pageFile({ data: { ...data, v: 3, notes: [], sync: { ...data.sync, failedDays: 2 } } }),
+    );
+    expect(await failed.page.textContent("footer .gap")).toBe(
+      "Days not read from Garmin: 2 (their values show n/a)",
+    );
+    expect([...errors, ...failed.errors]).toEqual([]);
+  });
+
   it("shows a message without data", async () => {
     const { page, errors } = await open(browser, pageFile({ data: null }));
     expect(await page.textContent("#app")).toContain("no data yet");

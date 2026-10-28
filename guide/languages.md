@@ -46,10 +46,8 @@ out. To add one:
 | `inProgress` | * week in progress |
 | `menu.settings` | Settings |
 | `menu.theme` | Theme |
-| `footer.links` | Project links |
-| `footer.source` | Source on GitHub |
-| `footer.issues` | Report an issue |
-| `footer.releases` | Releases |
+| `footer.updated` | Data from Garmin Connect, updated {date} |
+| `footer.failed` | Days not read from Garmin: {n} (their values show n/a) |
 | `footer.license` | MIT License |
 | `menu.language` | Language |
 | `lang.auto` | Auto |
