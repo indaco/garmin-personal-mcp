@@ -35,21 +35,42 @@ export class GarminTools {
     limit?: number,
     raw?: boolean,
   ): Promise<string> {
-    const json = await this.api.getJson("/activitylist-service/activities/search/activities", {
-      start: "0",
-      limit: String(limit == null || limit <= 0 ? 20 : Math.min(limit, 200)),
-      startDate,
-      endDate,
-      activityType,
-    });
-    if (raw === true) {
-      return JSON.stringify(json);
+    const asked = limit == null || limit <= 0 ? 20 : Math.min(limit, 200);
+    const search = (type: string | undefined, max: number) =>
+      this.api.getJson("/activitylist-service/activities/search/activities", {
+        start: "0",
+        limit: String(max),
+        startDate,
+        endDate,
+        activityType: type,
+      });
+    let json: unknown;
+    let local = false;
+    try {
+      json = await search(activityType, asked);
+    } catch (e) {
+      // Garmin sometimes answers 400 to activityType: ask for the biggest page and filter here
+      if (!activityType || !(e instanceof GarminApiError) || !/-> HTTP 400\b/.test(e.message)) {
+        throw e;
+      }
+      log("INFO", `activityType ${activityType} refused, filtering locally`);
+      json = await search(undefined, 200);
+      local = true;
     }
     const list = Array.isArray(json) ? json : firstArray(json);
     if (!list) {
       return JSON.stringify(json);
     }
-    return JSON.stringify(list.map((a) => summarize(isObject(a) ? a : {})));
+    const rows = local
+      ? list
+          .filter(
+            (a) => field(isObject(a) ? a.activityType : undefined, "typeKey") === activityType,
+          )
+          .slice(0, asked)
+      : list;
+    return JSON.stringify(
+      raw === true ? (local ? rows : json) : rows.map((a) => summarize(isObject(a) ? a : {})),
+    );
   }
 
   async getActivity(activityId: number): Promise<string> {

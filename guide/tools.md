@@ -23,7 +23,8 @@ yourself.
 
 Dates use the format `yyyy-MM-dd`. The API reference does not always give the names of the query
 parameters. If an endpoint answers 400, Claude can use `garminGet` to try a different name.
-`listActivities` with `activityType` sometimes answers 400. `garminGet` decodes the query string
+When Garmin refuses `activityType` (HTTP 400), `listActivities` asks for the last 200 activities
+and filters them by type itself. `garminGet` decodes the query string
 before it sends it, so an encoded value such as `calendarDate=2026%2D10%2D24` also works.
 API reference: <https://developer.garmin.com/gc-developer-program/personal/swagger-docs/>
 
