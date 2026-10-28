@@ -953,6 +953,16 @@ table.data .num {
   background: none;
   cursor: default;
 }
+/* a rest day needs an edge against the tile; a busy day already has its colour */
+.cal-cell:not(.out) {
+  box-shadow: inset 0 0 0 1px var(--control-border);
+}
+/* the ring of a day in --text, with a panel-coloured gap: it borders panel colours only, in every theme */
+.tile-body .cal-cell:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 4px var(--panel);
+}
 .cal-cell.l1 {
   background: color-mix(in srgb, var(--good) 30%, var(--panel2));
 }

@@ -2,6 +2,7 @@ import { readFileSync, statSync, writeFileSync } from "node:fs";
 import axe from "axe-core";
 import type { Browser, Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { THEMES } from "../../src/page/theme";
 import { data, launch, open, pageFile } from "./page";
 
 let browser: Browser;
@@ -630,6 +631,62 @@ describe("accessibility", () => {
     await page.focus("#theme");
     await page.selectOption("#theme", "light");
     expect(["light", await problems(page)]).toEqual(["light", []]);
+  });
+});
+
+describe("calendar contrast", () => {
+  it("has a calendar focus ring and day borders with 3:1 contrast in every theme", async () => {
+    const { page } = await open(browser, pageFile());
+    const failures: string[] = [];
+    // :focus-visible on a script focus needs keyboard modality
+    await page.keyboard.press("Tab");
+    for (const { id } of THEMES) {
+      const out = await page.evaluate((theme) => {
+        document.documentElement.dataset.theme = theme;
+        // colours as the browser draws them: a 1 px canvas turns any CSS colour into RGB
+        const ctx2d = document.createElement("canvas").getContext("2d")!;
+        const ratio = (a: string, b: string) => {
+          const [x, y] = [a, b]
+            .map((css) => {
+              ctx2d.fillStyle = css;
+              ctx2d.fillRect(0, 0, 1, 1);
+              return [...ctx2d.getImageData(0, 0, 1, 1).data]
+                .slice(0, 3)
+                .map((v) => {
+                  const c = v / 255;
+                  return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+                })
+                .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+            })
+            .toSorted((p, q) => q - p);
+          return (x + 0.05) / (y + 0.05);
+        };
+        const cells = [...document.querySelectorAll<HTMLElement>("[data-id=calendar] .cal-cell")];
+        const busy =
+          cells.find((c) => c.classList.contains("l4")) ??
+          cells.find((c) => c.classList.contains("l3"))!;
+        const rest = cells.find((c) => c.classList.contains("l0") && c.dataset.date)!;
+        const probe = document.createElement("div");
+        probe.style.background = "var(--panel)";
+        document.body.append(probe);
+        const tile = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        busy.focus();
+        const cs = getComputedStyle(busy);
+        const edge = getComputedStyle(rest);
+        const shadow = /(?:rgba?|color)\([^)]*\)/.exec(edge.boxShadow)?.[0];
+        return {
+          focusable: busy.matches(":focus-visible"),
+          restVsTile: ratio(shadow ?? edge.backgroundColor, tile),
+          // the ring borders the panel-coloured gap that the focus rule draws
+          ringVsGap: ratio(cs.outlineColor, tile),
+        };
+      }, id);
+      if (out.ringVsGap < 3) failures.push(`${id}: ring vs gap ${out.ringVsGap.toFixed(2)}`);
+      if (!out.focusable) failures.push(`${id}: day not :focus-visible`);
+      if (out.restVsTile < 3) failures.push(`${id}: rest day vs tile ${out.restVsTile.toFixed(2)}`);
+    }
+    expect(failures).toEqual([]);
   });
 });
 
