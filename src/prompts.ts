@@ -210,9 +210,12 @@ const PATH_ARG = z
   .describe("The dashboard file, e.g. garmin-dashboard-coach.html; empty = the default page")
   .optional();
 
-/** The page file: an argument ending in .html, from any slot (Claude Code passes arguments by position). */
-function pathOf(...slots: (string | undefined)[]): string {
-  return slots.map(arg).find((s) => /\.html$/i.test(s)) ?? "";
+/**
+ * The page file: the `path` argument as given, else a positional argument ending in .html
+ * (Claude Code passes arguments by position, so a file given alone arrives in the first slot).
+ */
+function pathOf(path: string | undefined, positional: string | undefined): string {
+  return arg(path) || (/\.html$/i.test(arg(positional)) ? arg(positional) : "");
 }
 
 /** The text that adds the page file after a "with ..." clause. */
