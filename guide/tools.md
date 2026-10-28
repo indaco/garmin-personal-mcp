@@ -1,0 +1,49 @@
+# Tools
+
+The server gives Claude these tools. Claude chooses and calls them. You do not call them
+yourself.
+
+| Tool                  | Endpoint                                             | What it gives                                                                                                                                                                                                                                                                                                                                               |
+| --------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `listActivities`      | `/activitylist-service/activities/search/activities` | a compact summary of each activity: the Garmin type key and the FIT SDK sport name, km, moving and elapsed time, pace, HR, cadence, ascent, HR-zone seconds, Garmin training load and training effect, intensity minutes, race flag, best efforts, power, running form, run/walk segments, swim SWOLF, lengths and strokes. `raw=true` gives the full JSON. |
+| `getActivity`         | `/activity-service/activity/{id}`                    | summary, metadata and segments by type                                                                                                                                                                                                                                                                                                                      |
+| `getActivityLaps`     | `/download-service/files/activity/{id}`              | laps from the .FIT file: km, time, pace or speed, HR, cadence, ascent, power and intensity                                                                                                                                                                                                                                                                  |
+| `getActivitySets`     | `/download-service/files/activity/{id}`              | strength sets from the .FIT file: exercise, movement category, primary and secondary muscles, reps, weight (kg), set time and the rest after the set. The empty set that the watch adds at the end of a workout is not shown                                                                                                                                |
+| `downloadActivityFit` | `/download-service/files/activity/{id}`              | saves `{id}.fit` in the `fit` folder of the data folder. The server downloads each file one time only.                                                                                                                                                                                                                                                      |
+| `getHrvRange`         | `/hrv-service/hrv/daily/{from}/{to}`                 | HRV during the night                                                                                                                                                                                                                                                                                                                                        |
+| `getDailyHeartRate`   | `/wellness-service/wellness/dailyHeartRate`          | the heart rate of a day, with the resting HR                                                                                                                                                                                                                                                                                                                |
+| `getSleep`            | `/sleep-service/sleep/dailySleep`                    | the sleep of a night. The date is the morning after the night.                                                                                                                                                                                                                                                                                              |
+| `getHeartRateZones`   | `/biometric-service/heartRateZones/v2`               | the HR zones in Garmin Connect                                                                                                                                                                                                                                                                                                                              |
+| `getFitnessAge`       | `/fitnessage-service/fitnessage/v2/{date}`           | fitness age against actual age, and its components                                                                                                                                                                                                                                                                                                          |
+| `getDailySummary`     | `/usersummary-service/usersummary/daily`             | steps, stress and body battery                                                                                                                                                                                                                                                                                                                              |
+| `getDashboardData`    | the endpoints above                                  | all the data of the dashboard in one call. It keeps a local cache and asks Garmin only for new days.                                                                                                                                                                                                                                                        |
+| `writeDashboard`      | the endpoints above                                  | writes the dashboard page (default `garmin-dashboard.html` in the data folder) and gives a short digest of the data for the coach notes. An update changes only the data of the page. A replaced page is kept as `.bak`.                                                                                                                                    |
+| `editDashboard`       | none                                                 | changes the layout of the dashboard page, adds or removes custom widgets, and adds languages. Without arguments, it gives the layout, the widget catalogue and the guide for a custom widget.                                                                                                                                                               |
+| `garminGet`           | all other GET endpoints                              | a relative path and a query string                                                                                                                                                                                                                                                                                                                          |
+
+Dates use the format `yyyy-MM-dd`. The API reference does not always give the names of the query
+parameters. If an endpoint answers 400, Claude can use `garminGet` to try a different name.
+`listActivities` with `activityType` sometimes answers 400. `garminGet` decodes the query string
+before it sends it, so an encoded value such as `calendarDate=2026%2D10%2D24` also works.
+API reference: <https://developer.garmin.com/gc-developer-program/personal/swagger-docs/>
+
+The Personal API does not have these Garmin Connect data, and their endpoints answer 404:
+
+- VO2 max, training status and readiness, race predictions and personal records;
+- weight, gear and activity weather;
+- endurance and hill score, lactate threshold and exercise sets.
+
+When the dashboard needs one of these values, it calculates an estimate and labels it.
+
+## The data folder
+
+The data folder has:
+
+| File                   | Content                                                                |
+| ---------------------- | ---------------------------------------------------------------------- |
+| `fit/{id}.fit`         | the original .FIT files. The server downloads each file one time only. |
+| `exercises.json`       | the exercise catalogue of Garmin, for the muscles of each exercise     |
+| `dashboard-cache.json` | the dashboard data of the last calls                                   |
+
+The server writes its log to `~/.cache/garmin-personal-mcp/garmin-personal-mcp.log`. When the log
+is larger than 1 MB, the server moves it to `garmin-personal-mcp.log.1` and starts a new log.

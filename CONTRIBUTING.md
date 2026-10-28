@@ -47,11 +47,39 @@ You need Node.js 22 or later and pnpm. The `packageManager` field in `package.js
 version, so `corepack enable` gives you the same pnpm as CI.
 
 ```bash
+git clone https://github.com/indaco/garmin-personal-mcp.git
+cd garmin-personal-mcp
 pnpm install
 pnpm build               # writes dist/index.js, dist/dashboard.html and THIRD-PARTY-NOTICES.md
 ```
 
-To use your build in a client, follow "Run from source" in the README.
+### Run your build in a client
+
+To try a change before a release, use your build in place of the npm package. In the client
+configuration, use `node` with the absolute path of `dist/index.js` in place of
+`npx -y @indaco/garmin-personal-mcp`:
+
+```json
+{
+  "mcpServers": {
+    "garmin-personal": {
+      "command": "node",
+      "args": ["/absolute/path/to/garmin-personal-mcp/dist/index.js"]
+    }
+  }
+}
+```
+
+In Claude Code: `claude mcp add garmin-personal --scope user -- node /absolute/path/to/dist/index.js`.
+Remove the npm version first, because the two servers have the same name.
+
+To check that your build starts, send it one `initialize` request. It must answer with one JSON
+line and write nothing else to stdout:
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}' \
+  | node dist/index.js
+```
 
 ## Code map
 
@@ -83,6 +111,12 @@ pnpm typecheck           # tsc --noEmit
 pnpm test                # Vitest
 pnpm build               # tsdown, the page template, then the third-party notices
 pnpm test:page           # the dashboard page in headless Chromium, after the build
+```
+
+`pnpm test:page` needs the Chromium headless shell. Install it one time:
+
+```bash
+pnpm exec playwright-core install --only-shell chromium
 ```
 
 `pnpm fmt` corrects the format. `pnpm guide` writes the generated parts of `guide/`. After a
@@ -120,6 +154,8 @@ module that they test (`test/tools.test.ts` for `src/tools.ts`).
 - **No real Garmin calls.** Mock `fetch`, or give the code a mocked API client.
 - **No writes to your home folder.** Use a temporary folder for the data folder, and set `HOME`
   for tests of the log.
+- **Synthetic page data.** The page tests use the synthetic data in
+  `test/fixtures/dashboard-data.json`.
 
 ## Add a widget
 
