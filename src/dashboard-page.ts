@@ -106,7 +106,12 @@ export interface EditResult {
 /** The JSON value of a block; undefined when the page has no such block. */
 export function readBlock(page: string, block: Block): unknown {
   const m = marker(block).exec(page);
-  return m ? JSON.parse(m[1]) : undefined;
+  if (!m) return undefined;
+  try {
+    return JSON.parse(m[1]);
+  } catch {
+    throw new Error(`The garmin-${block} block of the page is not valid JSON`);
+  }
 }
 
 /**
@@ -323,7 +328,21 @@ export class DashboardWriter {
     const asked = settings === undefined ? undefined : checkSettings(settings);
     const target = this.#target(path);
     const old = await readExisting(target);
-    const oldSettings = settingsOf(old);
+    let oldSettings: Settings;
+    let unreadable = false;
+    try {
+      oldSettings = settingsOf(old);
+    } catch (e) {
+      // without readable settings, a shared page could get data it must not have: only new settings help
+      if (asked === undefined) {
+        throw new Error(
+          `${(e as Error).message} in ${target}: give new settings, or delete the file`,
+          { cause: e },
+        );
+      }
+      oldSettings = {};
+      unreadable = true;
+    }
     const own = asked ?? oldSettings;
 
     const template = await this.template();
@@ -341,7 +360,7 @@ export class DashboardWriter {
       kind = old === undefined ? "created" : "replaced";
     } else if (
       templateVersion(old) > 0 &&
-      (templateVersion(old) < templateVersion(template) || !same(own, oldSettings))
+      (templateVersion(old) < templateVersion(template) || !same(own, oldSettings) || unreadable)
     ) {
       // a newer template or new settings: the user's state lives in the blocks, so it moves over as it is
       next = writeBlock(template, "layout", readBlock(old, "layout") ?? null);
@@ -404,10 +423,16 @@ export class DashboardWriter {
       );
     }
     let page = old;
-    let layout = parseLayout(readBlock(page, "layout"));
-    let widgets = (readBlock(page, "widgets") as CustomWidget[] | undefined) ?? [];
-    const texts =
-      (readBlock(page, "i18n") as Record<string, Record<string, string>> | undefined) ?? {};
+    let layout: ReturnType<typeof parseLayout>;
+    let widgets: CustomWidget[];
+    let texts: Record<string, Record<string, string>>;
+    try {
+      layout = parseLayout(readBlock(page, "layout"));
+      widgets = (readBlock(page, "widgets") as CustomWidget[] | undefined) ?? [];
+      texts = (readBlock(page, "i18n") as Record<string, Record<string, string>> | undefined) ?? {};
+    } catch (e) {
+      throw new Error(`${(e as Error).message} in ${target}`, { cause: e });
+    }
     let layoutChanged = false;
 
     if (o.layout !== undefined) {
@@ -438,6 +463,7 @@ export class DashboardWriter {
           `Unknown board ${p.board}: use all, recovery, ${GROUPS.join(", ")} or another SDK sport name`,
         );
       if (!known.has(p.widget)) throw new Error(`Unknown widget ${p.widget}`);
+      if (p.type !== undefined && !TYPES.has(p.type)) throw new Error(`Unknown type ${p.type}`);
       const board = boardOf(layout, p.board, preset);
       layout = withBoard(
         layout,
