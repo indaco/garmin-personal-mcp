@@ -133,6 +133,16 @@ export class GarminTools {
     );
   }
 
+  async getDailySummaryRange(fromDate: string, toDate: string): Promise<string> {
+    checkRange(fromDate, toDate, 366);
+    return JSON.stringify(
+      await this.api.getJson("/usersummary-service/v2/dailysummaries", {
+        startDate: fromDate,
+        endDate: toDate,
+      }),
+    );
+  }
+
   // ------------------------------------------------------------------ generic
 
   async garminGet(path: string, query?: string): Promise<string> {
@@ -551,10 +561,17 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
     "getDailySummary",
     {
       description:
-        "Daily user summary for one date (steps, calories, stress, body battery, resting HR), yyyy-MM-dd.",
-      inputSchema: z.object({ date }),
+        "Daily user summary (steps, calories, stress, body battery, resting HR) for one date, or for up to 366 days (fromDate and toDate; the range answer has Garmin's v2 field names), yyyy-MM-dd.",
+      inputSchema: dayOrRangeInput,
     },
-    async (a) => text(await tools.getDailySummary(a.date)),
+    async (a) =>
+      text(
+        await dayOrRange(
+          a,
+          (d) => tools.getDailySummary(d),
+          (f, t) => tools.getDailySummaryRange(f, t),
+        ),
+      ),
   );
   server.registerTool(
     "garminGet",

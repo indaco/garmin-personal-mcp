@@ -230,7 +230,7 @@ without a translation shows in English. To remove an added language, ask Claude 
 | `getSleep`            | the sleep of a night, or of up to 31 nights                            |
 | `getHeartRateZones`   | your HR zones                                                          |
 | `getFitnessAge`       | fitness age against actual age                                         |
-| `getDailySummary`     | steps, stress and Body Battery                                         |
+| `getDailySummary`     | steps, stress and Body Battery, for a day or a range                   |
 | `getDashboardData`    | all the data of the dashboard in one call, with a local cache          |
 | `writeDashboard`      | writes the dashboard page                                              |
 | `editDashboard`       | changes the layout, the custom widgets and the languages of the page   |
