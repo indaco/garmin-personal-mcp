@@ -46,7 +46,21 @@ jobs:
         run: pnpm typecheck
 
       - name: Test
+        if: matrix.node != 26
         run: pnpm test
+
+      # coverage once, on the newest Node: the numbers do not depend on the version
+      - name: Test with coverage
+        if: matrix.node == 26
+        run: pnpm test:coverage
+
+      # until CODECOV_TOKEN is set, the upload fails with a warning and the job continues
+      - name: Upload coverage to Codecov
+        if: matrix.node == 26
+        uses: codecov/codecov-action@v7
+        with:
+          files: coverage/lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Build
         run: pnpm build

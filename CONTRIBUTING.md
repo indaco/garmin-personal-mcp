@@ -119,6 +119,7 @@ Run these commands before you open the PR. CI runs the same commands on Node 22,
 pnpm lint                # Oxlint, then an Oxfmt check
 pnpm typecheck           # tsc --noEmit
 pnpm test                # Vitest
+pnpm test:coverage       # Vitest with coverage, report in coverage/
 pnpm build               # tsdown, the page template, then the third-party notices
 pnpm test:page           # the dashboard page in headless Chromium, after the build
 ```
