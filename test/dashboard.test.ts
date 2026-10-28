@@ -348,6 +348,19 @@ describe("getDashboardData", () => {
     expect(out.sync.cachedActivities).toBe(450);
   });
 
+  it("asks for the sleep and the summary of a day together", async () => {
+    const log: string[] = [];
+    api.getJson.mockImplementation(async (path, q) => {
+      log.push(`start ${path}`);
+      await Promise.resolve();
+      log.push(`end ${path}`);
+      return fakeGarmin(path, q);
+    });
+    await dashboard.getDashboardData(1);
+    const sleep = log.indexOf("start /sleep-service/sleep/dailySleep");
+    expect(log[sleep + 1]).toBe("start /usersummary-service/usersummary/daily");
+  });
+
   it("keeps the old recovery row of a day that fails and reports the day", async () => {
     await dashboard.getDashboardData(1);
     failingSleep.add("2026-10-26");

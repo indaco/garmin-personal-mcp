@@ -62,6 +62,10 @@ export class GarminDashboard {
     cache.syncedAt = new Date().toISOString();
     await writeAtomically(this.#file(), JSON.stringify(cache));
 
+    const [zones, fitnessAge] = await Promise.all([
+      optional(sync, "zones", () => this.tools.getHeartRateZones()),
+      optional(sync, "fitnessAge", () => this.tools.getFitnessAge(today)),
+    ]);
     const out: Json = {
       generated: today,
       weeks: w,
@@ -69,8 +73,8 @@ export class GarminDashboard {
       end: today,
       prevStart,
       prevEnd: addDays(start, -1),
-      zones: await optional(sync, "zones", () => this.tools.getHeartRateZones()),
-      fitnessAge: await optional(sync, "fitnessAge", () => this.tools.getFitnessAge(today)),
+      zones,
+      fitnessAge,
     };
     const activities = activitiesBetween(cache, start, today).map((a) => structuredClone(a));
     await this.#attachDetails(activities);
@@ -187,8 +191,10 @@ export class GarminDashboard {
         continue;
       }
       try {
-        const sleep = await call(sync, () => this.tools.getSleep(day));
-        const summary = await call(sync, () => this.tools.getDailySummary(day));
+        const [sleep, summary] = await Promise.all([
+          call(sync, () => this.tools.getSleep(day)),
+          call(sync, () => this.tools.getDailySummary(day)),
+        ]);
         byDate[day] = recoveryRow(day, sleep, summary);
       } catch (e) {
         if (!(e instanceof GarminApiError)) throw e;
