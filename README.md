@@ -16,6 +16,7 @@
 <p align="center">
   <b><a href="#quick-start">Quick start</a></b> &middot;
   <b><a href="#prompts">Prompts</a></b> &middot;
+  <b><a href="#dashboard-setup">Dashboard setup</a></b> &middot;
   <b><a href="#tools">Tools</a></b> &middot;
   <b><a href="#presets-or-freeform">Presets or freeform</a></b> &middot;
   <b><a href="guide/dashboard.md">Dashboard guide</a></b> &middot;
@@ -23,9 +24,29 @@
   <b><a href="guide/troubleshooting.md">Troubleshooting</a></b>
 </p>
 
-MCP server for the official Garmin Connect Personal API. Read-only access to activities, laps and
-strength sets from .FIT files, HRV, sleep and heart rate. Includes a training and recovery
-dashboard with widgets that you can arrange. Runs with npx, with nothing to install.
+![The training dashboard: the All board, load against recovery, the Run board, strength trends, edit mode (drag a widget to a new place, hide a widget, add widgets from the catalogue to an empty board), and the light and high-contrast themes](assets/dashboard.gif)
+
+_The training dashboard with demo data._
+
+MCP server for the official Garmin Connect Personal API.
+
+## Features
+
+- **Official and read-only**: uses the Garmin Connect Personal API. It writes nothing back.
+- **Nothing to install**: runs with `npx`.
+- **Laps and strength sets**: read from the original .FIT files.
+- **Recovery data**: HRV, sleep and heart rate.
+- **Dashboard in less than a minute**: [training-dashboard](#training-dashboard) shows your
+  training load next to recovery, in widgets that you can move, resize, hide and add. You can also
+  [let Claude design the whole page](#presets-or-freeform).
+- **Your layout stays**: [training-dashboard-update](#training-dashboard-update) adds only the
+  new data.
+- **A page for you or for your coach**: [dashboard-setup](#dashboard-setup) makes a personal page,
+  or a page to share with your coach or personal trainer. You select the sports and the data. The
+  data that you do not select is not in the file.
+- **Extend it**: [dashboard-widget](#dashboard-widget) makes a new widget from your idea.
+  [dashboard-language](#dashboard-language) adds a language.
+- **All stdio clients**: Claude Desktop, Claude Code and all other MCP clients that use stdio.
 
 With this server, you can ask Claude:
 
@@ -33,21 +54,6 @@ With this server, you can ask Claude:
 - "Show the laps of my last run."
 - "Compare my sets of this week with the week before."
 - "How did I sleep this week, and how was my HRV?"
-
-Ready-made prompts do more:
-
-- **training-dashboard** writes a dashboard page in less than a minute. It shows your training
-  load next to HRV, sleep and resting heart rate, in widgets that you can move, resize, hide and
-  add. You can also let Claude design the whole page.
-- **training-dashboard-update** adds the new data to the dashboard. Your layout stays.
-- **dashboard-widget** makes a new widget from your idea.
-- **dashboard-language** adds a language to the dashboard.
-
-![The training dashboard: the All board, load against recovery, the Run board, strength trends, edit mode (drag a widget to a new place, hide a widget, add widgets from the catalogue to an empty board), and the light and high-contrast themes](assets/dashboard.gif)
-
-_The training dashboard with demo data._
-
-The server works with Claude Desktop, Claude Code and all other MCP clients that use stdio.
 
 ## Quick start
 
@@ -154,6 +160,28 @@ new data.
 
 The first call sends approximately 35 requests to Garmin. Later calls use the local cache and send
 approximately 8.
+
+### dashboard-setup
+
+Claude asks you some questions, then writes a page with your answers. First, it asks who the page
+is for:
+
+- **Personal**: a page for you, with all your data.
+- **Shared**: a page for your coach or personal trainer. You select each type of data to include,
+  for example HR zones yes, fitness age and sleep no.
+
+Then Claude asks for the file (any name or path), the title, the headline, the sports, the
+languages and the themes. The server writes only the data that you select into the file. Other data
+is not in the file, so you can send the file safely. A personal page and a shared page can be two
+files side by side. Each page keeps its settings on each update. The argument `weeks` is optional
+(default 12).
+
+| Client         | How to run it                                        |
+| -------------- | ---------------------------------------------------- |
+| Claude Desktop | **+** → _garmin-personal_ → `dashboard-setup` → send |
+| Claude Code    | `/garmin-personal:dashboard-setup`                   |
+
+[Page settings](guide/dashboard.md#page-settings) tells more.
 
 ### dashboard-widget
 

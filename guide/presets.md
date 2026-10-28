@@ -56,8 +56,8 @@ in, so a build costs less. The page code still takes time and tokens.
 
 - **We maintain the page**: the template, the widgets and their tests are part of this project. A
   change to the page needs a new release.
-- **One design**: each build gives the same page. You change it with the edit mode, custom widgets
-  and languages, not with a new design.
+- **One design**: each build gives the same page. You change it with the edit mode, custom widgets,
+  languages and page settings, not with a new design.
 - **No inline artifact**: in Claude Desktop, the dashboard is a file that you open in the browser.
 
 For a different design, use `layout` = `freeform`.

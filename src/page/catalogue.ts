@@ -1,6 +1,7 @@
 import { GROUPS } from "./calc";
 import type { Key } from "./i18n/en";
 import type { Span } from "./layout";
+import type { DataItem } from "./settings";
 
 /**
  * The built-in widgets: id, title, the types they can show (none for a widget without a type) and width.
@@ -14,6 +15,8 @@ export interface CatalogueEntry {
   span: Span;
   /** The narrowest width that the widget fits in; 1 when not set. */
   minSpan?: Span;
+  /** The data the widget shows: a page without it has no such widget. */
+  needs?: DataItem;
 }
 
 export const CATALOGUE: readonly CatalogueEntry[] = [
@@ -26,11 +29,13 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
   {
     id: "readiness",
     title: "w.readiness",
+    needs: "recovery",
     span: 2,
   },
   {
     id: "fitnessAge",
     title: "w.fitnessAge",
+    needs: "fitnessAge",
     span: 1,
   },
   {
@@ -72,33 +77,39 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
   {
     id: "loadVsRecovery",
     title: "w.loadVsRecovery",
+    needs: "recovery",
     types: ["all", ...GROUPS],
     span: 3,
   },
   {
     id: "hrv",
     title: "w.hrv",
+    needs: "recovery",
     span: 1,
   },
-  { id: "restingHr", title: "w.restingHr", span: 1 },
+  { id: "restingHr", title: "w.restingHr", needs: "recovery", span: 1 },
   {
     id: "sleep",
     title: "w.sleep",
+    needs: "recovery",
     span: 1,
   },
   {
     id: "sleepNeed",
     title: "w.sleepNeed",
+    needs: "recovery",
     span: 1,
   },
   {
     id: "bedtime",
     title: "w.bedtime",
+    needs: "recovery",
     span: 1,
   },
   {
     id: "bodyBattery",
     title: "w.bodyBattery",
+    needs: "recovery",
     span: 1,
   },
   {
@@ -111,6 +122,7 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
   {
     id: "coachNotes",
     title: "w.coachNotes",
+    needs: "notes",
     span: 3,
   },
   {
@@ -218,6 +230,7 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
   {
     id: "steps",
     title: "w.steps",
+    needs: "recovery",
     span: 1,
   },
   {

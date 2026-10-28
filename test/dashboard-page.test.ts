@@ -1,5 +1,5 @@
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardWriter, readBlock, templateVersion } from "../src/dashboard-page";
@@ -71,7 +71,7 @@ describe("writeDashboard", () => {
 
   it("has every block in the real template", () => {
     const real = readFileSync("src/page/template.html", "utf8");
-    for (const block of ["data", "layout", "widgets", "i18n"] as const) {
+    for (const block of ["data", "layout", "widgets", "i18n", "settings", "languages"] as const) {
       expect([block, readBlock(real, block) !== undefined]).toEqual([block, true]);
     }
   });
@@ -257,5 +257,155 @@ describe("writeDashboard", () => {
       /not a dashboard/,
     );
     expect(readFileSync(other, "utf8")).toBe("<html>my page</html>");
+  });
+});
+
+describe("writeDashboard settings", () => {
+  /** A template with the blocks, the title and the theme CSS of the real one. */
+  const styledTemplate = `<!doctype html>
+<meta name="garmin-template" content="6">
+<title>Training + Recovery</title>
+<style>:root,:root[data-theme="midnight"],:root[data-theme="system"]{--bg:#000}:root[data-theme="ocean"]{--bg:#012}:root[data-theme="paper"]{--bg:#fff}@media (prefers-color-scheme:light){:root[data-theme="system"]{--bg:#eee}}:root[data-theme="paper"],:root[data-theme="mist"]{--line:#ccc}</style>
+<script>
+window.GARMIN_SETTINGS = /* garmin-settings:start */null/* garmin-settings:end */;
+const DATA = /* garmin-data:start */null/* garmin-data:end */;
+const LAYOUT = /* garmin-layout:start */null/* garmin-layout:end */;
+const WIDGETS = /* garmin-widgets:start */[]/* garmin-widgets:end */;
+const LANGS = /* garmin-languages:start */{}/* garmin-languages:end */;
+const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
+</script>
+`;
+  const full = {
+    ...data,
+    zones: [{ sport: "DEFAULT", zone1Floor: 100 }],
+    fitnessAge: { fitnessAge: 40 },
+    activities: [
+      {
+        id: 1,
+        name: "Run with Anna",
+        sport: "running",
+        type: "running",
+        start: "2026-10-25 07:00:00",
+        km: 10,
+        duration: "50:00",
+      },
+      {
+        id: 2,
+        name: "Ride",
+        sport: "cycling",
+        type: "road_biking",
+        start: "2026-10-24 07:00:00",
+        km: 40,
+        duration: "1:30:00",
+      },
+    ],
+    previousActivities: [
+      { id: 3, sport: "cycling", type: "road_biking", start: "2026-07-24 07:00:00" },
+    ],
+    hrv: [{ date: "2026-10-25", hrv: 50 }],
+    recovery: [{ date: "2026-10-25", sleepScore: 80 }],
+  };
+  type Full = typeof full & { notes: string[] };
+
+  beforeEach(() => {
+    templateText = styledTemplate;
+    writer = new DashboardWriter(
+      async () => JSON.stringify(full),
+      dir,
+      async () => templateText,
+    );
+  });
+
+  it("leaves out of the page and of the digest the data and the sports that the settings exclude", async () => {
+    const r = await writer.write({
+      settings: { sports: ["running"], exclude: ["recovery", "fitnessAge", "names", "notes"] },
+      notes: ["a note"],
+    });
+    const d = readBlock(page(), "data") as Full;
+    const { name: _, ...run } = full.activities[0];
+    expect(d.activities).toEqual([run]);
+    expect(d.previousActivities).toEqual([]);
+    expect(d.hrv).toEqual([]);
+    expect(d.recovery).toEqual([]);
+    expect(d).not.toHaveProperty("fitnessAge");
+    expect(d.zones).toEqual(full.zones);
+    expect(d.notes).toEqual([]);
+    expect(r.notes).toBe(0);
+    expect(page()).not.toContain("Anna");
+    expect(r.digest.hrvLast14).toEqual([]);
+    expect(Object.keys(r.digest.totals)).toEqual(["running"]);
+  });
+
+  it("keeps the settings on an update and on a new layout; an argument replaces them", async () => {
+    await writer.write({ settings: { exclude: ["zones"] } });
+    expect(readBlock(page(), "settings")).toEqual({ exclude: ["zones"] });
+    expect((await writer.write({})).page).toBe("updated");
+    await writer.write({ layout: "blank" });
+    expect(readBlock(page(), "settings")).toEqual({ exclude: ["zones"] });
+    expect(readBlock(page(), "data")).not.toHaveProperty("zones");
+
+    const r = await writer.write({ settings: { title: "Mine" } });
+    expect(r).toMatchObject({ page: "replaced", backup: `${file}.bak` });
+    expect(readBlock(page(), "settings")).toEqual({ title: "Mine" });
+    expect((readBlock(page(), "data") as Full).zones).toEqual(full.zones);
+    // empty settings give the page of the template again
+    await writer.write({ settings: {} });
+    expect(readBlock(page(), "settings")).toBeNull();
+    expect(page()).toContain("<title>Training + Recovery</title>");
+  });
+
+  it("writes the title escaped, and only the CSS of the chosen themes", async () => {
+    await writer.write({ settings: { title: "Coach <b>view</b>", themes: ["midnight", "paper"] } });
+    const s = page();
+    expect(s).toContain("<title>Coach &lt;b&gt;view&lt;/b&gt;</title>");
+    expect(s).not.toContain('data-theme="ocean"');
+    expect(s).toContain(':root[data-theme="paper"]{--bg:#fff}');
+    // a rule of several themes and the default stay
+    expect(s).toContain(':root,:root[data-theme="midnight"],:root[data-theme="system"]{--bg:#000}');
+    expect(s).toContain(':root[data-theme="paper"],:root[data-theme="mist"]{--line:#ccc}');
+    // system is not chosen: its rule in @media goes, the @media stays valid
+    expect(s).toContain("@media (prefers-color-scheme:light){}");
+  });
+
+  it("writes the built-in languages that the settings keep", async () => {
+    await writer.write({});
+    expect(Object.keys(readBlock(page(), "languages") as object)).toEqual(["it"]);
+    await writer.write({ settings: { languages: ["en"] } });
+    expect(readBlock(page(), "languages")).toEqual({});
+    await writer.write({ settings: { languages: ["it"] } });
+    expect(Object.keys(readBlock(page(), "languages") as object)).toEqual(["it"]);
+  });
+
+  it("writes a path that starts with ~ in the home folder", async () => {
+    await expect(writer.write({ path: "~/no-such-folder-garmin/x.txt" })).rejects.toThrow(
+      new RegExp(`${homedir()}/no-such-folder-garmin/x\\.txt`),
+    );
+  });
+
+  it("refuses bad settings, and settings for a page that Claude wrote", async () => {
+    await expect(writer.write({ settings: { sports: ["chess"] } })).rejects.toThrow(
+      /sports: unknown chess/,
+    );
+    await expect(writer.write({ settings: { themes: ["neon"] } })).rejects.toThrow(/themes/);
+    await expect(writer.write({ settings: { theme: "ocean", themes: ["paper"] } })).rejects.toThrow(
+      /theme: one of paper/,
+    );
+    await expect(writer.write({ settings: { languages: ["xx"] } })).rejects.toThrow(/languages/);
+    await expect(writer.write({ settings: { title: " " } })).rejects.toThrow(/title/);
+    await expect(writer.write({ settings: { sports: [] } })).rejects.toThrow(/sports/);
+    await expect(writer.write({ settings: { languages: [] } })).rejects.toThrow(/languages/);
+    expect(existsSync(file)).toBe(false);
+    const own = "<html><script>/* garmin-data:start */null/* garmin-data:end */</script></html>";
+    await expect(writer.write({ page: own, settings: { exclude: ["names"] } })).rejects.toThrow(
+      /template/,
+    );
+    expect(existsSync(file)).toBe(false);
+  });
+
+  it("previews without writing: the boards of all activities and the digest of the settings", async () => {
+    const r = await writer.preview({ settings: { sports: ["cycling"] } });
+    expect(r.boards).toEqual({ running: 1, cycling: 1 });
+    expect(Object.keys(r.digest.totals)).toEqual(["road_biking"]);
+    expect(existsSync(file)).toBe(false);
   });
 });

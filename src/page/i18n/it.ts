@@ -2,6 +2,7 @@ import type { Catalogue } from "./en";
 
 export const it: Catalogue = {
   title: "Allenamento + Recupero",
+  headline: "Carico di allenamento, recupero e progressi da Garmin Connect",
   na: "n/d",
   noData: "Questa pagina non ha ancora dati. Chiedi a Claude di scrivere la dashboard.",
   period: "dal {from} al {to}",
@@ -9,10 +10,8 @@ export const it: Catalogue = {
 
   "menu.settings": "Impostazioni",
   "menu.theme": "Tema",
-  "footer.links": "Link del progetto",
-  "footer.source": "Codice su GitHub",
-  "footer.issues": "Segnala un problema",
-  "footer.releases": "Versioni",
+  "footer.updated": "Dati da Garmin Connect, aggiornati il {date}",
+  "footer.failed": "Giorni non letti da Garmin: {n} (i loro valori mostrano n/d)",
   "footer.license": "Licenza MIT",
   "menu.language": "Lingua",
   "lang.auto": "Automatica",

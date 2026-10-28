@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="garmin-template" content="5" />
+    <meta name="garmin-template" content="6" />
     <title>Training + Recovery</title>
     <link
       rel="icon"
@@ -11,11 +11,24 @@
     />
     <!--touch-icon-->
     <script>
-      // the theme before the first paint; a blocked storage gives the default
+      // the server fills the settings; the theme is set before the first paint. An object, like the
+      // blocks below: at the end of a statement the formatter moves the semicolon into the block
+      window.GARMIN_SETTINGS = {
+        settings: /* garmin-settings:start */ null /* garmin-settings:end */,
+      }.settings;
       try {
-        document.documentElement.dataset.theme = localStorage.getItem("garmin-theme") || "midnight";
+        var garminTheme = localStorage.getItem("garmin-theme");
       } catch (e) {
-        document.documentElement.dataset.theme = "midnight";
+        // a blocked storage gives the default
+      }
+      {
+        let s = window.GARMIN_SETTINGS || {};
+        let themes = s.themes;
+        let fallback =
+          s.theme || (themes && themes.indexOf("midnight") < 0 ? themes[0] : "midnight");
+        // a theme that the page no longer has gives the default too
+        document.documentElement.dataset.theme =
+          garminTheme && (!themes || themes.indexOf(garminTheme) >= 0) ? garminTheme : fallback;
       }
     </script>
     <!--style-->
@@ -28,6 +41,7 @@
         data: /* garmin-data:start */ null /* garmin-data:end */,
         layout: /* garmin-layout:start */ null /* garmin-layout:end */,
         widgets: /* garmin-widgets:start */ [] /* garmin-widgets:end */,
+        languages: /* garmin-languages:start */ {} /* garmin-languages:end */,
         i18n: /* garmin-i18n:start */ {} /* garmin-i18n:end */,
       };
     </script>

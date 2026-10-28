@@ -1,16 +1,20 @@
 import { randomBytes } from "node:crypto";
 import { copyFile, readFile, stat } from "node:fs/promises";
+import { homedir } from "node:os";
 import { resolve } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { type Digest, digest } from "./digest";
 import { Profile } from "@garmin/fitsdk";
-import { GROUPS } from "./page/calc";
+import { type Activity, GROUPS, groupOf } from "./page/calc";
 import { CATALOGUE } from "./page/catalogue";
 import { ABOUT } from "./page/catalogue-about";
+import { BUILT_IN } from "./page/i18n/built-in";
 import { en } from "./page/i18n/en";
 import { add, boardOf, type Layout, parseLayout, type Span, withBoard } from "./page/layout";
 import { preset } from "./page/presets";
+import { DATA_ITEMS, type Settings } from "./page/settings";
+import { THEMES } from "./page/theme";
 import { WIDGET_API } from "./page/widget-api";
 import { DASHBOARD_VERSION } from "./prompts";
 import { writeAtomically } from "./tools";
@@ -18,14 +22,15 @@ import { writeAtomically } from "./tools";
 /**
  * The dashboard page file: the server writes it from the built-in template (or from a page that Claude
  * wrote) and fills its blocks. The page keeps its state in marked blocks (data, layout, custom widgets,
- * extra languages); nothing else changes on an update, so the user's layout, widgets and texts stay.
+ * extra languages, settings); nothing else changes on an update, so the user's layout, widgets and texts
+ * stay. The built-in languages block is written again on each update, so it has the server's texts.
  */
 
 export const DASHBOARD_FILE = "garmin-dashboard.html";
 const MAX_NOTES = 5;
 const REUSE_MS = 15 * 60_000;
 
-export type Block = "data" | "layout" | "widgets" | "i18n";
+export type Block = "data" | "layout" | "widgets" | "i18n" | "settings" | "languages";
 const marker = (b: Block) =>
   new RegExp(`/\\*\\s*garmin-${b}:start\\s*\\*/([\\s\\S]*?)/\\*\\s*garmin-${b}:end\\s*\\*/`);
 // the formatter writes the tag as <meta ... content="3" />
@@ -37,11 +42,20 @@ export interface WriteOptions {
   layout?: "preset" | "blank";
   page?: string;
   path?: string;
+  /** Replaces the settings of the page; without it, the page keeps its own. */
+  settings?: Settings;
+}
+
+export interface PreviewResult {
+  path: string;
+  /** The activities of each board in the period, before the `sports` setting. */
+  boards: Record<string, number>;
+  digest: Digest;
 }
 
 export interface WriteResult {
   path: string;
-  /** created: no page before; updated: only the data changed; replaced: a new page; upgraded: a newer template. */
+  /** created: no page before; updated: only the data changed; replaced: a new page or new settings; upgraded: a newer template. */
   page: "created" | "updated" | "replaced" | "upgraded";
   backup?: string;
   notes: number;
@@ -112,7 +126,8 @@ export function writeBlock(page: string, block: Block, value: unknown): string {
 const newRev = () => randomBytes(6).toString("hex");
 
 /** The weeks of the page's data; undefined when it has none. */
-function weeksOf(page: string): number | undefined {
+function weeksOf(page: string | undefined): number | undefined {
+  if (page === undefined) return undefined;
   try {
     const w = (readBlock(page, "data") as { weeks?: unknown } | null)?.weeks;
     return typeof w === "number" && Number.isInteger(w) ? w : undefined;
@@ -129,6 +144,127 @@ const escapeHtml = (s: string) =>
     /[&<>"']/g,
     (c) => `&${{ "&": "amp", "<": "lt", ">": "gt", '"': "quot", "'": "#39" }[c]};`,
   );
+
+type Json = Record<string, unknown>;
+const listOf = (v: unknown): Json[] => (Array.isArray(v) ? (v as Json[]) : []);
+const same = (a: Settings, b: Settings) => JSON.stringify(a) === JSON.stringify(b);
+
+/** The settings of a page; none for no page or a page without them. */
+function settingsOf(page: string | undefined): Settings {
+  const s = page === undefined ? undefined : readBlock(page, "settings");
+  return s && typeof s === "object" ? (s as Settings) : {};
+}
+
+/** The number of items for each key. */
+function countBy(items: Json[], key: (a: Activity) => string): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const a of items) out[key(a as Activity)] = (out[key(a as Activity)] ?? 0) + 1;
+  return out;
+}
+
+/** The data without what the settings leave out: what the page holds and what the digest quotes. */
+export function filterData(data: Json, s: Settings): Json {
+  const out: Json = { ...data };
+  const no = new Set(s.exclude);
+  const keep = (items: unknown) =>
+    listOf(items)
+      .filter((a) => !s.sports || s.sports.includes(groupOf(a as Activity)))
+      .map((a) => {
+        if (!no.has("names")) return a;
+        const { name: _, ...rest } = a;
+        return rest;
+      });
+  for (const key of ["activities", "previousActivities"]) {
+    if (key in data) out[key] = keep(data[key]);
+  }
+  if (no.has("recovery")) {
+    out.hrv = [];
+    out.recovery = [];
+  }
+  if (no.has("fitnessAge")) delete out.fitnessAge;
+  if (no.has("zones")) delete out.zones;
+  return out;
+}
+
+/** The built-in languages that the settings choose, by code. */
+const languagesOf = (s: Settings) =>
+  Object.fromEntries(
+    Object.entries(BUILT_IN).filter(([code]) => !s.languages || s.languages.includes(code)),
+  );
+
+/**
+ * A page from the template with the settings: its settings block, its title, and the CSS of the chosen
+ * themes. Only rules for one theme alone go: a rule that lists more selectors is kept as it is.
+ */
+function styled(page: string, s: Settings): string {
+  let next = writeBlock(page, "settings", Object.keys(s).length > 0 ? s : null);
+  if (s.title)
+    next = next.replace(/<title>[^<]*<\/title>/, () => `<title>${escapeHtml(s.title!)}</title>`);
+  const themes = s.themes;
+  if (themes) {
+    next = next.replace(/<style>[\s\S]*?<\/style>/, (css) =>
+      css.replace(/(?<=[{}>]):root\[data-theme="(\w+)"\]\{[^}]*\}/g, (rule, id: string) =>
+        themes.includes(id) ? rule : "",
+      ),
+    );
+  }
+  return next;
+}
+
+/** Settings that the page can use; throws with what is wrong. */
+export function checkSettings(s: Settings): Settings {
+  const problems: string[] = [];
+  const text = (key: "title" | "headline", max: number) => {
+    const v = s[key];
+    if (v !== undefined && (typeof v !== "string" || !v.trim() || v.length > max))
+      problems.push(`${key}: 1 to ${max} characters`);
+  };
+  // an empty list of sports, languages or themes leaves a page with nothing
+  const names = (key: keyof Settings, known: readonly string[], empty = false) => {
+    const v = s[key];
+    if (v === undefined) return;
+    if (!Array.isArray(v) || (v.length === 0 && !empty))
+      problems.push(`${key}: a list with at least one name`);
+    else {
+      const bad = v.filter((x) => !known.includes(x));
+      if (bad.length > 0) problems.push(`${key}: unknown ${bad.join(", ")}`);
+    }
+  };
+  const unknown = Object.keys(s).filter(
+    (k) =>
+      ![
+        "title",
+        "headline",
+        "sports",
+        "exclude",
+        "languages",
+        "language",
+        "themes",
+        "theme",
+      ].includes(k),
+  );
+  if (unknown.length > 0) problems.push(`unknown settings ${unknown.join(", ")}`);
+  text("title", 80);
+  text("headline", 120);
+  names(
+    "sports",
+    [...TYPES].filter((t) => t !== "all" && t !== "recovery"),
+  );
+  names("exclude", DATA_ITEMS, true);
+  names("languages", ["en", ...Object.keys(BUILT_IN)]);
+  const themeIds = THEMES.map((t) => t.id);
+  names("themes", themeIds);
+  if (s.language !== undefined && !/^(auto|[a-z]{2,3}(-[A-Z]{2})?)$/.test(String(s.language)))
+    problems.push("language: auto or a code such as en, it or pt-BR");
+  if (s.theme !== undefined && !(s.themes ?? themeIds).includes(s.theme))
+    problems.push(`theme: one of ${(s.themes ?? themeIds).join(", ")}`);
+  if (problems.length > 0) throw new Error(`Settings: ${problems.join("; ")}`);
+  return {
+    ...s,
+    ...(s.title ? { title: s.title.trim() } : {}),
+    ...(s.headline ? { headline: s.headline.trim() } : {}),
+  };
+}
 
 export class DashboardWriter {
   /** Writes run one at a time, so two calls never mix their pages. */
@@ -148,7 +284,31 @@ export class DashboardWriter {
     return run;
   }
 
-  async #write({ weeks, notes = [], layout, page, path }: WriteOptions): Promise<WriteResult> {
+  /** What a write would show, and the activities of each board, so the user can choose the sports; writes nothing. */
+  preview(options: Pick<WriteOptions, "weeks" | "path" | "settings">): Promise<PreviewResult> {
+    const run = this.#queue.then(async () => {
+      const target = this.#target(options.path);
+      const old = await readExisting(target);
+      const settings = options.settings ? checkSettings(options.settings) : settingsOf(old);
+      const data = JSON.parse(await this.#data(options.weeks ?? weeksOf(old))) as Json;
+      return {
+        path: target,
+        boards: countBy(listOf(data.activities), groupOf),
+        digest: digest(filterData(data, settings)),
+      };
+    });
+    this.#queue = run.catch(() => {});
+    return run;
+  }
+
+  async #write({
+    weeks,
+    notes = [],
+    layout,
+    page,
+    path,
+    settings,
+  }: WriteOptions): Promise<WriteResult> {
     if (layout && page) {
       throw new Error(
         "Give either `layout` (a page from the template) or `page` (your own page), not both",
@@ -160,8 +320,11 @@ export class DashboardWriter {
     if (notes.length > MAX_NOTES) {
       throw new Error(`At most ${MAX_NOTES} notes`);
     }
+    const asked = settings === undefined ? undefined : checkSettings(settings);
     const target = this.#target(path);
     const old = await readExisting(target);
+    const oldSettings = settingsOf(old);
+    const own = asked ?? oldSettings;
 
     const template = await this.template();
     let next: string;
@@ -176,24 +339,34 @@ export class DashboardWriter {
         boards: {},
       });
       kind = old === undefined ? "created" : "replaced";
-    } else if (templateVersion(old) > 0 && templateVersion(old) < templateVersion(template)) {
-      // a newer template: the user's state lives in the blocks, so it moves over as it is
+    } else if (
+      templateVersion(old) > 0 &&
+      (templateVersion(old) < templateVersion(template) || !same(own, oldSettings))
+    ) {
+      // a newer template or new settings: the user's state lives in the blocks, so it moves over as it is
       next = writeBlock(template, "layout", readBlock(old, "layout") ?? null);
       next = writeBlock(next, "widgets", readBlock(old, "widgets") ?? []);
       next = writeBlock(next, "i18n", readBlock(old, "i18n") ?? {});
-      kind = "upgraded";
+      kind = templateVersion(old) < templateVersion(template) ? "upgraded" : "replaced";
     } else {
       next = old;
       kind = "updated";
     }
+    if (Object.keys(own).length > 0 && !marker("settings").test(next)) {
+      // the data filter must hold on the next update too, so the page must keep its settings
+      throw new Error(
+        "Settings need a page from the template; this page has no garmin-settings block",
+      );
+    }
+    if (page === undefined && next !== old) next = styled(next, own);
+    next = writeBlock(next, "languages", languagesOf(own));
 
-    // without weeks, an existing page keeps its own
-    const pageWeeks = old === undefined ? undefined : weeksOf(old);
-    const data = JSON.parse(await this.#data(weeks ?? pageWeeks)) as Record<string, unknown>;
+    const data = filterData(JSON.parse(await this.#data(weeks ?? weeksOf(old))) as Json, own);
+    const kept = own.exclude?.includes("notes") ? [] : notes;
     next = writeBlock(next, "data", {
       ...data,
       v: DASHBOARD_VERSION,
-      notes: notes.map(escapeHtml),
+      notes: kept.map(escapeHtml),
     });
 
     let backup: string | undefined;
@@ -206,7 +379,7 @@ export class DashboardWriter {
       path: target,
       page: kind,
       ...(backup ? { backup } : {}),
-      notes: notes.length,
+      notes: kept.length,
       digest: digest(data),
       ...(hasLanguages(next) ? { languages: missingTexts(next) } : {}),
     };
@@ -300,7 +473,10 @@ export class DashboardWriter {
         ...(types ? { types } : {}),
       })),
       languages: missingTexts(page),
-      catalogue: CATALOGUE.map((c) => ({
+      // a widget whose data the page leaves out shows nothing there
+      catalogue: CATALOGUE.filter(
+        (c) => !c.needs || !settingsOf(page).exclude?.includes(c.needs),
+      ).map((c) => ({
         id: c.id,
         title: en[c.title],
         ...(c.types ? { types: c.types } : {}),
@@ -323,7 +499,11 @@ export class DashboardWriter {
 
   /** The page file: relative paths sit in the data dir; only .html files. */
   #target(path: string | undefined): string {
-    const target = resolve(this.dataDir, path ?? DASHBOARD_FILE);
+    // ~ is the home folder, as the user types it in a shell
+    const target = resolve(
+      this.dataDir,
+      (path ?? DASHBOARD_FILE).replace(/^~(?=$|[/\\])/, homedir()),
+    );
     if (!/\.html$/i.test(target)) {
       throw new Error(`The dashboard must be an .html file: ${target}`);
     }
@@ -433,6 +613,9 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         "from the template: `preset` (the default widgets) or `blank` (empty boards). `page` writes your own",
         "page code instead; it must contain /* garmin-data:start */null/* garmin-data:end */. A replaced",
         "page is kept as <file>.bak. `notes`: at most 5 plain-text coach notes; the server escapes them.",
+        "`settings` replace the page's settings (title, headline, sports, data to leave out, languages,",
+        "themes); without them the page keeps its own. The page holds only the data, languages and themes",
+        "they keep. `preview: true` writes nothing: it returns the digest and the activities of each board.",
       ].join("\n"),
       inputSchema: z.object({
         weeks: z.number().int().describe("Weeks to cover, default 12, max 52").optional(),
@@ -453,10 +636,44 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
           .string()
           .describe("The .html file; relative paths are inside the data dir")
           .optional(),
+        settings: z
+          .object({
+            title: z.string().describe("Replaces the title in every language").optional(),
+            headline: z.string().describe("A line under the title").optional(),
+            sports: z
+              .array(z.string())
+              .describe("The boards to keep, e.g. running, cycling; all when not set")
+              .optional(),
+            exclude: z
+              .array(z.enum(DATA_ITEMS))
+              .describe("The data to leave out of the page")
+              .optional(),
+            languages: z
+              .array(z.string())
+              .describe(`Languages to keep: en, ${Object.keys(BUILT_IN).join(", ")}`)
+              .optional(),
+            language: z.string().describe("Default language: auto or a code").optional(),
+            themes: z
+              .array(z.string())
+              .describe(`Themes to keep: ${THEMES.map((t) => t.id).join(", ")}`)
+              .optional(),
+            theme: z.string().describe("Default theme").optional(),
+          })
+          .describe("The page settings; replaces the page's own")
+          .optional(),
+        preview: z
+          .boolean()
+          .describe("Write nothing: return the digest and the activities of each board")
+          .optional(),
       }),
     },
-    async (a) => ({
-      content: [{ type: "text" as const, text: JSON.stringify(await writer.write(a)) }],
+    async ({ preview, ...a }) => ({
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify(await (preview ? writer.preview(a) : writer.write(a))),
+        },
+      ],
     }),
   );
 

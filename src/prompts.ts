@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { addDays, localToday } from "./dates";
+import { BUILT_IN } from "./page/i18n/built-in";
+import { en } from "./page/i18n/en";
+import { THEMES } from "./page/theme";
 
 /**
  * MCP prompts: ready-made instructions the client shows in its prompt menu (e.g. Claude Desktop "+").
@@ -22,6 +25,7 @@ export function registerPrompts(server: McpServer): void {
   const update = load("training-dashboard-update.md");
   const widgetPrompt = load("dashboard-widget.md");
   const languagePrompt = load("dashboard-language.md");
+  const setupPrompt = load("dashboard-setup.md");
 
   const dashboardDescription =
     "Build a personal training + recovery dashboard (volume, load, HRV, sleep) from Garmin data";
@@ -95,6 +99,31 @@ export function registerPrompts(server: McpServer): void {
     (args) => result(widgetDescription, render(widgetPrompt, { idea: arg(args.idea) })),
   );
 
+  const setupDescription =
+    "Set up a dashboard: title, sports, the data it shows (e.g. for a coach), languages, themes, file";
+  server.registerPrompt(
+    "dashboard-setup",
+    {
+      description: setupDescription,
+      argsSchema: z.object({
+        weeks: z.string().describe(`Number of weeks to cover, default ${DEFAULT_WEEKS}`).optional(),
+      }),
+    },
+    (args) =>
+      result(
+        setupDescription,
+        render(setupPrompt, {
+          weeks: String(weeks(args.weeks)),
+          today: localToday(),
+          title: en.title,
+          headline: en.headline,
+          languages: ["en", ...Object.keys(BUILT_IN)].join(", "),
+          languageNames: ["English", ...Object.keys(BUILT_IN).map(languageName)].join(" and "),
+          themes: THEMES.map((t) => t.id).join(", "),
+        }),
+      ),
+  );
+
   const languageDescription =
     "Add a language to the training dashboard (Claude translates its texts)";
   server.registerPrompt(
@@ -146,6 +175,10 @@ function render(template: string, values: Record<string, string>): string {
   }
   return text;
 }
+
+/** A language code by its English name, e.g. Italian for it. */
+const languageName = (code: string) =>
+  new Intl.DisplayNames(["en"], { type: "language" }).of(code) ?? code;
 
 /** The argument without whitespace or control characters at either end; "" when missing. */
 function arg(v: string | undefined): string {

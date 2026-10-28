@@ -96,5 +96,17 @@ export function registerCustom(def: WidgetDef): void {
   widgets.set(def.id, { ...def, custom: true });
 }
 
+/** The built-in widgets whose data the page leaves out: no board shows them, Add widget does not list them. */
+export const withheld = new Set<string>();
+
+export function withhold(exclude: readonly string[]): void {
+  for (const c of CATALOGUE) {
+    if (c.needs && exclude.includes(c.needs)) {
+      widgets.delete(c.id);
+      withheld.add(c.id);
+    }
+  }
+}
+
 export const widget = (id: string) => widgets.get(id);
 export const allWidgets = () => [...widgets.values()];

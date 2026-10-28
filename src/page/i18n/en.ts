@@ -1,6 +1,7 @@
 /** The page texts in English: the source of the keys. Every other catalogue has exactly these keys. */
 export const en = {
   title: "Training + Recovery",
+  headline: "Training load, recovery and progress from Garmin Connect",
   na: "n/a",
   noData: "This page has no data yet. Ask Claude to write the dashboard.",
   period: "{from} to {to}",
@@ -8,10 +9,8 @@ export const en = {
 
   "menu.settings": "Settings",
   "menu.theme": "Theme",
-  "footer.links": "Project links",
-  "footer.source": "Source on GitHub",
-  "footer.issues": "Report an issue",
-  "footer.releases": "Releases",
+  "footer.updated": "Data from Garmin Connect, updated {date}",
+  "footer.failed": "Days not read from Garmin: {n} (their values show n/a)",
   "footer.license": "MIT License",
   "menu.language": "Language",
   "lang.auto": "Auto",
