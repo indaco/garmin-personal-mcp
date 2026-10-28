@@ -1,0 +1,56 @@
+#:schema https://www.schemastore.org/prek.json
+# Git hooks run by prek: https://prek.j178.dev
+# Install once per clone: prek install
+# Skip in an emergency: git commit --no-verify / git push --no-verify
+
+default_install_hook_types = ["pre-commit", "pre-push"]
+
+# pre-commit: fast checks on staged files only
+[[repos]]
+repo = "builtin"
+hooks = [
+  { id = "no-commit-to-branch", args = ["--branch", "main"] },
+  { id = "check-merge-conflict" },
+  { id = "check-case-conflict" },
+  { id = "check-added-large-files" },
+  { id = "detect-private-key" },
+  { id = "check-yaml", args = ["--allow-multiple-documents"] }, # pnpm-lock.yaml has two
+  { id = "check-toml" },
+]
+
+[[repos]]
+repo = "local"
+
+# staged files only, so local untracked files never block a commit; CI runs the whole repo
+[[repos.hooks]]
+id = "oxlint"
+name = "oxlint"
+language = "system"
+entry = "pnpm exec oxlint --deny-warnings --no-error-on-unmatched-pattern"
+types_or = ["ts", "javascript"]
+
+[[repos.hooks]]
+id = "oxfmt"
+name = "oxfmt --check"
+language = "system"
+entry = "pnpm exec oxfmt --check --no-error-on-unmatched-pattern"
+types_or = ["ts", "javascript", "json", "yaml", "markdown", "toml"]
+
+# pre-push: the slower checks, once per push instead of once per commit
+[[repos.hooks]]
+id = "typecheck"
+name = "tsc --noEmit"
+language = "system"
+entry = "pnpm typecheck"
+pass_filenames = false
+always_run = true
+stages = ["pre-push"]
+
+[[repos.hooks]]
+id = "test"
+name = "vitest"
+language = "system"
+entry = "pnpm test"
+pass_filenames = false
+always_run = true
+stages = ["pre-push"]
