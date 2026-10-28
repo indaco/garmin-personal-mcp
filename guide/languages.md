@@ -19,6 +19,10 @@ A text without a translation shows in English.
 The server accepts only the keys of the English texts, with the same placeholders. After a server
 update with new texts, the update prompt tells Claude which texts are missing.
 
+To remove a language that you added, ask Claude. For example: "Remove the German language from the
+page". Claude calls `editDashboard` with `removeLanguages`. Built-in languages stay: the
+[page settings](dashboard.md#page-settings) choose them.
+
 To change one text of a built-in language, ask Claude. For example: "In Italian, call the readiness
 widget _Forma di oggi_".
 

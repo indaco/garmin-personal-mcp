@@ -208,7 +208,8 @@ This prompt adds a language to the dashboard. Claude translates the texts of the
 `editDashboard` stores them in the page. The argument `language` is optional: the default is the
 language of the conversation. The argument `path` is optional: it is the file of the page, for
 example `coach.html`. In Claude Code: `/garmin-personal:dashboard-language German coach.html`. A text
-without a translation shows in English.
+without a translation shows in English. To remove an added language, ask Claude to remove it:
+`editDashboard` with `removeLanguages`.
 [Languages](guide/languages.md) tells more.
 
 ## Tools
