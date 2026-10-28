@@ -52,7 +52,7 @@ MCP server for the official Garmin Connect Personal API.
   data that you do not select is not in the file.
 - **Extend it**: [dashboard-widget](#dashboard-widget) makes a new widget from your idea.
   [dashboard-language](#dashboard-language) adds a language.
-- **All stdio clients**: Claude Desktop, Claude Code and all other MCP clients that use stdio.
+- **All stdio clients**: Claude Desktop, Claude Code, Codex and all other MCP clients that use stdio.
 
 With this server, you can ask Claude:
 
@@ -106,6 +106,29 @@ claude mcp list          # garmin-personal: ... ✔ Connected
 ```
 
 Use `--scope project` to write a `.mcp.json` file that you can share in the current repository.
+
+**Codex**: this command adds the server:
+
+```bash
+codex mcp add garmin-personal -- npx -y @indaco/garmin-personal-mcp@latest
+```
+
+You can also add it to `~/.codex/config.toml`. The first `npx` download can take longer than the
+default start time, so set a longer one:
+
+```toml
+[mcp_servers.garmin-personal]
+command = "npx"
+args = ["-y", "@indaco/garmin-personal-mcp@latest"]
+startup_timeout_sec = 60
+```
+
+Codex does not send your shell environment to the server. Use the key file, or add
+`env = { GARMIN_PERSONAL_API_KEY = "..." }` to the table.
+
+**Other clients** (Gemini CLI, VS Code, Cursor and others): in the MCP configuration of the client,
+set the command `npx` and the arguments `-y @indaco/garmin-personal-mcp@latest`. Some clients do not
+show MCP prompts. In these clients, ask for the dashboard in your own words. The tools are the same.
 
 ### 3. Ask Claude
 
