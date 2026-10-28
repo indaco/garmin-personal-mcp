@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { digest } from "../src/digest";
+import { sessionSeconds } from "../src/page/calc";
 
 const squat = (sets: Record<string, number>[]) => ({ exercise: "Back Squat", sets });
 
@@ -134,6 +135,16 @@ describe("digest", () => {
       elapsed: "1:30:00",
     };
     expect(digest({ ...data, activities: [tennis] }).totals.tennis.hours).toBe(1.5);
+  });
+
+  it("counts a session as long as the page does, whatever its sport field", () => {
+    const rows = [
+      { type: "strength_training", sport: "training", duration: "10:00", elapsed: "1:00:00" },
+      { type: "tennis", sport: "tennis", duration: "20:00", elapsed: "1:30:00" },
+    ].map((r) => ({ ...r, start: "2026-10-20 18:00:00" }));
+    const t = digest({ ...data, activities: rows }).totals;
+    expect(t.strength_training.hours).toBe(Math.round((sessionSeconds(rows[0]) / 3600) * 10) / 10);
+    expect(t.tennis.hours).toBe(Math.round((sessionSeconds(rows[1]) / 3600) * 10) / 10);
   });
 
   it("sums the previous period for the comparison", () => {

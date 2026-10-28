@@ -83,6 +83,13 @@ describe("time", () => {
     expect(sessionSeconds({ type: "strength_training", duration: "40:00" })).toBe(2400);
   });
 
+  it("counts the elapsed time of a racket type key, whatever its sport", () => {
+    const row = { duration: "20:00", elapsed: "1:30:00" };
+    expect(sessionSeconds({ ...row, type: "tennis", sport: "tennis" })).toBe(5400);
+    expect(sessionSeconds({ ...row, type: "paddelball" })).toBe(5400);
+    expect(sessionSeconds({ ...row, type: "running", sport: "running" })).toBe(1200);
+  });
+
   it("gives the day and the Monday of its week", () => {
     expect(dayOf({ start: "2026-10-25 07:00:00" })).toBe("2026-10-25");
     expect(dayOf({})).toBeUndefined();
