@@ -1,7 +1,7 @@
 [
   {
     "name": "dashboard-language",
-    "description": "Add a language to the training dashboard (Claude translates its texts)",
+    "description": "Add a language to the training dashboard (the assistant translates its texts)",
     "arguments": [
       {
         "name": "language",
@@ -53,7 +53,7 @@
       },
       {
         "name": "layout",
-        "description": "preset (default): the built-in widgets; blank: an empty grid; freeform: Claude designs the whole page",
+        "description": "preset (default): the built-in widgets; blank: an empty grid; freeform: the assistant designs the whole page",
         "required": false
       }
     ]

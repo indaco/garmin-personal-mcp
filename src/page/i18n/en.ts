@@ -3,7 +3,7 @@ export const en = {
   title: "Training + Recovery",
   headline: "Training load, recovery and progress from Garmin Connect",
   na: "n/a",
-  noData: "This page has no data yet. Ask Claude to write the dashboard.",
+  noData: "This page has no data yet. Ask your assistant to write the dashboard.",
   period: "{from} to {to}",
   inProgress: "* week in progress",
 
@@ -160,7 +160,7 @@ export const en = {
   "said.discarded": "Changes discarded",
   "stale.label": "New layout",
   "stale.text":
-    "Claude wrote a new layout for this dashboard. The layout you made in this browser stays until you choose.",
+    "Your assistant wrote a new layout for this dashboard. The layout you made in this browser stays until you choose.",
   "stale.keep": "Keep mine",
   "stale.new": "Use the new one",
   "stale.used": "The new layout is in use",
@@ -175,7 +175,7 @@ export const en = {
 
   "copy.title": "Copy layout",
   "copy.hint":
-    "This layout is saved in this browser only. To keep it in the page, paste this text to Claude and ask it to save the dashboard layout.",
+    "This layout is saved in this browser only. To keep it in the page, paste this text to your assistant and ask it to save the dashboard layout.",
   "copy.copy": "Copy",
   "copy.copied": "Copied",
 
