@@ -110,7 +110,7 @@ export class GarminTools {
   }
 
   async getSleepRange(fromDate: string, toDate: string): Promise<string> {
-    checkRange(fromDate, toDate, 31);
+    checkRange(fromDate, toDate);
     return JSON.stringify(
       await this.api.getJson("/sleep-service/sleep/dailySleepSummariesByDate", {
         startDate: fromDate,
@@ -134,7 +134,7 @@ export class GarminTools {
   }
 
   async getDailySummaryRange(fromDate: string, toDate: string): Promise<string> {
-    checkRange(fromDate, toDate, 366);
+    checkRange(fromDate, toDate);
     return JSON.stringify(
       await this.api.getJson("/usersummary-service/v2/dailysummaries", {
         startDate: fromDate,
@@ -391,14 +391,28 @@ function asString(v: unknown): string | null {
   return typeof v === "string" ? v : typeof v === "number" ? String(v) : null;
 }
 
-/** Throws unless from and to are yyyy-MM-dd, from <= to, and the range has at most `max` days. */
-function checkRange(from: string, to: string, max: number): void {
-  const iso = /^\d{4}-\d{2}-\d{2}$/;
-  if (!iso.test(from) || !iso.test(to) || from > to) {
-    throw new Error("fromDate and toDate must be yyyy-MM-dd with fromDate <= toDate");
+/** The most days a range tool answers: 14 days of sleep or summaries stay well under the chat's tool output limit. */
+const RANGE_DAYS = 14;
+
+/** A real calendar date in the form yyyy-MM-dd: 2026-02-31 is not one. */
+function isDate(d: string): boolean {
+  const t = Date.parse(`${d}T00:00:00Z`);
+  return (
+    /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(t) && new Date(t).toISOString().startsWith(d)
+  );
+}
+
+/** Throws unless from and to are real yyyy-MM-dd dates, from <= to, and the range has at most RANGE_DAYS days. */
+function checkRange(from: string, to: string): void {
+  if (!isDate(from) || !isDate(to) || from > to) {
+    throw new Error("fromDate and toDate must be real dates yyyy-MM-dd with fromDate <= toDate");
   }
   const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000 + 1;
-  if (days > max) throw new Error(`A range has at most ${max} days; this one has ${days}`);
+  if (days > RANGE_DAYS) {
+    throw new Error(
+      `A range has at most ${RANGE_DAYS} days; this one has ${days}. Ask for it in parts.`,
+    );
+  }
 }
 
 /** A tool call for one date or for a range: `date` alone, or `fromDate` and `toDate` without it. */
@@ -525,7 +539,7 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
     "getSleep",
     {
       description:
-        "Sleep data for one night (date: the morning you woke up), or for up to 31 nights (fromDate and toDate), yyyy-MM-dd.",
+        "Sleep data for one night (date: the morning you woke up), or for up to 14 nights (fromDate and toDate), yyyy-MM-dd.",
       inputSchema: dayOrRangeInput,
     },
     async (a) =>
@@ -561,7 +575,7 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
     "getDailySummary",
     {
       description:
-        "Daily user summary (steps, calories, stress, body battery, resting HR) for one date, or for up to 366 days (fromDate and toDate; the range answer has Garmin's v2 field names), yyyy-MM-dd.",
+        "Daily user summary (steps, calories, stress, body battery, resting HR) for one date, or for up to 14 days (fromDate and toDate; the range answer has Garmin's v2 field names), yyyy-MM-dd.",
       inputSchema: dayOrRangeInput,
     },
     async (a) =>

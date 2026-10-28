@@ -335,34 +335,42 @@ describe("activities", () => {
     });
   });
 
-  it("getSleepRange accepts 31 days and refuses 32", async () => {
+  it("getSleepRange accepts 14 days and refuses 15", async () => {
     api.getJson.mockResolvedValue([]);
-    await tools.getSleepRange("2026-10-01", "2026-10-31");
+    await tools.getSleepRange("2026-10-01", "2026-10-14");
     expect(api.getJson).toHaveBeenCalledOnce();
-    await expect(tools.getSleepRange("2026-10-01", "2026-11-01")).rejects.toThrow(
-      "A range has at most 31 days; this one has 32",
+    await expect(tools.getSleepRange("2026-10-01", "2026-10-15")).rejects.toThrow(
+      /at most 14 days/,
     );
     expect(api.getJson).toHaveBeenCalledOnce();
   });
 
   it("getDailySummaryRange asks for the days between two dates in one request", async () => {
     api.getJson.mockResolvedValue({ summaries: [] });
-    expect(await tools.getDailySummaryRange("2026-10-01", "2026-10-27")).toBe('{"summaries":[]}');
+    expect(await tools.getDailySummaryRange("2026-10-01", "2026-10-14")).toBe('{"summaries":[]}');
     expect(api.getJson).toHaveBeenCalledOnce();
     expect(api.getJson).toHaveBeenCalledWith("/usersummary-service/v2/dailysummaries", {
       startDate: "2026-10-01",
-      endDate: "2026-10-27",
+      endDate: "2026-10-14",
     });
   });
 
-  it("getDailySummaryRange accepts 366 days and refuses 367", async () => {
+  it("getDailySummaryRange accepts 14 days and refuses 15", async () => {
     api.getJson.mockResolvedValue({});
-    await tools.getDailySummaryRange("2026-01-01", "2027-01-01");
+    await tools.getDailySummaryRange("2026-10-01", "2026-10-14");
     expect(api.getJson).toHaveBeenCalledOnce();
-    await expect(tools.getDailySummaryRange("2026-01-01", "2027-01-02")).rejects.toThrow(
-      "A range has at most 366 days; this one has 367",
+    await expect(tools.getDailySummaryRange("2026-10-01", "2026-10-15")).rejects.toThrow(
+      /at most 14 days/,
     );
     expect(api.getJson).toHaveBeenCalledOnce();
+  });
+
+  it("a range refuses a date that does not exist, without a request", async () => {
+    await expect(tools.getSleepRange("2026-02-27", "2026-02-31")).rejects.toThrow(/yyyy-MM-dd/);
+    await expect(tools.getDailySummaryRange("2026-13-01", "2026-13-02")).rejects.toThrow(
+      /yyyy-MM-dd/,
+    );
+    expect(api.getJson).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -370,7 +378,7 @@ describe("activities", () => {
     ["a bad from date", "27-10-2026", "2026-10-27"],
     ["a bad to date", "2026-10-01", "2026-10-27T00:00"],
   ])("range calls refuse %s without a request", async (_name, from, to) => {
-    const message = "fromDate and toDate must be yyyy-MM-dd with fromDate <= toDate";
+    const message = "fromDate and toDate must be real dates yyyy-MM-dd with fromDate <= toDate";
     await expect(tools.getSleepRange(from, to)).rejects.toThrow(message);
     await expect(tools.getDailySummaryRange(from, to)).rejects.toThrow(message);
     expect(api.getJson).not.toHaveBeenCalled();

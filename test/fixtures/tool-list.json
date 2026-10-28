@@ -212,7 +212,7 @@
   },
   {
     "name": "getDailySummary",
-    "description": "Daily user summary (steps, calories, stress, body battery, resting HR) for one date, or for up to 366 days (fromDate and toDate; the range answer has Garmin's v2 field names), yyyy-MM-dd.",
+    "description": "Daily user summary (steps, calories, stress, body battery, resting HR) for one date, or for up to 14 days (fromDate and toDate; the range answer has Garmin's v2 field names), yyyy-MM-dd.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
@@ -298,7 +298,7 @@
   },
   {
     "name": "getSleep",
-    "description": "Sleep data for one night (date: the morning you woke up), or for up to 31 nights (fromDate and toDate), yyyy-MM-dd.",
+    "description": "Sleep data for one night (date: the morning you woke up), or for up to 14 nights (fromDate and toDate), yyyy-MM-dd.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
