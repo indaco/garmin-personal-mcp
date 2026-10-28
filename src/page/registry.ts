@@ -5,7 +5,7 @@ import type * as running from "./running";
 import type * as strength from "./strength";
 import type * as sports from "./sports";
 import type { Activity } from "./calc";
-import type { Fmt, T } from "./i18n";
+import type { Fmt, T, Units } from "./i18n";
 import { CATALOGUE } from "./catalogue";
 import type { Span } from "./layout";
 
@@ -26,7 +26,7 @@ export interface Data {
   sync?: Record<string, unknown>;
   notes?: string[];
   /** The measurement system of the Garmin profile; the data stays metric. Metric when not set. */
-  units?: "metric" | "statute_us" | "statute_uk";
+  units?: Units;
 }
 
 /** What a widget gets to draw itself. Built-in and custom widgets get the same. */

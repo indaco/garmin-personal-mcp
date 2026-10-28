@@ -160,7 +160,7 @@ function setLanguage(choice: string): void {
   // a language the page does not offer (English left out) gives its first language
   if (!(lang in LANGUAGE_NAMES)) lang = Object.keys(LANGUAGE_NAMES)[0];
   t = translator(lang);
-  fmt = formatter(lang);
+  fmt = formatter(lang, G.data?.units);
   document.documentElement.lang = lang;
 }
 
