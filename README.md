@@ -260,11 +260,16 @@ log.
 
 ## Presets or freeform
 
-Many setup guides for Claude and Garmin give all the work to Claude: Claude reads the data and
-writes the whole dashboard page. This server also gives you presets. The server writes the page
-from a tested template, and Claude writes only the coach notes. In our measurements, a first build
-took 34 s and $0.16 with a preset, and 24 to 35 minutes and $6.6 to $9.2 when Claude wrote the
-whole page. For a design of your own, use `layout` = `freeform`.
+In many setup guides for Claude and Garmin, Claude reads the data and writes the whole dashboard
+page. With a preset, the server writes the page from a tested template, and Claude writes only the
+coach notes. My measurements for a first build:
+
+| First build            | Time         | Cost         |
+| ---------------------- | ------------ | ------------ |
+| Preset                 | 34 s         | $0.16        |
+| Claude writes the page | 24 to 35 min | $6.6 to $9.2 |
+
+For a design of your own, use `layout` = `freeform`: Claude writes the page, as in those guides.
 
 [Presets or freeform](guide/presets.md) gives the measurements and the limits of the presets.
 
@@ -300,9 +305,19 @@ the commands, the test rules and the code map.
 
 ## Credits
 
-This project is a TypeScript version of [indaco/garmin-mcp](https://github.com/indaco/garmin-mcp),
-which is a fork of [apratico/garmin-mcp](https://github.com/apratico/garmin-mcp) by Alessandro
-Praticò. The two servers use the same key file and can share the same data folder.
+The idea comes from [apratico/garmin-mcp](https://github.com/apratico/garmin-mcp) by Alessandro
+Praticò: a Java MCP server for the Garmin Personal API, where Claude writes the dashboard. I
+tested it in a fork, [indaco/garmin-mcp](https://github.com/indaco/garmin-mcp), and then made this
+server as a different solution:
+
+- **No Java**: the server runs with `npx`. You do not need Java 21 and a jar file.
+- **The server writes the page**: in garmin-mcp, Claude writes all of the dashboard HTML on each run. Here the server fills a tested template, and Claude writes only the coach notes. A first build takes seconds, not minutes ([measurements](#presets-or-freeform)).
+- **Updates keep your page**: [training-dashboard-update](#training-dashboard-update) adds only the new data, and your layout stays.
+- **Widgets that you control**: charts for training load, recovery, running and strength. In the page, you drag, resize, hide and add widgets, and select a theme.
+- **Setup by sport**: [dashboard-setup](#dashboard-setup) makes a page with only the sports and the data that you select, for you or for your coach.
+- **Languages and custom widgets**: [dashboard-language](#dashboard-language) and [dashboard-widget](#dashboard-widget) extend the page.
+
+This server uses the same key file as indaco/garmin-mcp and can share its data folder.
 
 ## License
 
