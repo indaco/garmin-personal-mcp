@@ -369,6 +369,21 @@ describe("getDashboardData", () => {
     expect(out.recovery.at(-1)).toEqual({ date: "2026-10-26", sleepH: 7.5, rhr: 50 });
   });
 
+  it("fetches a failed recovery day again although it kept its old row", async () => {
+    vi.setSystemTime(new Date(2026, 9, 20, 12));
+    await dashboard.getDashboardData(1);
+    vi.setSystemTime(new Date(2026, 9, 26, 12));
+    failingSleep.add("2026-10-19");
+    const out = JSON.parse(await dashboard.getDashboardData(1));
+    expect(out.sync.failedDates).toEqual(["2026-10-19"]);
+    expect(readCache().recoveryTo).toBe("2026-10-19");
+    failingSleep.clear();
+    api.getJson.mockClear();
+    await dashboard.getDashboardData(1);
+    expect(callsTo("/sleep-service").map(([, q]) => q.date)).toContain("2026-10-19");
+    expect(readCache().recoveryTo).toBe("2026-10-26");
+  });
+
   it("builds the dashboard without zones and fitness age when they fail", async () => {
     failing.add("/biometric-service/heartRateZones");
     failing.add("/fitnessage-service/");

@@ -1,5 +1,7 @@
-// Fills the built page template with dashboard data, like writeDashboard does, for screenshots and
-// manual checks: `node scripts/fill-dashboard-fixture.mjs dist/dashboard.html test/fixtures/dashboard-data.json out.html`
+// Fills the built page template with dashboard data, for screenshots and manual checks: data, layout,
+// widgets and i18n. Settings and languages keep the template defaults (no settings, English only):
+// plain node cannot import src/dashboard-page.ts, whose withData is what writeDashboard uses.
+// `node scripts/fill-dashboard-fixture.mjs dist/dashboard.html test/fixtures/dashboard-data.json out.html`
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 

@@ -2,8 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Browser, type BrowserContextOptions, chromium, type Page } from "playwright-core";
-import { writeBlock } from "../../src/dashboard-page";
-import { BUILT_IN } from "../../src/page/i18n/built-in";
+import { styled, withData, writeBlock } from "../../src/dashboard-page";
 import type { Settings } from "../../src/page/settings";
 
 /** The synthetic data of the page tests: generated, no real activity data. */
@@ -22,23 +21,16 @@ export function pageFile(
     settings?: Settings;
   } = {},
 ): string {
-  let page = readFileSync("dist/dashboard.html", "utf8");
-  page = writeBlock(
-    page,
-    "data",
-    "data" in blocks ? blocks.data : { ...data, v: 3, notes: ["Load &lt;b&gt;1.2"] },
-  );
+  const s = blocks.settings ?? {};
+  let page = styled(readFileSync("dist/dashboard.html", "utf8"), s);
   page = writeBlock(page, "layout", blocks.layout ?? null);
   page = writeBlock(page, "widgets", blocks.widgets ?? []);
   page = writeBlock(page, "i18n", blocks.i18n ?? {});
-  page = writeBlock(page, "settings", blocks.settings ?? null);
-  page = writeBlock(
-    page,
-    "languages",
-    Object.fromEntries(
-      Object.entries(BUILT_IN).filter(([c]) => blocks.settings?.languages?.includes(c) ?? true),
-    ),
-  );
+  // a test that gives its own data block gets it as it is
+  page =
+    "data" in blocks
+      ? writeBlock(withData(page, data, s, []), "data", blocks.data)
+      : withData(page, data, s, ["Load <b>1.2"]);
   const file = join(dir, `page-${++n}.html`);
   writeFileSync(file, page);
   return file;

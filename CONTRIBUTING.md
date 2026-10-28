@@ -43,14 +43,16 @@ wrong, open an issue _before_ you write code.
 
 ## Development environment
 
-You need Node.js 22 or later and pnpm. The `packageManager` field in `package.json` sets the pnpm
-version, so `corepack enable` gives you the same pnpm as CI.
+You need Node.js 22 or later and pnpm. With [devbox](https://www.jetify.com/devbox), `devbox shell`
+gives you Node 26, pnpm and prek. Without devbox, install pnpm with `npm install -g pnpm`. pnpm uses
+the version that the `packageManager` field in `package.json` sets, so you get the same pnpm as CI.
 
 ```bash
 git clone https://github.com/indaco/garmin-personal-mcp.git
 cd garmin-personal-mcp
 pnpm install
 pnpm build               # writes dist/index.js, dist/dashboard.html and THIRD-PARTY-NOTICES.md
+prek install             # the git hooks: format and lint on commit, typecheck and tests on push
 ```
 
 ### Run your build in a client

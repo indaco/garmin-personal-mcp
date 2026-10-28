@@ -1,5 +1,5 @@
 import { addDays } from "../../dates";
-import { type Activity, dayOf, GROUPS, groupOf, sessionSeconds } from "../calc";
+import { type Activity, dayOf, groupOf, groupsIn, sessionSeconds } from "../calc";
 import { append, h } from "../dom";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
@@ -7,9 +7,6 @@ import { alpha, typeName, kpi, kpiRow, maxHR, note, picker, weekLabel, windowEnd
 
 /** The heat of a calendar day by its training minutes. */
 const level = (m: number) => (m === 0 ? 0 : m < 30 ? 1 : m < 60 ? 2 : m < 90 ? 3 : 4);
-
-/** The groups that have activities in the list, in tab order. */
-const groupsIn = (acts: Activity[]) => GROUPS.filter((g) => acts.some((a) => groupOf(a) === g));
 
 /** Bars stacked per type, one bar per week. */
 function stackedWeeks(ctx: Ctx, value: (a: Activity) => number) {
@@ -276,10 +273,7 @@ register({
     const weekday = new Intl.DateTimeFormat(ctx.lang, { weekday: "short", timeZone: "UTC" });
     const tip = h("div", { class: "cal-tip", role: "status", hidden: true });
     // the last day of the window takes the tab stop
-    const last = [...ctx.weeks.map((w) => addDays(w, 6)), ctx.data.end]
-      .filter((d) => d <= ctx.data.end)
-      .toSorted()
-      .at(-1);
+    const last = windowEnd(ctx);
     const show = (cell: HTMLElement, d: string) => {
       const acts = byDay.get(d) ?? [];
       tip.replaceChildren(

@@ -219,10 +219,12 @@ export function median(values: number[]): number | undefined {
   return s.length % 2 ? s[m] : (mean([s[m - 1], s[m]]) ?? undefined);
 }
 
-/** The exercise name for the URL hash, e.g. "barbell-back-squat". */
+/** The exercise name for the URL hash, e.g. "barbell-back-squat": letters, marks and digits of any script. */
 export function slug(name: string): string {
-  return name
+  const s = name
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-")
     .replace(/^-|-$/g, "");
+  // a name of symbols only keeps its text, so it still gets its own link
+  return s || name;
 }

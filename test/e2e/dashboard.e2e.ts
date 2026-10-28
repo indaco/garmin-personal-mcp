@@ -2,6 +2,8 @@ import { readFileSync, statSync, writeFileSync } from "node:fs";
 import axe from "axe-core";
 import type { Browser, Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { THEMES } from "../../src/page/theme";
+import { DASHBOARD_VERSION } from "../../src/prompts";
 import { data, launch, open, pageFile } from "./page";
 
 let browser: Browser;
@@ -18,6 +20,22 @@ const tabs = (page: Page) =>
   );
 const tiles = (page: Page) =>
   page.$$eval(".tile", (els) => els.map((e) => (e as HTMLElement).dataset.id));
+/** The "Average pace" value of the running board for the given activities. */
+async function runningPace(activities: unknown[]): Promise<string | null> {
+  const { page } = await open(
+    browser,
+    pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }),
+    {
+      hash: "#running",
+    },
+  );
+  return page
+    .locator("[data-id=typeKpis] .kpi", {
+      has: page.locator(".kpi-label", { hasText: "Average pace" }),
+    })
+    .locator(".kpi-value")
+    .textContent();
+}
 const hash = (page: Page) => page.evaluate(() => location.hash);
 /** Opens edit mode from the settings menu. */
 async function startEdit(page: Page): Promise<void> {
@@ -241,7 +259,9 @@ describe("the page", () => {
 
     const failed = await open(
       browser,
-      pageFile({ data: { ...data, v: 3, notes: [], sync: { ...data.sync, failedDays: 2 } } }),
+      pageFile({
+        data: { ...data, v: DASHBOARD_VERSION, notes: [], sync: { ...data.sync, failedDays: 2 } },
+      }),
     );
     expect(await failed.page.textContent("footer .gap")).toBe(
       "Days not read from Garmin: 2 (their values show n/a)",
@@ -363,6 +383,40 @@ describe("edit mode", () => {
     expect(await handle.getAttribute("aria-valuetext")).toBe("2 of 3 columns");
     await page.keyboard.press("End");
     expect(await page.getAttribute("[data-id=coachNotes]", "class")).toContain("span-3");
+  });
+
+  it("ends a drag when the page draws again during it", async () => {
+    const { page } = await open(browser, pageFile({ layout: two }));
+    await startEdit(page);
+    const from = (await page.locator("[aria-label='Move Coach notes']").boundingBox())!;
+    await page.mouse.move(from.x + 5, from.y + 5);
+    await page.mouse.down();
+    const to = (await page.locator("[data-id=x]").boundingBox())!;
+    await page.mouse.move(to.x + to.width * 0.75, to.y + to.height / 2, { steps: 8 });
+    expect(await page.evaluate(() => document.documentElement.classList.contains("dragging"))).toBe(
+      true,
+    );
+    await page.evaluate(() => window.dispatchEvent(new HashChangeEvent("hashchange")));
+    await page.waitForFunction(() => !document.documentElement.classList.contains("dragging"));
+    expect(await page.$(".tile-slot")).toBeNull();
+    await page.mouse.up();
+  });
+
+  it("ends a resize when the page draws again during it", async () => {
+    const { page } = await open(browser, pageFile({ layout: two }));
+    await startEdit(page);
+    const box = (await page.locator("[aria-label='Width of Coach notes']").boundingBox())!;
+    const grid = (await page.locator(".grid").boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(grid.x + grid.width * 0.4, box.y + box.height / 2, { steps: 6 });
+    expect(await page.evaluate(() => document.documentElement.classList.contains("resizing"))).toBe(
+      true,
+    );
+    await page.evaluate(() => window.dispatchEvent(new HashChangeEvent("hashchange")));
+    await page.waitForFunction(() => !document.documentElement.classList.contains("resizing"));
+    expect(await page.$(".guides")).toBeNull();
+    await page.mouse.up();
   });
 
   it("keeps a widget at its narrowest width", async () => {
@@ -587,6 +641,62 @@ describe("accessibility", () => {
   });
 });
 
+describe("calendar contrast", () => {
+  it("has a calendar focus ring and day borders with 3:1 contrast in every theme", async () => {
+    const { page } = await open(browser, pageFile());
+    const failures: string[] = [];
+    // :focus-visible on a script focus needs keyboard modality
+    await page.keyboard.press("Tab");
+    for (const { id } of THEMES) {
+      const out = await page.evaluate((theme) => {
+        document.documentElement.dataset.theme = theme;
+        // colours as the browser draws them: a 1 px canvas turns any CSS colour into RGB
+        const ctx2d = document.createElement("canvas").getContext("2d")!;
+        const ratio = (a: string, b: string) => {
+          const [x, y] = [a, b]
+            .map((css) => {
+              ctx2d.fillStyle = css;
+              ctx2d.fillRect(0, 0, 1, 1);
+              return [...ctx2d.getImageData(0, 0, 1, 1).data]
+                .slice(0, 3)
+                .map((v) => {
+                  const c = v / 255;
+                  return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+                })
+                .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+            })
+            .toSorted((p, q) => q - p);
+          return (x + 0.05) / (y + 0.05);
+        };
+        const cells = [...document.querySelectorAll<HTMLElement>("[data-id=calendar] .cal-cell")];
+        const busy =
+          cells.find((c) => c.classList.contains("l4")) ??
+          cells.find((c) => c.classList.contains("l3"))!;
+        const rest = cells.find((c) => c.classList.contains("l0") && c.dataset.date)!;
+        const probe = document.createElement("div");
+        probe.style.background = "var(--panel)";
+        document.body.append(probe);
+        const tile = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        busy.focus();
+        const cs = getComputedStyle(busy);
+        const edge = getComputedStyle(rest);
+        const shadow = /(?:rgba?|color)\([^)]*\)/.exec(edge.boxShadow)?.[0];
+        return {
+          focusable: busy.matches(":focus-visible"),
+          restVsTile: ratio(shadow ?? edge.backgroundColor, tile),
+          // the ring borders the panel-coloured gap that the focus rule draws
+          ringVsGap: ratio(cs.outlineColor, tile),
+        };
+      }, id);
+      if (out.ringVsGap < 3) failures.push(`${id}: ring vs gap ${out.ringVsGap.toFixed(2)}`);
+      if (!out.focusable) failures.push(`${id}: day not :focus-visible`);
+      if (out.restVsTile < 3) failures.push(`${id}: rest day vs tile ${out.restVsTile.toFixed(2)}`);
+    }
+    expect(failures).toEqual([]);
+  });
+});
+
 describe("phone", () => {
   const phone = { viewport: { width: 390, height: 844 } };
 
@@ -694,6 +804,21 @@ describe("overview widgets", () => {
     expect(errors).toEqual([]);
   });
 
+  it("leaves a session without a distance out of the average pace", async () => {
+    const treadmill = {
+      id: 9100,
+      name: "Treadmill without a foot pod",
+      type: "treadmill_running",
+      sport: "running",
+      start: "2026-10-25 07:00:00",
+      duration: "1:00:00",
+      avgHR: 140,
+    };
+    expect(await runningPace([treadmill, ...data.activities])).toBe(
+      await runningPace(data.activities),
+    );
+  });
+
   it("totals the window", async () => {
     const { page } = await open(browser, pageFile());
     const km = data.activities.reduce((s: number, a: { km?: number }) => s + (a.km ?? 0), 0);
@@ -713,6 +838,36 @@ describe("overview widgets", () => {
     const tip = await page.textContent(".cal-tip");
     expect(tip).toContain("Riverside Half Marathon");
     expect(await page.isVisible(".cal-tip")).toBe(true);
+  });
+
+  it("keeps one tab stop in the calendar of an older window", async () => {
+    const { page } = await open(browser, pageFile(), { hash: "#all@2026-08-03_2026-08-31" });
+    const stops = await page.$$eval("[data-id=calendar] .cal-cell[tabindex='0']", (c) =>
+      c.map((x) => x.getAttribute("data-date")),
+    );
+    // the Sunday of the window's last week
+    expect(stops).toEqual(["2026-09-06"]);
+  });
+
+  it("shows n/a without a unit for a missing distance", async () => {
+    const swim = {
+      id: 9200,
+      name: "Open water, no distance",
+      type: "open_water_swimming",
+      sport: "swimming",
+      start: "2026-10-24 07:00:00",
+      duration: "30:00",
+    };
+    const { page } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: [swim, ...data.activities] } }),
+      { hash: "#swimming" },
+    );
+    const cells = await page.$$eval("[data-id=swimDetails] tbody tr:first-child td", (c) =>
+      c.map((x) => x.textContent),
+    );
+    expect(cells[2]).toBe("n/a");
+    expect(cells[3]).toBe("n/a");
   });
 
   it("lists the activities, and opens and closes their laps", async () => {
@@ -871,7 +1026,7 @@ describe("type boards", () => {
     const ride = data.activities.find((a: { type: string }) => a.type === "cycling");
     const { page } = await open(
       browser,
-      pageFile({ data: { ...data, activities: [ride], v: 3 } }),
+      pageFile({ data: { ...data, activities: [ride], v: DASHBOARD_VERSION } }),
       { hash: "#cycling" },
     );
     expect(await page.textContent("[data-id=typeWeekly]")).toContain("One session so far");
@@ -919,6 +1074,31 @@ describe("strength board", () => {
     expect(await sort()).toBe("descending");
     await page.click("[data-id=exercises] .sort >> text=Best est. 1RM");
     expect(await sort()).toBe("ascending");
+  });
+
+  it("opens an exercise with a name in another script, and keeps it in the hash", async () => {
+    const renamed: Record<string, string> = { Plank: "Планка", "Lat Pulldown": "腹筋" };
+    const activities = data.activities.map((a: Record<string, unknown>) =>
+      Array.isArray(a.exercises)
+        ? {
+            ...a,
+            exercises: a.exercises.map((e: { exercise: string }) => ({
+              ...e,
+              exercise: renamed[e.exercise] ?? e.exercise,
+            })),
+          }
+        : a,
+    );
+    const file = pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } });
+    const { page, errors } = await open(browser, file, { hash: "#strengthTraining" });
+    await page.click("[data-exercise='腹筋']");
+    expect(await page.textContent(".detail h3")).toBe("腹筋");
+    expect(decodeURIComponent(await hash(page))).toMatch(/\/腹筋$/);
+    expect(await page.getAttribute("[data-exercise='планка']", "data-exercise")).toBe("планка");
+
+    const again = await open(browser, file, { hash: await hash(page) });
+    expect(await again.page.textContent(".detail h3")).toBe("腹筋");
+    expect(errors).toEqual([]);
   });
 
   it("opens an exercise with a click or Enter, keeps it in the hash, and closes it with a second click", async () => {
@@ -1030,7 +1210,11 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
   };
   const more = () =>
     pageFile({
-      data: { ...data, v: 3, activities: [hike, swim, yoga, tennis, ski, ...data.activities] },
+      data: {
+        ...data,
+        v: DASHBOARD_VERSION,
+        activities: [hike, swim, yoga, tennis, ski, ...data.activities],
+      },
     });
 
   it("adds a tab for each other sport in the data, and the Other tab last", async () => {
@@ -1060,6 +1244,36 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     expect(errors).toEqual([]);
   });
 
+  it("draws the bars and the period row of another sport", async () => {
+    // a board with a single session shows a note instead of the chart, so give it two
+    const two = pageFile({
+      data: {
+        ...data,
+        v: DASHBOARD_VERSION,
+        activities: [{ ...ski, id: 9006, start: "2026-10-14 10:00:00" }, ski, ...data.activities],
+      },
+    });
+    const { page, errors } = await open(browser, two, { hash: "#alpineSkiing" });
+    const bars = await page.evaluate(() => {
+      const c = Object.values(window.Chart!.instances).find((x) =>
+        x.canvas.closest("[data-widget=typeWeekly]"),
+      )!;
+      return c.data.datasets.filter((d) => d.type === "bar").map((d) => d.label);
+    });
+    expect(bars).toEqual(["Alpine skiing"]);
+    await page.click("[data-tab=all]");
+    expect(await page.textContent("[data-widget=periodComparison]")).toContain("Alpine skiing");
+    expect(errors).toEqual([]);
+  });
+
+  it("adds a widget to another sport's board with that sport as its type", async () => {
+    const { page } = await open(browser, more(), { hash: "#alpineSkiing" });
+    await startEdit(page);
+    await page.click(".edit-bar >> text=Add widget");
+    const select = page.locator(".catalogue li:has-text('Weekly volume') select");
+    expect(await select.inputValue()).toBe("alpineSkiing");
+  });
+
   it("draws every extra board without errors, with a tooltip on every chart", async () => {
     const { page, errors } = await open(browser, more());
     for (const tab of ["walking", "hiking", "cycling", "swimming", "racket", "generic"]) {
@@ -1083,6 +1297,10 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     );
     // in the order of the data, where the test puts tennis first
     expect(sports).toEqual(["Tennis", "Padel", "Padel", "Padel"]);
+    const numeric = await page.$$eval("[data-id=racketDetails] thead th", (th) =>
+      th.map((x) => x.classList.contains("num")),
+    );
+    expect(numeric).toEqual([false, false, false, true, true, true, true, true, true, true, true]);
     expect(await page.textContent("[data-tab=racket] .count")).toBe("4");
     await page.click("[data-tab=walking]");
     expect(await tiles(page)).toEqual([
@@ -1130,7 +1348,7 @@ describe("custom widgets and languages", () => {
     const { page, errors } = await open(
       browser,
       pageFile({
-        data: { ...data, v: 3, notes: ["Don&#39;t skip Z2 &amp; strides"] },
+        data: { ...data, v: DASHBOARD_VERSION, notes: ["Don&#39;t skip Z2 &amp; strides"] },
         widgets: [custom("note", "el.textContent = ctx.data.notes[0];")],
         layout: on("note"),
       }),
@@ -1160,7 +1378,7 @@ describe("custom widgets and languages", () => {
       zones: null,
       activities: data.activities.map(noLoad),
       previousActivities: data.previousActivities.map(noLoad),
-      v: 3,
+      v: DASHBOARD_VERSION,
       notes: [],
     };
     const { page, errors } = await open(browser, pageFile({ data: noLoadData }), {

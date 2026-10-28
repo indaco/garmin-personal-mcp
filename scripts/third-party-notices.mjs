@@ -18,6 +18,10 @@ const dirs = [
     bundle.match(/node_modules\/\.pnpm\/[^/]+\/node_modules\/(?:@[^/]+\/)?[^/\s"']+/g) ?? [],
   ),
 ];
+// a change of the pnpm store layout would make the regex find nothing and write empty notices
+if (dirs.length === 0) {
+  throw new Error("found no bundled package in dist/: check the node_modules path regex");
+}
 const packages = dirs
   .map((dir) => {
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));

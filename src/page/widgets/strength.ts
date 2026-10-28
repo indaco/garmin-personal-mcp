@@ -257,7 +257,8 @@ function exerciseTable(
       const toggle = () => {
         ctx.setItem(selected ? undefined : calc.slug(s.name));
         // the detail opens after the table: take the focus there
-        if (!selected) document.querySelector<HTMLElement>("#ex-detail h3")?.focus();
+        if (!selected)
+          document.getElementById(`ex-detail-${ctx.id}`)?.querySelector<HTMLElement>("h3")?.focus();
       };
       body.append(
         h(
@@ -275,7 +276,7 @@ function exerciseTable(
               {
                 class: "linkish",
                 "aria-expanded": String(selected),
-                "aria-controls": "ex-detail",
+                "aria-controls": `ex-detail-${ctx.id}`,
                 onclick: (e: Event) => {
                   e.stopPropagation(); // the row would toggle it again
                   toggle();
@@ -346,7 +347,7 @@ function detail(ctx: Ctx, s: ExerciseStats): HTMLElement {
   const { t, fmt } = ctx;
   const panel = h(
     "section",
-    { class: "detail", id: "ex-detail", "aria-label": s.name },
+    { class: "detail", id: `ex-detail-${ctx.id}`, "aria-label": s.name },
     h(
       "header",
       { class: "detail-head" },

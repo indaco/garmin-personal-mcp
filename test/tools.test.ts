@@ -11,11 +11,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Profile } from "@garmin/fitsdk";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
+import { McpServer } from "@modelcontextprotocol/server";
 import { zipSync } from "fflate";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GarminApiError, type GarminApiClient } from "../src/api-client";
+import { registerDashboard, type GarminDashboard } from "../src/dashboard";
+import { registerDashboardWriter, type DashboardWriter } from "../src/dashboard-page";
 import { createServer } from "../src/server";
-import { GarminTools, summarize } from "../src/tools";
+import { GarminTools, registerTools, summarize } from "../src/tools";
 import { fitFile } from "./fit-file";
 import toolList from "./fixtures/tool-list.json";
 
@@ -469,6 +472,25 @@ async function connect() {
   return client;
 }
 
+/** A client on the tool handlers, with the mocked API, a mocked dashboard and a mocked page writer. */
+async function connectHandlers(
+  writer: Partial<DashboardWriter> = {},
+  dashboard: Partial<GarminDashboard> = {},
+) {
+  const server = new McpServer({ name: "test", version: "1" });
+  registerTools(server, tools);
+  registerDashboard(server, dashboard as GarminDashboard);
+  registerDashboardWriter(server, writer as DashboardWriter);
+  const [clientEnd, serverEnd] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "test", version: "1" });
+  await server.connect(serverEnd);
+  await client.connect(clientEnd);
+  return client;
+}
+
+/** The text of a tool result. */
+const textOf = (r: unknown) => (r as { content: { text: string }[] }).content[0].text;
+
 // zod bounds integers to the safe range; the reference list declares a plain integer
 const unbounded = (properties: unknown) =>
   JSON.parse(
@@ -506,6 +528,123 @@ describe("MCP tools", () => {
     expect(result).toMatchObject({
       isError: true,
       content: [{ type: "text", text: "Network error obtaining token: fetch failed" }],
+    });
+  });
+
+  it.each([
+    ["getActivity", { activityId: 42 }, "/activity-service/activity/42", {}],
+    [
+      "getHrvRange",
+      { fromDate: "2026-10-01", toDate: "2026-10-27" },
+      "/hrv-service/hrv/daily/2026-10-01/2026-10-27",
+      {},
+    ],
+    [
+      "getDailyHeartRate",
+      { date: "2026-10-27" },
+      "/wellness-service/wellness/dailyHeartRate",
+      { date: "2026-10-27" },
+    ],
+    ["getSleep", { date: "2026-10-27" }, "/sleep-service/sleep/dailySleep", { date: "2026-10-27" }],
+    ["getHeartRateZones", {}, "/biometric-service/heartRateZones/v2", {}],
+    ["getFitnessAge", { date: "2026-10-27" }, "/fitnessage-service/fitnessage/v2/2026-10-27", {}],
+    [
+      "getDailySummary",
+      { date: "2026-10-27" },
+      "/usersummary-service/usersummary/daily",
+      { calendarDate: "2026-10-27" },
+    ],
+    ["garminGet", { path: "/x", query: "a=1" }, "/x", { a: "1" }],
+  ])("%s passes its arguments to the Garmin path", async (tool, args, path, query) => {
+    api.getJson.mockResolvedValue({ ok: 1 });
+    const client = await connectHandlers();
+    const result = await client.callTool({ name: tool, arguments: args });
+    expect(textOf(result)).toBe('{"ok":1}');
+    expect(api.getJson).toHaveBeenCalledWith(path, query);
+  });
+
+  it("listActivities passes the dates, the type, the limit and raw in their places", async () => {
+    api.getJson.mockResolvedValue([{ activityId: 9 }]);
+    const client = await connectHandlers();
+    const result = await client.callTool({
+      name: "listActivities",
+      arguments: {
+        startDate: "2026-10-01",
+        endDate: "2026-10-27",
+        activityType: "running",
+        limit: 5,
+        raw: true,
+      },
+    });
+    expect(api.getJson).toHaveBeenCalledWith("/activitylist-service/activities/search/activities", {
+      start: "0",
+      limit: "5",
+      startDate: "2026-10-01",
+      endDate: "2026-10-27",
+      activityType: "running",
+    });
+    expect(textOf(result)).toBe('[{"activityId":9}]');
+  });
+
+  it("the FIT tools read the activity id from their arguments", async () => {
+    api.getBytes.mockResolvedValue(zipSync({ "77_ACTIVITY.fit": strengthFit() }));
+    const client = await connectHandlers();
+    const download = await client.callTool({
+      name: "downloadActivityFit",
+      arguments: { activityId: 77 },
+    });
+    const laps = await client.callTool({ name: "getActivityLaps", arguments: { activityId: 77 } });
+    const sets = await client.callTool({ name: "getActivitySets", arguments: { activityId: 77 } });
+    expect(JSON.parse(textOf(download)).path).toBe(join(dataDir, "fit", "77.fit"));
+    expect(api.getBytes).toHaveBeenCalledTimes(1);
+    expect(api.getBytes).toHaveBeenCalledWith("/download-service/files/activity/77", {});
+    expect(() => JSON.parse(textOf(laps))).not.toThrow();
+    expect(JSON.parse(textOf(sets)).exercises[0].sets[0]).toMatchObject({ reps: 5 });
+  });
+
+  describe("dashboard tools", () => {
+    const writer = { write: vi.fn(), preview: vi.fn(), edit: vi.fn() };
+    const dashboard = { getDashboardData: vi.fn() };
+    beforeEach(() => {
+      writer.write.mockResolvedValue({ wrote: 1 });
+      writer.preview.mockResolvedValue({ previewed: 1 });
+      writer.edit.mockResolvedValue({ edited: 1 });
+      dashboard.getDashboardData.mockResolvedValue('{"d":1}');
+    });
+
+    it("getDashboardData passes weeks", async () => {
+      const client = await connectHandlers(writer, dashboard);
+      const result = await client.callTool({ name: "getDashboardData", arguments: { weeks: 8 } });
+      expect(dashboard.getDashboardData).toHaveBeenCalledWith(8);
+      expect(textOf(result)).toBe('{"d":1}');
+    });
+
+    it("writeDashboard writes with its arguments", async () => {
+      const client = await connectHandlers(writer, dashboard);
+      const args = { weeks: 4, notes: ["n"], path: "a.html" };
+      const result = await client.callTool({ name: "writeDashboard", arguments: args });
+      expect(writer.write).toHaveBeenCalledWith(args);
+      expect(writer.preview).not.toHaveBeenCalled();
+      expect(textOf(result)).toBe('{"wrote":1}');
+    });
+
+    it("writeDashboard with preview only previews, without the preview key", async () => {
+      const client = await connectHandlers(writer, dashboard);
+      const result = await client.callTool({
+        name: "writeDashboard",
+        arguments: { weeks: 4, preview: true },
+      });
+      expect(writer.preview).toHaveBeenCalledWith({ weeks: 4 });
+      expect(writer.write).not.toHaveBeenCalled();
+      expect(textOf(result)).toBe('{"previewed":1}');
+    });
+
+    it("editDashboard edits with its arguments", async () => {
+      const client = await connectHandlers(writer, dashboard);
+      const args = { removeLanguages: ["de"], path: "a.html" };
+      const result = await client.callTool({ name: "editDashboard", arguments: args });
+      expect(writer.edit).toHaveBeenCalledWith(args);
+      expect(textOf(result)).toBe('{"edited":1}');
     });
   });
 });

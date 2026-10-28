@@ -196,9 +196,16 @@ describe("token", () => {
     );
   });
 
-  it("reports a token response that is not valid JSON", async () => {
-    mockFetch({ body: "{oops" });
-    await expect(client().getJson("/x")).rejects.toThrow(/^Token response is not valid JSON: /);
+  it("reports a token response that is not valid JSON without quoting it", async () => {
+    mockFetch({ body: '{"access_token":tok-secret-value}' });
+    const error = await client()
+      .getJson("/x")
+      .catch((e: Error) => e);
+    expect(error).toBeInstanceOf(GarminApiError);
+    expect((error as Error).message).toBe(
+      "Token response is not valid JSON (Content-Type: application/json, 33 characters)",
+    );
+    expect(String(error)).not.toContain("tok-secret");
   });
 });
 
@@ -347,6 +354,24 @@ describe("requests", () => {
     mockFetch({ status: 503 });
     await expect(client().getExerciseCatalogue()).rejects.toThrow(
       "GET exercise catalogue -> HTTP 503",
+    );
+  });
+
+  it("wraps a network error while reading the exercise catalogue body", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        arrayBuffer: () => Promise.reject(new TypeError("terminated")),
+      }),
+    );
+    const error = await client()
+      .getExerciseCatalogue()
+      .catch((e: Error) => e);
+    expect(error).toBeInstanceOf(GarminApiError);
+    expect((error as Error).message).toBe(
+      "Network error reading the exercise catalogue: terminated",
     );
   });
 });

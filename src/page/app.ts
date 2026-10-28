@@ -3,7 +3,7 @@ import * as metrics from "./metrics";
 import * as running from "./running";
 import * as strength from "./strength";
 import * as sports from "./sports";
-import { type Activity, activitiesIn, GROUPS, groupOf, weeksOf } from "./calc";
+import { type Activity, activitiesIn, boardOrder, GROUPS, groupOf, weeksOf } from "./calc";
 import { Chart, chart, destroyCharts, themeCharts } from "./charts";
 import { announce, h, keepFocus } from "./dom";
 import { dragTile, keyMove, resizeTile } from "./edit-drag";
@@ -110,12 +110,11 @@ export function start(): void {
   const data = G.data;
   if (data) {
     const present = new Set(data.activities.map(groupOf));
-    const others = [...present].filter((g) => !GROUPS.includes(g)).toSorted();
     const kept = S.sports;
     tabs = [
       "all",
       ...(S.exclude?.includes("recovery") ? [] : ["recovery"]),
-      ...[...GROUPS.slice(0, -1), ...others, "generic"].filter((g) =>
+      ...boardOrder(present).filter((g) =>
         kept ? kept.includes(g) : ALWAYS.includes(g) || present.has(g),
       ),
     ];
@@ -851,6 +850,8 @@ function dialog(title: string, ...content: (HTMLElement | false)[]): HTMLDialogE
   return d;
 }
 
+const isOtherSport = (tab: string) => tab !== "all" && tab !== "recovery" && !GROUPS.includes(tab);
+
 function addDialog(): void {
   const board = currentBoard();
   const own = boardType();
@@ -865,7 +866,10 @@ function addDialog(): void {
     .filter((def) => def.types !== undefined || !board.some((x) => x.widget === def.id))
     .toSorted((a, b) => a.title(t).localeCompare(b.title(t), lang));
   for (const def of defs) {
-    const types = def.types?.filter((x) => x === "all" || tabs.includes(x));
+    // "generic" also stands for every other SDK sport: their boards have the widgets of the Other board
+    const types = def.types
+      ?.flatMap((x) => (x === "generic" ? [...tabs.filter(isOtherSport), x] : [x]))
+      .filter((x) => x === "all" || tabs.includes(x));
     const pick =
       types && types.length > 0
         ? h(

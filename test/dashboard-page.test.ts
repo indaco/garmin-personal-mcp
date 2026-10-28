@@ -2,8 +2,9 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DashboardWriter, readBlock, templateVersion } from "../src/dashboard-page";
+import { DashboardWriter, readBlock, templateVersion, withData } from "../src/dashboard-page";
 import { digest } from "../src/digest";
+import { DASHBOARD_VERSION } from "../src/prompts";
 
 const template = (version: number, extra = "") => `<!doctype html>
 <meta name="garmin-template" content="${version}">
@@ -62,6 +63,26 @@ const code = (s: string) =>
   s.replace(/\/\* garmin-data:start \*\/[\s\S]*?\/\* garmin-data:end \*\//, "");
 
 describe("writeDashboard", () => {
+  it("withData keeps only the sports, data and notes that the settings keep", () => {
+    const shell =
+      "/* garmin-languages:start */{}/* garmin-languages:end */ /* garmin-data:start */null/* garmin-data:end */";
+    const cut = withData(
+      shell,
+      data,
+      { sports: ["cycling"], exclude: ["notes"], languages: ["en"] },
+      ["a <b>"],
+    );
+    expect(readBlock(cut, "data")).toMatchObject({
+      v: DASHBOARD_VERSION,
+      activities: [],
+      notes: [],
+    });
+    expect(readBlock(cut, "languages")).toEqual({});
+    const all = readBlock(withData(shell, data, {}, ["a <b>"]), "data") as typeof data;
+    expect(all.activities).toHaveLength(data.activities.length);
+    expect(all).toMatchObject({ notes: ["a &lt;b&gt;"] });
+  });
+
   it("reads the template version of the real template, as the formatter writes it", async () => {
     const real = readFileSync("src/page/template.html", "utf8");
     expect(templateVersion(real)).toBeGreaterThan(2);
@@ -125,6 +146,12 @@ describe("writeDashboard", () => {
       vi.useRealTimers();
     }
     expect(asked).toEqual([12, 6, 6]);
+  });
+
+  it("reuses the snapshot when the first call has no weeks and the page is new", async () => {
+    await writer.write({});
+    await writer.write({ notes: ["n"] });
+    expect(asked).toEqual([undefined]);
   });
 
   it("returns the digest of the data, not the data", async () => {

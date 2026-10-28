@@ -6,6 +6,7 @@
     ".agents/**",
     "prompts/**",
     "docs/**",
+    "plans/**",
     "pnpm-lock.yaml",
     "THIRD-PARTY-NOTICES.md",
     "test/fixtures/dashboard-data.json",

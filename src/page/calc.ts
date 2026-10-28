@@ -66,6 +66,18 @@ export function groupOf(a: Activity): string {
   return TYPE_BOARD.get(a.type ?? "") ?? sport;
 }
 
+/** The type boards in tab order: the fixed groups, then the other SDK sports in `present` sorted, then Other. */
+export function boardOrder(present: ReadonlySet<string>): string[] {
+  const others = [...present].filter((g) => !GROUPS.includes(g)).toSorted();
+  return [...GROUPS.slice(0, -1), ...others, "generic"];
+}
+
+/** The boards that the activities have, in tab order. */
+export function groupsIn(acts: Activity[]): string[] {
+  const present = new Set(acts.map(groupOf));
+  return boardOrder(present).filter((g) => present.has(g));
+}
+
 export const isIndoor = (key: string) =>
   ["indoor_cycling", "virtual_ride", "treadmill_running", "indoor_rowing"].includes(key);
 
@@ -73,6 +85,19 @@ export const isIndoor = (key: string) =>
 export function seconds(v: unknown): number {
   const m = typeof v === "string" ? /^(\d+(?::\d{1,2}){1,2})(?:\/km)?$/.exec(v) : null;
   return m ? m[1].split(":").reduce((s, x) => s * 60 + Number(x), 0) : 0;
+}
+
+/** The km and the moving seconds of the activities that have both: pace and speed come from these only. */
+export function timedDistance(acts: Activity[]): { km: number; seconds: number } {
+  return acts.reduce<{ km: number; seconds: number }>(
+    (s, a) => {
+      const sec = seconds(a.duration);
+      return typeof a.km === "number" && a.km > 0 && sec > 0
+        ? { km: s.km + a.km, seconds: s.seconds + sec }
+        : s;
+    },
+    { km: 0, seconds: 0 },
+  );
 }
 
 /** Strength and racket sports have little moving time: their session lasts the elapsed time. */

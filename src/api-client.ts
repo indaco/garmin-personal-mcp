@@ -59,7 +59,13 @@ export class GarminApiClient {
     if (!resp.ok) {
       throw new GarminApiError(`GET exercise catalogue -> HTTP ${resp.status}`);
     }
-    return new Uint8Array(await resp.arrayBuffer());
+    try {
+      return new Uint8Array(await resp.arrayBuffer());
+    } catch (e) {
+      throw new GarminApiError(
+        `Network error reading the exercise catalogue: ${(e as Error).message}`,
+      );
+    }
   }
 
   async #get(
@@ -162,8 +168,11 @@ export class GarminApiClient {
     let json: Record<string, unknown>;
     try {
       json = JSON.parse(body);
-    } catch (e) {
-      throw new GarminApiError(`Token response is not valid JSON: ${(e as Error).message}`);
+    } catch {
+      // the parse message quotes the text around the error, which can be part of the token
+      throw new GarminApiError(
+        `Token response is not valid JSON (Content-Type: ${contentType}, ${body.length} characters)`,
+      );
     }
     const token = firstText(json, "access_token", "accessToken", "token");
     if (!token) {

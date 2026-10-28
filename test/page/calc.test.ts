@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   activitiesIn,
+  boardOrder,
   dayOf,
+  GROUPS,
   groupOf,
+  groupsIn,
   isIndoor,
   mondayOf,
   seconds,
   sessionSeconds,
   sportOf,
+  timedDistance,
   weeksOf,
 } from "../../src/page/calc";
 import { formatHash, parseHash } from "../../src/page/state";
@@ -160,5 +164,43 @@ describe("URL hash", () => {
     expect(formatHash({ tab: "all", from: "2026-10-05", to: "2026-10-19" })).toBe(
       "#all@2026-10-05_2026-10-19",
     );
+  });
+});
+
+describe("boards in tab order", () => {
+  it("puts other sports, sorted, between the type boards and Other", () => {
+    expect(boardOrder(new Set(["rowing", "running", "alpineSkiing"]))).toEqual([
+      ...GROUPS.slice(0, -1),
+      "alpineSkiing",
+      "rowing",
+      "generic",
+    ]);
+  });
+
+  it("lists the boards of the activities in tab order, other sports included", () => {
+    expect(
+      groupsIn([
+        { type: "yoga" },
+        { type: "rowing", sport: "rowing" },
+        { type: "running", sport: "running" },
+      ]),
+    ).toEqual(["running", "rowing", "generic"]);
+  });
+});
+
+describe("distance and time for pace", () => {
+  it("adds only the sessions that have both a distance and a time", () => {
+    expect(
+      timedDistance([
+        { km: 10, duration: "50:00" },
+        { duration: "1:00:00" }, // no distance: an indoor ride without a sensor
+        { km: 5 }, // no time
+        { km: 0, duration: "10:00" },
+      ]),
+    ).toEqual({ km: 10, seconds: 3000 });
+  });
+
+  it("gives zero for no session", () => {
+    expect(timedDistance([])).toEqual({ km: 0, seconds: 0 });
   });
 });

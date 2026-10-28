@@ -165,6 +165,46 @@ describe("editDashboard", () => {
     expect(r.languages).not.toHaveProperty("de");
   });
 
+  it("saves nothing when the settings block of the page is damaged", async () => {
+    writeFileSync(
+      file,
+      page().replace(
+        "  i18n:",
+        "  s: /* garmin-settings:start */{bad/* garmin-settings:end */,\n  i18n:",
+      ),
+    );
+    const before = page();
+    await expect(writer.edit({ place: [{ board: "all", widget: "kpis" }] })).rejects.toThrow(
+      /garmin-settings.*garmin-dashboard\.html/,
+    );
+    expect(page()).toBe(before);
+  });
+
+  it.each(["layout", "widgets", "i18n"] as const)(
+    "names the file when the %s block is damaged",
+    async (block) => {
+      writeFileSync(
+        file,
+        page().replace(
+          new RegExp(`(garmin-${block}:start \\*/)[\\s\\S]*?(/\\* garmin-${block}:end)`),
+          "$1{bad$2",
+        ),
+      );
+      await expect(writer.edit({})).rejects.toThrow(
+        new RegExp(`garmin-${block}.*garmin-dashboard\\.html`),
+      );
+    },
+  );
+
+  it("refuses names that every object has", async () => {
+    const before = page();
+    await expect(writer.edit({ removeLanguages: ["toString"] })).rejects.toThrow(/toString/);
+    await expect(writer.edit({ languages: { de: { constructor: "x" } } })).rejects.toThrow(
+      /unknown text constructor/,
+    );
+    expect(page()).toBe(before);
+  });
+
   it("refuses to remove a language that the page did not add", async () => {
     await expect(writer.edit({ removeLanguages: ["fr"] })).rejects.toThrow(/fr/);
   });

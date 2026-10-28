@@ -107,6 +107,18 @@ describe("prompts", () => {
     expect(upper).toContain('`path` = "Coach.HTML"');
   });
 
+  it("passes on a path without .html, so the tool can refuse it", async () => {
+    const text = await render("training-dashboard-update", { path: "coach" });
+    expect(text).toContain('`path` = "coach"');
+    expect(text).toContain("no `weeks` (the page keeps its weeks)");
+  });
+
+  it("treats a positional value without .html as weeks, not as a path", async () => {
+    const text = await render("training-dashboard-update", { weeks: "8" });
+    expect(text).not.toContain("`path`");
+    expect(text).toContain("`weeks` = 8");
+  });
+
   it("asks Claude to name the failed days and the failed sections", async () => {
     for (const text of [
       await render("training-dashboard"),
@@ -208,6 +220,9 @@ describe("widget and language prompts", () => {
     const positional = await render("dashboard-language", { language: "coach.html" });
     expect(positional).toContain("Add my language (the language of this chat) to my");
     expect(positional).toContain('`path` = "coach.html"');
+    const odd = await render("dashboard-language", { language: "German", path: "coach.htm" });
+    expect(odd).toContain('`path` = "coach.htm"');
+    expect(odd).toContain("German");
     const plain = await render("dashboard-language", { language: "German" });
     expect(plain).not.toContain("`path`");
     expect(plain).toContain("call `writeDashboard` first");
