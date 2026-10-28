@@ -34,6 +34,11 @@
         "name": "idea",
         "description": "What the widget shows, e.g. my longest ride each month",
         "required": true
+      },
+      {
+        "name": "path",
+        "description": "The dashboard file, e.g. garmin-dashboard-coach.html; empty = the default page",
+        "required": false
       }
     ]
   },
