@@ -25,6 +25,8 @@ export interface Data {
   recovery: Record<string, unknown>[];
   sync?: Record<string, unknown>;
   notes?: string[];
+  /** The measurement system of the Garmin profile; the data stays metric. Metric when not set. */
+  units?: "metric" | "statute_us" | "statute_uk";
 }
 
 /** What a widget gets to draw itself. Built-in and custom widgets get the same. */

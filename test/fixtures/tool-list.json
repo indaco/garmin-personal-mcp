@@ -271,7 +271,7 @@
   },
   {
     "name": "getDashboardData",
-    "description": "All the data of the training dashboard in one call: HR zones, fitness age, the activities of the\nlast `weeks` weeks (compact summaries, with strength sets and laps where they apply), the activities\nof the weeks before for the period comparison, daily HRV, and the last 14 days of sleep and daily\nsummaries. Keeps a local cache and fetches from Garmin only what is new since the last call, so a\nrebuild or an update needs few calls. `sync` in the result says what was fetched.",
+    "description": "All the data of the training dashboard in one call: HR zones, fitness age, the activities of the\nlast `weeks` weeks (compact summaries, with strength sets and laps where they apply), the activities\nof the weeks before for the period comparison, daily HRV, and the last 14 days of sleep and daily\nsummaries, and `units`: the measurement system of the Garmin profile (metric, statute_us or\nstatute_uk) that the page shows; the data itself is always metric. Keeps a local cache and\nfetches from Garmin only what is new since the last call, so a rebuild or an update needs few\ncalls. `sync` in the result says what was fetched.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,

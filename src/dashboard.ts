@@ -66,10 +66,13 @@ export class GarminDashboard {
     cache.syncedAt = new Date().toISOString();
     await writeAtomically(this.#file(), JSON.stringify(cache));
 
-    const [zones, fitnessAge] = await Promise.all([
+    const [zones, fitnessAge, settings] = await Promise.all([
       optional(sync, "zones", () => this.tools.getHeartRateZones()),
       optional(sync, "fitnessAge", () => this.tools.getFitnessAge(today)),
+      optional(sync, "units", () => this.api.getJson("/userprofile-service/userprofile/settings")),
     ]);
+    // Garmin answers in metric whatever this setting says: it only tells the page what to show
+    const units = isObject(settings) ? settings.measurementSystem : undefined;
     const out: Json = {
       generated: today,
       weeks: w,
@@ -79,6 +82,7 @@ export class GarminDashboard {
       prevEnd: addDays(start, -1),
       zones,
       fitnessAge,
+      ...(typeof units === "string" && UNITS.includes(units) ? { units } : {}),
     };
     const activities = activitiesBetween(cache, start, today).map((a) => structuredClone(a));
     await this.#attachDetails(activities);
@@ -473,6 +477,9 @@ function asLong(v: unknown): number {
 
 // ------------------------------------------------------------------ MCP registration
 
+/** The measurement systems of a Garmin profile. */
+const UNITS = ["metric", "statute_us", "statute_uk"];
+
 /** Registers getDashboardData. */
 export function registerDashboard(server: McpServer, dashboard: GarminDashboard): void {
   server.registerTool(
@@ -482,8 +489,10 @@ export function registerDashboard(server: McpServer, dashboard: GarminDashboard)
         "All the data of the training dashboard in one call: HR zones, fitness age, the activities of the",
         "last `weeks` weeks (compact summaries, with strength sets and laps where they apply), the activities",
         "of the weeks before for the period comparison, daily HRV, and the last 14 days of sleep and daily",
-        "summaries. Keeps a local cache and fetches from Garmin only what is new since the last call, so a",
-        "rebuild or an update needs few calls. `sync` in the result says what was fetched.",
+        "summaries, and `units`: the measurement system of the Garmin profile (metric, statute_us or",
+        "statute_uk) that the page shows; the data itself is always metric. Keeps a local cache and",
+        "fetches from Garmin only what is new since the last call, so a rebuild or an update needs few",
+        "calls. `sync` in the result says what was fetched.",
       ].join("\n"),
       inputSchema: z.object({
         weeks: z.number().int().describe("Weeks to cover, default 12, max 52").optional(),
