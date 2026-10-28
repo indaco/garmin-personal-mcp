@@ -100,9 +100,22 @@ export function registerPrompts(server: McpServer): void {
       description: widgetDescription,
       argsSchema: z.object({
         idea: z.string().describe("What the widget shows, e.g. my longest ride each month"),
+        path: PATH_ARG,
       }),
     },
-    (args) => result(widgetDescription, render(widgetPrompt, { idea: arg(args.idea) })),
+    (args) => {
+      // Claude Code splits the text by position: join the slots, a last word ending in .html is the file
+      const words = [arg(args.idea), arg(args.path)].filter(Boolean).join(" ");
+      const m = /^(.*?)\s*(\S+\.html)$/i.exec(words);
+      const named = arg(args.path);
+      const keepNamed = !m && named !== "" && !/\s/.test(named);
+      const path = m ? m[2] : keepNamed ? named : "";
+      const idea = m ? m[1] : keepNamed ? arg(args.idea) : words;
+      return result(
+        widgetDescription,
+        render(widgetPrompt, { idea, pathArgument: pathPart(path), pathWith: pathWith(path) }),
+      );
+    },
   );
 
   const setupDescription =

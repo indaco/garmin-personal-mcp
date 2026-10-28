@@ -6,6 +6,7 @@ the page, and each update keeps it.
 ## Make a widget
 
 Run the `dashboard-widget` prompt with your idea, for example "my longest ride of each month".
+The optional `path` argument, or a last word that ends in `.html`, picks the page file.
 Claude:
 
 1. reads the widget catalogue. If a built-in widget shows the same thing, Claude adds that widget

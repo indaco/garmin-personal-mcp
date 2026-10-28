@@ -200,7 +200,10 @@ files side by side. Each page keeps its settings on each update. The argument `w
 
 This prompt makes a new widget from your idea, for example "my longest ride of each month". Claude
 writes a small widget, and `editDashboard` stores it in the page. The widget stays after each
-update. The argument `idea` is required. Reload the page to see the widget.
+update. The argument `idea` is required. The argument `path` is optional: it is the file of the
+page, for example `coach.html`. In Claude Code:
+`/garmin-personal:dashboard-widget my longest ride each month coach.html`. Reload the page to see
+the widget.
 [Custom widgets](guide/custom-widgets.md) tells more.
 
 ### dashboard-language

@@ -201,6 +201,40 @@ describe("widget and language prompts", () => {
     expect(text.includes("{{")).toBe(false);
   });
 
+  it("adds the widget to the page file given as path", async () => {
+    const text = await render("dashboard-widget", { idea: "my longest ride", path: "coach.html" });
+    expect(text).toContain("dashboard: my longest ride. Use");
+    expect(text).toContain('with no other arguments and `path` = "coach.html". Read');
+    expect(text).toContain('call `writeDashboard` with `path` = "coach.html" first');
+    expect(text).toContain('(`all` if no board fits) and `path` = "coach.html".');
+    expect(text).toContain('call `editDashboard` again with `path` = "coach.html", at most');
+    expect(text.includes("{{")).toBe(false);
+  });
+
+  it("takes a last word ending in .html as the page file", async () => {
+    const text = await render("dashboard-widget", { idea: "my longest ride coach.html" });
+    expect(text).toContain("dashboard: my longest ride. Use");
+    expect(text).toContain('`path` = "coach.html"');
+  });
+
+  it("rejoins an idea that the slash command split by position", async () => {
+    const text = await render("dashboard-widget", { idea: "my", path: "longest ride coach.html" });
+    expect(text).toContain("dashboard: my longest ride. Use");
+    expect(text).toContain('`path` = "coach.html"');
+  });
+
+  it("passes on a named path without .html", async () => {
+    const text = await render("dashboard-widget", { idea: "my longest ride", path: "coach" });
+    expect(text).toContain("dashboard: my longest ride. Use");
+    expect(text).toContain('`path` = "coach"');
+  });
+
+  it("leaves out path when no file is given", async () => {
+    const text = await render("dashboard-widget", { idea: "my longest ride" });
+    expect(text).not.toContain("`path`");
+    expect(text.includes("{{")).toBe(false);
+  });
+
   it("asks for the language, or uses the language of the chat", async () => {
     expect(await render("dashboard-language", { language: "German" })).toContain(
       "Add German to my",
