@@ -84,6 +84,14 @@ export class GarminTools {
     return JSON.stringify(await this.api.getJson(`/activity-service/activity/${activityId}`, {}));
   }
 
+  async getActivityWorkouts(activityId: number): Promise<string> {
+    // many fields of each step are null (equipment, weight, name): leaving them out keeps the answer short
+    return JSON.stringify(
+      await this.api.getJson(`/activity-service/activity/${activityId}/workouts`, {}),
+      (_, v: unknown) => (v === null ? undefined : v),
+    );
+  }
+
   async downloadActivityFit(activityId: number): Promise<string> {
     const fit = await this.fetchFit(activityId);
     return JSON.stringify({ path: resolve(fit), bytes: (await stat(fit)).size });
@@ -469,7 +477,7 @@ const dayOrRangeInput = z.object({
 });
 const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 
-/** Registers the 14 tools. */
+/** Registers the 15 tools. */
 export function registerTools(server: McpServer, tools: GarminTools): void {
   server.registerTool(
     "listActivities",
@@ -507,6 +515,22 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
       inputSchema: z.object({ activityId }),
     },
     async (a) => text(await tools.getActivity(a.activityId)),
+  );
+  server.registerTool(
+    "getActivityWorkouts",
+    {
+      description: [
+        "The planned workout that an activity followed, as created in Garmin Connect: its steps in",
+        "order, each with its intensity (warmup/active/rest/recovery/cooldown), its duration (time in",
+        "seconds, reps, or open), its target (cadence, heart rate, pace, or open, with low and high",
+        "values), the exercise for strength steps, and the coach's notes. A step with durationType",
+        "REPEAT_UNTIL_STEPS_CMPLT repeats the steps from stepIndex durationValue up to it, targetValue",
+        "times in all. Compare it with getActivitySets or getActivityLaps for plan against done.",
+        "An empty list means the activity followed no planned workout. Null fields are left out.",
+      ].join("\n"),
+      inputSchema: z.object({ activityId }),
+    },
+    async (a) => text(await tools.getActivityWorkouts(a.activityId)),
   );
   server.registerTool(
     "downloadActivityFit",

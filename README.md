@@ -60,6 +60,7 @@ With this server, you can ask your assistant:
 - "List my last 5 activities, with pace and heart rate."
 - "Show the laps of my last run."
 - "Compare my sets of this week with the week before."
+- "Did I do the reps and rests my workout planned?"
 - "How did I sleep this week, and how was my HRV?"
 - "How has my weight changed over the last 3 months?"
 - "Did my Body Battery recover overnight this week, and which days drained it most?"
@@ -250,6 +251,7 @@ remove it: `editDashboard` with `removeLanguages`.
 | `getActivity`         | the details of one activity                                            |
 | `getActivityLaps`     | the laps of an activity, from its .FIT file                            |
 | `getActivitySets`     | the strength sets of an activity, with the muscles, from its .FIT file |
+| `getActivityWorkouts` | the planned workout of an activity: steps, targets and notes           |
 | `downloadActivityFit` | saves the .FIT file of an activity in the data folder                  |
 | `getHrvRange`         | HRV during the night                                                   |
 | `getDailyHeartRate`   | the heart rate of a day, with the resting HR                           |

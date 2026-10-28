@@ -367,6 +367,29 @@ describe("activities", () => {
     expect(api.getJson).toHaveBeenLastCalledWith("/y", {});
   });
 
+  it("getActivityWorkouts leaves out the null fields and keeps the rest", async () => {
+    api.getJson.mockResolvedValue([
+      {
+        workoutName: "Drills",
+        multisportSet: null,
+        steps: [
+          { stepIndex: 0, intensity: "WARMUP", durationValue: 600, targetValueLow: null },
+          { stepIndex: 1, intensity: "ACTIVE", targetType: "CADENCE", targetValue: 0, notes: "" },
+        ],
+      },
+    ]);
+    expect(JSON.parse(await tools.getActivityWorkouts(42))).toEqual([
+      {
+        workoutName: "Drills",
+        steps: [
+          { stepIndex: 0, intensity: "WARMUP", durationValue: 600 },
+          { stepIndex: 1, intensity: "ACTIVE", targetType: "CADENCE", targetValue: 0, notes: "" },
+        ],
+      },
+    ]);
+    expect(api.getJson).toHaveBeenCalledWith("/activity-service/activity/42/workouts", {});
+  });
+
   it("getSleepRange asks for the nights between two dates in one request", async () => {
     api.getJson.mockResolvedValue([{ calendarDate: "2026-10-27" }]);
     expect(await tools.getSleepRange("2026-10-21", "2026-10-27")).toBe(
@@ -662,6 +685,7 @@ describe("MCP tools", () => {
 
   it.each([
     ["getActivity", { activityId: 42 }, "/activity-service/activity/42", {}],
+    ["getActivityWorkouts", { activityId: 42 }, "/activity-service/activity/42/workouts", {}],
     [
       "getHrvRange",
       { fromDate: "2026-10-01", toDate: "2026-10-27" },
