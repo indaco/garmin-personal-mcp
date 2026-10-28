@@ -126,6 +126,17 @@ export class GarminTools {
     );
   }
 
+  async getWeight(fromDate: string, toDate: string, includeAll?: boolean): Promise<string> {
+    // no day cap: one small row per day, and a weight trend needs months
+    // the spec says kilograms, but Garmin answers grams (72500 for 72.5 kg)
+    checkRange(fromDate, toDate, Infinity);
+    return JSON.stringify(
+      await this.api.getJson(`/weight-service/weight/range/${fromDate}/${toDate}`, {
+        includeAll: includeAll === true ? "true" : undefined,
+      }),
+    );
+  }
+
   async getHeartRateZones(): Promise<string> {
     return JSON.stringify(await this.api.getJson("/biometric-service/heartRateZones/v2", {}));
   }
@@ -409,15 +420,15 @@ function isDate(d: string): boolean {
   );
 }
 
-/** Throws unless from and to are real yyyy-MM-dd dates, from <= to, and the range has at most RANGE_DAYS days. */
-function checkRange(from: string, to: string): void {
+/** Throws unless from and to are real yyyy-MM-dd dates, from <= to, and the range has at most maxDays days. */
+function checkRange(from: string, to: string, maxDays = RANGE_DAYS): void {
   if (!isDate(from) || !isDate(to) || from > to) {
     throw new Error("fromDate and toDate must be real dates yyyy-MM-dd with fromDate <= toDate");
   }
   const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000 + 1;
-  if (days > RANGE_DAYS) {
+  if (days > maxDays) {
     throw new Error(
-      `A range has at most ${RANGE_DAYS} days; this one has ${days}. Ask for it in parts.`,
+      `A range has at most ${maxDays} days; this one has ${days}. Ask for it in parts.`,
     );
   }
 }
@@ -448,7 +459,7 @@ const dayOrRangeInput = z.object({
 });
 const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 
-/** Registers the 12 tools. */
+/** Registers the 13 tools. */
 export function registerTools(server: McpServer, tools: GarminTools): void {
   server.registerTool(
     "listActivities",
@@ -562,6 +573,26 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
           (f, t) => tools.getSleepRange(f, t),
         ),
       ),
+  );
+  server.registerTool(
+    "getWeight",
+    {
+      description: [
+        "Weight for a date range, yyyy-MM-dd: the latest weight of each day (with body fat, muscle",
+        "and bone mass, BMI and body water when a scale records them), the average of the range, and",
+        "the last weight before and the first after the range. Set includeAll=true for every entry",
+        "of each day. Weight, muscle mass and bone mass are in grams.",
+      ].join("\n"),
+      inputSchema: z.object({
+        fromDate: z.string().describe("From date yyyy-MM-dd"),
+        toDate: z.string().describe("To date yyyy-MM-dd"),
+        includeAll: z
+          .boolean()
+          .describe("Every weight entry of each day, not only the latest")
+          .optional(),
+      }),
+    },
+    async (a) => text(await tools.getWeight(a.fromDate, a.toDate, a.includeAll)),
   );
   server.registerTool(
     "getHeartRateZones",

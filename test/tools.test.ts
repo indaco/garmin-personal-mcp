@@ -325,6 +325,12 @@ describe("activities", () => {
       { date: "2026-10-27" },
     ],
     ["getSleep", ["2026-10-27"], "/sleep-service/sleep/dailySleep", { date: "2026-10-27" }],
+    [
+      "getWeight",
+      ["2026-07-01", "2026-10-27"],
+      "/weight-service/weight/range/2026-07-01/2026-10-27",
+      { includeAll: undefined },
+    ],
     ["getHeartRateZones", [], "/biometric-service/heartRateZones/v2", {}],
     ["getFitnessAge", ["2026-10-27"], "/fitnessage-service/fitnessage/v2/2026-10-27", {}],
     [
@@ -365,6 +371,20 @@ describe("activities", () => {
       startDate: "2026-10-21",
       endDate: "2026-10-27",
     });
+  });
+
+  it("getWeight takes a range of months but refuses a date that is not real, without a request", async () => {
+    api.getJson.mockResolvedValue({});
+    await tools.getWeight("2025-10-28", "2026-10-27");
+    expect(api.getJson).toHaveBeenCalledOnce();
+    for (const [from, to] of [
+      ["2026-02-31", "2026-03-01"],
+      ["2026-10-27", "2026-10-01"],
+      ["../x", "2026-10-01"],
+    ]) {
+      await expect(tools.getWeight(from, to)).rejects.toThrow(/real dates/);
+    }
+    expect(api.getJson).toHaveBeenCalledOnce();
   });
 
   it("getSleepRange accepts 14 days and refuses 15", async () => {
@@ -639,6 +659,12 @@ describe("MCP tools", () => {
       { date: "2026-10-27" },
     ],
     ["getSleep", { date: "2026-10-27" }, "/sleep-service/sleep/dailySleep", { date: "2026-10-27" }],
+    [
+      "getWeight",
+      { fromDate: "2026-10-01", toDate: "2026-10-27", includeAll: true },
+      "/weight-service/weight/range/2026-10-01/2026-10-27",
+      { includeAll: "true" },
+    ],
     ["getHeartRateZones", {}, "/biometric-service/heartRateZones/v2", {}],
     ["getFitnessAge", { date: "2026-10-27" }, "/fitnessage-service/fitnessage/v2/2026-10-27", {}],
     [

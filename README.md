@@ -61,6 +61,7 @@ With this server, you can ask your assistant:
 - "Show the laps of my last run."
 - "Compare my sets of this week with the week before."
 - "How did I sleep this week, and how was my HRV?"
+- "How has my weight changed over the last 3 months?"
 
 ## Quick start
 
@@ -252,6 +253,7 @@ remove it: `editDashboard` with `removeLanguages`.
 | `getHrvRange`         | HRV during the night                                                   |
 | `getDailyHeartRate`   | the heart rate of a day, with the resting HR                           |
 | `getSleep`            | the sleep of a night, or of up to 14 nights                            |
+| `getWeight`           | weight and body composition for a range of dates                       |
 | `getHeartRateZones`   | your HR zones                                                          |
 | `getFitnessAge`       | fitness age against actual age                                         |
 | `getDailySummary`     | steps, stress and Body Battery, for a day or a range                   |

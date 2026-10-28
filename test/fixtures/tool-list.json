@@ -320,6 +320,30 @@
     }
   },
   {
+    "name": "getWeight",
+    "description": "Weight for a date range, yyyy-MM-dd: the latest weight of each day (with body fat, muscle\nand bone mass, BMI and body water when a scale records them), the average of the range, and\nthe last weight before and the first after the range. Set includeAll=true for every entry\nof each day. Weight, muscle mass and bone mass are in grams.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "fromDate": {
+          "type": "string",
+          "description": "From date yyyy-MM-dd"
+        },
+        "toDate": {
+          "type": "string",
+          "description": "To date yyyy-MM-dd"
+        },
+        "includeAll": {
+          "type": "boolean",
+          "description": "Every weight entry of each day, not only the latest"
+        }
+      },
+      "required": ["fromDate", "toDate"]
+    }
+  },
+  {
     "name": "listActivities",
     "description": "List the user's Garmin activities (most recent first) as a compact summary: id, name, type,\nlocal start time, distance (km), moving duration, average pace, average/max heart rate,\ncadence, ascent; when Garmin has them: elapsed time (if longer than moving time), race flag,\nGarmin training load, aerobic/anaerobic training effect and label, seconds in HR zones 1-5,\ncalories, moderate/vigorous intensity minutes, body battery change, steps, swim SWOLF, pool\nlength, lengths and strokes, power, running form (stride, ground contact, vertical\noscillation and ratio), grade-adjusted pace, best efforts (1k, mile, 5k, 10k, half,\nmarathon) and run/walk segments. Dates are yyyy-MM-dd. Set raw=true for Garmin's full JSON.",
     "inputSchema": {
