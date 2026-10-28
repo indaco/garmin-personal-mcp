@@ -51,29 +51,6 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # the dashboard page in headless Chromium, once: the page does not depend on the Node version.
-      # playwright-core in the lockfile picks the browser build; the cache keeps it between runs.
-      # The image has the system libraries already, so no apt download (--with-deps took 10 min once).
-      - name: Browser version
-        if: matrix.node == 26
-        id: browser
-        run: echo "playwright=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: Cache the Chromium headless shell
-        if: matrix.node == 26
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.browser.outputs.playwright }}
-
-      - name: Install the Chromium headless shell
-        if: matrix.node == 26
-        run: pnpm exec playwright-core install --only-shell chromium
-
-      - name: Page tests
-        if: matrix.node == 26
-        run: pnpm test:page
-
       # stdout carries MCP messages only: one initialize request, one JSON line back
       - name: Smoke test
         run: |
@@ -95,3 +72,44 @@ jobs:
             if (!files.includes("dist/dashboard.html")) { console.error("the dashboard template is missing"); process.exit(1); }
             console.log(`${files.length} files in the package`);
           '
+
+  # the dashboard page in headless Chromium, once: the page does not depend on the Node version
+  page:
+    name: Page tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # the page tests load the built dashboard template
+      - name: Build
+        run: pnpm build
+
+      # playwright-core in the lockfile picks the browser build; the cache keeps it between runs.
+      # The image has the system libraries already, so no apt download (--with-deps took 10 min once).
+      - name: Browser version
+        id: browser
+        run: echo "playwright=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the Chromium headless shell
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.browser.outputs.playwright }}
+
+      - name: Install the Chromium headless shell
+        run: pnpm exec playwright-core install --only-shell chromium
+
+      - name: Page tests
+        run: pnpm test:page
