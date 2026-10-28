@@ -155,8 +155,15 @@ that it calculates as an estimate, and a missing value shows as "n/a".
 ### training-dashboard-update
 
 This prompt replaces the data and the coach notes of the page. Your layout, your custom widgets and
-your languages stay. Leave `weeks` empty to keep the weeks of the page. Reload the page to see the
-new data.
+your languages stay. Reload the page to see the new data.
+
+| Argument | Values                                                                  | Default                 |
+| -------- | ----------------------------------------------------------------------- | ----------------------- |
+| `weeks`  | the weeks to cover                                                      | the weeks of the page   |
+| `path`   | the dashboard file, for example `garmin-dashboard-coach.html` (`.html`) | `garmin-dashboard.html` |
+
+In Claude Code: `/garmin-personal:training-dashboard-update coach.html` updates `coach.html`. A
+value that ends in `.html` is the file, also in the first place.
 
 | Client         | How to run it                                                  |
 | -------------- | -------------------------------------------------------------- |
@@ -199,7 +206,9 @@ update. The argument `idea` is required. Reload the page to see the widget.
 
 This prompt adds a language to the dashboard. Claude translates the texts of the page, and
 `editDashboard` stores them in the page. The argument `language` is optional: the default is the
-language of the conversation. A text without a translation shows in English.
+language of the conversation. The argument `path` is optional: it is the file of the page, for
+example `coach.html`. In Claude Code: `/garmin-personal:dashboard-language German coach.html`. A text
+without a translation shows in English.
 [Languages](guide/languages.md) tells more.
 
 ## Tools

@@ -172,9 +172,10 @@ Each page keeps its own settings, so a personal page and a page for your coach c
 example `garmin-dashboard.html` and `garmin-dashboard-coach.html`. In the `dashboard-setup`
 questions, you can type any file name or path, for example `~/Desktop/coach.html`. A name or
 relative path is in the data folder. An update without `settings` keeps the settings of the page. To
-update a page with another file name, give its file: "update my dashboard
-garmin-dashboard-coach.html". New settings replace all the old settings, and the old page is kept as
-`.bak`.
+update a page with another file name, give its file to the prompt:
+`/garmin-personal:training-dashboard-update garmin-dashboard-coach.html`. The prompt
+`dashboard-language` takes the file in the same way. New settings replace all the old settings, and
+the old page is kept as `.bak`.
 
 Settings need a page from the template: a page that Claude designed (`freeform`) cannot keep them.
 
