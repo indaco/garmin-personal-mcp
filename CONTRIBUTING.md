@@ -186,6 +186,29 @@ module that they test (`test/tools.test.ts` for `src/tools.ts`).
 [guide/languages.md](guide/languages.md) gives the procedure. The tests make sure that the new
 catalogue has every key and every placeholder of English.
 
+## Release
+
+Release from an up-to-date `main` with a clean tree.
+
+1. Run `pnpm lint && pnpm test`.
+2. Run `sley bump auto && sley changelog merge`. Edit `.changes/<TAG>.md` if you want highlights.
+3. Branch protection blocks a push to `main`, so open a PR. Create a branch, commit `.version`,
+   `package.json`, `CHANGELOG.md` and `.changes/` as `chore(release): vX.Y.Z`, push it and open
+   the PR with the same title: the squash merge uses the title as the commit message.
+4. After the merge, switch to `main` and pull. The tag must point to the release commit on `main`.
+5. Run `sley tag create --push`.
+
+The first version, 0.1.0, was published by hand. Its notes in `.changes/v0.1.0.md` are written by
+hand, because `sley bump` writes the notes file and 0.1.0 needs no bump.
+
+The Release workflow checks the tag and runs the checks. It publishes to npm with trusted
+publishing and skips a version that is already on npm. It creates the GitHub Release from
+`.changes/<TAG>.md`. As a last check, it installs the published version with `npx`.
+
+If `tag-validate` fails, nothing was published. Delete the tag (`git push --delete origin <TAG>`,
+`git tag -d <TAG>`), fix the problem and tag again. After a publish, a version cannot be replaced.
+Fix forward with a new patch version, and use `npm deprecate` for a bad one.
+
 ## License
 
 garmin-personal-mcp uses the [MIT License](LICENSE). When you submit a contribution, you agree to
