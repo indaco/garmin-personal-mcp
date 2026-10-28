@@ -90,6 +90,23 @@ describe("prompts", () => {
     expect(keep.includes("{{")).toBe(false);
   });
 
+  it("updates the page file given as path, or as the only positional argument", async () => {
+    const withPath = await render("training-dashboard-update", { weeks: "8", path: "coach.html" });
+    expect(withPath).toContain('`weeks` = 8 and `path` = "coach.html", without `layout`');
+    expect(withPath).toContain('the same `weeks` and `path` = "coach.html" and the `notes`');
+    expect(withPath).toContain('call `editDashboard` with `path` = "coach.html" to save them');
+    expect(withPath.includes("{{")).toBe(false);
+    const plain = await render("training-dashboard-update", {});
+    expect(plain).not.toContain("`path`");
+    expect(plain).not.toMatch(/\S {2}\S/);
+    expect(plain).toContain("call `editDashboard` to save them");
+    const positional = await render("training-dashboard-update", { weeks: "coach.html" });
+    expect(positional).toContain('`path` = "coach.html"');
+    expect(positional).toContain("no `weeks` (the page keeps its weeks)");
+    const upper = await render("training-dashboard-update", { weeks: "6", path: "Coach.HTML" });
+    expect(upper).toContain('`path` = "Coach.HTML"');
+  });
+
   it("asks Claude to name the failed days and the failed sections", async () => {
     for (const text of [
       await render("training-dashboard"),
@@ -179,5 +196,20 @@ describe("widget and language prompts", () => {
     expect(await render("dashboard-language", {})).toContain(
       "Add my language (the language of this chat) to my",
     );
+  });
+
+  it("adds the language to the page file given as path, also as the only argument", async () => {
+    const text = await render("dashboard-language", { language: "German", path: "coach.html" });
+    expect(text).toContain("Add German to my");
+    expect(text).toContain('with `englishTexts: true` and `path` = "coach.html"');
+    expect(text).toContain('call `writeDashboard` with `path` = "coach.html" first');
+    expect(text).toContain('} and `path` = "coach.html".');
+    expect(text.includes("{{")).toBe(false);
+    const positional = await render("dashboard-language", { language: "coach.html" });
+    expect(positional).toContain("Add my language (the language of this chat) to my");
+    expect(positional).toContain('`path` = "coach.html"');
+    const plain = await render("dashboard-language", { language: "German" });
+    expect(plain).not.toContain("`path`");
+    expect(plain).toContain("call `writeDashboard` first");
   });
 });

@@ -7,6 +7,11 @@
         "name": "language",
         "description": "The language, e.g. German; empty = the language of this chat",
         "required": false
+      },
+      {
+        "name": "path",
+        "description": "The dashboard file, e.g. garmin-dashboard-coach.html; empty = the default page",
+        "required": false
       }
     ]
   },
@@ -55,6 +60,11 @@
       {
         "name": "weeks",
         "description": "Weeks to cover; empty = keep the weeks of the dashboard",
+        "required": false
+      },
+      {
+        "name": "path",
+        "description": "The dashboard file, e.g. garmin-dashboard-coach.html; empty = the default page",
         "required": false
       }
     ]

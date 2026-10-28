@@ -72,19 +72,25 @@ export function registerPrompts(server: McpServer): void {
           .string()
           .describe("Weeks to cover; empty = keep the weeks of the dashboard")
           .optional(),
+        path: PATH_ARG,
       }),
     },
-    (args) =>
-      result(
+    (args) => {
+      // Claude Code passes arguments by position: the file given alone arrives in weeks
+      const path = pathOf(args.path, args.weeks);
+      const keepWeeks = arg(args.weeks) === "" || /\.html$/i.test(arg(args.weeks));
+      return result(
         updateDescription,
         render(update, {
           today: localToday(),
-          weeksArgument:
-            arg(args.weeks) === ""
-              ? "no `weeks` (the page keeps its weeks)"
-              : `\`weeks\` = ${weeks(args.weeks)}`,
+          weeksArgument: keepWeeks
+            ? "no `weeks` (the page keeps its weeks)"
+            : `\`weeks\` = ${weeks(args.weeks)}`,
+          pathArgument: pathPart(path),
+          pathWith: pathWith(path),
         }),
-      ),
+      );
+    },
   );
 
   const widgetDescription = "Make a new widget for the training dashboard from your idea";
@@ -135,15 +141,22 @@ export function registerPrompts(server: McpServer): void {
           .string()
           .describe("The language, e.g. German; empty = the language of this chat")
           .optional(),
+        path: PATH_ARG,
       }),
     },
-    (args) =>
-      result(
+    (args) => {
+      // Claude Code passes arguments by position: the file given alone arrives in language
+      const path = pathOf(args.path, args.language);
+      const language = /\.html$/i.test(arg(args.language)) ? "" : arg(args.language);
+      return result(
         languageDescription,
         render(languagePrompt, {
-          language: arg(args.language) || "my language (the language of this chat)",
+          language: language || "my language (the language of this chat)",
+          pathArgument: pathPart(path),
+          pathWith: pathWith(path),
         }),
-      ),
+      );
+    },
   );
 }
 
@@ -190,6 +203,26 @@ function arg(v: string | undefined): string {
 function layoutOf(v: string | undefined): "preset" | "blank" | "freeform" {
   const s = arg(v).toLowerCase();
   return s === "blank" || s === "freeform" ? s : "preset";
+}
+
+const PATH_ARG = z
+  .string()
+  .describe("The dashboard file, e.g. garmin-dashboard-coach.html; empty = the default page")
+  .optional();
+
+/** The page file: an argument ending in .html, from any slot (Claude Code passes arguments by position). */
+function pathOf(...slots: (string | undefined)[]): string {
+  return slots.map(arg).find((s) => /\.html$/i.test(s)) ?? "";
+}
+
+/** The text that adds the page file after a "with ..." clause. */
+function pathPart(path: string): string {
+  return path ? ` and \`path\` = "${path}"` : "";
+}
+
+/** The text that adds the page file as its own "with ..." clause. */
+function pathWith(path: string): string {
+  return path ? ` with \`path\` = "${path}"` : "";
 }
 
 /** weeks clamped to 1..52; the default when empty or not a whole number. */
