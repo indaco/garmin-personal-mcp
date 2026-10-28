@@ -155,4 +155,16 @@ describe("exercise stats", () => {
     expect(slug("Barbell Back Squat")).toBe("barbell-back-squat");
     expect(slug("Pull-Up (Assisted)")).toBe("pull-up-assisted");
   });
+
+  it("keeps the letters of any script in the URL name", () => {
+    expect(slug("Жим лёжа")).toBe("жим-лёжа");
+    expect(slug("腹筋")).toBe("腹筋");
+    expect(slug("Développé couché")).toBe("développé-couché");
+    // a mark such as a Devanagari vowel sign stays inside its word
+    expect(slug("दंड बैठक")).toBe("दंड-बैठक");
+  });
+
+  it("uses the name itself when it has no letter or digit", () => {
+    expect(slug("💪")).toBe("💪");
+  });
 });

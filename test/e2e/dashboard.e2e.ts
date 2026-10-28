@@ -978,6 +978,31 @@ describe("strength board", () => {
     expect(await sort()).toBe("ascending");
   });
 
+  it("opens an exercise with a name in another script, and keeps it in the hash", async () => {
+    const renamed: Record<string, string> = { Plank: "Планка", "Lat Pulldown": "腹筋" };
+    const activities = data.activities.map((a: Record<string, unknown>) =>
+      Array.isArray(a.exercises)
+        ? {
+            ...a,
+            exercises: a.exercises.map((e: { exercise: string }) => ({
+              ...e,
+              exercise: renamed[e.exercise] ?? e.exercise,
+            })),
+          }
+        : a,
+    );
+    const file = pageFile({ data: { ...data, v: 3, activities } });
+    const { page, errors } = await open(browser, file, { hash: "#strengthTraining" });
+    await page.click("[data-exercise='腹筋']");
+    expect(await page.textContent(".detail h3")).toBe("腹筋");
+    expect(decodeURIComponent(await hash(page))).toMatch(/\/腹筋$/);
+    expect(await page.getAttribute("[data-exercise='планка']", "data-exercise")).toBe("планка");
+
+    const again = await open(browser, file, { hash: await hash(page) });
+    expect(await again.page.textContent(".detail h3")).toBe("腹筋");
+    expect(errors).toEqual([]);
+  });
+
   it("opens an exercise with a click or Enter, keeps it in the hash, and closes it with a second click", async () => {
     const file = pageFile();
     const { page, errors } = await open(browser, file, { hash: "#strengthTraining" });
