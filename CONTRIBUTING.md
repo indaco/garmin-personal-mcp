@@ -81,6 +81,16 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
   | node dist/index.js
 ```
 
+The command sends the first message of each client, then the server stops. The server does not
+call Garmin, so you do not need an API key.
+
+| Output                                                      | Meaning                                                                |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------- |
+| One JSON line with `"serverInfo":{"name":"garmin-personal"` | The build is correct.                                                  |
+| An error on stderr                                          | The build does not start. Read the error, then run `pnpm build`.       |
+| Text before the JSON line                                   | Code in `src/` writes to stdout. The clients cannot read the messages. |
+| No output, and the command does not stop                    | The server does not answer. Stop it with Ctrl-C.                       |
+
 ## Code map
 
 Where each part of the server and the page is.
