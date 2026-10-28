@@ -102,7 +102,7 @@ Ask "list my last 5 activities". The first time that a garmin-personal tool asks
 ## Prompts
 
 In Claude Desktop, the prompts are in the **+** menu of the message box, under _garmin-personal_. In
-Claude Code, they are slash commands such as `/mcp__garmin-personal__training-dashboard`.
+Claude Code, they are slash commands such as `/garmin-personal:training-dashboard`.
 
 The prompts remove all spaces around an argument, also the no-break space from a phone keyboard.
 
@@ -127,10 +127,10 @@ is one HTML file, `garmin-dashboard.html` in the data folder. It works offline.
 | Client         | How to run it                                                               |
 | -------------- | --------------------------------------------------------------------------- |
 | Claude Desktop | **+** → _garmin-personal_ → `training-dashboard` → set the arguments → send |
-| Claude Code    | `/mcp__garmin-personal__training-dashboard 8`                               |
+| Claude Code    | `/garmin-personal:training-dashboard 8`                                     |
 
 In Claude Code, the arguments are in order and separated by spaces: first `weeks`, then `layout`.
-You can also give only the layout: `/mcp__garmin-personal__training-dashboard freeform`.
+You can also give only the layout: `/garmin-personal:training-dashboard freeform`.
 
 Claude gives you the path of the page and the command to open it. The page has:
 
@@ -162,7 +162,7 @@ new data.
 | Client         | How to run it                                                  |
 | -------------- | -------------------------------------------------------------- |
 | Claude Desktop | **+** → _garmin-personal_ → `training-dashboard-update` → send |
-| Claude Code    | `/mcp__garmin-personal__training-dashboard-update`             |
+| Claude Code    | `/garmin-personal:training-dashboard-update`                   |
 
 The first call sends approximately 35 requests to Garmin. Later calls use the local cache and send
 approximately 8.
