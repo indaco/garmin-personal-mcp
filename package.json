@@ -21,6 +21,7 @@
   "scripts": {
     "build": "tsdown && node scripts/build-template.mjs && node scripts/third-party-notices.mjs",
     "test": "vitest run --passWithNoTests",
+    "test:coverage": "vitest run --coverage",
     "test:page": "vitest run --config vitest.page.config.ts",
     "guide": "UPDATE_DOCS=1 vitest run test/docs.test.ts",
     "demo": "node scripts/demo-gif.mjs",
@@ -33,6 +34,7 @@
     "@modelcontextprotocol/client": "^2.4.0",
     "@modelcontextprotocol/server": "^2.4.0",
     "@types/node": "^26.6.5",
+    "@vitest/coverage-istanbul": "^5.0.5",
     "axe-core": "^4.14.0",
     "chart.js": "^4.6.1",
     "fflate": "^0.8.3",
