@@ -34,7 +34,7 @@ id = "oxfmt"
 name = "oxfmt --check"
 language = "system"
 entry = "pnpm exec oxfmt --check --no-error-on-unmatched-pattern"
-types_or = ["ts", "javascript", "json", "yaml", "markdown", "toml"]
+types_or = ["ts", "javascript", "json", "yaml", "markdown", "toml", "css", "html"]
 
 # pre-push: the slower checks, once per push instead of once per commit
 [[repos.hooks]]
