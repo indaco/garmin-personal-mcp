@@ -18,6 +18,10 @@ jobs:
     name: Check (Node ${{ matrix.node }})
     # a fixed image: a move to a new Ubuntu is a change that we watch, not a surprise
     runs-on: ubuntu-24.04
+    # CODECOV_TOKEN is an environment secret, not a repository one; no deployment record per run
+    environment:
+      name: codecov
+      deployment: false
     strategy:
       fail-fast: false
       matrix:
