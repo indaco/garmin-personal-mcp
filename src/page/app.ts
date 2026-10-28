@@ -69,6 +69,10 @@ declare global {
 }
 
 const G = window.GARMIN ?? { data: null, layout: null, widgets: [] };
+/** The server writes the notes HTML-escaped (pages that Claude designs show them as HTML); widgets get plain text. */
+const plain = (s: string) =>
+  new DOMParser().parseFromString(s, "text/html").documentElement.textContent ?? "";
+if (G.data?.notes) G.data.notes = G.data.notes.map(plain);
 const S: Settings = window.GARMIN_SETTINGS ?? {};
 const LAYOUT_KEY = `garmin-layout:${location.pathname}`;
 const ALWAYS: readonly string[] = ["running", "strengthTraining", "walking", "cycling", "racket"];

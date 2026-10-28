@@ -1125,6 +1125,19 @@ describe("custom widgets and languages", () => {
     expect(errors).toEqual([]);
   });
 
+  it("gives the notes to a custom widget as plain text", async () => {
+    const { page, errors } = await open(
+      browser,
+      pageFile({
+        data: { ...data, v: 3, notes: ["Don&#39;t skip Z2 &amp; strides"] },
+        widgets: [custom("note", "el.textContent = ctx.data.notes[0];")],
+        layout: on("note"),
+      }),
+    );
+    expect(await page.textContent("[data-id=note]")).toContain("Don't skip Z2 & strides");
+    expect(errors).toEqual([]);
+  });
+
   it("shows the error of a failing widget in its own tile only", async () => {
     const { page, errors } = await open(
       browser,
