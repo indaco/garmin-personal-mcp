@@ -4,6 +4,9 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    # a new release waits a week, so a compromised one is found and pulled first
+    cooldown:
+      default-days: 7
     labels:
       - "ci"
       - "deps"
@@ -16,6 +19,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     labels:
       - "deps"
     commit-message:
