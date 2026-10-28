@@ -130,7 +130,7 @@ is one HTML file, `garmin-dashboard.html` in the data folder. It works offline.
 | Claude Code    | `/mcp__garmin-personal__training-dashboard 8`                               |
 
 In Claude Code, the arguments are in order and separated by spaces: first `weeks`, then `layout`.
-To give `layout`, also give `weeks`: `/mcp__garmin-personal__training-dashboard 12 freeform`.
+You can also give only the layout: `/mcp__garmin-personal__training-dashboard freeform`.
 
 Claude gives you the path of the page and the command to open it. The page has:
 

@@ -41,7 +41,8 @@ export function registerPrompts(server: McpServer): void {
     },
     (args) => {
       const w = weeks(args.weeks);
-      const layout = layoutOf(args.layout);
+      // Claude Code passes arguments by position: a layout given alone arrives in weeks
+      const layout = layoutOf(arg(args.layout) === "" ? args.weeks : args.layout);
       const text =
         layout === "freeform"
           ? renderDashboard(freeform, w)

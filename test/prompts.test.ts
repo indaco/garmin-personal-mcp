@@ -62,6 +62,18 @@ describe("prompts", () => {
     expect(preset.includes("{{") || blank.includes("{{")).toBe(false);
   });
 
+  it("takes a layout given as the only argument, as Claude Code passes it in weeks", async () => {
+    const freeformText = await render("training-dashboard", { weeks: "freeform" });
+    expect(freeformText).toContain("You design the page; the server puts the data into it.");
+    expect(freeformText).toContain("last **12 weeks**");
+    expect(await render("training-dashboard", { weeks: " Blank " })).toContain(
+      '`layout` = "blank"',
+    );
+    expect(await render("training-dashboard", { weeks: "blank", layout: "preset" })).toContain(
+      '`layout` = "preset"',
+    );
+  });
+
   it("lets Claude design the whole page with the freeform layout, with the data from the server", async () => {
     const text = await render("training-dashboard", { layout: "freeform", weeks: "8" });
     expect(text).toContain("You design the page; the server puts the data into it.");
