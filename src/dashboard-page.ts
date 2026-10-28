@@ -82,6 +82,8 @@ export interface EditOptions {
   removeWidgets?: string[];
   /** Texts of a language by key: added to the texts the page has. */
   languages?: Record<string, Record<string, string>>;
+  /** Codes of languages that languages added, to remove. */
+  removeLanguages?: string[];
   englishTexts?: boolean;
   path?: string;
 }
@@ -475,17 +477,28 @@ export class DashboardWriter {
     for (const [lang, entries] of Object.entries(o.languages ?? {})) {
       texts[lang] = { ...texts[lang], ...checkTexts(lang, entries) };
     }
+    for (const lang of o.removeLanguages ?? []) {
+      if (!(lang in texts)) {
+        throw new Error(
+          `The page has no added texts for ${lang}: built-in languages are chosen with writeDashboard settings.languages`,
+        );
+      }
+      delete texts[lang];
+    }
 
     const changed =
       layoutChanged ||
       o.widgets !== undefined ||
       o.removeWidgets !== undefined ||
-      o.languages !== undefined;
+      o.languages !== undefined ||
+      o.removeLanguages !== undefined;
     if (changed) {
       if (layoutChanged) layout = { ...layout, rev: newRev() };
       page = writeBlock(page, "layout", layout);
       page = writeBlock(page, "widgets", widgets);
-      if (o.languages !== undefined) page = writeBlock(page, "i18n", texts);
+      if (o.languages !== undefined || o.removeLanguages !== undefined) {
+        page = writeBlock(page, "i18n", texts);
+      }
       await writeAtomically(target, page);
     }
     return {
@@ -715,6 +728,7 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         "by id; `removeWidgets` removes them, also from the boards. `languages` adds texts by key, e.g.",
         '{"de": {"title": "Training + Erholung"}}: keys and {placeholders} as in `englishTexts: true`; a',
         'text with "|" has a singular and a plural form. Missing texts show in English.',
+        "`removeLanguages` removes languages that `languages` added.",
       ].join("\n"),
       inputSchema: z.object({
         layout: z
@@ -755,6 +769,10 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         languages: z
           .record(z.string(), z.record(z.string(), z.string()))
           .describe("Texts by language code and key")
+          .optional(),
+        removeLanguages: z
+          .array(z.string())
+          .describe("Codes of added languages, e.g. de")
           .optional(),
         englishTexts: z.boolean().describe("Also return the English texts to translate").optional(),
         path: z

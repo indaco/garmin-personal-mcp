@@ -17,7 +17,7 @@
   },
   {
     "name": "editDashboard",
-    "description": "Changes the layout, the custom widgets or the languages of the dashboard page (a page from the\ntemplate; call writeDashboard first). Without arguments it only reads: the reply has the layout, the\ncustom widgets, the missing texts of each language, the catalogue of built-in widgets and `widgetApi`,\nthe guide to writing a custom widget. `layout` replaces the whole layout (the text of the page's\n'Copy layout'); `place` adds widgets at the end of a board; `widgets` adds or replaces custom widgets\nby id; `removeWidgets` removes them, also from the boards. `languages` adds texts by key, e.g.\n{\"de\": {\"title\": \"Training + Erholung\"}}: keys and {placeholders} as in `englishTexts: true`; a\ntext with \"|\" has a singular and a plural form. Missing texts show in English.",
+    "description": "Changes the layout, the custom widgets or the languages of the dashboard page (a page from the\ntemplate; call writeDashboard first). Without arguments it only reads: the reply has the layout, the\ncustom widgets, the missing texts of each language, the catalogue of built-in widgets and `widgetApi`,\nthe guide to writing a custom widget. `layout` replaces the whole layout (the text of the page's\n'Copy layout'); `place` adds widgets at the end of a board; `widgets` adds or replaces custom widgets\nby id; `removeWidgets` removes them, also from the boards. `languages` adds texts by key, e.g.\n{\"de\": {\"title\": \"Training + Erholung\"}}: keys and {placeholders} as in `englishTexts: true`; a\ntext with \"|\" has a singular and a plural form. Missing texts show in English.\n`removeLanguages` removes languages that `languages` added.",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -107,6 +107,13 @@
             }
           },
           "description": "Texts by language code and key"
+        },
+        "removeLanguages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Codes of added languages, e.g. de"
         },
         "englishTexts": {
           "type": "boolean",

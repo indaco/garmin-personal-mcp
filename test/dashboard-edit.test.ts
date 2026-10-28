@@ -157,6 +157,18 @@ describe("editDashboard", () => {
     expect((await writer.write({})).languages?.de.missing).toHaveLength(Object.keys(en).length - 3);
   });
 
+  it("removes an added language", async () => {
+    await writer.edit({ languages: { de: { title: "Training + Erholung" } } });
+    const r = await writer.edit({ removeLanguages: ["de"] });
+    expect(r.changed).toBe(true);
+    expect(readBlock(page(), "i18n")).toEqual({});
+    expect(r.languages).not.toHaveProperty("de");
+  });
+
+  it("refuses to remove a language that the page did not add", async () => {
+    await expect(writer.edit({ removeLanguages: ["fr"] })).rejects.toThrow(/fr/);
+  });
+
   it("refuses unknown texts, a changed placeholder and a bad language code", async () => {
     await expect(writer.edit({ languages: { de: { nope: "x" } } })).rejects.toThrow(/nope/);
     await expect(writer.edit({ languages: { de: { "window.last": "Letzte" } } })).rejects.toThrow(
