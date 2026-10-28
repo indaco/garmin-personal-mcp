@@ -6,11 +6,13 @@
 <p align="center"><b>Your Garmin training in Claude, through the official Personal API. Read-only, nothing to install.</b></p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
+  <a href="https://www.npmjs.com/package/@indaco/garmin-personal-mcp"><img src="https://img.shields.io/npm/v/@indaco/garmin-personal-mcp.svg" alt="npm version" /></a>
+  <a href="https://codecov.io/gh/indaco/garmin-personal-mcp"><img src="https://codecov.io/gh/indaco/garmin-personal-mcp/branch/main/graph/badge.svg" alt="Code coverage" /></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg" alt="Node.js 22 or later" /></a>
   <a href="tsconfig.json"><img src="https://img.shields.io/badge/TypeScript-strict-3178c6.svg" alt="TypeScript strict" /></a>
   <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-stdio%20server-8a2be2.svg" alt="MCP stdio server" /></a>
   <a href="https://developer.garmin.com/gc-developer-program/personal/"><img src="https://img.shields.io/badge/Garmin-Personal%20API-007cc3.svg" alt="Garmin Connect Personal API" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
 </p>
 
 <p align="center">
@@ -24,9 +26,12 @@
   <b><a href="guide/troubleshooting.md">Troubleshooting</a></b>
 </p>
 
-![The training dashboard: the All board, load against recovery, the Run board, strength trends, edit mode (drag a widget to a new place, hide a widget, add widgets from the catalogue to an empty board), and the light and high-contrast themes](assets/dashboard.gif)
-
-_The training dashboard with demo data._
+<p align="center">
+  <img src="assets/dashboard.gif" alt="The training dashboard: the All board, load against recovery, the Run board, strength trends, edit mode (drag a widget to a new place, hide a widget, add widgets from the catalogue to an empty board), and the light and high-contrast themes" width="800">
+</p>
+<p align="center">
+  <sub><i>The training dashboard with demo data.</i></sub>
+</p>
 
 MCP server for the official Garmin Connect Personal API.
 
