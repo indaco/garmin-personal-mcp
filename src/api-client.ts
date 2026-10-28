@@ -96,7 +96,9 @@ export class GarminApiClient {
         signal: AbortSignal.timeout(60_000),
       });
     } catch (e) {
-      throw new GarminApiError(`Network error calling ${path}: ${(e as Error).message}`);
+      throw new GarminApiError(
+        `Network error calling ${path}: ${this.#scrub((e as Error).message, token)}`,
+      );
     }
   }
 
@@ -123,7 +125,9 @@ export class GarminApiClient {
       });
       text = await resp.text();
     } catch (e) {
-      throw new GarminApiError(`Network error obtaining token: ${(e as Error).message}`);
+      throw new GarminApiError(
+        `Network error obtaining token: ${this.#scrub((e as Error).message, apiKey)}`,
+      );
     }
     const contentType = resp.headers.get("Content-Type") ?? "none";
     if (!resp.ok) {
@@ -138,7 +142,11 @@ export class GarminApiClient {
     }
     if (!body.startsWith("{")) {
       // Plain-text token, possibly wrapped in quotes
-      this.#token = body.replace(/^"|"$/g, "");
+      const plain = body.replace(/^"|"$/g, "");
+      if (!isHeaderSafe(plain)) {
+        throw new GarminApiError(`Token response is not a token (Content-Type: ${contentType})`);
+      }
+      this.#token = plain;
       this.#expiresAt = Date.now() + DEFAULT_TOKEN_TTL_MS;
       log(
         "INFO",
@@ -158,6 +166,9 @@ export class GarminApiClient {
         `Token response has no access token field (Content-Type: ${contentType}). Fields: ${Object.keys(json).join(" ")}`,
       );
     }
+    if (!isHeaderSafe(token)) {
+      throw new GarminApiError(`Token response is not a token (Content-Type: ${contentType})`);
+    }
     const expiresIn = asLong(json.expires_in) ?? asLong(json.expiresIn) ?? 0;
     this.#token = token;
     this.#expiresAt =
@@ -169,9 +180,19 @@ export class GarminApiClient {
     return token;
   }
 
+  /** The text of a fetch error without the key or the token: some fetch errors quote a header. */
+  #scrub(message: string, ...secrets: (string | undefined)[]): string {
+    return secrets.reduce<string>((m, s) => (s ? m.replaceAll(s, "***") : m), message);
+  }
+
   async #apiKey(): Promise<string> {
     const env = process.env.GARMIN_PERSONAL_API_KEY?.trim();
     if (env) {
+      if (!isHeaderSafe(env)) {
+        throw new GarminApiError(
+          "GARMIN_PERSONAL_API_KEY has spaces, line breaks or other characters that a key cannot have",
+        );
+      }
       return env;
     }
     const file = this.config.apiKeyFile;
@@ -184,9 +205,17 @@ export class GarminApiClient {
     if (!key) {
       throw new GarminApiError(`API key file is empty: ${file}`);
     }
+    if (!isHeaderSafe(key)) {
+      throw new GarminApiError(
+        `The API key file has more than the key (spaces, line breaks or other characters): ${file}`,
+      );
+    }
     return key;
   }
 }
+
+/** A key or token is printable ASCII without spaces; anything else would break the header and show in fetch's error. */
+const isHeaderSafe = (s: string) => /^[\x21-\x7e]+$/.test(s);
 
 function toQueryString(query: Record<string, string | undefined>): string {
   const params = new URLSearchParams();
