@@ -188,7 +188,8 @@ jobs:
           shopt -s nullglob
           files=(out/*.tgz)
           [ "${#files[@]}" -eq 1 ] || { echo "::error::expected one tarball, got ${#files[@]}"; exit 1; }
-          npm publish "${files[0]}" --access public
+          # without ./ npm reads out/<name>.tgz as a GitHub user/repo
+          npm publish "./${files[0]}" --access public
 
   release-notes:
     name: GitHub Release
