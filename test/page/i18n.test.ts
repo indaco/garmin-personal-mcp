@@ -67,10 +67,10 @@ describe("translator", () => {
 
 describe("plurals", () => {
   it("picks the singular or plural form of a text with {n}", () => {
-    expect(translator("en")("kpi.totals", { km: "5", time: "1h", n: 1 })).toBe(
+    expect(translator("en")("kpi.totals", { distance: "5 km", time: "1h", n: 1 })).toBe(
       "5 km · 1h · 1 session",
     );
-    expect(translator("en")("kpi.totals", { km: "5", time: "1h", n: 2 })).toBe(
+    expect(translator("en")("kpi.totals", { distance: "5 km", time: "1h", n: 2 })).toBe(
       "5 km · 1h · 2 sessions",
     );
     expect(translator("it")("ss.count", { n: 1 })).toBe("1 esercizio");
@@ -88,7 +88,33 @@ describe("formatter", () => {
     expect(formatter("it").day("2026-10-26")).toBe("26 ott");
   });
 
+  it("shows metric data in the units of the Garmin profile", () => {
+    const m = formatter("en");
+    const us = formatter("en", "statute_us");
+    const uk = formatter("en", "statute_uk");
+    expect([m.dist(5), us.dist(5), uk.dist(5)]).toEqual(["5.0 km", "3.1 mi", "3.1 mi"]);
+    expect([m.pace(300), us.pace(300), uk.pace(300)]).toEqual(["5:00/km", "8:03/mi", "8:03/mi"]);
+    expect([m.speed(30), us.speed(30)]).toEqual(["30.0 km/h", "18.6 mph"]);
+    expect([m.elev(100), us.elev(100), uk.elev(100)]).toEqual(["100 m", "328 ft", "100 m"]);
+    expect([m.mass(100), us.mass(100), uk.mass(100)]).toEqual(["100.0 kg", "220.5 lb", "220.5 lb"]);
+    expect([m.swimPace(110), us.swimPace(110), uk.swimPace(110)]).toEqual([
+      "1:50/100 m",
+      "1:41/100 yd",
+      "1:50/100 m",
+    ]);
+    expect(us.to.dist(1.609344)).toBeCloseTo(1);
+    expect(us.unit).toMatchObject({ dist: "mi", pace: "/mi", mass: "lb", elev: "ft" });
+  });
+
+  it("shows metric for a measurement system it does not know", () => {
+    expect(formatter("en", "nautical" as never).dist(5)).toBe("5.0 km");
+  });
+
   it("writes a missing value as n/a", () => {
+    expect(formatter("en", "statute_us").dist(undefined)).toBe("n/a");
+    expect(formatter("en", "statute_us").pace(Number.NaN)).toBe("n/a");
+    expect(formatter("en", "statute_us").swimPace(undefined)).toBe("n/a");
+    expect(formatter("en").hms(undefined)).toBe("n/a");
     expect(formatter("en").num(undefined)).toBe("n/a");
     expect(formatter("en").num(Number.NaN)).toBe("n/a");
   });

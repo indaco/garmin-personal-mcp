@@ -29,7 +29,11 @@ export function renderVolume(el: HTMLElement, ctx: Ctx, only?: string[]): void {
   const max = maxHR(ctx);
   const metrics: Record<string, [label: string, unit: string, value: (a: Activity) => number]> = {
     time: [t("m.time"), "h", (a) => sessionSeconds(a) / 3600],
-    distance: [t("m.distance"), "km", (a) => (typeof a.km === "number" ? a.km : 0)],
+    distance: [
+      t("m.distance"),
+      fmt.unit.dist,
+      (a) => (typeof a.km === "number" ? fmt.to.dist(a.km) : 0),
+    ],
     sessions: [t("m.sessions"), "", () => 1],
     load: [t("m.load"), "", (a) => calc.loadOf(a, max)?.value ?? 0],
   };
@@ -283,7 +287,7 @@ register({
           h(
             "div",
             { class: "small" },
-            `${a.name ?? ""} · ${typeof a.km === "number" ? `${fmt.num(a.km, 1)} km · ` : ""}${fmt.hours(sessionSeconds(a))}`,
+            `${a.name ?? ""} · ${typeof a.km === "number" ? `${fmt.dist(a.km)} · ` : ""}${fmt.hours(sessionSeconds(a))}`,
           ),
         ),
       );

@@ -1,5 +1,6 @@
 import { type Activity, groupOf, seconds } from "../calc";
 import { append, h } from "../dom";
+import type { Fmt } from "../i18n";
 import { register } from "../registry";
 import { showAll, table, typeCell } from "./ui";
 
@@ -63,11 +64,11 @@ register({
               ` · ${t("laps.show")}`,
             )
           : name,
-        typeof a.km === "number" ? `${fmt.num(a.km, 2)} km` : "",
+        typeof a.km === "number" ? fmt.dist(a.km, 2) : "",
         fmt.hms(ctx.calc.sessionSeconds(a)),
-        pace(a, fmt.num),
+        pace(a, fmt),
         typeof a.avgHR === "number" ? fmt.num(a.avgHR) : "",
-        typeof a.ascentM === "number" ? `${fmt.num(a.ascentM)} m` : "",
+        typeof a.ascentM === "number" ? fmt.elev(a.ascentM) : "",
       ];
       body.append(
         h("tr", {}, ...cells.map((c, i) => h("td", { class: i >= 3 ? "num" : undefined }, c))),
@@ -91,9 +92,13 @@ register({
                 ],
                 laps.map((l) => [
                   String(l.lap ?? ""),
-                  typeof l.km === "number" ? `${fmt.num(l.km, 2)} km` : "",
+                  typeof l.km === "number" ? fmt.dist(l.km, 2) : "",
                   String(l.time ?? ""),
-                  String(l.pace ?? (typeof l.kmh === "number" ? `${fmt.num(l.kmh, 1)} km/h` : "")),
+                  seconds(l.pace) > 0
+                    ? fmt.pace(seconds(l.pace))
+                    : typeof l.kmh === "number"
+                      ? fmt.speed(l.kmh)
+                      : "",
                   typeof l.avgHR === "number" ? fmt.num(l.avgHR) : "",
                   String(l.intensity ?? ""),
                 ]),
@@ -111,11 +116,10 @@ register({
 });
 
 /** Pace for activities on foot, speed for rides, nothing for strength or racket sports (their distance means little). */
-function pace(a: Activity, num: (v: number, digits: number) => string): string {
+function pace(a: Activity, fmt: Fmt): string {
   const g = groupOf(a);
   if (g === "strengthTraining" || g === "racket") return "";
   const hours = seconds(a.duration) / 3600;
-  if (g === "cycling")
-    return typeof a.km === "number" && hours > 0 ? `${num(a.km / hours, 1)} km/h` : "";
-  return typeof a.pace === "string" ? a.pace : "";
+  if (g === "cycling") return typeof a.km === "number" && hours > 0 ? fmt.speed(a.km / hours) : "";
+  return seconds(a.pace) > 0 ? fmt.pace(seconds(a.pace)) : "";
 }

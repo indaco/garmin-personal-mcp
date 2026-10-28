@@ -28,7 +28,7 @@ register({
     const weekly = ctx.weeks.map((_, i) => ctx.activities.filter((a) => weekOf(ctx, a) === i));
     const pace = weekly.map((w) => {
       const d = calc.timedDistance(w);
-      return d.km > 0 ? d.seconds / d.km : null;
+      return d.km > 0 ? fmt.to.pace(d.seconds / d.km) : null;
     });
     const hr = weekly.map((w) =>
       calc.mean(w.map((a) => a.avgHR).filter((v): v is number => typeof v === "number")),
@@ -61,7 +61,7 @@ register({
             y: {
               reverse: true,
               ticks: { callback: (v) => fmt.hms(Number(v)) },
-              title: { display: true, text: t("af.pace") },
+              title: { display: true, text: t("af.pace", { unit: fmt.unit.pace }) },
             },
             y1: {
               position: "right",
@@ -74,7 +74,7 @@ register({
               callbacks: {
                 label: (c) =>
                   c.datasetIndex === 0
-                    ? `${c.dataset.label}: ${fmt.hms(c.parsed.y ?? 0)}/km`
+                    ? `${c.dataset.label}: ${fmt.hms(c.parsed.y ?? 0)}${fmt.unit.pace}`
                     : `${c.dataset.label}: ${fmt.num(c.parsed.y ?? undefined)} bpm`,
               },
             },
@@ -157,13 +157,19 @@ register({
     append(
       el,
       table(
-        [t("col.date"), t("col.name"), t("col.distance"), t("col.ascent"), t("hv.vam")],
+        [
+          t("col.date"),
+          t("col.name"),
+          t("col.distance"),
+          t("col.ascent"),
+          t("hv.vam", { unit: fmt.unit.elev }),
+        ],
         list.map((a) => [
           fmt.day(day(a)),
           a.name ?? "",
-          withUnit(ctx, fmt.num(num(a.km), 1), " km"),
-          withUnit(ctx, fmt.num(num(a.ascentM)), " m"),
-          withUnit(ctx, fmt.num(calc.verticalPerHour(a)), " m/h"),
+          fmt.dist(num(a.km)),
+          fmt.elev(num(a.ascentM)),
+          withUnit(ctx, fmt.elev(calc.verticalPerHour(a)), "/h"),
         ]),
         [2, 3, 4],
       ),
@@ -207,7 +213,7 @@ register({
                 label: t("tk.speed"),
                 data: weekly.map((w) => {
                   const d = calc.timedDistance(w);
-                  return d.seconds > 0 ? d.km / (d.seconds / 3600) : null;
+                  return d.seconds > 0 ? fmt.to.speed(d.km / (d.seconds / 3600)) : null;
                 }),
                 borderColor: ctx.color("cycling"),
                 yAxisID: "y",
@@ -216,7 +222,9 @@ register({
               {
                 type: "bar",
                 label: t("lr.ascent"),
-                data: weekly.map((w) => w.reduce((s, a) => s + (num(a.ascentM) ?? 0), 0)),
+                data: weekly.map((w) =>
+                  fmt.to.elev(w.reduce((s, a) => s + (num(a.ascentM) ?? 0), 0)),
+                ),
                 backgroundColor: `${ctx.color("hiking")}88`,
                 yAxisID: "y1",
               },
@@ -224,11 +232,11 @@ register({
           },
           options: {
             scales: {
-              y: { title: { display: true, text: "km/h" } },
+              y: { title: { display: true, text: fmt.unit.speed } },
               y1: {
                 position: "right",
                 grid: { drawOnChartArea: false },
-                title: { display: true, text: "m" },
+                title: { display: true, text: fmt.unit.elev },
               },
             },
           },
@@ -250,9 +258,9 @@ register({
         rides.map((a) => [
           fmt.day(day(a)),
           a.name ?? "",
-          withUnit(ctx, fmt.num(num(a.km), 1), " km"),
-          withUnit(ctx, fmt.num(speed(a), 1), " km/h"),
-          withUnit(ctx, fmt.num(num(a.ascentM)), " m"),
+          fmt.dist(num(a.km)),
+          fmt.speed(speed(a)),
+          fmt.elev(num(a.ascentM)),
           isIndoor(a.type ?? "") ? t("bd.indoor") : t("bd.outdoor"),
         ]),
         [2, 3, 4],
@@ -282,8 +290,8 @@ register({
         ctx.activities.map((a) => [
           fmt.day(day(a)),
           a.name ?? "",
-          withUnit(ctx, fmt.num(num(a.km), 2), " km"),
-          withUnit(ctx, fmt.hms(calc.swimPace(a)), "/100 m"),
+          fmt.dist(num(a.km), 2),
+          fmt.swimPace(calc.swimPace(a)),
           fmt.num(num(a.swolf)),
           fmt.num(num(a.lengths)),
           fmt.num(num(a.strokes)),

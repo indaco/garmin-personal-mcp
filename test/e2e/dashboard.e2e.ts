@@ -110,6 +110,19 @@ async function chartsWithoutTooltip(page: Page): Promise<string[]> {
   return missing;
 }
 
+/** The text of the All, Run, Strength and Bike boards of a page with these units, race names left out. */
+async function shownUnits(units?: string): Promise<string> {
+  const { page, errors } = await open(browser, pageFile({ data: { ...data, units } }));
+  let text = "";
+  for (const tab of ["all", "running", "strengthTraining", "cycling"]) {
+    await page.click(`[data-tab=${tab}]`);
+    text += await page.innerText("#app");
+  }
+  expect(errors).toEqual([]);
+  // race names such as "5 km" and the 15 km long-run threshold stay metric
+  return text.replaceAll(/\b(1|5|10|15) km\b/g, "");
+}
+
 describe("the page", () => {
   it("keeps the template small", () => {
     // minified, with only the Chart.js parts the page uses: Chart.js is most of it, and the page
@@ -140,6 +153,18 @@ describe("the page", () => {
       ["cycling", "3"],
       ["racket", "3"],
     ]);
+  });
+
+  it("shows the units of the Garmin profile, and metric without them", async () => {
+    const us = await shownUnits("statute_us");
+    expect(us).toMatch(/\d mi\b/);
+    expect(us).toMatch(/\d:\d\d\/mi\b/);
+    expect(us).toMatch(/\d lb\b/);
+    expect(us).not.toMatch(/\d km\b|\/km\b|km\/h|\d kg\b/);
+    const metric = await shownUnits();
+    expect(metric).toMatch(/\d km\b/);
+    expect(metric).toMatch(/\d kg\b/);
+    expect(metric).not.toMatch(/\d mi\b|\/mi\b|\d lb\b/);
   });
 
   it("keeps the tab and the window in the URL hash", async () => {

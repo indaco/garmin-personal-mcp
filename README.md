@@ -175,7 +175,9 @@ You can also give only the layout: `/garmin-personal:training-dashboard freeform
 The assistant gives you the path of the page and the command to open it. The page has a board for
 all your training, a Recovery board and a board for each sport, with 11 themes and English and
 Italian texts. It uses the training load, HR zones and training effect from Garmin. It labels each
-value that it calculates as an estimate, and a missing value shows as "n/a".
+value that it calculates as an estimate, and a missing value shows as "n/a". Distances, paces,
+elevation and weights use the units of your Garmin profile: metric, or miles and pounds for
+Statute US and Statute UK (Statute UK keeps elevation in metres).
 
 [The dashboard guide](guide/dashboard.md) tells what each board shows and how to change the layout.
 [The widget catalogue](guide/widgets.md) lists every widget.

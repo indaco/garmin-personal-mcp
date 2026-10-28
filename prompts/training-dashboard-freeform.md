@@ -27,6 +27,10 @@ of `getDashboardData` with `weeks` = {{weeks}}, which has:
   `failedSections` is not empty, name those sections in chat: `zones` and `fitnessAge` are then null
   and `hrv` can have no rows. Their widgets show "n/a".
 - `notes`: the coach notes, a list of strings. The server escapes them as HTML.
+- `units`: the measurement system of my Garmin profile. The data is always metric (km, m, kg,
+  pace per km). Show every distance, pace, speed, elevation and weight in my units: `metric` km,
+  /km, km/h, m, kg; `statute_us` mi, /mi, mph, ft, lb; `statute_uk` mi, /mi, mph, m, lb. Without
+  `units`, use metric. Race names (5 km, 10 km, half marathon) stay as they are.
 
 You do not need to call `getDashboardData`: the field names above are all the page needs.
 
