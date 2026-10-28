@@ -190,6 +190,7 @@ export class GarminDashboard {
   async #syncRecovery(cache: Json, from: string, to: string, sync: Sync): Promise<void> {
     const byDate = objectAt(cache, "recovery");
     const refreshFrom = recoveryRefreshFrom(date(cache.recoveryTo), to);
+    let stale: string | undefined;
     for (let day = from; day <= to; day = addDays(day, 1)) {
       if (day in byDate && day < refreshFrom) {
         continue;
@@ -202,12 +203,13 @@ export class GarminDashboard {
         byDate[day] = recoveryRow(day, sleep, summary);
       } catch (e) {
         if (!(e instanceof GarminApiError)) throw e;
-        // keep the old row, if any; the day is fetched again on the next call
+        // the old row stays; recoveryTo stops at this day, so the next call fetches it again
+        if (day in byDate) stale ??= day;
         sync.failedDates.push(day);
         log("WARN", `Recovery data of ${day} not fetched: ${e.message}`);
       }
     }
-    cache.recoveryTo = to;
+    cache.recoveryTo = stale ?? to;
     // the cache keeps only what a dashboard can show
     const keepFrom = addDays(from, -RECOVERY_DAYS);
     for (const day of Object.keys(byDate)) {
