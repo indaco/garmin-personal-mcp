@@ -87,6 +87,19 @@ export function seconds(v: unknown): number {
   return m ? m[1].split(":").reduce((s, x) => s * 60 + Number(x), 0) : 0;
 }
 
+/** The km and the moving seconds of the activities that have both: pace and speed come from these only. */
+export function timedDistance(acts: Activity[]): { km: number; seconds: number } {
+  return acts.reduce<{ km: number; seconds: number }>(
+    (s, a) => {
+      const sec = seconds(a.duration);
+      return typeof a.km === "number" && a.km > 0 && sec > 0
+        ? { km: s.km + a.km, seconds: s.seconds + sec }
+        : s;
+    },
+    { km: 0, seconds: 0 },
+  );
+}
+
 /** Strength and racket sports have little moving time: their session lasts the elapsed time. */
 export function sessionSeconds(a: Activity): number {
   const g = groupOf(a);

@@ -27,8 +27,8 @@ register({
     if (oneSession(el, ctx)) return;
     const weekly = ctx.weeks.map((_, i) => ctx.activities.filter((a) => weekOf(ctx, a) === i));
     const pace = weekly.map((w) => {
-      const km = w.reduce((s, a) => s + (num(a.km) ?? 0), 0);
-      return km > 0 ? w.reduce((s, a) => s + seconds(a.duration), 0) / km : null;
+      const d = calc.timedDistance(w);
+      return d.km > 0 ? d.seconds / d.km : null;
     });
     const hr = weekly.map((w) =>
       calc.mean(w.map((a) => a.avgHR).filter((v): v is number => typeof v === "number")),
@@ -174,7 +174,7 @@ register({
 register({
   id: "bikeDetails",
   render(el, ctx) {
-    const { t, fmt } = ctx;
+    const { t, fmt, calc } = ctx;
     const rides = ctx.activities;
     if (rides.length === 0) return ctx.empty(el);
     const indoor = rides.filter((a) => isIndoor(a.type ?? ""));
@@ -206,9 +206,8 @@ register({
                 type: "line",
                 label: t("tk.speed"),
                 data: weekly.map((w) => {
-                  const km = w.reduce((s, a) => s + (num(a.km) ?? 0), 0);
-                  const h = w.reduce((s, a) => s + seconds(a.duration), 0) / 3600;
-                  return h > 0 ? km / h : null;
+                  const d = calc.timedDistance(w);
+                  return d.seconds > 0 ? d.km / (d.seconds / 3600) : null;
                 }),
                 borderColor: ctx.color("cycling"),
                 yAxisID: "y",

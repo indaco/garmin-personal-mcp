@@ -18,6 +18,18 @@ const tabs = (page: Page) =>
   );
 const tiles = (page: Page) =>
   page.$$eval(".tile", (els) => els.map((e) => (e as HTMLElement).dataset.id));
+/** The "Average pace" value of the running board for the given activities. */
+async function runningPace(activities: unknown[]): Promise<string | null> {
+  const { page } = await open(browser, pageFile({ data: { ...data, v: 3, activities } }), {
+    hash: "#running",
+  });
+  return page
+    .locator("[data-id=typeKpis] .kpi", {
+      has: page.locator(".kpi-label", { hasText: "Average pace" }),
+    })
+    .locator(".kpi-value")
+    .textContent();
+}
 const hash = (page: Page) => page.evaluate(() => location.hash);
 /** Opens edit mode from the settings menu. */
 async function startEdit(page: Page): Promise<void> {
@@ -692,6 +704,21 @@ describe("overview widgets", () => {
     );
     expect(await chartsWithoutTooltip(page)).toEqual([]);
     expect(errors).toEqual([]);
+  });
+
+  it("leaves a session without a distance out of the average pace", async () => {
+    const treadmill = {
+      id: 9100,
+      name: "Treadmill without a foot pod",
+      type: "treadmill_running",
+      sport: "running",
+      start: "2026-10-25 07:00:00",
+      duration: "1:00:00",
+      avgHR: 140,
+    };
+    expect(await runningPace([treadmill, ...data.activities])).toBe(
+      await runningPace(data.activities),
+    );
   });
 
   it("totals the window", async () => {

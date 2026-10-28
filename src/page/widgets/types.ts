@@ -43,6 +43,7 @@ register({
       return;
     }
     const sum = totals(ctx, acts);
+    const timed = calc.timedDistance(acts);
     const all = totals(ctx, ctx.allActivities);
     const hr = acts.map((a) => a.avgHR).filter((v): v is number => typeof v === "number");
     const peak = Math.max(...acts.map((a) => (typeof a.maxHR === "number" ? a.maxHR : 0)));
@@ -63,10 +64,10 @@ register({
       ),
       hasDistance && kpi(t("tk.distance"), `${fmt.num(sum.km, 1)} km`, vs(week.km, base.km)),
       hasDistance &&
-        sum.km > 0 &&
+        timed.km > 0 &&
         (ctx.type === "cycling"
-          ? kpi(t("tk.speed"), `${fmt.num(sum.km / (sum.seconds / 3600), 1)} km/h`)
-          : kpi(t("tk.pace"), `${fmt.hms(sum.seconds / sum.km)}/km`)),
+          ? kpi(t("tk.speed"), `${fmt.num(timed.km / (timed.seconds / 3600), 1)} km/h`)
+          : kpi(t("tk.pace"), `${fmt.hms(timed.seconds / timed.km)}/km`)),
       ctx.type === "cycling" && kpi(t("tk.ascent"), `${fmt.num(ascent)} m`),
       kpi(
         t("tk.hr"),

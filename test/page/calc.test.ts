@@ -11,6 +11,7 @@ import {
   seconds,
   sessionSeconds,
   sportOf,
+  timedDistance,
   weeksOf,
 } from "../../src/page/calc";
 import { formatHash, parseHash } from "../../src/page/state";
@@ -184,5 +185,22 @@ describe("boards in tab order", () => {
         { type: "running", sport: "running" },
       ]),
     ).toEqual(["running", "rowing", "generic"]);
+  });
+});
+
+describe("distance and time for pace", () => {
+  it("adds only the sessions that have both a distance and a time", () => {
+    expect(
+      timedDistance([
+        { km: 10, duration: "50:00" },
+        { duration: "1:00:00" }, // no distance: an indoor ride without a sensor
+        { km: 5 }, // no time
+        { km: 0, duration: "10:00" },
+      ]),
+    ).toEqual({ km: 10, seconds: 3000 });
+  });
+
+  it("gives zero for no session", () => {
+    expect(timedDistance([])).toEqual({ km: 0, seconds: 0 });
   });
 });

@@ -134,9 +134,8 @@ register({
     });
     const weekly = ctx.weeks.map((_, i) => runs(ctx).filter((a) => weekOf(ctx, a) === i));
     const pace = weekly.map((w) => {
-      const km = w.reduce((s, a) => s + (num(a.km) ?? 0), 0);
-      const sec = w.reduce((s, a) => s + calc.seconds(a.duration), 0);
-      return km > 0 ? sec / km : null;
+      const d = calc.timedDistance(w);
+      return d.km > 0 ? d.seconds / d.km : null;
     });
     const eff = weekly.map((w) =>
       calc.mean(w.map((a) => calc.efficiency(a)).filter((v): v is number => v !== undefined)),
