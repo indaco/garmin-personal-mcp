@@ -35,6 +35,7 @@ jobs:
 
           # the v* trigger also matches "vfoo"
           case "$TAG_NAME" in
+            *-* | *+*) fail "tag '$TAG_NAME' is a prerelease; the workflow publishes only vX.Y.Z as latest" ;;
             v[0-9]*.[0-9]*.[0-9]*) ;;
             *) fail "tag '$TAG_NAME' is not vX.Y.Z" ;;
           esac
@@ -82,7 +83,7 @@ jobs:
           node-version: 26
           package-manager-cache: false
 
-      # the same checks as ci.yml; keep them in step
+      # the same checks as the check and page jobs of ci.yml; keep them in step
       - name: Install
         run: pnpm install --frozen-lockfile
 
@@ -105,6 +106,16 @@ jobs:
             | timeout 10 node dist/index.js)
           test "$(printf '%s\n' "$out" | wc -l)" -eq 1
           printf '%s' "$out" | node -e 'JSON.parse(require("fs").readFileSync(0, "utf8"))'
+
+      - name: Third-party notices are up to date
+        run: git diff --exit-code THIRD-PARTY-NOTICES.md
+
+      # the page tests load the built template; no browser cache in a release
+      - name: Install the Chromium headless shell
+        run: pnpm exec playwright-core install --only-shell chromium
+
+      - name: Page tests
+        run: pnpm test:page
 
       - name: Package contents
         run: |
