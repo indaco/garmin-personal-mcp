@@ -25,7 +25,7 @@ write a list of changed files, because the diff shows them.
 > [!NOTE]
 > **AI-assisted contributions are welcome.** You can write a PR with Claude, Copilot or a similar
 > tool. But you must read the diff, understand what the change does, and accept it as your own
-> work.
+> work. [AGENTS.md](AGENTS.md) gives the rules to your coding agent.
 
 ## Out of scope
 
