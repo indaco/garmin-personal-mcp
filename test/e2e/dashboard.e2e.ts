@@ -377,6 +377,40 @@ describe("edit mode", () => {
     expect(await page.getAttribute("[data-id=coachNotes]", "class")).toContain("span-3");
   });
 
+  it("ends a drag when the page draws again during it", async () => {
+    const { page } = await open(browser, pageFile({ layout: two }));
+    await startEdit(page);
+    const from = (await page.locator("[aria-label='Move Coach notes']").boundingBox())!;
+    await page.mouse.move(from.x + 5, from.y + 5);
+    await page.mouse.down();
+    const to = (await page.locator("[data-id=x]").boundingBox())!;
+    await page.mouse.move(to.x + to.width * 0.75, to.y + to.height / 2, { steps: 8 });
+    expect(await page.evaluate(() => document.documentElement.classList.contains("dragging"))).toBe(
+      true,
+    );
+    await page.evaluate(() => window.dispatchEvent(new HashChangeEvent("hashchange")));
+    await page.waitForFunction(() => !document.documentElement.classList.contains("dragging"));
+    expect(await page.$(".tile-slot")).toBeNull();
+    await page.mouse.up();
+  });
+
+  it("ends a resize when the page draws again during it", async () => {
+    const { page } = await open(browser, pageFile({ layout: two }));
+    await startEdit(page);
+    const box = (await page.locator("[aria-label='Width of Coach notes']").boundingBox())!;
+    const grid = (await page.locator(".grid").boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(grid.x + grid.width * 0.4, box.y + box.height / 2, { steps: 6 });
+    expect(await page.evaluate(() => document.documentElement.classList.contains("resizing"))).toBe(
+      true,
+    );
+    await page.evaluate(() => window.dispatchEvent(new HashChangeEvent("hashchange")));
+    await page.waitForFunction(() => !document.documentElement.classList.contains("resizing"));
+    expect(await page.$(".guides")).toBeNull();
+    await page.mouse.up();
+  });
+
   it("keeps a widget at its narrowest width", async () => {
     const { page } = await open(browser, pageFile());
     await startEdit(page);

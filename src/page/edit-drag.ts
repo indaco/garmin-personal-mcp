@@ -114,6 +114,7 @@ export function dragTile(
     grip.removeEventListener("pointerup", up);
     grip.removeEventListener("pointercancel", cancel);
     window.removeEventListener("keydown", esc, true);
+    document.removeEventListener("lostpointercapture", lost);
     const before = nextId(slot);
     slot.remove();
     tile.classList.remove("lifted");
@@ -131,9 +132,14 @@ export function dragTile(
     ev.stopImmediatePropagation(); // Escape here cancels the drag, not edit mode
     finish(false);
   };
+  // a redraw removes the grip: the browser then fires lostpointercapture at the document
+  const lost = (ev: PointerEvent) => {
+    if (ev.pointerId === e.pointerId) finish(false);
+  };
   grip.addEventListener("pointermove", move);
   grip.addEventListener("pointerup", up);
   grip.addEventListener("pointercancel", cancel);
+  document.addEventListener("lostpointercapture", lost);
   window.addEventListener("keydown", esc, true);
   place();
 }
@@ -254,6 +260,7 @@ export function resizeTile(
     handle.removeEventListener("pointerup", up);
     handle.removeEventListener("pointercancel", cancel);
     window.removeEventListener("keydown", esc, true);
+    document.removeEventListener("lostpointercapture", lost);
     guides.remove();
     badge.remove();
     handle.classList.remove("active");
@@ -269,8 +276,13 @@ export function resizeTile(
     ev.stopImmediatePropagation();
     finish(false);
   };
+  // a redraw removes the handle: the browser then fires lostpointercapture at the document
+  const lost = (ev: PointerEvent) => {
+    if (ev.pointerId === e.pointerId) finish(false);
+  };
   handle.addEventListener("pointermove", move);
   handle.addEventListener("pointerup", up);
   handle.addEventListener("pointercancel", cancel);
+  document.addEventListener("lostpointercapture", lost);
   window.addEventListener("keydown", esc, true);
 }
