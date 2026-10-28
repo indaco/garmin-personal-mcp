@@ -1,27 +1,27 @@
 # Presets or freeform
 
-Many setup guides for Claude and Garmin give all the work to Claude. Claude reads the data, then
-writes the whole dashboard page: the code, the design and the data. This server gives you two
-methods:
+Many setup guides for Claude and Garmin give all the work to the assistant. The assistant reads the
+data, then writes the whole dashboard page: the code, the design and the data. This server gives you
+two methods:
 
-- **Presets** (`preset` or `blank`): the server writes the page from a tested template. Claude
-  writes only the coach notes.
-- **Freeform** (`freeform`): Claude designs the whole page. The server puts the data into the
-  page, so Claude does not copy it.
+- **Presets** (`preset` or `blank`): the server writes the page from a tested template. The
+  assistant writes only the coach notes.
+- **Freeform** (`freeform`): the assistant designs the whole page. The server puts the data into
+  the page, so the assistant does not copy it.
 
 The presets are faster and use fewer tokens. We measured the two methods.
 
 ## What makes a page expensive
 
-The cost of a model is mostly the tokens that it writes. A page that Claude writes has three
+The cost of a model is mostly the tokens that it writes. A page that the model writes has three
 parts:
 
 - **The page code**: about 90 KB of HTML, CSS and JavaScript for the charts, tabs and themes.
-- **The data**: the `getDashboardData` result is about 150 KB. Claude must copy it into the page,
+- **The data**: the `getDashboardData` result is about 150 KB. The model must copy it into the page,
   character by character.
-- **The thinking**: Claude plans the page from a description of about 300 lines.
+- **The thinking**: the model plans the page from a description of about 300 lines.
 
-Claude writes such a page in many parts. Each part sends the conversation again, so the input
+The model writes such a page in many parts. Each part sends the conversation again, so the input
 tokens also grow.
 
 The data causes two more problems:
@@ -34,7 +34,8 @@ The data causes two more problems:
 ## The measurements
 
 We used Claude Code (`claude -p`) with Opus, on synthetic data: 75 activities in 12 weeks. The
-costs are list prices. With a subscription, the runs count against your usage limits.
+costs are list prices. With a subscription, the runs count against your usage limits. Other clients
+and models give other times and costs.
 
 | Task                     | Claude writes the whole page                              | Preset                          |
 | ------------------------ | --------------------------------------------------------- | ------------------------------- |

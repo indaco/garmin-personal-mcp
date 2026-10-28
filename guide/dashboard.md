@@ -1,7 +1,7 @@
 # The training dashboard
 
 The training dashboard is one HTML file. It shows your training load next to HRV, sleep and resting
-heart rate. The server writes the file, and Claude writes the coach notes.
+heart rate. The server writes the file, and the assistant writes the coach notes.
 
 - [Make the dashboard](#make-the-dashboard)
 - [Update the dashboard](#update-the-dashboard)
@@ -20,22 +20,21 @@ Run the `training-dashboard` prompt. It has two optional arguments:
 | `weeks`  | 1 to 52                         | 12       |
 | `layout` | `preset`, `blank` or `freeform` | `preset` |
 
-| Layout     | What you get                                                                                                               |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `preset`   | The built-in widgets on each board, in a fixed order. A build takes less than a minute.                                    |
-| `blank`    | An empty grid on each board. You add the widgets that you want.                                                            |
-| `freeform` | Claude designs the whole page from a long description. A build can take 25 minutes or more, and each page looks different. |
+| Layout     | What you get                                                                                                                      |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `preset`   | The built-in widgets on each board, in a fixed order. A build takes less than a minute.                                           |
+| `blank`    | An empty grid on each board. You add the widgets that you want.                                                                   |
+| `freeform` | The assistant designs the whole page from a long description. A build can take 25 minutes or more, and each page looks different. |
 
 To set the title, the sports and the data of the page first, for example for a page that you share
 with your coach, run `dashboard-setup`. See [Page settings](#page-settings).
 
-With `preset` and `blank`, Claude does not write the page. The server writes the page from its
-template, and Claude writes only the coach notes. The page is the same in Claude Code and Claude
-Desktop.
+With `preset` and `blank`, the assistant does not write the page. The server writes the page from
+its template, and the assistant writes only the coach notes. The page is the same in every client.
 
-The server writes `garmin-dashboard.html` in the data folder. Claude gives you the path and the
-command to open the file. An existing page stays as `garmin-dashboard.html.bak`. To write the page in
-a different place, ask Claude for a path. A relative path is in the data folder.
+The server writes `garmin-dashboard.html` in the data folder. The assistant gives you the path and
+the command to open the file. An existing page stays as `garmin-dashboard.html.bak`. To write the
+page in a different place, ask your assistant for a path. A relative path is in the data folder.
 
 The page works offline. It has Chart.js inside, and its own code sends no requests. Its footer tells when the
 data was written. When Garmin did not give some days, the footer also gives their number: their
@@ -130,8 +129,8 @@ The edit bar stays at the top of the window while you scroll. It has:
 Your changes are a draft until you select **Done**. The bar says "Unsaved changes" when you have
 some, and the browser asks before you close the page with them.
 
-You can also ask Claude to change the layout, for example "hide the bedtime widget and move HRV to
-the top". Claude uses the `editDashboard` tool.
+You can also ask your assistant to change the layout, for example "hide the bedtime widget and move
+HRV to the top". The assistant uses the `editDashboard` tool.
 
 To make your own widget, see [Custom widgets](custom-widgets.md).
 
@@ -146,9 +145,9 @@ language of the browser. [Languages](languages.md) tells how to add a language.
 
 ## Page settings
 
-The `dashboard-setup` prompt asks you questions and writes a page with your answers. You can also ask
-Claude directly, for example "make a dashboard for my coach without my sleep data". Claude calls
-`writeDashboard` with `settings`:
+The `dashboard-setup` prompt asks you questions and writes a page with your answers. You can also
+ask your assistant directly, for example "make a dashboard for my coach without my sleep data". The
+assistant calls `writeDashboard` with `settings`:
 
 | Setting     | What it does                                                               | Default               |
 | ----------- | -------------------------------------------------------------------------- | --------------------- |
@@ -177,7 +176,8 @@ update a page with another file name, give its file to the prompt:
 `dashboard-language` takes the file in the same way. New settings replace all the old settings, and
 the old page is kept as `.bak`.
 
-Settings need a page from the template: a page that Claude designed (`freeform`) cannot keep them.
+Settings need a page from the template: a page that the assistant designed (`freeform`) cannot keep
+them.
 
 ## Keyboard and screen readers
 
@@ -195,9 +195,10 @@ The page keeps its state in blocks of the file: the data, the layout, the custom
 languages that you add and the [page settings](#page-settings). An update replaces only the data
 block and the block of the built-in languages.
 
-The browser saves the layout when you select **Done**, but only in that browser. To keep the layout in the page,
-select **Copy layout** and give the text to Claude. Claude saves it with `editDashboard`. When Claude
-saves a layout, the page shows the new layout and asks which one to use: **Keep mine** goes back to
-the layout of the browser, **Use the new one** deletes it from the browser.
+The browser saves the layout when you select **Done**, but only in that browser. To keep the layout
+in the page, select **Copy layout** and give the text to your assistant. The assistant saves it with
+`editDashboard`. When the assistant saves a layout, the page shows the new layout and asks which one
+to use: **Keep mine** goes back to the layout of the browser, **Use the new one** deletes it from
+the browser.
 
 The choice of theme and language stays in the browser.
