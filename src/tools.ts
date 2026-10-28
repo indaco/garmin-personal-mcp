@@ -137,6 +137,16 @@ export class GarminTools {
     );
   }
 
+  async getBodyBattery(fromDate: string, toDate: string): Promise<string> {
+    checkRange(fromDate, toDate);
+    return JSON.stringify(
+      await this.api.getJson("/wellness-service/wellness/bodyBattery/reports/daily", {
+        startDate: fromDate,
+        endDate: toDate,
+      }),
+    );
+  }
+
   async getHeartRateZones(): Promise<string> {
     return JSON.stringify(await this.api.getJson("/biometric-service/heartRateZones/v2", {}));
   }
@@ -459,7 +469,7 @@ const dayOrRangeInput = z.object({
 });
 const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 
-/** Registers the 13 tools. */
+/** Registers the 14 tools. */
 export function registerTools(server: McpServer, tools: GarminTools): void {
   server.registerTool(
     "listActivities",
@@ -593,6 +603,21 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
       }),
     },
     async (a) => text(await tools.getWeight(a.fromDate, a.toDate, a.includeAll)),
+  );
+  server.registerTool(
+    "getBodyBattery",
+    {
+      description: [
+        "Body Battery for up to 14 days, yyyy-MM-dd: for each day how much it charged and drained,",
+        "its readings through the day, and the events that changed it (sleep, activities, stress,",
+        "naps) with their impact.",
+      ].join("\n"),
+      inputSchema: z.object({
+        fromDate: z.string().describe("From date yyyy-MM-dd"),
+        toDate: z.string().describe("To date yyyy-MM-dd"),
+      }),
+    },
+    async (a) => text(await tools.getBodyBattery(a.fromDate, a.toDate)),
   );
   server.registerTool(
     "getHeartRateZones",

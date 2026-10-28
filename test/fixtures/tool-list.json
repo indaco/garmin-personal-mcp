@@ -195,6 +195,26 @@
     }
   },
   {
+    "name": "getBodyBattery",
+    "description": "Body Battery for up to 14 days, yyyy-MM-dd: for each day how much it charged and drained,\nits readings through the day, and the events that changed it (sleep, activities, stress,\nnaps) with their impact.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "fromDate": {
+          "type": "string",
+          "description": "From date yyyy-MM-dd"
+        },
+        "toDate": {
+          "type": "string",
+          "description": "To date yyyy-MM-dd"
+        }
+      },
+      "required": ["fromDate", "toDate"]
+    }
+  },
+  {
     "name": "getDailyHeartRate",
     "description": "Daily heart rate for one date (includes resting heart rate), yyyy-MM-dd.",
     "inputSchema": {

@@ -62,6 +62,7 @@ With this server, you can ask your assistant:
 - "Compare my sets of this week with the week before."
 - "How did I sleep this week, and how was my HRV?"
 - "How has my weight changed over the last 3 months?"
+- "Did my Body Battery recover overnight this week, and which days drained it most?"
 
 ## Quick start
 
@@ -254,6 +255,7 @@ remove it: `editDashboard` with `removeLanguages`.
 | `getDailyHeartRate`   | the heart rate of a day, with the resting HR                           |
 | `getSleep`            | the sleep of a night, or of up to 14 nights                            |
 | `getWeight`           | weight and body composition for a range of dates                       |
+| `getBodyBattery`      | how Body Battery charged and drained, for up to 14 days                |
 | `getHeartRateZones`   | your HR zones                                                          |
 | `getFitnessAge`       | fitness age against actual age                                         |
 | `getDailySummary`     | steps, stress and Body Battery, for a day or a range                   |

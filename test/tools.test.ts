@@ -331,6 +331,12 @@ describe("activities", () => {
       "/weight-service/weight/range/2026-07-01/2026-10-27",
       { includeAll: undefined },
     ],
+    [
+      "getBodyBattery",
+      ["2026-10-21", "2026-10-27"],
+      "/wellness-service/wellness/bodyBattery/reports/daily",
+      { startDate: "2026-10-21", endDate: "2026-10-27" },
+    ],
     ["getHeartRateZones", [], "/biometric-service/heartRateZones/v2", {}],
     ["getFitnessAge", ["2026-10-27"], "/fitnessage-service/fitnessage/v2/2026-10-27", {}],
     [
@@ -384,6 +390,16 @@ describe("activities", () => {
     ]) {
       await expect(tools.getWeight(from, to)).rejects.toThrow(/real dates/);
     }
+    expect(api.getJson).toHaveBeenCalledOnce();
+  });
+
+  it("getBodyBattery accepts 14 days and refuses 15", async () => {
+    api.getJson.mockResolvedValue([]);
+    await tools.getBodyBattery("2026-10-01", "2026-10-14");
+    expect(api.getJson).toHaveBeenCalledOnce();
+    await expect(tools.getBodyBattery("2026-10-01", "2026-10-15")).rejects.toThrow(
+      /at most 14 days/,
+    );
     expect(api.getJson).toHaveBeenCalledOnce();
   });
 
@@ -664,6 +680,12 @@ describe("MCP tools", () => {
       { fromDate: "2026-10-01", toDate: "2026-10-27", includeAll: true },
       "/weight-service/weight/range/2026-10-01/2026-10-27",
       { includeAll: "true" },
+    ],
+    [
+      "getBodyBattery",
+      { fromDate: "2026-10-21", toDate: "2026-10-27" },
+      "/wellness-service/wellness/bodyBattery/reports/daily",
+      { startDate: "2026-10-21", endDate: "2026-10-27" },
     ],
     ["getHeartRateZones", {}, "/biometric-service/heartRateZones/v2", {}],
     ["getFitnessAge", { date: "2026-10-27" }, "/fitnessage-service/fitnessage/v2/2026-10-27", {}],
