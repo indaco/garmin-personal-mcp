@@ -306,6 +306,9 @@ that test the key and the server.
 Read [CONTRIBUTING.md](CONTRIBUTING.md). It tells how to run the server from source, and it has
 the commands, the test rules and the code map.
 
+To build a demo site with a year of sample data, run `pnpm build`, then
+`node scripts/demo-data.mjs`. The script writes `demo-site/index.html` and `demo-site/demo-data.json`.
+
 ## Credits
 
 The idea comes from [apratico/garmin-mcp](https://github.com/apratico/garmin-mcp) by Alessandro

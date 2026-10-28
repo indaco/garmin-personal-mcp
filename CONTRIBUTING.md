@@ -112,6 +112,7 @@ Where each part of the server and the page is.
 | `scripts/build-template.mjs`         | writes `dist/dashboard.html`                                             |
 | `scripts/third-party-notices.mjs`    | writes `THIRD-PARTY-NOTICES.md` after each build                         |
 | `scripts/fill-dashboard-fixture.mjs` | fills `dist/dashboard.html` with a data file, for screenshots and checks |
+| `scripts/demo-data.mjs`              | writes the demo site in `demo-site/`: sample data and the filled page    |
 
 ## Before you submit
 
