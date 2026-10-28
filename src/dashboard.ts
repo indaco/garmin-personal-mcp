@@ -22,6 +22,7 @@ const PAGE = 200;
 interface Sync {
   calls: number;
   failedDates: string[];
+  failedSections: string[];
 }
 
 /**
@@ -51,7 +52,7 @@ export class GarminDashboard {
     const start = addDays(today, -7 * w);
     // one extra week before: the dashboard shows whole Monday-Sunday weeks
     const prevStart = addDays(start, -7 * (w + 1));
-    const sync: Sync = { calls: 0, failedDates: [] };
+    const sync: Sync = { calls: 0, failedDates: [], failedSections: [] };
 
     const cache = await this.load();
     const before = new Set(Object.keys(objectAt(cache, "activities")));
@@ -68,8 +69,8 @@ export class GarminDashboard {
       end: today,
       prevStart,
       prevEnd: addDays(start, -1),
-      zones: await call(sync, () => this.tools.getHeartRateZones()),
-      fitnessAge: await call(sync, () => this.tools.getFitnessAge(today)),
+      zones: await optional(sync, "zones", () => this.tools.getHeartRateZones()),
+      fitnessAge: await optional(sync, "fitnessAge", () => this.tools.getFitnessAge(today)),
     };
     const activities = activitiesBetween(cache, start, today).map((a) => structuredClone(a));
     await this.#attachDetails(activities);
@@ -87,6 +88,7 @@ export class GarminDashboard {
       newActivities: cached.filter((id) => !before.has(id)).length,
       failedDays: sync.failedDates.length,
       failedDates: sync.failedDates,
+      failedSections: sync.failedSections,
       cachedActivities: cached.length,
     };
     return JSON.stringify(out);
@@ -146,12 +148,17 @@ export class GarminDashboard {
     const byDate = objectAt(cache, "hrv");
     const cachedFrom = date(cache.hrvFrom);
     const cachedTo = date(cache.hrvTo);
+    let failed = false;
     for (const [rFrom, rTo] of toFetch(cachedFrom, cachedTo, from, to)) {
       // Garmin may reject long ranges: ask 4 weeks at a time
       for (let a = rFrom; a <= rTo; a = addDays(a, 28)) {
         const end = addDays(a, 27) > rTo ? rTo : addDays(a, 27);
         const path = `/hrv-service/hrv/daily/${a}/${end}`;
-        const json = await call(sync, () => this.api.getJson(path, {}));
+        const json = await optional(sync, "hrv", () => this.api.getJson(path, {}));
+        if (json === null) {
+          failed = true;
+          continue;
+        }
         const summaries = field(json, "hrvSummaries");
         for (const h of Array.isArray(summaries) ? summaries : []) {
           const day = date(field(h, "calendarDate"));
@@ -168,7 +175,8 @@ export class GarminDashboard {
         }
       }
     }
-    setCovered(cache, "hrvFrom", "hrvTo", covered(cachedFrom, cachedTo, from, to));
+    // a failed range stays uncovered: it is fetched again next time
+    if (!failed) setCovered(cache, "hrvFrom", "hrvTo", covered(cachedFrom, cachedTo, from, to));
   }
 
   async #syncRecovery(cache: Json, from: string, to: string, sync: Sync): Promise<void> {
@@ -342,6 +350,18 @@ async function call(sync: Sync, f: () => Promise<unknown>): Promise<unknown> {
   sync.calls++;
   const r = await f();
   return typeof r === "string" ? JSON.parse(r) : r;
+}
+
+/** A section the dashboard can do without: a Garmin error gives null and is reported in sync. */
+async function optional(sync: Sync, section: string, f: () => Promise<unknown>): Promise<unknown> {
+  try {
+    return await call(sync, f);
+  } catch (e) {
+    if (!(e instanceof GarminApiError)) throw e;
+    if (!sync.failedSections.includes(section)) sync.failedSections.push(section);
+    log("WARN", `${section} not fetched: ${e.message}`);
+    return null;
+  }
 }
 
 /** Most recent first, as listActivities returns them. */

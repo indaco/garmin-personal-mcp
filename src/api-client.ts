@@ -81,7 +81,12 @@ export class GarminApiClient {
       log("INFO", `406 from ${path} with Accept ${accept}, retrying with */*`);
       resp = await this.#send(url, path, "*/*");
     }
-    const body = new Uint8Array(await resp.arrayBuffer());
+    let body: Uint8Array;
+    try {
+      body = new Uint8Array(await resp.arrayBuffer());
+    } catch (e) {
+      throw new GarminApiError(`Network error reading ${path}: ${(e as Error).message}`);
+    }
     if (!resp.ok) {
       throw new GarminApiError(`GET ${path} -> HTTP ${resp.status}: ${preview(body)}`);
     }

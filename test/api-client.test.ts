@@ -319,6 +319,22 @@ describe("requests", () => {
     await expect(api.getJson("/x")).rejects.toBeInstanceOf(GarminApiError);
   });
 
+  it("wraps a network error while reading the body", async () => {
+    mockFetch(tokenJson({ access_token: "tok" }));
+    const api = client();
+    await api.getJson("/warm").catch(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        arrayBuffer: () => Promise.reject(new TypeError("terminated")),
+      }),
+    );
+    await expect(api.getJson("/x")).rejects.toThrow("Network error reading /x: terminated");
+    await expect(api.getJson("/x")).rejects.toBeInstanceOf(GarminApiError);
+  });
+
   it("fetches the exercise catalogue without the token", async () => {
     mockFetch(ok({ categories: {} }));
     const body = await client().getExerciseCatalogue();
