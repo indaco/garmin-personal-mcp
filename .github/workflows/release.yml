@@ -80,6 +80,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 26
+          package-manager-cache: false
 
       # the same checks as ci.yml; keep them in step
       - name: Install
@@ -134,13 +135,13 @@ jobs:
     environment:
       name: Release
     permissions:
-      # the OIDC token for npm trusted publishing (no npm token anywhere)
-      id-token: write
+      id-token: write # npm trusted publishing (OIDC); no npm token anywhere
     steps:
       - uses: actions/setup-node@v7
         with:
           node-version: 26
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
 
       - uses: actions/download-artifact@v8
         with:
@@ -159,12 +160,12 @@ jobs:
             echo "published=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # trusted publishing needs npm 11.5.1 or newer
-      - name: Update npm
+      # trusted publishing needs npm 11.5.1 or newer; Node 26 ships a newer npm, so nothing is installed
+      - name: Check the npm version
         if: steps.exists.outputs.published != 'true'
         run: |
-          npm install -g npm@latest
           npm --version
+          node -e 'const [a,b,c]=process.argv[1].split(".").map(Number); if (a<11 || (a===11 && (b<5 || (b===5 && c<1)))) { console.error("npm " + process.argv[1] + " is older than 11.5.1"); process.exit(1) }' "$(npm --version)"
 
       - name: Publish
         if: steps.exists.outputs.published != 'true'
@@ -182,7 +183,7 @@ jobs:
     environment:
       name: Release
     permissions:
-      contents: write
+      contents: write # creates or edits the GitHub Release
     steps:
       - uses: actions/checkout@v7
         with:
@@ -218,6 +219,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 26
+          package-manager-cache: false
 
       - name: Install and start the published package
         env:
