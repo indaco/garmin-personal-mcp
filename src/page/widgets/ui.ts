@@ -132,6 +132,8 @@ export interface Totals {
   km: number;
   seconds: number;
   load: number;
+  /** How many of the sessions have a load. */
+  loadKnown: number;
 }
 
 /** The max HR of the default zones, for estimated loads. */
@@ -140,15 +142,23 @@ export const maxHR = (ctx: Ctx) => ctx.calc.zonesOf(ctx.data.zones).maxHR;
 export function totals(ctx: Ctx, acts: Activity[]): Totals {
   const max = maxHR(ctx);
   return acts.reduce<Totals>(
-    (t, a) => ({
-      sessions: t.sessions + 1,
-      km: t.km + (typeof a.km === "number" ? a.km : 0),
-      seconds: t.seconds + sessionSeconds(a),
-      load: t.load + (ctx.calc.loadOf(a, max)?.value ?? 0),
-    }),
-    { sessions: 0, km: 0, seconds: 0, load: 0 },
+    (t, a) => {
+      const l = ctx.calc.loadOf(a, max);
+      return {
+        sessions: t.sessions + 1,
+        km: t.km + (typeof a.km === "number" ? a.km : 0),
+        seconds: t.seconds + sessionSeconds(a),
+        load: t.load + (l?.value ?? 0),
+        loadKnown: t.loadKnown + (l ? 1 : 0),
+      };
+    },
+    { sessions: 0, km: 0, seconds: 0, load: 0, loadKnown: 0 },
   );
 }
+
+/** The load of a total; n/a when there are sessions and none of them has a load. */
+export const loadText = (ctx: Ctx, t: Totals) =>
+  t.sessions > 0 && t.loadKnown === 0 ? ctx.fmt.na : ctx.fmt.num(t.load);
 
 /** A colour with alpha, from a theme token in #rrggbb. */
 export function alpha(color: string, a: number): string {

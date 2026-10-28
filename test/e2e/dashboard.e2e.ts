@@ -1096,6 +1096,7 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
   });
 });
 
+const noLoad = (a: Record<string, unknown>) => ({ ...a, trainingLoad: undefined });
 const custom = (id: string, code: string) => ({ id, title: `Custom ${id}`, span: 1, code });
 const on = (...ids: string[]) => ({
   rev: "c",
@@ -1151,6 +1152,25 @@ describe("custom widgets and languages", () => {
       document.querySelector("[data-id=leak]")?.textContent?.includes("blocked"),
     );
     expect(errors.join("\n")).toMatch(/Content Security Policy|Content-Security-Policy/);
+  });
+
+  it("shows n/a, not 0, for a load that no activity has", async () => {
+    const noLoadData = {
+      ...data,
+      zones: null,
+      activities: data.activities.map(noLoad),
+      previousActivities: data.previousActivities.map(noLoad),
+      v: 3,
+      notes: [],
+    };
+    const { page, errors } = await open(browser, pageFile({ data: noLoadData }), {
+      hash: "#running",
+    });
+    const load = page
+      .locator(".kpi", { has: page.locator(".kpi-label", { hasText: "Garmin training load" }) })
+      .first();
+    expect(await load.textContent()).toContain("n/a");
+    expect(errors).toEqual([]);
   });
 
   it("shows the error of a failing widget in its own tile only", async () => {

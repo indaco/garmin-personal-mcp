@@ -13,6 +13,7 @@ import {
   note,
   showAll,
   table,
+  loadText,
   totals,
   typeName,
   windowEnd,
@@ -191,7 +192,7 @@ register({
         cell(fmt.num(x.sessions), calc.change(x.sessions, y.sessions)),
         x.km > 0 || y.km > 0 ? cell(`${fmt.num(x.km, 1)} km`, calc.change(x.km, y.km)) : "",
         cell(fmt.hours(x.seconds), calc.change(x.seconds, y.seconds)),
-        cell(fmt.num(x.load), calc.change(x.load, y.load)),
+        cell(loadText(ctx, x), x.loadKnown && y.loadKnown ? calc.change(x.load, y.load) : null),
       ];
     };
     append(

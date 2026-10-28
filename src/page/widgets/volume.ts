@@ -140,19 +140,25 @@ register({
     const flagged = ramp.map((r) => r !== null && r > 10);
     const end = windowEnd(ctx);
     const week = calc.monotony(calc.dailyLoads(acts, addDays(end, -6), end, max));
+    const weekActs = acts.filter((a) => {
+      const d = dayOf(a);
+      return d !== undefined && d >= addDays(end, -6) && d <= end;
+    });
+    // none of the week's activities has a load: show n/a, not a 0 that was never measured
+    const weekNa = weekActs.length > 0 && !weekActs.some((a) => calc.loadOf(a, max));
     const estimated = acts.some((a) => calc.loadOf(a, max)?.estimate);
     append(
       el,
       kpiRow(
-        kpi(t("ls.weekLoad"), fmt.num(week.weekLoad)),
+        kpi(t("ls.weekLoad"), weekNa ? fmt.na : fmt.num(week.weekLoad)),
         kpi(
           t("ls.monotony"),
-          week.monotony === null ? fmt.na : fmt.num(week.monotony, 2),
+          weekNa || week.monotony === null ? fmt.na : fmt.num(week.monotony, 2),
           week.monotony !== null &&
             week.monotony > 2 &&
             h("span", { class: "bad" }, t("ls.monotonyFlag")),
         ),
-        kpi(t("ls.strain"), week.strain === null ? fmt.na : fmt.num(week.strain)),
+        kpi(t("ls.strain"), weekNa || week.strain === null ? fmt.na : fmt.num(week.strain)),
         kpi(t("ls.flagged"), String(flagged.filter(Boolean).length)),
       ),
     );

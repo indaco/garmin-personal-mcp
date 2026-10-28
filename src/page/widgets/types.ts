@@ -10,6 +10,7 @@ import {
   kpi,
   kpiRow,
   note,
+  loadText,
   totals,
   weekLabel,
   windowEnd,
@@ -74,8 +75,10 @@ register({
       ),
       kpi(
         t("tk.load"),
-        fmt.num(sum.load),
-        all.load > 0 && t("tk.share", { v: fmt.num((sum.load / all.load) * 100) }),
+        loadText(ctx, sum),
+        sum.loadKnown > 0 &&
+          all.load > 0 &&
+          t("tk.share", { v: fmt.num((sum.load / all.load) * 100) }),
       ),
     ].filter((x): x is HTMLElement => x instanceof HTMLElement);
     append(el, kpiRow(...tiles), acts.length === 1 && note(t("one.session")));
