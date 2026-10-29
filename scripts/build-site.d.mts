@@ -4,7 +4,7 @@ export interface Entry {
   text: string;
 }
 export interface Facts {
-  pkg: { name: string; license: string };
+  pkg: { name: string; license: string; version: string };
   site: { url: string; description: string };
   tools: Entry[];
   prompts: Entry[];

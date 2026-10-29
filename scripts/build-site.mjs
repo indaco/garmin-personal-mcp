@@ -147,6 +147,10 @@ export function values(f) {
   return {
     url: f.site.url,
     description: escapeHtml(f.site.description),
+    version: f.pkg.version,
+    license: f.pkg.license,
+    repository: f.repository,
+    npm: `https://www.npmjs.com/package/${f.pkg.name}`,
     package: f.package,
     node: f.node,
     jsonld: jsonLd(f),

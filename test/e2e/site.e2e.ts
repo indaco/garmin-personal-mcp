@@ -111,6 +111,18 @@ describe("site accessibility", () => {
   });
 });
 
+describe("site footer", () => {
+  it("names the version link for screen readers by what it opens", async () => {
+    const { page } = await site();
+    const version = JSON.parse(readFileSync("package.json", "utf8")).version;
+    const link = page.getByRole("link", { name: `v${version} release notes`, exact: true });
+    expect(await link.count()).toBe(1);
+    // on screen only the version shows: the rest is clipped to a 1 px box
+    const box = await link.locator(".sr-only").boundingBox();
+    expect(box!.width * box!.height).toBeLessThanOrEqual(1);
+  });
+});
+
 describe("site header", () => {
   it("shows the section links on a desktop and a menu button on a phone", async () => {
     const { page } = await site();

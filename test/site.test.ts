@@ -76,6 +76,9 @@ describe("site page", () => {
     expect(page).toContain(`${f.themes.length} themes, your languages`);
     for (const t of f.tools) expect(page).toContain(`<code>${t.name}</code>`);
     for (const p of f.prompts) expect(page).toContain(`<code>${p.name}</code>`);
+    // the footer: the version of package.json, linked to its release notes
+    const release = `<a\\s+href="${f.repository}/releases/tag/v${f.pkg.version}"[^>]*>\\s*v${f.pkg.version}<span class="sr-only"> release notes</span></a`;
+    expect(page).toMatch(new RegExp(release.replace(/\./g, "\\.")));
   });
 
   it("is a whole document, and the preview is the head content and the body", () => {
