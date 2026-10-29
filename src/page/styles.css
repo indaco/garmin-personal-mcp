@@ -76,7 +76,6 @@
     --bad: #ff5252;
     --warn: #ffd600;
   }
-
   /* Bright type colours for the dark themes. */
   :root {
     /* the edge of a form control: at least 3:1 against the panel in every theme */
@@ -91,7 +90,6 @@
     --generic: #94a3b8;
     color-scheme: dark;
   }
-
   :root[data-theme="light"] {
     --bg: #f6f7f9;
     --panel: #fff;
@@ -202,7 +200,6 @@
       --warn: #8e5f00;
     }
   }
-
   /* Darker type colours for the light themes, for contrast. */
   :root[data-theme="light"],
   :root[data-theme="paper"],
@@ -231,7 +228,6 @@
       color-scheme: light;
     }
   }
-
   /* Page */
   * {
     box-sizing: border-box;
@@ -267,9 +263,9 @@
     font-size: 17px;
     font-weight: 500;
     line-height: 1.3;
-  }
-  .title .headline + .muted {
-    margin-top: 6px;
+    & + .muted {
+      margin-top: 6px;
+    }
   }
   .muted {
     color: var(--muted);
@@ -287,9 +283,9 @@
     border-radius: var(--corner, 8px);
     background: var(--accent);
     color: var(--bg);
-  }
-  .skip:focus {
-    top: 8px;
+    &:focus {
+      top: 8px;
+    }
   }
   #board:focus {
     outline: none;
@@ -332,7 +328,6 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
-
   /* Header */
   .top {
     display: grid;
@@ -345,10 +340,10 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: 12px;
-  }
-  /* top right even when the row wraps on a narrow screen */
-  .title-row .menus {
-    margin-left: auto;
+    /* top right even when the row wraps on a narrow screen */
+    & .menus {
+      margin-left: auto;
+    }
   }
   .menus,
   .window-bar,
@@ -383,10 +378,9 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-  }
-  .btn:hover,
-  .chip:hover {
-    border-color: var(--accent);
+    &:hover {
+      border-color: var(--accent);
+    }
   }
   .chip[aria-pressed="true"],
   .btn[aria-pressed="true"] {
@@ -405,9 +399,9 @@
     border-radius: var(--corner, 12px);
     background: var(--panel);
     box-shadow: var(--lift, 0 6px 18px rgb(0 0 0 / 25%));
-  }
-  .edit-bar .spacer {
-    flex: 1;
+    & .spacer {
+      flex: 1;
+    }
   }
   .unsaved::before {
     content: "";
@@ -424,7 +418,6 @@
     color: var(--bg);
     font-weight: 600;
   }
-
   /* Tabs: the bar scrolls sideways on a phone, the page does not */
   .tabs {
     display: flex;
@@ -444,10 +437,10 @@
     gap: 6px;
     white-space: nowrap;
     color: var(--muted);
-  }
-  .tab[aria-selected="true"] {
-    color: var(--text);
-    border-bottom-color: var(--accent);
+    &[aria-selected="true"] {
+      color: var(--text);
+      border-bottom-color: var(--accent);
+    }
   }
   .tabs.more {
     mask-image: linear-gradient(90deg, #000 80%, transparent);
@@ -501,7 +494,6 @@
   .tab-generic .icon {
     color: var(--generic);
   }
-
   /* The grid: 3 columns, 2 on a tablet, 1 on a phone */
   .grid {
     display: grid;
@@ -586,10 +578,10 @@
     border: 1px solid var(--accent);
     border-radius: var(--corner, 12px);
     background: color-mix(in srgb, var(--accent) 10%, var(--panel));
-  }
-  .banner p {
-    flex: 1 1 240px;
-    margin: 0;
+    & p {
+      flex: 1 1 240px;
+      margin: 0;
+    }
   }
   .board-note {
     margin: 0 0 12px;
@@ -603,7 +595,6 @@
     border: 1px dashed var(--line);
     border-radius: var(--corner, 14px);
   }
-
   /* Tiles */
   .tile {
     background: var(--panel);
@@ -627,18 +618,18 @@
   /* Edit mode: a lifted tile follows the pointer, a slot shows where it lands */
   .grid.editing {
     position: relative;
-  }
-  .grid.editing .tile {
-    position: relative;
-  }
-  .grid.editing .tile.lifted {
-    position: fixed;
-    left: 0;
-    top: 0;
-    z-index: 50;
-    outline: 2px solid var(--accent);
-    box-shadow: var(--lift, 0 24px 48px rgb(0 0 0 / 45%));
-    pointer-events: none;
+    & .tile {
+      position: relative;
+    }
+    & .tile.lifted {
+      position: fixed;
+      left: 0;
+      top: 0;
+      z-index: 50;
+      outline: 2px solid var(--accent);
+      box-shadow: var(--lift, 0 24px 48px rgb(0 0 0 / 45%));
+      pointer-events: none;
+    }
   }
   .tile.picked {
     outline: 2px solid var(--accent);
@@ -662,20 +653,20 @@
     cursor: ew-resize;
     touch-action: none;
     border-radius: var(--corner, 7px);
-  }
-  .resize::after {
-    content: "";
-    width: 4px;
-    height: 40px;
-    max-height: 100%;
-    border-radius: 2px;
-    background: var(--muted);
-  }
-  .resize:hover::after,
-  .resize:focus-visible::after,
-  .resize.active::after {
-    height: 72px;
-    background: var(--accent);
+    &::after {
+      content: "";
+      width: 4px;
+      height: 40px;
+      max-height: 100%;
+      border-radius: 2px;
+      background: var(--muted);
+    }
+    &:hover::after,
+    &:focus-visible::after,
+    &.active::after {
+      height: 72px;
+      background: var(--accent);
+    }
   }
   .span-badge {
     position: absolute;
@@ -697,11 +688,11 @@
     z-index: 4;
     display: grid;
     pointer-events: none;
-  }
-  .guides div {
-    border: 1.5px dashed color-mix(in srgb, var(--accent) 70%, transparent);
-    border-radius: var(--corner, 14px);
-    background: color-mix(in srgb, var(--accent) 6%, transparent);
+    & div {
+      border: 1.5px dashed color-mix(in srgb, var(--accent) 70%, transparent);
+      border-radius: var(--corner, 14px);
+      background: color-mix(in srgb, var(--accent) 6%, transparent);
+    }
   }
   @media (max-width: 700px) {
     .resize {
@@ -721,13 +712,13 @@
     height: 26px;
     cursor: pointer;
     padding: 0 6px;
-  }
-  .tool[aria-pressed="true"] {
-    border-color: var(--accent);
-  }
-  .tool:disabled {
-    opacity: 0.4;
-    cursor: default;
+    &[aria-pressed="true"] {
+      border-color: var(--accent);
+    }
+    &:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
   }
   .grip {
     cursor: grab;
@@ -756,7 +747,6 @@
   .notes li {
     margin: 6px 0;
   }
-
   /* Dialogs */
   .dialog {
     background: var(--panel);
@@ -765,14 +755,14 @@
     border-radius: var(--corner, 14px);
     padding: 16px;
     width: min(560px, calc(100vw - 32px));
-  }
-  /* a dialog with a search stays at the top: a centred one would jump as the list gets shorter */
-  .dialog:has(.catalogue-search) {
-    margin-top: min(10vh, 80px);
-    margin-bottom: auto;
-  }
-  .dialog::backdrop {
-    background: rgb(0 0 0 / 50%);
+    /* a dialog with a search stays at the top: a centred one would jump as the list gets shorter */
+    &:has(.catalogue-search) {
+      margin-top: min(10vh, 80px);
+      margin-bottom: auto;
+    }
+    &::backdrop {
+      background: rgb(0 0 0 / 50%);
+    }
   }
   .dialog-head {
     display: flex;
@@ -792,16 +782,16 @@
     padding: 0;
     max-height: 60vh;
     overflow-y: auto;
-  }
-  .catalogue li {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 0;
-    border-bottom: 1px solid var(--line);
-  }
-  .catalogue li[hidden] {
-    display: none;
+    & li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    & li[hidden] {
+      display: none;
+    }
   }
   .catalogue-search {
     width: 100%;
@@ -838,7 +828,6 @@
     font-family: ui-monospace, monospace;
     font-size: 12px;
   }
-
   /* Widget parts */
   .kpis {
     display: grid;
@@ -918,23 +907,23 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 13px;
-  }
-  table.data th {
-    text-align: left;
-    color: var(--muted);
-    font-weight: 500;
-    font-size: 12px;
-    border-bottom: 1px solid var(--line);
-    padding: 6px 8px;
-    white-space: nowrap;
-  }
-  table.data td {
-    border-bottom: 1px solid var(--line);
-    padding: 6px 8px;
-  }
-  table.data .num {
-    text-align: right;
-    white-space: nowrap;
+    & th {
+      text-align: left;
+      color: var(--muted);
+      font-weight: 500;
+      font-size: 12px;
+      border-bottom: 1px solid var(--line);
+      padding: 6px 8px;
+      white-space: nowrap;
+    }
+    & td {
+      border-bottom: 1px solid var(--line);
+      padding: 6px 8px;
+    }
+    & .num {
+      text-align: right;
+      white-space: nowrap;
+    }
   }
   .laps-row > td {
     background: var(--panel2);
@@ -986,7 +975,6 @@
     color: var(--text);
     text-decoration: underline dotted var(--muted);
   }
-
   /* Consistency calendar */
   .cal-wrap {
     position: relative;
@@ -1003,9 +991,9 @@
     align-items: center;
     gap: 4px;
     margin-top: 8px;
-  }
-  .cal-legend .cal-cell {
-    width: 12px;
+    & .cal-cell {
+      width: 12px;
+    }
   }
   .cal-day {
     padding-right: 6px;
@@ -1018,14 +1006,14 @@
     padding: 0;
     background: var(--panel2);
     cursor: pointer;
-  }
-  .cal-cell.out {
-    background: none;
-    cursor: default;
-  }
-  /* a rest day needs an edge against the tile; a busy day already has its colour */
-  .cal-cell:not(.out) {
-    box-shadow: inset 0 0 0 1px var(--control-border);
+    &.out {
+      background: none;
+      cursor: default;
+    }
+    /* a rest day needs an edge against the tile; a busy day already has its colour */
+    &:not(.out) {
+      box-shadow: inset 0 0 0 1px var(--control-border);
+    }
   }
   /* the ring of a day in --text, with a panel-coloured gap: it borders panel colours only, in every theme */
   .tile-body .cal-cell:focus-visible {
@@ -1061,11 +1049,11 @@
   }
   .more-details {
     margin-top: 10px;
-  }
-  .more-details summary {
-    cursor: pointer;
-    color: var(--muted);
-    font-size: 13px;
+    & summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 13px;
+    }
   }
   .multiples {
     display: grid;
@@ -1110,10 +1098,10 @@
   }
   .ex-row {
     cursor: pointer;
-  }
-  .ex-row:hover,
-  .ex-row.selected {
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    &:hover,
+    &.selected {
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+    }
   }
   .spark {
     width: 80px;
@@ -1133,20 +1121,20 @@
     align-items: center;
     gap: 10px;
     margin-bottom: 8px;
-  }
-  .detail-head h3 {
-    margin: 0;
-    font-size: 15px;
-  }
-  .detail-head .tool {
-    margin-left: auto;
+    & h3 {
+      margin: 0;
+      font-size: 15px;
+    }
+    & .tool {
+      margin-left: auto;
+    }
   }
   .ex-sessions {
     margin: 8px 0 0;
     padding-left: 20px;
-  }
-  .ex-sessions > li {
-    margin: 6px 0;
+    & > li {
+      margin: 6px 0;
+    }
   }
   /* the sets of a session on one wrapping line: "62.5 × 10 (62%) · rest 1:25" */
   .sets {
@@ -1166,11 +1154,10 @@
   .session {
     border-bottom: 1px solid var(--line);
     padding: 6px 0;
+    & summary {
+      cursor: pointer;
+    }
   }
-  .session summary {
-    cursor: pointer;
-  }
-
   .title {
     display: flex;
     align-items: center;
@@ -1195,34 +1182,33 @@
     fill: var(--accent);
     stroke: none;
   }
-
   /* Account menu */
   .account {
     position: relative;
-  }
-  .account summary {
-    display: grid;
-    place-items: center;
-    width: 32px;
-    height: 32px;
-    border: 1px solid var(--line);
-    border-radius: var(--corner, 50%);
-    background: var(--panel2);
-    color: var(--muted);
-    list-style: none;
-    cursor: pointer;
-  }
-  .account summary::-webkit-details-marker {
-    display: none;
-  }
-  .account summary:hover,
-  .account[open] summary {
-    color: var(--text);
-    border-color: var(--accent);
-  }
-  .account summary .icon {
-    width: 18px;
-    height: 18px;
+    & summary {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--line);
+      border-radius: var(--corner, 50%);
+      background: var(--panel2);
+      color: var(--muted);
+      list-style: none;
+      cursor: pointer;
+    }
+    & summary::-webkit-details-marker {
+      display: none;
+    }
+    & summary:hover,
+    &[open] summary {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+    & summary .icon {
+      width: 18px;
+      height: 18px;
+    }
   }
   .account-panel {
     position: absolute;
@@ -1237,10 +1223,10 @@
     border-radius: var(--corner, 12px);
     background: var(--panel);
     box-shadow: var(--lift, 0 8px 24px rgb(0 0 0 / 0.3));
-  }
-  .account-panel .menu {
-    display: grid;
-    gap: 4px;
+    & .menu {
+      display: grid;
+      gap: 4px;
+    }
   }
   .menu-note {
     max-width: 240px;
@@ -1255,7 +1241,6 @@
   .board-empty .btn {
     margin-top: 12px;
   }
-
   /* Footer */
   .foot {
     display: flex;
@@ -1269,59 +1254,58 @@
     border-top: 1px solid var(--line);
     font-size: 13px;
     color: var(--muted);
-  }
-  .foot p {
-    margin: 0;
-  }
-  .foot .source {
-    display: grid;
-    gap: 2px;
-  }
-  .foot .gap {
-    display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    color: var(--text);
-  }
-  /* the dot stays beside the first line when the text wraps */
-  .foot .gap::before {
-    content: "";
-    flex: none;
-    width: 8px;
-    height: 8px;
-    margin-top: calc((1lh - 8px) / 2);
-    border-radius: 50%;
-    background: var(--warn);
-  }
-  .foot .made {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .foot a {
-    color: inherit;
-    text-decoration: underline;
-    text-decoration-color: var(--line);
-    text-underline-offset: 3px;
-  }
-  .foot a:hover {
-    color: var(--text);
-    text-decoration-color: currentColor;
-  }
-  .foot .brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--text);
-    font-weight: 600;
-    text-decoration: none;
-  }
-  .foot .logo {
-    width: 16px;
-    height: 16px;
+    & p {
+      margin: 0;
+    }
+    & .source {
+      display: grid;
+      gap: 2px;
+    }
+    & .gap {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      color: var(--text);
+    }
+    /* the dot stays beside the first line when the text wraps */
+    & .gap::before {
+      content: "";
+      flex: none;
+      width: 8px;
+      height: 8px;
+      margin-top: calc((1lh - 8px) / 2);
+      border-radius: 50%;
+      background: var(--warn);
+    }
+    & .made {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    & a {
+      color: inherit;
+      text-decoration: underline;
+      text-decoration-color: var(--line);
+      text-underline-offset: 3px;
+    }
+    & a:hover {
+      color: var(--text);
+      text-decoration-color: currentColor;
+    }
+    & .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text);
+      font-weight: 600;
+      text-decoration: none;
+    }
+    & .logo {
+      width: 16px;
+      height: 16px;
+    }
   }
 }
-
 /* "Show all" hides rows and cards whose class sets a display */
 [hidden] {
   display: none;
