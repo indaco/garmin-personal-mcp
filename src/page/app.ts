@@ -18,6 +18,7 @@ import {
   type T,
   translator,
   languageName,
+  widgetText,
 } from "./i18n";
 import {
   add,
@@ -684,6 +685,11 @@ function ctxFor(data: Data, inst: Instance): Ctx {
     calc: { ...calc, ...metrics, ...running, ...strength, ...sports },
     chart,
     color: (name: string) => token(name) || token("generic"),
+    text: (key, params = {}) =>
+      (widgetText(widget(inst.widget)?.texts, lang, key) ?? key).replace(
+        /\{(\w+)\}/g,
+        (m, name: string) => String(params[name] ?? m),
+      ),
     empty: (el, message) =>
       el.replaceChildren(h("p", { class: "muted empty" }, message ?? t("empty.window"))),
     item: view.item,
@@ -985,7 +991,7 @@ function copyDialog(): void {
 /** A custom widget from the page block. Code that does not compile gives a widget that shows the error. */
 function compile(w: unknown): WidgetDef | undefined {
   if (!w || typeof w !== "object") return undefined;
-  const { id, title, code, span, types } = w as Record<string, unknown>;
+  const { id, title, code, span, types, texts } = w as Record<string, unknown>;
   if (typeof id !== "string" || typeof code !== "string") return undefined;
   let draw: WidgetDef["render"];
   try {
@@ -996,9 +1002,11 @@ function compile(w: unknown): WidgetDef | undefined {
       throw new Error((e as Error).message, { cause: e });
     };
   }
+  const own = texts && typeof texts === "object" ? (texts as WidgetDef["texts"]) : undefined;
   return {
     id,
-    title: () => (typeof title === "string" ? title : id),
+    title: () => widgetText(own, lang, "title") ?? (typeof title === "string" ? title : id),
+    texts: own,
     span: Math.min(3, Math.max(1, Math.round(Number(span) || 1))) as Span,
     types: Array.isArray(types) ? (types as WidgetDef["types"]) : undefined,
     render: draw,

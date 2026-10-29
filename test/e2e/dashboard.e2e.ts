@@ -1406,6 +1406,29 @@ describe("custom widgets and languages", () => {
     expect(errors).toEqual([]);
   });
 
+  it("shows the texts of a custom widget in the page language, else in English", async () => {
+    const texts = {
+      en: { title: "Longest ride", best: "Best: {n}", only: "English only" },
+      it: { title: "Uscita più lunga", best: "Migliore: {n}" },
+    };
+    const code = `el.textContent = ctx.text("best", { n: 42 }) + " / " + ctx.text("only");`;
+    const { page, errors } = await open(
+      browser,
+      pageFile({
+        settings: { languages: ["en", "it"] },
+        widgets: [{ ...custom("ride", code), texts }],
+        layout: on("ride"),
+      }),
+      { locale: "it-IT" },
+    );
+    expect(await page.textContent("[data-id=ride] h2")).toBe("Uscita più lunga");
+    expect(await page.textContent("[data-id=ride] .tile-body")).toBe("Migliore: 42 / English only");
+    await page.click(".account summary");
+    await page.selectOption("#lang", "en");
+    expect(await page.textContent("[data-id=ride] h2")).toBe("Longest ride");
+    expect(errors).toEqual([]);
+  });
+
   it("gives the notes to a custom widget as plain text", async () => {
     const { page, errors } = await open(
       browser,

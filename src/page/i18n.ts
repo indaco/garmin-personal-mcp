@@ -36,6 +36,15 @@ export function languageName(code: string): string {
   }
 }
 
+/** A text of a custom widget in the language (full tag, then language), else in English. */
+export function widgetText(
+  texts: Record<string, Record<string, string>> | undefined,
+  lang: string,
+  key: string,
+): string | undefined {
+  return texts?.[lang]?.[key] ?? texts?.[lang.slice(0, 2)]?.[key] ?? texts?.en?.[key];
+}
+
 export type T = (key: Key, params?: Record<string, string | number>) => string;
 
 /** The chosen language when it is built in; for "auto", the first browser language that is; else English. */

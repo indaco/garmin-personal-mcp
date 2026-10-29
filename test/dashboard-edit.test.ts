@@ -306,3 +306,33 @@ describe("widget library", () => {
     expect(readFileSync(libraryFile(), "utf8")).toContain("kpis");
   });
 });
+
+describe("widget texts", () => {
+  const texts = { en: { title: "Longest ride", best: "{distance} on {day}" } };
+
+  it("keeps the texts of a widget, and adds a language with widgetTexts, also in the library", async () => {
+    await writer.edit({ widgets: [{ ...widget, texts }] });
+    const r = await writer.edit({
+      widgetTexts: {
+        "longest-ride": { it: { title: "Uscita più lunga", best: "{distance} il {day}" } },
+      },
+    });
+    const saved = { ...texts, it: { title: "Uscita più lunga", best: "{distance} il {day}" } };
+    expect((readBlock(page(), "widgets") as { texts: unknown }[])[0].texts).toEqual(saved);
+    expect((library()[0] as unknown as { texts: unknown }).texts).toEqual(saved);
+    expect(r.customWidgets[0].texts).toEqual(saved);
+    expect(r.pageLanguages).toEqual(["en"]);
+  });
+
+  it("refuses bad codes, keys, empty texts, changed placeholders and unknown widgets", async () => {
+    const bad = (t: Record<string, Record<string, string>>) =>
+      writer.edit({ widgets: [{ ...widget, texts: { ...texts, ...t } }] });
+    await expect(bad({ Italian: { title: "x" } })).rejects.toThrow(/language code Italian/);
+    await expect(bad({ it: { "bad key": "x" } })).rejects.toThrow(/bad key/);
+    await expect(bad({ it: { title: " " } })).rejects.toThrow(/it\.title/);
+    await expect(bad({ it: { best: "{distanza} il {day}" } })).rejects.toThrow(/placeholders/);
+    await expect(writer.edit({ widgetTexts: { nope: { it: { title: "x" } } } })).rejects.toThrow(
+      /nope/,
+    );
+  });
+});

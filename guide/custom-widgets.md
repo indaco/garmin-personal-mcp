@@ -19,6 +19,13 @@ Reload the page to see the widget. The assistant cannot open the page, so it can
 You can also ask your assistant to change or remove a custom widget. The widget catalogue of the
 page (the settings menu, **Edit layout**, then **Add widget**) lists the custom widgets too.
 
+## Languages
+
+A custom widget keeps its texts by language: its title and every text that it shows. The assistant
+writes them in English and in each language of your page. When you add a language with the
+`dashboard-language` prompt, the assistant also translates your custom widgets. A text without a
+translation shows in English.
+
 ## Your widget library
 
 The server also keeps each custom widget in `widgets.json` in the data folder. This file is your
@@ -64,20 +71,23 @@ ctx gives:
 - ctx.from, ctx.to: Mondays of the first and last week of the window; ctx.weeks: every Monday in it.
 - ctx.activities: the activities of the window and of ctx.type. ctx.allActivities: every type. ctx.ofType(list): the same type filter for any list.
 - ctx.t(key, params): a page text; ctx.lang: the page language.
+- ctx.text(key, params): a text of the widget's own texts in the page language, else in English, with its {placeholders} filled from params.
 - ctx.fmt: num(v, digits), pct(v), day("yyyy-MM-dd"), longDay(d), hms(seconds), hours(seconds), na (the text for a missing value). In the profile's units, from metric data: dist(km, digits), pace(secondsPerKm), speed(kmh), elev(m), mass(kg), swimPace(secondsPer100m). ctx.fmt.to.dist/pace/speed/elev/mass/swim(value) give the number only, for sums and charts; ctx.fmt.unit.dist/pace/speed/elev/mass/swim give the unit names, for axis titles. Show every distance, pace, speed, elevation and weight with these, never with a fixed "km" or "kg".
 - ctx.calc: groupOf(activity) (its board), sportOf(typeKey), seconds("1:02:03"), sessionSeconds(activity), dayOf(activity), mondayOf(day), weekly(activities, weeks, a => value), loadOf(activity, maxHR), loadRatio(activities, day, maxHR), dailyLoads(activities, from, to, maxHR), mean, sd, rolling(values, n), change(now, before), zonesOf(ctx.data.zones), zoneSeconds(activity, floors), paceSeconds(activity), efficiency(activity), epley(kg, reps), riegel(seconds, km, km), exerciseStats(activities), muscleSets(activities, weeks), swimPace(activity), verticalPerHour(activity).
 - ctx.chart(el, config, heightPx): a Chart.js 4 chart that follows the theme, with tooltips. Chart types: bar, line, scatter, doughnut, pie, with the category and linear scales.
 - ctx.color(token): a theme colour: text, muted, accent, good, bad, warn, line, panel, panel2, or a board (running, strengthTraining, walking, hiking, cycling, swimming, racket, generic); another sport gets the generic colour.
 - ctx.empty(el, message): a short message in place of the content.
 
+Texts: give every text that the widget shows in its texts, by language code and key: { en: { title: "...", best: "Best: {value}" }, it: { ... } }. title is the widget's title. Write English and each language of pageLanguages (from editDashboard), with the same keys and {placeholders}. Draw texts with ctx.text(key, params), never as fixed strings in the code. A missing text shows in English.
+
 Rules: build elements with document.createElement and set text with textContent, never innerHTML with data. Use only values in ctx.data; show ctx.fmt.na for a missing value; label an estimate as one. Keep the code short. Requests from the page are blocked: fetch, XMLHttpRequest, and images, scripts and styles from the web.
 
-Example (the longest ride of the window):
+Example (the longest ride of the window), with texts { en: { title: "Longest ride", best: "{distance} on {day}" } }:
 const rides = ctx.activities.filter((a) => ctx.calc.groupOf(a) === "cycling" && typeof a.km === "number");
 if (rides.length === 0) return ctx.empty(el);
 const best = rides.reduce((x, y) => (y.km > x.km ? y : x));
 const p = document.createElement("p");
-p.textContent = `${ctx.fmt.dist(best.km)} · ${best.name ?? ""} · ${ctx.fmt.day(best.start.slice(0, 10))}`;
+p.textContent = ctx.text("best", { distance: ctx.fmt.dist(best.km), day: ctx.fmt.day(best.start.slice(0, 10)) });
 el.append(p);
 ```
 <!-- widget-api:end -->

@@ -79,6 +79,8 @@ export interface CustomWidget {
   code: string;
   span?: number;
   types?: string[];
+  /** Texts by language code and key, e.g. { en: { title, best }, it: { title, best } }. */
+  texts?: Record<string, Record<string, string>>;
 }
 
 export interface EditOptions {
@@ -91,6 +93,8 @@ export interface EditOptions {
   removeWidgets?: string[];
   /** Custom widgets to remove from the library and from this page. */
   forgetWidgets?: string[];
+  /** Texts of custom widgets by widget id, language and key: added to the texts they have. */
+  widgetTexts?: Record<string, Record<string, Record<string, string>>>;
   /** Texts of a language by key: added to the texts the page has. */
   languages?: Record<string, Record<string, string>>;
   /** Codes of languages that languages added, to remove. */
@@ -103,7 +107,16 @@ export interface EditResult {
   path: string;
   changed: boolean;
   layout: Layout;
-  customWidgets: { id: string; title: string; span: number; types?: string[]; library: boolean }[];
+  customWidgets: {
+    id: string;
+    title: string;
+    span: number;
+    types?: string[];
+    texts?: Record<string, Record<string, string>>;
+    library: boolean;
+  }[];
+  /** The languages of the page's Language menu: a custom widget gives its texts in each of them. */
+  pageLanguages: string[];
   languages: Record<string, { missing: string[] }>;
   catalogue: {
     id: string;
@@ -474,6 +487,17 @@ export class DashboardWriter {
       widgets = [...widgets.filter((x) => x.id !== clean.id), clean];
       library = [...library.filter((x) => x.id !== clean.id), clean];
     }
+    for (const [id, byLang] of Object.entries(o.widgetTexts ?? {})) {
+      const w = widgets.find((x) => x.id === id);
+      if (!w) throw new Error(`Unknown custom widget ${id}`);
+      const own = { ...w.texts };
+      for (const [lang, entries] of Object.entries(byLang)) {
+        own[lang] = { ...own[lang], ...entries };
+      }
+      const clean = checkWidget({ ...w, texts: own });
+      widgets = widgets.map((x) => (x.id === id ? clean : x));
+      library = library.map((x) => (x.id === id ? clean : x));
+    }
     const forget = new Set(o.forgetWidgets);
     library = library.filter((x) => !forget.has(x.id));
     for (const id of [...(o.removeWidgets ?? []), ...forget]) {
@@ -522,9 +546,10 @@ export class DashboardWriter {
       o.widgets !== undefined ||
       o.removeWidgets !== undefined ||
       o.forgetWidgets !== undefined ||
+      o.widgetTexts !== undefined ||
       o.languages !== undefined ||
       o.removeLanguages !== undefined;
-    if (o.widgets !== undefined || o.forgetWidgets !== undefined) {
+    if (o.widgets !== undefined || o.forgetWidgets !== undefined || o.widgetTexts !== undefined) {
       await this.#saveLibrary(library);
     }
     if (changed) {
@@ -540,13 +565,15 @@ export class DashboardWriter {
       path: target,
       changed,
       layout,
-      customWidgets: widgets.map(({ id, title, span, types }) => ({
-        id,
-        title,
-        span: span ?? 1,
-        ...(types ? { types } : {}),
-        library: library.some((l) => l.id === id),
+      customWidgets: widgets.map((w) => ({
+        id: w.id,
+        title: w.title,
+        span: w.span ?? 1,
+        ...(w.types ? { types: w.types } : {}),
+        ...(w.texts ? { texts: w.texts } : {}),
+        library: library.some((l) => l.id === w.id),
       })),
+      pageLanguages: pageLanguages(page, settings),
       languages: missingTexts(page),
       // a widget whose data the page leaves out shows nothing there
       catalogue: CATALOGUE.filter((c) => !c.needs || !settings.exclude?.includes(c.needs)).map(
@@ -658,13 +685,40 @@ function checkWidget(w: CustomWidget): CustomWidget {
     throw new Error("A widget needs code, at most 20000 characters");
   const unknown = (w.types ?? []).filter((t) => !TYPES.has(t));
   if (unknown.length > 0) throw new Error(`Unknown widget types: ${unknown.join(", ")}`);
+  const texts = checkWidgetTexts(w);
   return {
     id: w.id,
     title: w.title.trim(),
     code: w.code,
     span: spanOf(w.span),
     ...(w.types?.length ? { types: w.types } : {}),
+    ...(texts ? { texts } : {}),
   };
+}
+
+/** The texts of a custom widget: language codes, short keys, and the placeholders of the English text. */
+function checkWidgetTexts(w: CustomWidget): CustomWidget["texts"] {
+  const texts = w.texts;
+  if (texts === undefined || Object.keys(texts).length === 0) return undefined;
+  if (JSON.stringify(texts).length > 20_000)
+    throw new Error(`The texts of ${w.id} are too long: at most 20000 characters`);
+  const problems: string[] = [];
+  for (const [lang, entries] of Object.entries(texts)) {
+    if (!/^[a-z]{2,3}(-[A-Z]{2})?$/.test(lang)) {
+      problems.push(`bad language code ${lang}`);
+      continue;
+    }
+    for (const [key, text] of Object.entries(entries ?? {})) {
+      const english = texts.en?.[key];
+      if (!/^[a-zA-Z][\w.-]{0,40}$/.test(key)) problems.push(`bad key ${key}`);
+      else if (typeof text !== "string" || !text.trim() || text.length > 500)
+        problems.push(`${lang}.${key}: 1 to 500 characters`);
+      else if (english !== undefined && placeholders(text) !== placeholders(english))
+        problems.push(`${lang}.${key}: keep the placeholders ${placeholders(english) || "(none)"}`);
+    }
+  }
+  if (problems.length > 0) throw new Error(`Texts of ${w.id}: ${problems.join("; ")}`);
+  return texts;
 }
 
 const placeholders = (s: string) => [...new Set(s.match(/\{\w+\}/g) ?? [])].toSorted().join(" ");
@@ -835,7 +889,8 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         "'Copy layout'); `place` adds widgets at the end of a board; `widgets` adds or replaces custom widgets",
         "by id and saves them in the widget library (<data-dir>/widgets.json), which every page from the",
         "template gets; `removeWidgets` removes them from this page and its boards, `forgetWidgets` also",
-        "from the library. `languages` adds texts by key, e.g.",
+        "from the library. `widgetTexts` adds texts to custom widgets by id, language and key, e.g.",
+        '{"longest-ride": {"de": {"title": "Längste Fahrt"}}}. `languages` adds page texts by key, e.g.',
         '{"de": {"title": "Training + Erholung"}}: keys and {placeholders} as in `englishTexts: true`; a',
         'text with "|" has a singular and a plural form. Missing texts show in English.',
         "`removeLanguages` removes languages that `languages` added.",
@@ -872,6 +927,10 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
               code: z.string().describe("The body of a function (el, ctx): see widgetApi"),
               span: z.number().int().optional(),
               types: z.array(z.string()).describe("Types the widget can show").optional(),
+              texts: z
+                .record(z.string(), z.record(z.string(), z.string()))
+                .describe("Texts by language code and key; title is the title: see widgetApi")
+                .optional(),
             }),
           )
           .optional(),
@@ -882,6 +941,10 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         forgetWidgets: z
           .array(z.string())
           .describe("Ids of custom widgets to remove from the library and from this page")
+          .optional(),
+        widgetTexts: z
+          .record(z.string(), z.record(z.string(), z.record(z.string(), z.string())))
+          .describe("Texts of custom widgets by widget id, language code and key")
           .optional(),
         languages: z
           .record(z.string(), z.record(z.string(), z.string()))

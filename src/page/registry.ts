@@ -57,6 +57,8 @@ export interface Ctx {
   chart: (el: HTMLElement, config: ChartConfiguration, height?: number) => Chart;
   /** A colour token of the theme, e.g. "text", "good", or a group for its type colour. */
   color: (token: string) => string;
+  /** A text of a custom widget in the page language, else in English, with its {placeholders} filled. */
+  text: (key: string, params?: Record<string, string | number>) => string;
   /** Shows a short message in place of the widget's content. */
   empty: (el: HTMLElement, message?: string) => void;
   /** The item in the URL hash (e.g. a strength exercise), and a way to set it. */
@@ -65,6 +67,8 @@ export interface Ctx {
   /** Draws the whole page again, e.g. after a widget changed one of its own options. */
   refresh: () => void;
 }
+
+export type WidgetTexts = Record<string, Record<string, string>>;
 
 export interface WidgetDef {
   id: string;
@@ -77,6 +81,8 @@ export interface WidgetDef {
   render: (el: HTMLElement, ctx: Ctx) => void;
   /** Written by Claude and stored in the page, not built in. */
   custom?: boolean;
+  /** The texts of a custom widget by language and key; `title` is its title. */
+  texts?: WidgetTexts;
 }
 
 const widgets = new Map<string, WidgetDef>();

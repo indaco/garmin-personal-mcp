@@ -4,7 +4,8 @@ MCP server. Answer in my language.
 1. Call `editDashboard` with no other arguments{{pathArgument}}. Read `widgetApi` (how a widget works), `catalogue` (the
    built-in widgets) and `customWidgets`. If there is no dashboard, call `writeDashboard`{{pathWith}} first.
 2. If a built-in widget already shows this, name it, add it with `place`, and stop.
-3. Write the widget as `widgetApi` says: the body of a function (el, ctx), a short id and a title.
+3. Write the widget as `widgetApi` says: the body of a function (el, ctx), a short id, a title, and
+   `texts` with every text it shows, in English and in each language of `pageLanguages`.
    Use only values from `ctx.data`. Show `ctx.fmt.na` for a missing value. Label an estimate as one.
    **Never invent, interpolate or estimate missing values.**
 4. Call `editDashboard` with `widgets` = [the widget] and `place` = [{ board, widget, span }] for the

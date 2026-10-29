@@ -19,6 +19,8 @@ The assistant uses the language of the conversation. The assistant:
 1. gets the English texts from the `editDashboard` tool.
 2. translates them. Each `{placeholder}` stays as it is.
 3. saves them in the page with `editDashboard`.
+4. translates your custom widgets too. Their texts stay in your widget library, so each page gets
+   them.
 
 Reload the page. The **Language** menu shows the language by its own name, for example _Deutsch_.
 A text without a translation shows in English.

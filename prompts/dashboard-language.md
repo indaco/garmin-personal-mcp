@@ -10,6 +10,9 @@ Add {{language}} to my Garmin training dashboard. Use the tools of the `garmin-p
    The code is the language code, for example `de`, `fr` or `pt-BR`. Send at most 150 texts in one
    call.
 4. If the reply lists `missing` texts for the language, translate them and call again.
+5. If `customWidgets` of the first reply has widgets with `texts`, translate their English texts
+   (`texts.en`) the same way, and call `editDashboard` with `widgetTexts` =
+   { "<widget id>": { "<code>": { "<key>": "<text>", ... } } }{{pathArgument}}.
 
 Finish with one line in chat: the language code, and that the Language menu of the page shows the
 language after a reload.

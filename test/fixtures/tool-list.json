@@ -17,7 +17,7 @@
   },
   {
     "name": "editDashboard",
-    "description": "Changes the layout, the custom widgets or the languages of the dashboard page (a page from the\ntemplate; call writeDashboard first). Without arguments it only reads: the reply has the layout, the\ncustom widgets, the missing texts of each language, the catalogue of built-in widgets and `widgetApi`,\nthe guide to writing a custom widget. `layout` replaces the whole layout (the text of the page's\n'Copy layout'); `place` adds widgets at the end of a board; `widgets` adds or replaces custom widgets\nby id and saves them in the widget library (<data-dir>/widgets.json), which every page from the\ntemplate gets; `removeWidgets` removes them from this page and its boards, `forgetWidgets` also\nfrom the library. `languages` adds texts by key, e.g.\n{\"de\": {\"title\": \"Training + Erholung\"}}: keys and {placeholders} as in `englishTexts: true`; a\ntext with \"|\" has a singular and a plural form. Missing texts show in English.\n`removeLanguages` removes languages that `languages` added.",
+    "description": "Changes the layout, the custom widgets or the languages of the dashboard page (a page from the\ntemplate; call writeDashboard first). Without arguments it only reads: the reply has the layout, the\ncustom widgets, the missing texts of each language, the catalogue of built-in widgets and `widgetApi`,\nthe guide to writing a custom widget. `layout` replaces the whole layout (the text of the page's\n'Copy layout'); `place` adds widgets at the end of a board; `widgets` adds or replaces custom widgets\nby id and saves them in the widget library (<data-dir>/widgets.json), which every page from the\ntemplate gets; `removeWidgets` removes them from this page and its boards, `forgetWidgets` also\nfrom the library. `widgetTexts` adds texts to custom widgets by id, language and key, e.g.\n{\"longest-ride\": {\"de\": {\"title\": \"Längste Fahrt\"}}}. `languages` adds page texts by key, e.g.\n{\"de\": {\"title\": \"Training + Erholung\"}}: keys and {placeholders} as in `englishTexts: true`; a\ntext with \"|\" has a singular and a plural form. Missing texts show in English.\n`removeLanguages` removes languages that `languages` added.",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -80,6 +80,22 @@
                   "type": "string"
                 },
                 "description": "Types the widget can show"
+              },
+              "texts": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "description": "Texts by language code and key; title is the title: see widgetApi"
               }
             },
             "required": ["id", "title", "code"]
@@ -98,6 +114,28 @@
             "type": "string"
           },
           "description": "Ids of custom widgets to remove from the library and from this page"
+        },
+        "widgetTexts": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "Texts of custom widgets by widget id, language code and key"
         },
         "languages": {
           "type": "object",
