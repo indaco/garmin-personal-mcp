@@ -32,10 +32,11 @@ readiness widget _Forma di oggi_".
 A built-in language is in every page, unless the [page settings](dashboard.md#page-settings) leave it
 out. To add one:
 
-1. Copy `src/page/i18n/it.ts` to `src/page/i18n/<code>.ts`, for example `de.ts`.
+1. Copy `src/page/i18n/locales/it.json` to `src/page/i18n/locales/<code>.json`, for example
+   `nl.json`.
 2. Translate every text. Keep each `{placeholder}`. A text with `|` has a singular and a plural
    form: keep the `|`.
-3. Add the catalogue in `src/page/i18n/built-in.ts`. The page shows the language by its own name.
+3. Import the file in `src/page/i18n/built-in.ts` and add it to `BUILT_IN`. The page shows the language by its own name.
 4. Run `pnpm test`. The tests make sure that the new language has every key and every placeholder.
 
 ## The texts

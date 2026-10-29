@@ -1,9 +1,9 @@
-import { de } from "./de";
 import type { Catalogue } from "./en";
-import { es } from "./es";
-import { fr } from "./fr";
-import { it } from "./it";
-import { pt } from "./pt";
+import de from "./locales/de.json";
+import es from "./locales/es.json";
+import fr from "./locales/fr.json";
+import it from "./locales/it.json";
+import pt from "./locales/pt.json";
 
 /**
  * The built-in languages besides English. The page script does not hold them: the server writes the
