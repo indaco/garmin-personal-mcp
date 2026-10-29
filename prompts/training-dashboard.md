@@ -63,7 +63,8 @@ the schedule is for all the pages: offer `cron`, in words, as the first choice a
 each automatic refresh replaces the data and removes the coach notes, and that the computer must be
 on. On a yes, turn the answer into a cron expression and call `scheduleDashboardRefresh` with `cron`
 and the `path` of the page. Tell me the schedule and the `next` runs of the reply in my language, in
-one line.
+one line. If its `pages` already have the `path`, do not ask: tell me in one line, in my language,
+the schedule in words and the first `next` run, and that I can ask you to change or stop it.
 
 Finish with two lines in chat: the path of the page with the command to open it (`open` on macOS,
 `xdg-open` on Linux, `start` on Windows), and anything that was missing.{{layoutNote}}
