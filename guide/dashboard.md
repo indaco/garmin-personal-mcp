@@ -119,7 +119,8 @@ Some widgets have a narrowest width: Activities and Period comparison need 2 col
 The edit bar stays at the top of the window while you scroll. It has:
 
 - **Add widget**: opens the catalogue: the built-in widgets, your custom widgets and the hidden
-  widgets of the board.
+  widgets of the board. Type in the search field to find a widget by its title, in the page
+  language or in English.
 - **Reset board**: puts the preset widgets back on the board.
 - **Copy layout**: gives the layout as text.
 - **Discard**: puts the layout back as it was before you selected **Edit layout**, on every board.

@@ -164,6 +164,8 @@
   "add.close": "Schließen",
   "add.hiddenGroup": "Auf diesem Board ausgeblendet",
   "add.none": "Alle Widgets sind auf diesem Board.",
+  "add.search": "Widgets suchen",
+  "add.noMatch": "Kein Widget passt.",
   "copy.title": "Layout kopieren",
   "copy.hint": "Dieses Layout ist nur in diesem Browser gespeichert. Um es in der Seite zu behalten, füge diesen Text bei deinem Assistenten ein und bitte ihn, das Dashboard-Layout zu speichern.",
   "copy.copy": "Kopieren",

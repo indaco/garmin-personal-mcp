@@ -164,6 +164,8 @@
   "add.close": "Fermer",
   "add.hiddenGroup": "Masqués sur ce tableau",
   "add.none": "Tous les widgets sont sur ce tableau.",
+  "add.search": "Rechercher un widget",
+  "add.noMatch": "Aucun widget ne correspond.",
   "copy.title": "Copier la mise en page",
   "copy.hint": "Cette mise en page est enregistrée uniquement dans ce navigateur. Pour la garder dans la page, colle ce texte à ton assistant et demande-lui d'enregistrer la mise en page du tableau de bord.",
   "copy.copy": "Copier",

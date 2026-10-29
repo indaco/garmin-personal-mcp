@@ -164,6 +164,8 @@
   "add.close": "Chiudi",
   "add.hiddenGroup": "Nascosti in questa scheda",
   "add.none": "Tutti i widget sono già in questa scheda.",
+  "add.search": "Cerca widget",
+  "add.noMatch": "Nessun widget corrisponde.",
   "copy.title": "Copia layout",
   "copy.hint": "Questo layout è salvato solo in questo browser. Per tenerlo nella pagina, incolla questo testo al tuo assistente e chiedigli di salvare il layout della dashboard.",
   "copy.copy": "Copia",

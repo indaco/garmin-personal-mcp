@@ -883,7 +883,15 @@ function addDialog(): void {
   const board = currentBoard();
   const own = boardType();
   const list = h("ul", { class: "catalogue" });
-  const d = dialog(t("add.title"), list);
+  const search = h("input", {
+    type: "search",
+    class: "catalogue-search",
+    placeholder: t("add.search"),
+    "aria-label": t("add.search"),
+    autofocus: true,
+    oninput: () => filter(),
+  });
+  const d = dialog(t("add.title"), search, list);
   const addOne = (def: WidgetDef, type: string | undefined) => {
     d.close();
     saveBoard(add(board, def.id, { type: type === own ? undefined : type, span: def.span ?? 1 }));
@@ -908,7 +916,7 @@ function addDialog(): void {
     list.append(
       h(
         "li",
-        {},
+        { "data-find": findText(def.title(t), def.title(english)) },
         h("span", {}, def.title(t)),
         pick,
         h(
@@ -924,14 +932,18 @@ function addDialog(): void {
     );
   }
   const hidden = board.filter((x) => x.hidden);
+  const group = h("li", { class: "group" }, t("add.hiddenGroup"));
   if (hidden.length > 0) {
-    list.append(h("li", { class: "group" }, t("add.hiddenGroup")));
+    list.append(group);
     for (const inst of hidden) {
       const title = titleOf(inst, widget(inst.widget));
       list.append(
         h(
           "li",
-          {},
+          {
+            "data-find": findText(title, widget(inst.widget)?.title(english) ?? ""),
+            "data-hidden": true,
+          },
           h("span", {}, title),
           h(
             "button",
@@ -961,8 +973,25 @@ function addDialog(): void {
       );
     }
   }
-  if (list.childElementCount === 0) list.append(h("li", {}, t("add.none")));
+  const noMatch = h("li", { class: "muted", hidden: true }, t("add.noMatch"));
+  list.append(noMatch);
+  // the title in the page language and in English, without case or accents: "hrv" and "Fréquence" both find
+  function filter(): void {
+    const q = findText(search.value.trim());
+    const items = [...list.querySelectorAll<HTMLElement>("li[data-find]")];
+    for (const li of items) li.hidden = !li.dataset.find!.includes(q);
+    group.hidden = !items.some((li) => li.dataset.hidden !== undefined && !li.hidden);
+    noMatch.hidden = items.some((li) => !li.hidden);
+  }
+  if (list.childElementCount === 1) {
+    search.remove();
+    list.replaceChildren(h("li", {}, t("add.none")));
+  }
 }
+
+const english = translator("en");
+const findText = (...titles: string[]) =>
+  titles.join(" ").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
 function copyDialog(): void {
   const shown = draft ?? layout;

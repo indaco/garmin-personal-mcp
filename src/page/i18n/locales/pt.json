@@ -164,6 +164,8 @@
   "add.close": "Fechar",
   "add.hiddenGroup": "Ocultos neste quadro",
   "add.none": "Todos os widgets já estão neste quadro.",
+  "add.search": "Pesquisar widgets",
+  "add.noMatch": "Nenhum widget corresponde.",
   "copy.title": "Copiar layout",
   "copy.hint": "Este layout está salvo apenas neste navegador. Para mantê-lo na página, cole este texto na conversa com o seu assistente e peça que ele salve o layout do painel.",
   "copy.copy": "Copiar",

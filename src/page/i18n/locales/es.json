@@ -164,6 +164,8 @@
   "add.close": "Cerrar",
   "add.hiddenGroup": "Ocultos en esta pestaña",
   "add.none": "Todos los widgets ya están en esta pestaña.",
+  "add.search": "Buscar widgets",
+  "add.noMatch": "Ningún widget coincide.",
   "copy.title": "Copiar diseño",
   "copy.hint": "Este diseño solo está guardado en este navegador. Para conservarlo en la página, pega este texto a tu asistente y pídele que guarde el diseño del panel.",
   "copy.copy": "Copiar",

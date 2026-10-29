@@ -164,6 +164,8 @@
   "add.close": "Close",
   "add.hiddenGroup": "Hidden on this board",
   "add.none": "Every widget is on this board.",
+  "add.search": "Search widgets",
+  "add.noMatch": "No widget matches.",
   "copy.title": "Copy layout",
   "copy.hint": "This layout is saved in this browser only. To keep it in the page, paste this text to your assistant and ask it to save the dashboard layout.",
   "copy.copy": "Copy",

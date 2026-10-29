@@ -487,6 +487,30 @@ describe("edit mode", () => {
     expect(await page.getAttribute("[data-id=activities]", "class")).toContain("span-2");
   });
 
+  it("finds a widget in the catalogue by its title, in the page language or in English", async () => {
+    const { page, errors } = await open(
+      browser,
+      pageFile({ layout: two, settings: { languages: ["en", "it"] } }),
+      { locale: "it-IT" },
+    );
+    await page.click(".account summary");
+    await page.click(".account-panel >> text=Modifica layout");
+    await page.click("[aria-label='Nascondi Note del coach']");
+    await page.click(".edit-bar >> text=/Aggiungi widget/");
+    expect(await focused(page)).toBe("Cerca widget");
+    const shown = () => page.locator(".catalogue li:visible").allTextContents();
+    // no case, no accents, and the English title works too
+    await page.fill(".catalogue-search", "VOLUME SETTIMANALE");
+    expect((await shown()).map((x) => x.slice(0, 18))).toEqual(["Volume settimanale"]);
+    await page.fill(".catalogue-search", "coach notes");
+    expect((await shown()).join("|")).toMatch(/^Nascosti.*\|Note del coach/);
+    await page.fill(".catalogue-search", "zzz");
+    expect(await shown()).toEqual(["Nessun widget corrisponde."]);
+    await page.fill(".catalogue-search", "");
+    expect((await shown()).length).toBeGreaterThan(30);
+    expect(errors).toEqual([]);
+  });
+
   it("removes a widget, adds it back from the catalogue, and resets to the preset", async () => {
     const { page } = await open(browser, pageFile({ layout: two }));
     await startEdit(page);
