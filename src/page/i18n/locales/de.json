@@ -26,6 +26,8 @@
   "theme.light": "Hell",
   "theme.paper": "Papier",
   "theme.mist": "Nebel",
+  "theme.munich": "München",
+  "theme.munichDark": "München dunkel",
   "theme.hcDark": "Hoher Kontrast dunkel",
   "theme.hcLight": "Hoher Kontrast hell",
   "window.label": "Wochen",

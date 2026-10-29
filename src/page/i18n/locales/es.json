@@ -26,6 +26,8 @@
   "theme.light": "Claro",
   "theme.paper": "Papel",
   "theme.mist": "Niebla",
+  "theme.munich": "Múnich",
+  "theme.munichDark": "Múnich oscuro",
   "theme.hcDark": "Alto contraste oscuro",
   "theme.hcLight": "Alto contraste claro",
   "window.label": "Semanas",

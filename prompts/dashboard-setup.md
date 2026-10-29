@@ -24,7 +24,7 @@ such a tool, ask the questions in chat as numbered lists, with the default first
    - **Languages**: options "English and the language of my Garmin profile, opens in the profile
      language" (default), "All: {{languageNames}}", "English only" and "Italian only". Say that I can
      type another choice, for example "English and Italian, opens in Italian".
-   - **Themes**: options "All 11 themes, opens in midnight" (default), "Midnight only" and "Paper
+   - **Themes**: options "All 13 themes, opens in midnight" (default), "Midnight only" and "Paper
      only". Say that I can type other themes and the one it opens in: {{themes}}.
 3. Call `writeDashboard` with `preview` = true, `weeks` = {{weeks}} and the `path`. It writes nothing.
    Ask which sports to keep (multiple choice) from the boards of `boards`, with their number of

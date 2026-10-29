@@ -8,9 +8,11 @@ export const THEMES: { id: string; group: "auto" | "dark" | "light" | "accessibl
   { id: "ocean", group: "dark" },
   { id: "forest", group: "dark" },
   { id: "plum", group: "dark" },
+  { id: "munichDark", group: "dark" },
   { id: "light", group: "light" },
   { id: "paper", group: "light" },
   { id: "mist", group: "light" },
+  { id: "munich", group: "light" },
   { id: "hcDark", group: "accessible" },
   { id: "hcLight", group: "accessible" },
 ];

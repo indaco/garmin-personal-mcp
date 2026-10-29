@@ -259,13 +259,13 @@ describe("the page", () => {
     expect(errors).toEqual([]);
   });
 
-  it("switches between the 11 themes and keeps the choice", async () => {
+  it("switches between the 13 themes and keeps the choice", async () => {
     const file = pageFile();
     const { page, errors } = await open(browser, file);
     const themes = await page.$$eval("#theme option", (o) =>
       o.map((x) => (x as HTMLOptionElement).value),
     );
-    expect(themes).toHaveLength(11);
+    expect(themes).toHaveLength(13);
     expect(await page.inputValue("#theme")).toBe("midnight");
     // the menu stays open while the page renders again for each theme
     await page.click(".account summary");
@@ -794,7 +794,7 @@ async function problems(page: Page): Promise<string[]> {
 }
 
 describe("accessibility", () => {
-  it("has no serious problem on the boards, in edit mode and in a light theme", async () => {
+  it("has no serious problem on the boards, in edit mode and in the light and both Munich themes", async () => {
     const { page } = await open(browser, pageFile());
     for (const tab of ["all", "recovery", "running", "strengthTraining"]) {
       await page.click(`[data-tab=${tab}]`);
@@ -808,6 +808,10 @@ describe("accessibility", () => {
     await page.focus("#theme");
     await page.selectOption("#theme", "light");
     expect(["light", await problems(page)]).toEqual(["light", []]);
+    await page.selectOption("#theme", "munich");
+    expect(["munich", await problems(page)]).toEqual(["munich", []]);
+    await page.selectOption("#theme", "munichDark");
+    expect(["munichDark", await problems(page)]).toEqual(["munichDark", []]);
   });
 });
 
