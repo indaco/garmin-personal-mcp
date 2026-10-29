@@ -1,8 +1,9 @@
 # Languages
 
-The dashboard has English and Italian built in. You can add any language, and you can change the
-built-in texts. The [page settings](dashboard.md#page-settings) can keep only one built-in
-language in the page, for example Italian only.
+The dashboard has English, Italian, German, French, Spanish and Portuguese built in. A page holds
+English and the language of your Garmin profile. The [page settings](dashboard.md#page-settings)
+choose other built-in languages, for example Italian only. You can add any language, and you can
+change the built-in texts.
 
 ## Add a language through your assistant
 
@@ -31,10 +32,11 @@ readiness widget _Forma di oggi_".
 A built-in language is in every page, unless the [page settings](dashboard.md#page-settings) leave it
 out. To add one:
 
-1. Copy `src/page/i18n/it.ts` to `src/page/i18n/<code>.ts`, for example `de.ts`.
+1. Copy `src/page/i18n/locales/it.json` to `src/page/i18n/locales/<code>.json`, for example
+   `nl.json`.
 2. Translate every text. Keep each `{placeholder}`. A text with `|` has a singular and a plural
    form: keep the `|`.
-3. Add the catalogue in `src/page/i18n/built-in.ts`. The page shows the language by its own name.
+3. Import the file in `src/page/i18n/built-in.ts` and add it to `BUILT_IN`. The page shows the language by its own name.
 4. Run `pnpm test`. The tests make sure that the new language has every key and every placeholder.
 
 ## The texts

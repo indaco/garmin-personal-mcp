@@ -1,13 +1,10 @@
-import type { Catalogue } from "./en";
-
-export const it: Catalogue = {
-  title: "Allenamento + Recupero",
-  headline: "Carico di allenamento, recupero e progressi da Garmin Connect",
-  na: "n/d",
-  noData: "Questa pagina non ha ancora dati. Chiedi al tuo assistente di scrivere la dashboard.",
-  period: "dal {from} al {to}",
-  inProgress: "* settimana in corso",
-
+{
+  "title": "Allenamento + Recupero",
+  "headline": "Carico di allenamento, recupero e progressi da Garmin Connect",
+  "na": "n/d",
+  "noData": "Questa pagina non ha ancora dati. Chiedi al tuo assistente di scrivere la dashboard.",
+  "period": "dal {from} al {to}",
+  "inProgress": "* settimana in corso",
   "menu.settings": "Impostazioni",
   "menu.theme": "Tema",
   "footer.updated": "Dati da Garmin Connect, aggiornati il {date}",
@@ -30,13 +27,11 @@ export const it: Catalogue = {
   "theme.mist": "Nebbia",
   "theme.hcDark": "Alto contrasto scuro",
   "theme.hcLight": "Alto contrasto chiaro",
-
   "window.label": "Settimane",
   "window.last": "Ultime {n}",
   "window.all": "Tutte",
   "window.from": "Dalla settimana",
   "window.to": "Alla settimana",
-
   "type.all": "Tutte",
   "type.recovery": "Recupero",
   "type.running": "Corsa",
@@ -122,7 +117,6 @@ export const it: Catalogue = {
   "type.geocaching": "Geocaching",
   "type.canoeing": "Canoa",
   "tabs.label": "Tipi di attività",
-
   "edit.start": "Modifica layout",
   "edit.done": "Fine",
   "edit.add": "Aggiungi widget",
@@ -145,8 +139,7 @@ export const it: Catalogue = {
   "edit.widthValue": "{n} colonne su {cols}",
   "edit.addHidden": "Aggiungi widget · {n} nascosti",
   "add.addOne": "Aggiungi {title}",
-  "said.picked":
-    "{title} preso, posizione {n} di {count}. Le frecce lo spostano, Spazio lo rilascia, Esc lo rimette al suo posto.",
+  "said.picked": "{title} preso, posizione {n} di {count}. Le frecce lo spostano, Spazio lo rilascia, Esc lo rimette al suo posto.",
   "said.position": "Posizione {n} di {count}",
   "said.cancelled": "{title} è di nuovo al suo posto",
   "said.moved": "{title} spostato in posizione {n} di {count}",
@@ -159,37 +152,29 @@ export const it: Catalogue = {
   "said.unchanged": "Nessuna modifica da salvare",
   "said.discarded": "Modifiche annullate",
   "stale.label": "Nuovo layout",
-  "stale.text":
-    "Il tuo assistente ha scritto un nuovo layout per questa dashboard. Il layout che hai fatto in questo browser resta finché non scegli.",
+  "stale.text": "Il tuo assistente ha scritto un nuovo layout per questa dashboard. Il layout che hai fatto in questo browser resta finché non scegli.",
   "stale.keep": "Tieni il mio",
   "stale.new": "Usa il nuovo",
   "stale.used": "Ora usi il nuovo layout",
   "stale.kept": "Ora usi il tuo layout",
-
   "add.title": "Aggiungi un widget",
   "add.type": "Tipo",
   "add.add": "Aggiungi",
   "add.close": "Chiudi",
   "add.hiddenGroup": "Nascosti in questa scheda",
   "add.none": "Tutti i widget sono già in questa scheda.",
-
   "copy.title": "Copia layout",
-  "copy.hint":
-    "Questo layout è salvato solo in questo browser. Per tenerlo nella pagina, incolla questo testo al tuo assistente e chiedigli di salvare il layout della dashboard.",
+  "copy.hint": "Questo layout è salvato solo in questo browser. Per tenerlo nella pagina, incolla questo testo al tuo assistente e chiedigli di salvare il layout della dashboard.",
   "copy.copy": "Copia",
   "copy.copied": "Copiato",
-
   "board.empty": "Questa scheda non ha widget.",
   "board.emptyEdit": "Questa scheda non ha widget: usa “Aggiungi widget” per metterne.",
   "widget.failed": "Questo widget non funziona: {message}",
   "widget.unknown": "Widget sconosciuto: {id}",
   "empty.window": "Nessuna sessione nelle settimane scelte.",
-
   "w.coachNotes": "Note del coach",
   "notes.none": "Nessuna nota.",
-  "notes.disclaimer":
-    "Suggerimenti di allenamento sui dati fino al {date}. Non sono consigli medici.",
-
+  "notes.disclaimer": "Suggerimenti di allenamento sui dati fino al {date}. Non sono consigli medici.",
   "w.kpis": "Panoramica",
   "kpi.totals": "{distance} · {time} · {n} sessione|{distance} · {time} · {n} sessioni",
   "kpi.distance": "Distanza · ultimi 7 giorni",
@@ -211,8 +196,7 @@ export const it: Catalogue = {
   "ready.rhr": "FC a riposo",
   "ready.rhrVs": "7 giorni prima: {avg} bpm",
   "ready.ratio": "Rapporto di carico 7:28",
-  "ready.note":
-    "Una regola della dashboard, non la prontezza di Garmin. Mostra oggi: la finestra di settimane non la cambia.",
+  "ready.note": "Una regola della dashboard, non la prontezza di Garmin. Mostra oggi: la finestra di settimane non la cambia.",
   "w.fitnessAge": "Età fitness",
   "fa.age": "Età fitness",
   "fa.actual": "Età reale",
@@ -268,8 +252,7 @@ export const it: Catalogue = {
   "ls.flagged": "Settimane sopra +10%",
   "ls.load": "Carico settimanale",
   "ls.ramp": "Variazione sulla settimana prima (%)",
-  "ls.note":
-    "Tutte le attività. Le settimane rosse sono salite più del 10%; una settimana in corso non viene segnalata. Monotonia e strain (Foster) sono stime.",
+  "ls.note": "Tutte le attività. Le settimane rosse sono salite più del 10%; una settimana in corso non viene segnalata. Monotonia e strain (Foster) sono stime.",
   "ls.estimated": "Alcuni carichi sono stime: l'attività non ha un carico Garmin.",
   "w.loadVsRecovery": "Carico e recupero",
   "lvr.hrv": "HRV (ms)",
@@ -281,15 +264,14 @@ export const it: Catalogue = {
   "cal.less": "Meno",
   "cal.more": "Più",
   "m.label": "Misura",
-  skip: "Vai alla scheda",
+  "skip": "Vai alla scheda",
   "w.hrv": "HRV",
   "hrv.low": "Minimo dell'intervallo",
   "hrv.band": "Intervallo bilanciato",
   "hrv.nightly": "HRV notturna",
   "hrv.avg": "Media di 7 giorni",
-  rec14: "Ultimi 14 giorni: la finestra di settimane non li cambia.",
-  "rec.board":
-    "I widget di recupero mostrano gli ultimi 14 giorni: la finestra di settimane non li cambia.",
+  "rec14": "Ultimi 14 giorni: la finestra di settimane non li cambia.",
+  "rec.board": "I widget di recupero mostrano gli ultimi 14 giorni: la finestra di settimane non li cambia.",
   "w.restingHr": "FC a riposo",
   "w.sleep": "Sonno",
   "sl.deep": "Profondo",
@@ -336,8 +318,7 @@ export const it: Catalogue = {
   "tk.share": "{v}% di tutto il carico",
   "w.typeWeekly": "Ogni settimana",
   "w.hrZones": "Tempo nelle zone FC",
-  "zones.approximate":
-    "Approssimato: alcune attività non hanno il tempo per zona, quindi tutti i loro minuti contano nella zona della FC media.",
+  "zones.approximate": "Approssimato: alcune attività non hanno il tempo per zona, quindi tutti i loro minuti contano nella zona della FC media.",
   "form.cadence": "Cadenza",
   "form.stride": "Falcata",
   "form.gct": "Contatto al suolo",
@@ -374,8 +355,7 @@ export const it: Catalogue = {
   "w.longRuns": "Lunghi e ripartizione del passo",
   "lr.share": "Quota del lungo sulla distanza settimanale",
   "lr.ascent": "Dislivello settimanale",
-  "lr.note":
-    "Settimane rosse: il lungo supera il 35% della distanza della settimana. La tabella mostra le gare e le corse oltre 15 km con i giri.",
+  "lr.note": "Settimane rosse: il lungo supera il 35% della distanza della settimana. La tabella mostra le gare e le corse oltre 15 km con i giri.",
   "lr.first": "Prima metà",
   "lr.second": "Seconda metà",
   "lr.split": "Ripartizione",
@@ -389,8 +369,7 @@ export const it: Catalogue = {
   "mb.pushPull": "Serie di spinta : tirata",
   "mb.avg": "Media di serie a settimana",
   "mb.perWeek": "serie a settimana",
-  "mb.note":
-    "Una serie conta 1 per ogni gruppo muscolare primario e 0,5 per ogni gruppo secondario. Intervallo usuale: 10-20 serie a settimana (giallo sotto, rosso sopra).",
+  "mb.note": "Una serie conta 1 per ogni gruppo muscolare primario e 0,5 per ogni gruppo secondario. Intervallo usuale: 10-20 serie a settimana (giallo sotto, rosso sopra).",
   "w.exercises": "Esercizi",
   "ex.groups": "Gruppi muscolari",
   "ex.search": "Cerca esercizi",
@@ -451,8 +430,7 @@ export const it: Catalogue = {
   "pd.z45": "Quota Z4-5",
   "pd.kcal": "kcal all'ora",
   "pd.load": "Carico / corsa della stessa durata",
-  "pd.note":
-    "Il secondo carico è una stima: il carico Garmin medio al minuto delle tue corse, per la durata della sessione.",
+  "pd.note": "Il secondo carico è una stima: il carico Garmin medio al minuto delle tue corse, per la durata della sessione.",
   "col.sport": "Sport",
   "sport.tennis": "Tennis",
   "sport.padel": "Padel",
@@ -461,5 +439,5 @@ export const it: Catalogue = {
   "sport.squash": "Squash",
   "sport.badminton": "Badminton",
   "sport.tableTennis": "Tennis tavolo",
-  "sport.platformTennis": "Platform tennis",
-};
+  "sport.platformTennis": "Platform tennis"
+}

@@ -11,7 +11,7 @@ import { type Activity, GROUPS, groupOf } from "./page/calc";
 import { CATALOGUE } from "./page/catalogue";
 import { ABOUT } from "./page/catalogue-about";
 import { BUILT_IN } from "./page/i18n/built-in";
-import { en } from "./page/i18n/en";
+import { type Catalogue, en } from "./page/i18n/en";
 import { add, boardOf, type Layout, parseLayout, type Span, withBoard } from "./page/layout";
 import { preset } from "./page/presets";
 import { DATA_ITEMS, type Settings } from "./page/settings";
@@ -61,6 +61,10 @@ export interface WriteResult {
   backup?: string;
   notes: number;
   digest: Digest;
+  /** The languages of the page's Language menu, e.g. ["en", "it"]. */
+  pageLanguages: string[];
+  /** The settings that the page keeps. */
+  settings: Settings;
   /** The texts that each language of the page still misses (they show in English). */
   languages?: Record<string, { missing: string[] }>;
 }
@@ -194,11 +198,12 @@ export function filterData(data: Json, s: Settings): Json {
   return out;
 }
 
-/** The built-in languages that the settings choose, by code. */
-const languagesOf = (s: Settings) =>
-  Object.fromEntries(
-    Object.entries(BUILT_IN).filter(([code]) => !s.languages || s.languages.includes(code)),
-  );
+/** The built-in languages that the settings choose, by code; without a choice, the one of the profile locale. */
+export function languagesOf(s: Settings, locale: unknown): Record<string, Catalogue> {
+  const own = typeof locale === "string" ? [locale, locale.slice(0, 2)] : [];
+  const keep: (string | undefined)[] = s.languages ?? [own.find((code) => code in BUILT_IN)];
+  return Object.fromEntries(Object.entries(BUILT_IN).filter(([code]) => keep.includes(code)));
+}
 
 /**
  * A page from the template with the settings: its settings block, its title, and the CSS of the chosen
@@ -221,7 +226,7 @@ export function styled(page: string, s: Settings): string {
 
 /** The page with the built-in languages and the data that the settings keep, and the escaped notes. */
 export function withData(page: string, data: Json, s: Settings, notes: readonly string[]): string {
-  const next = writeBlock(page, "languages", languagesOf(s));
+  const next = writeBlock(page, "languages", languagesOf(s, data.locale));
   const kept = s.exclude?.includes("notes") ? [] : notes;
   return writeBlock(next, "data", {
     ...filterData(data, s),
@@ -407,6 +412,8 @@ export class DashboardWriter {
       ...(backup ? { backup } : {}),
       notes: own.exclude?.includes("notes") ? 0 : notes.length,
       digest: digest(filterData(raw, own)),
+      pageLanguages: pageLanguages(next, own),
+      settings: own,
       ...(hasLanguages(next) ? { languages: missingTexts(next) } : {}),
     };
   }
@@ -620,6 +627,16 @@ function hasLanguages(page: string): boolean {
   return !!t && typeof t === "object" && Object.keys(t).length > 0;
 }
 
+/** English unless the settings leave it out, then the built-in and the added languages of the page. */
+function pageLanguages(page: string, s: Settings): string[] {
+  const codes = [
+    ...(s.languages && !s.languages.includes("en") ? [] : ["en"]),
+    ...Object.keys(readBlock(page, "languages") ?? {}),
+    ...Object.keys(readBlock(page, "i18n") ?? {}),
+  ];
+  return [...new Set(codes)];
+}
+
 /** For each language of the page, the keys that it does not translate. */
 function missingTexts(page: string): Record<string, { missing: string[] }> {
   const t = (readBlock(page, "i18n") as Record<string, Record<string, string>> | undefined) ?? {};
@@ -663,7 +680,9 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         "page is kept as <file>.bak. `notes`: at most 5 plain-text coach notes; the server escapes them.",
         "`settings` replace the page's settings (title, headline, sports, data to leave out, languages,",
         "themes); without them the page keeps its own. The page holds only the data, languages and themes",
-        "they keep. `preview: true` writes nothing: it returns the digest and the activities of each board.",
+        "they keep. `pageLanguages` in the result lists the languages of the page's Language menu, and",
+        "`settings` the settings that the page keeps.",
+        "`preview: true` writes nothing: it returns the digest and the activities of each board.",
       ].join("\n"),
       inputSchema: z.object({
         weeks: z.number().int().describe("Weeks to cover, default 12, max 52").optional(),
@@ -698,7 +717,9 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
               .optional(),
             languages: z
               .array(z.string())
-              .describe(`Languages to keep: en, ${Object.keys(BUILT_IN).join(", ")}`)
+              .describe(
+                `Languages to keep: en, ${Object.keys(BUILT_IN).join(", ")}; when not set, English and the language of the Garmin profile`,
+              )
               .optional(),
             language: z.string().describe("Default language: auto or a code").optional(),
             themes: z

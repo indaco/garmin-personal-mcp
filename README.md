@@ -206,9 +206,10 @@ In Claude Code, the arguments are in order and separated by spaces: first `weeks
 You can also give only the layout: `/garmin-personal:training-dashboard freeform`.
 
 The assistant gives you the path of the page and the command to open it. The page has a board for
-all your training, a Recovery board and a board for each sport, with 11 themes and English and
-Italian texts. It uses the training load, HR zones and training effect from Garmin. It labels each
-value that it calculates as an estimate, and a missing value shows as "n/a". Distances, paces,
+all your training, a Recovery board and a board for each sport, with 11 themes, in English and the
+language of your Garmin profile. The assistant asks if you want one more language. The page uses
+the training load, HR zones and training effect from Garmin. It labels each value that it
+calculates as an estimate, and a missing value shows as "n/a". Distances, paces,
 elevation and weights use the units of your Garmin profile: metric, or miles and pounds for
 Statute US and Statute UK (Statute UK keeps elevation in metres).
 
@@ -348,6 +349,12 @@ server as a different solution. It runs with `npx`, without Java, and it writes 
 from a tested template.
 
 This server uses the same key file as indaco/garmin-mcp and can share its data folder.
+
+## How this was built
+
+AI agents in Claude Code wrote the code, tests and docs of this project. I chose the design,
+reviewed each change and tested the server with my own Garmin data. The rules that the agents
+follow are in [AGENTS.md](AGENTS.md).
 
 ## License
 

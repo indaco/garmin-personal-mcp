@@ -10,6 +10,14 @@ Answer in my language.
    Training suggestions only, no medical advice. Plain text, in my language.
 3. Call `writeDashboard` again with the same `weeks` and the `notes`, without `layout`. The page keeps
    its layout.
+4. Tell me the languages of the page (`pageLanguages` of the result) and ask whether to add one.
+   If your client has a tool for questions with choices, use it, with "No" as the default and the
+   built-in languages that the page does not have: {{builtIn}}. Say that I can type any other
+   language.
+   - A built-in language: call `writeDashboard` with the same `weeks` and `notes`, and `settings` =
+     the `settings` of the last result, with `languages` = the codes of `pageLanguages` that are `en`
+     or built in, and the new code.
+   - Any other language: tell me to run the `dashboard-language` prompt with it.
 
 Use only numbers of the digest. **Never invent, interpolate or estimate missing values.** If a value
 is missing, write "n/a". If `sync.failedDays` is more than 0, name the dates in `sync.failedDates`.

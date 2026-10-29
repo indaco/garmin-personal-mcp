@@ -150,8 +150,9 @@ let garminActivities: Record<string, unknown>[];
 let failingSleep: Set<string>;
 /** Path prefixes whose calls fail. */
 let failing: Set<string>;
-/** The measurementSystem of the profile settings. */
+/** The measurementSystem and preferredLocale of the profile settings. */
 let units: unknown;
+let locale: unknown;
 
 const cacheFile = () => join(dataDir, "dashboard-cache.json");
 const readCache = () => JSON.parse(readFileSync(cacheFile(), "utf8"));
@@ -208,7 +209,8 @@ function fakeGarmin(path: string, q: Record<string, string>) {
   if (path === "/usersummary-service/usersummary/daily") return { restingHeartRate: 50 };
   if (path === "/biometric-service/heartRateZones/v2") return [{ zone: 1 }];
   if (path.startsWith("/fitnessage-service/fitnessage/v2/")) return { fitnessAge: 40 };
-  if (path === "/userprofile-service/userprofile/settings") return { measurementSystem: units };
+  if (path === "/userprofile-service/userprofile/settings")
+    return { measurementSystem: units, preferredLocale: locale };
   throw new Error(`unexpected path ${path}`);
 }
 
@@ -220,6 +222,7 @@ beforeEach(() => {
   failingSleep = new Set();
   failing = new Set();
   units = "metric";
+  locale = "en";
   api.getJson.mockImplementation(async (path, q) => fakeGarmin(path, q));
   api.getBytes.mockResolvedValue(
     fitFile(
@@ -397,6 +400,16 @@ describe("getDashboardData", () => {
     expect(out.fitnessAge).toBeNull();
     expect(out.sync.failedSections).toEqual(["zones", "fitnessAge"]);
     expect(Array.isArray(out.activities)).toBe(true);
+  });
+
+  it("passes on the profile locale as a language tag, and leaves out one it cannot read", async () => {
+    expect(JSON.parse(await dashboard.getDashboardData(1)).locale).toBe("en");
+    locale = "pt_BR";
+    expect(JSON.parse(await dashboard.getDashboardData(1)).locale).toBe("pt-BR");
+    locale = undefined;
+    expect(JSON.parse(await dashboard.getDashboardData(1))).not.toHaveProperty("locale");
+    locale = "bad locale";
+    expect(JSON.parse(await dashboard.getDashboardData(1))).not.toHaveProperty("locale");
   });
 
   it("passes on a known measurement system only, and builds without it when the settings fail", async () => {

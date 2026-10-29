@@ -223,12 +223,27 @@ describe("the page", () => {
   });
 
   it("follows the browser language, and the language menu", async () => {
-    const { page } = await open(browser, pageFile(), { locale: "it-IT" });
+    const { page } = await open(browser, pageFile({ settings: { languages: ["en", "it"] } }), {
+      locale: "it-IT",
+    });
     expect(await page.textContent("h1")).toBe("Allenamento + Recupero");
     expect(await page.textContent("[data-tab=running]")).toContain("Corsa");
     await page.click(".account summary");
     await page.selectOption("#lang", "en");
     expect(await page.textContent("h1")).toBe("Training + Recovery");
+    expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
+  });
+
+  it("opens in the language of the Garmin profile, until the reader picks one", async () => {
+    const file = pageFile({
+      data: { ...data, locale: "pt-BR" },
+      settings: { languages: ["en", "pt"] },
+    });
+    const { page } = await open(browser, file, { locale: "en-US" });
+    expect(await page.evaluate(() => document.documentElement.lang)).toBe("pt");
+    await page.click(".account summary");
+    expect(await page.inputValue("#lang")).toBe("pt");
+    await page.selectOption("#lang", "auto");
     expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
   });
 
@@ -973,7 +988,11 @@ describe("overview widgets", () => {
   });
 
   it("shows the widgets in Italian", async () => {
-    const { page, errors } = await open(browser, pageFile(), { locale: "it-IT" });
+    const { page, errors } = await open(
+      browser,
+      pageFile({ settings: { languages: ["en", "it"] } }),
+      { locale: "it-IT" },
+    );
     expect(await page.textContent("[data-id=readiness] h2")).toBe("Prontezza di oggi");
     expect(await page.textContent(".totals")).toContain("sessioni");
     expect(errors).toEqual([]);

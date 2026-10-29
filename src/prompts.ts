@@ -52,6 +52,9 @@ export function registerPrompts(server: McpServer): void {
           ? renderDashboard(freeform, w)
           : render(renderDashboard(build, w), {
               layout,
+              builtIn: Object.keys(BUILT_IN)
+                .map((code) => `${languageName(code)} (${code})`)
+                .join(", "),
               layoutNote:
                 layout === "blank"
                   ? '\nThe page is an empty grid: tell me to add widgets with "Edit layout" and "Add widget".'
@@ -137,7 +140,10 @@ export function registerPrompts(server: McpServer): void {
           title: en.title,
           headline: en.headline,
           languages: ["en", ...Object.keys(BUILT_IN)].join(", "),
-          languageNames: ["English", ...Object.keys(BUILT_IN).map(languageName)].join(" and "),
+          languageNames: new Intl.ListFormat("en").format([
+            "English",
+            ...Object.keys(BUILT_IN).map(languageName),
+          ]),
           themes: THEMES.map((t) => t.id).join(", "),
         }),
       ),

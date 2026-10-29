@@ -52,8 +52,8 @@ describe("sport names", () => {
 describe("pickLang", () => {
   it("uses the chosen language, then the browser languages, then English", () => {
     expect(pickLang("it", ["en-US"])).toBe("it");
-    expect(pickLang("auto", ["de-DE", "it-IT", "en"])).toBe("it");
-    expect(pickLang("auto", ["de-DE"])).toBe("en");
+    expect(pickLang("auto", ["ja-JP", "it-IT", "en"])).toBe("it");
+    expect(pickLang("auto", ["ja-JP"])).toBe("en");
     expect(pickLang("xx", [])).toBe("en");
   });
 });

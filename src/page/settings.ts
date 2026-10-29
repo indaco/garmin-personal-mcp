@@ -12,7 +12,7 @@ export interface Settings {
   sports?: string[];
   /** The data that the server leaves out of the page. */
   exclude?: DataItem[];
-  /** The built-in languages of the page, e.g. ["en", "it"]; all when not set. English stays as the fallback text. */
+  /** The built-in languages of the page, e.g. ["en", "it"]; English and the profile's language when not set. English stays as the fallback text. */
   languages?: string[];
   /** The language before the reader picks one; "auto" when not set. */
   language?: string;

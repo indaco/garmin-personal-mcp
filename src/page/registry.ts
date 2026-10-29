@@ -27,6 +27,8 @@ export interface Data {
   notes?: string[];
   /** The measurement system of the Garmin profile; the data stays metric. Metric when not set. */
   units?: Units;
+  /** The language of the Garmin profile, e.g. it or pt-BR. */
+  locale?: string;
 }
 
 /** What a widget gets to draw itself. Built-in and custom widgets get the same. */

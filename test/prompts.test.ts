@@ -59,6 +59,7 @@ describe("prompts", () => {
     expect(await render("training-dashboard", { layout: "fancy" })).toContain(
       '`layout` = "preset"',
     );
+    expect(preset).toContain("German (de)");
     expect(preset.includes("{{") || blank.includes("{{")).toBe(false);
   });
 
@@ -133,7 +134,7 @@ describe("prompts", () => {
   it("asks the setup questions with the built-in languages and themes, and the weeks", async () => {
     const text = await render("dashboard-setup", { weeks: "8" });
     expect(text).toContain("last **8 weeks** (today is 2026-10-28)");
-    expect(text).toContain('"English and Italian, opens in the browser language" (default)');
+    expect(text).toContain('"All: English, Italian, German, French, Spanish, and Portuguese"');
     expect(text).toContain("the codes to keep: en, it");
     expect(text).toContain('options "Training + Recovery" (default) and "Type my own"');
     expect(text).toContain("system, midnight, graphite");
