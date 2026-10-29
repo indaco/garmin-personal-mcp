@@ -207,7 +207,9 @@ You can also give only the layout: `/garmin-personal:training-dashboard freeform
 
 The assistant gives you the path of the page and the command to open it. The page has a board for
 all your training, a Recovery board and a board for each sport, with 11 themes, in English and the
-language of your Garmin profile. The assistant asks if you want one more language. The page uses
+language of your Garmin profile. If the dashboard does not have the language of your profile (for
+example Russian), the page shows English, and the assistant tells you and offers to add the
+language. The assistant asks if you want one more language. The page uses
 the training load, HR zones and training effect from Garmin. It labels each value that it
 calculates as an estimate, and a missing value shows as "n/a". Distances, paces,
 elevation and weights use the units of your Garmin profile: metric, or miles and pounds for

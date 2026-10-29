@@ -49,3 +49,5 @@ layout freeform cannot keep them.
 Finish with two lines in chat: the path of the page with the command to open it (`open` on macOS,
 `xdg-open` on Linux, `start` on Windows), and the settings that the page keeps. Later updates keep
 the settings: for a page with another file name, ask your assistant to update that file.
+If the last reply has `missingProfileLanguage`, add one line: my Garmin profile uses that language,
+the page has no texts in it and shows English, and the `dashboard-language` prompt adds the language.

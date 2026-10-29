@@ -14,6 +14,9 @@ tools of the `garmin-personal` MCP server. Answer in my language.
 Use only numbers of the digest. **Never invent, interpolate or estimate missing values.** If a value
 is missing, write "n/a". If a call fails, say which one and why in one line.
 
+If the reply has `missingProfileLanguage`, add one line: my Garmin profile uses that language, the
+page shows English, and the `dashboard-language` prompt adds the language.
+
 Finish with two lines in chat: the period that the dashboard covers now, with the number of new
 activities (`sync.newActivities`), and anything that was missing. If `sync.failedDays` is more than
 0, name the dates in `sync.failedDates`. If `sync.failedSections` is not empty, name those sections

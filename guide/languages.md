@@ -5,6 +5,12 @@ English and the language of your Garmin profile. The [page settings](dashboard.m
 choose other built-in languages, for example Italian only. You can add any language, and you can
 change the built-in texts.
 
+## When the dashboard does not have your language
+
+When the language of your Garmin profile is not built in and not added, for example Russian, the
+page shows English. The assistant tells you after it writes or updates the page, and offers to add
+the language. When you add it, the page opens in your language.
+
 ## Add a language through your assistant
 
 Run the `dashboard-language` prompt. Give the language, for example "German". Without a language,

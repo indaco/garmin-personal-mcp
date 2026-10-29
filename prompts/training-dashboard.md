@@ -10,7 +10,10 @@ Answer in my language.
    Training suggestions only, no medical advice. Plain text, in my language.
 3. Call `writeDashboard` again with the same `weeks` and the `notes`, without `layout`. The page keeps
    its layout.
-4. Tell me the languages of the page (`pageLanguages` of the result) and ask whether to add one.
+4. If the result has `missingProfileLanguage`, say first that my Garmin profile uses that language,
+   that the page has no texts in it yet, so the page shows English, and that you can add it.
+   Make that language the default of the question below instead of "No".
+   Tell me the languages of the page (`pageLanguages` of the result) and ask whether to add one.
    If your client has a tool for questions with choices, use it, with "No" as the default and the
    built-in languages that the page does not have: {{builtIn}}. Say that I can type any other
    language.
