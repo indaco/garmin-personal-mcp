@@ -51,6 +51,7 @@ The data folder has:
 | `fit/{id}.fit`         | the original .FIT files. The server downloads each file one time only. |
 | `exercises.json`       | the exercise catalogue of Garmin, for the muscles of each exercise     |
 | `dashboard-cache.json` | the dashboard data of the last calls                                   |
+| `widgets.json`         | your custom widgets: every dashboard page gets them                    |
 
 The server writes its log to `~/.cache/garmin-personal-mcp/garmin-personal-mcp.log`. When the log
 is larger than 1 MB, the server moves it to `garmin-personal-mcp.log.1` and starts a new log.

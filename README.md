@@ -69,8 +69,11 @@ With this server, you can ask your assistant:
   [training-dashboard-update](#training-dashboard-update) adds only the new data, and your layout
   stays.
 - **Dashboard for you or for your coach**: [dashboard-setup](#dashboard-setup) makes a page with
-  only the sports and the data that you select. [dashboard-widget](#dashboard-widget) and
-  [dashboard-language](#dashboard-language) add a widget or a language.
+  only the sports and the data that you select. [dashboard-language](#dashboard-language) adds a
+  language.
+- **Your own widgets**: [dashboard-widget](#dashboard-widget) makes a widget from your idea. Your
+  widgets stay on your computer in your widget library, and each page that you make gets them, in
+  the languages of the page.
 
 ## Quick start
 
@@ -207,7 +210,9 @@ You can also give only the layout: `/garmin-personal:training-dashboard freeform
 
 The assistant gives you the path of the page and the command to open it. The page has a board for
 all your training, a Recovery board and a board for each sport, with 11 themes, in English and the
-language of your Garmin profile. The assistant asks if you want one more language. The page uses
+language of your Garmin profile. If the dashboard does not have the language of your profile (for
+example Russian), the page shows English, and the assistant tells you and offers to add the
+language. The assistant asks if you want one more language. The page uses
 the training load, HR zones and training effect from Garmin. It labels each value that it
 calculates as an estimate, and a missing value shows as "n/a". Distances, paces,
 elevation and weights use the units of your Garmin profile: metric, or miles and pounds for
@@ -252,8 +257,9 @@ files side by side. Each page keeps its settings on each update. The argument `w
 ### dashboard-widget
 
 This prompt makes a new widget from your idea, for example "my longest ride of each month". The
-assistant writes a small widget, and `editDashboard` stores it in the page. The widget stays after
-each update. The argument `idea` is required. The argument `path` is optional: it is the file of the
+assistant writes a small widget, and `editDashboard` stores it in the page and in your widget
+library (`widgets.json` in the data folder). The widget stays after each update, and each new page
+gets it too. The argument `idea` is required. The argument `path` is optional: it is the file of the
 page, for example `coach.html`. In Claude Code:
 `/garmin-personal:dashboard-widget my longest ride each month coach.html`. Reload the page to see
 the widget.

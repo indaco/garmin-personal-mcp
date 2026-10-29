@@ -27,13 +27,22 @@ export function addLanguages(extra: unknown): void {
 }
 
 /** A language by its own name, e.g. "Deutsch" for de. */
-function languageName(code: string): string {
+export function languageName(code: string): string {
   try {
     const name = new Intl.DisplayNames([code], { type: "language" }).of(code);
     return name ? name[0].toUpperCase() + name.slice(1) : code;
   } catch {
     return code;
   }
+}
+
+/** A text of a custom widget in the language (full tag, then language), else in English. */
+export function widgetText(
+  texts: Record<string, Record<string, string>> | undefined,
+  lang: string,
+  key: string,
+): string | undefined {
+  return texts?.[lang]?.[key] ?? texts?.[lang.slice(0, 2)]?.[key] ?? texts?.en?.[key];
 }
 
 export type T = (key: Key, params?: Record<string, string | number>) => string;

@@ -10,12 +10,15 @@ import { dragTile, keyMove, resizeTile } from "./edit-drag";
 import { icon, logo } from "./icons";
 import {
   addLanguages,
+  CATALOGUES,
   formatter,
   type Key,
   LANGUAGE_NAMES,
   pickLang,
   type T,
   translator,
+  languageName,
+  widgetText,
 } from "./i18n";
 import {
   add,
@@ -293,6 +296,7 @@ function accountMenu(): HTMLElement {
       !editing && h("hr", { class: "menu-sep" }),
       // one language needs no menu
       Object.keys(LANGUAGE_NAMES).length > 1 && languageMenu(),
+      missingLanguage(),
       shownThemes().length > 1 && themeMenu(),
     ),
   );
@@ -316,6 +320,17 @@ function languageMenu(): HTMLElement {
     ),
   );
   return h("label", { class: "menu" }, h("span", {}, t("menu.language")), select);
+}
+
+/** A note when the page has no texts in the language of the Garmin profile, by its own name. */
+function missingLanguage(): HTMLElement | false {
+  const own = G.data?.locale ?? "";
+  if (!own || [own, own.slice(0, 2)].some((code) => code in CATALOGUES)) return false;
+  return h(
+    "p",
+    { class: "muted small menu-note" },
+    t("lang.missing", { language: languageName(own) }),
+  );
 }
 
 /** The themes of the page: the ones the settings keep. */
@@ -670,6 +685,11 @@ function ctxFor(data: Data, inst: Instance): Ctx {
     calc: { ...calc, ...metrics, ...running, ...strength, ...sports },
     chart,
     color: (name: string) => token(name) || token("generic"),
+    text: (key, params = {}) =>
+      (widgetText(widget(inst.widget)?.texts, lang, key) ?? key).replace(
+        /\{(\w+)\}/g,
+        (m, name: string) => String(params[name] ?? m),
+      ),
     empty: (el, message) =>
       el.replaceChildren(h("p", { class: "muted empty" }, message ?? t("empty.window"))),
     item: view.item,
@@ -863,7 +883,15 @@ function addDialog(): void {
   const board = currentBoard();
   const own = boardType();
   const list = h("ul", { class: "catalogue" });
-  const d = dialog(t("add.title"), list);
+  const search = h("input", {
+    type: "search",
+    class: "catalogue-search",
+    placeholder: t("add.search"),
+    "aria-label": t("add.search"),
+    autofocus: true,
+    oninput: () => filter(),
+  });
+  const d = dialog(t("add.title"), search, list);
   const addOne = (def: WidgetDef, type: string | undefined) => {
     d.close();
     saveBoard(add(board, def.id, { type: type === own ? undefined : type, span: def.span ?? 1 }));
@@ -888,7 +916,7 @@ function addDialog(): void {
     list.append(
       h(
         "li",
-        {},
+        { "data-find": findText(def.title(t), def.title(english)) },
         h("span", {}, def.title(t)),
         pick,
         h(
@@ -904,14 +932,18 @@ function addDialog(): void {
     );
   }
   const hidden = board.filter((x) => x.hidden);
+  const group = h("li", { class: "group" }, t("add.hiddenGroup"));
   if (hidden.length > 0) {
-    list.append(h("li", { class: "group" }, t("add.hiddenGroup")));
+    list.append(group);
     for (const inst of hidden) {
       const title = titleOf(inst, widget(inst.widget));
       list.append(
         h(
           "li",
-          {},
+          {
+            "data-find": findText(title, widget(inst.widget)?.title(english) ?? ""),
+            "data-hidden": true,
+          },
           h("span", {}, title),
           h(
             "button",
@@ -941,8 +973,25 @@ function addDialog(): void {
       );
     }
   }
-  if (list.childElementCount === 0) list.append(h("li", {}, t("add.none")));
+  const noMatch = h("li", { class: "muted", hidden: true }, t("add.noMatch"));
+  list.append(noMatch);
+  // the title in the page language and in English, without case or accents: "hrv" and "Fréquence" both find
+  function filter(): void {
+    const q = findText(search.value.trim());
+    const items = [...list.querySelectorAll<HTMLElement>("li[data-find]")];
+    for (const li of items) li.hidden = !li.dataset.find!.includes(q);
+    group.hidden = !items.some((li) => li.dataset.hidden !== undefined && !li.hidden);
+    noMatch.hidden = items.some((li) => !li.hidden);
+  }
+  if (list.childElementCount === 1) {
+    search.remove();
+    list.replaceChildren(h("li", {}, t("add.none")));
+  }
 }
+
+const english = translator("en");
+const findText = (...titles: string[]) =>
+  titles.join(" ").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
 function copyDialog(): void {
   const shown = draft ?? layout;
@@ -971,7 +1020,7 @@ function copyDialog(): void {
 /** A custom widget from the page block. Code that does not compile gives a widget that shows the error. */
 function compile(w: unknown): WidgetDef | undefined {
   if (!w || typeof w !== "object") return undefined;
-  const { id, title, code, span, types } = w as Record<string, unknown>;
+  const { id, title, code, span, types, texts } = w as Record<string, unknown>;
   if (typeof id !== "string" || typeof code !== "string") return undefined;
   let draw: WidgetDef["render"];
   try {
@@ -982,9 +1031,11 @@ function compile(w: unknown): WidgetDef | undefined {
       throw new Error((e as Error).message, { cause: e });
     };
   }
+  const own = texts && typeof texts === "object" ? (texts as WidgetDef["texts"]) : undefined;
   return {
     id,
-    title: () => (typeof title === "string" ? title : id),
+    title: () => widgetText(own, lang, "title") ?? (typeof title === "string" ? title : id),
+    texts: own,
     span: Math.min(3, Math.max(1, Math.round(Number(span) || 1))) as Span,
     types: Array.isArray(types) ? (types as WidgetDef["types"]) : undefined,
     render: draw,

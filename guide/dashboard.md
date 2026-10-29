@@ -119,7 +119,8 @@ Some widgets have a narrowest width: Activities and Period comparison need 2 col
 The edit bar stays at the top of the window while you scroll. It has:
 
 - **Add widget**: opens the catalogue: the built-in widgets, your custom widgets and the hidden
-  widgets of the board.
+  widgets of the board. Type in the search field to find a widget by its title, in the page
+  language or in English.
 - **Reset board**: puts the preset widgets back on the board.
 - **Copy layout**: gives the layout as text.
 - **Discard**: puts the layout back as it was before you selected **Edit layout**, on every board.
@@ -132,7 +133,8 @@ some, and the browser asks before you close the page with them.
 You can also ask your assistant to change the layout, for example "hide the bedtime widget and move
 HRV to the top". The assistant uses the `editDashboard` tool.
 
-To make your own widget, see [Custom widgets](custom-widgets.md).
+To make your own widget, see [Custom widgets](custom-widgets.md). Your widgets stay in your widget
+library on your computer, and each page that you make gets them.
 
 ## Themes and languages
 
@@ -143,7 +145,9 @@ The **Language** menu has English, the language of your Garmin profile when it i
 languages that you add. The built-in languages are English, Italian, German, French, Spanish and
 Portuguese. The [page settings](#page-settings) can keep other built-in languages in the file. The
 page opens in the language of your Garmin profile until you choose one in the menu. _Auto_ follows
-the language of the browser. [Languages](languages.md) tells how to add a language.
+the language of the browser. When the page has no texts in the language of your Garmin profile, the
+settings menu says so, with the name of the language. [Languages](languages.md) tells how to add a
+language.
 
 ## Units
 
@@ -213,7 +217,8 @@ them.
 
 The page keeps its state in blocks of the file: the data, the layout, the custom widgets, the
 languages that you add and the [page settings](#page-settings). An update replaces only the data
-block and the block of the built-in languages.
+block and the block of the built-in languages, and adds the widgets of your widget library
+(`widgets.json` in the data folder).
 
 The browser saves the layout when you select **Done**, but only in that browser. To keep the layout
 in the page, select **Copy layout** and give the text to your assistant. The assistant saves it with

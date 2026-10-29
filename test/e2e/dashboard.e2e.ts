@@ -247,6 +247,24 @@ describe("the page", () => {
     expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
   });
 
+  it("says when the page has no texts in the language of the Garmin profile", async () => {
+    const { page, errors } = await open(browser, pageFile({ data: { ...data, locale: "ru" } }), {
+      locale: "ru-RU",
+    });
+    expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
+    await page.click(".account summary");
+    expect(await page.textContent(".menu-note")).toBe(
+      "Русский is not in this page yet. Ask your assistant to add it.",
+    );
+    expect(errors).toEqual([]);
+    const pt = await open(
+      browser,
+      pageFile({ data: { ...data, locale: "pt-BR" }, settings: { languages: ["en", "pt"] } }),
+    );
+    await pt.page.click(".account summary");
+    expect(await pt.page.locator(".menu-note").count()).toBe(0);
+  });
+
   it("shows the title, the sports, the data and the menus of its settings", async () => {
     const { page, errors } = await open(
       browser,
@@ -467,6 +485,30 @@ describe("edit mode", () => {
     await handle.focus();
     await page.keyboard.press("Home");
     expect(await page.getAttribute("[data-id=activities]", "class")).toContain("span-2");
+  });
+
+  it("finds a widget in the catalogue by its title, in the page language or in English", async () => {
+    const { page, errors } = await open(
+      browser,
+      pageFile({ layout: two, settings: { languages: ["en", "it"] } }),
+      { locale: "it-IT" },
+    );
+    await page.click(".account summary");
+    await page.click(".account-panel >> text=Modifica layout");
+    await page.click("[aria-label='Nascondi Note del coach']");
+    await page.click(".edit-bar >> text=/Aggiungi widget/");
+    expect(await focused(page)).toBe("Cerca widget");
+    const shown = () => page.locator(".catalogue li:visible").allTextContents();
+    // no case, no accents, and the English title works too
+    await page.fill(".catalogue-search", "VOLUME SETTIMANALE");
+    expect((await shown()).map((x) => x.slice(0, 18))).toEqual(["Volume settimanale"]);
+    await page.fill(".catalogue-search", "coach notes");
+    expect((await shown()).join("|")).toMatch(/^Nascosti.*\|Note del coach/);
+    await page.fill(".catalogue-search", "zzz");
+    expect(await shown()).toEqual(["Nessun widget corrisponde."]);
+    await page.fill(".catalogue-search", "");
+    expect((await shown()).length).toBeGreaterThan(30);
+    expect(errors).toEqual([]);
   });
 
   it("removes a widget, adds it back from the catalogue, and resets to the preset", async () => {
@@ -1385,6 +1427,29 @@ describe("custom widgets and languages", () => {
     expect(await page.textContent("[data-id=rides] h2")).toBe("Custom rides");
     expect(await page.textContent(".rides")).toBe("3 rides </script>");
     expect(await chartsWithoutTooltip(page)).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
+  it("shows the texts of a custom widget in the page language, else in English", async () => {
+    const texts = {
+      en: { title: "Longest ride", best: "Best: {n}", only: "English only" },
+      it: { title: "Uscita più lunga", best: "Migliore: {n}" },
+    };
+    const code = `el.textContent = ctx.text("best", { n: 42 }) + " / " + ctx.text("only");`;
+    const { page, errors } = await open(
+      browser,
+      pageFile({
+        settings: { languages: ["en", "it"] },
+        widgets: [{ ...custom("ride", code), texts }],
+        layout: on("ride"),
+      }),
+      { locale: "it-IT" },
+    );
+    expect(await page.textContent("[data-id=ride] h2")).toBe("Uscita più lunga");
+    expect(await page.textContent("[data-id=ride] .tile-body")).toBe("Migliore: 42 / English only");
+    await page.click(".account summary");
+    await page.selectOption("#lang", "en");
+    expect(await page.textContent("[data-id=ride] h2")).toBe("Longest ride");
     expect(errors).toEqual([]);
   });
 

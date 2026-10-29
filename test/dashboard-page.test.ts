@@ -299,6 +299,14 @@ const damageSettings = () =>
     page().replace(/garmin-settings:start \*\/[\s\S]*?\/\*/, "garmin-settings:start */{bad/*"),
   );
 
+/** A writer of this data for a Garmin profile in this locale. */
+const profile = (base: object, locale: string) =>
+  new DashboardWriter(
+    async () => JSON.stringify({ ...base, locale }),
+    dir,
+    async () => templateText,
+  );
+
 describe("writeDashboard settings", () => {
   /** A template with the blocks, the title and the theme CSS of the real one. */
   const styledTemplate = `<!doctype html>
@@ -440,6 +448,25 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
     expect(Object.keys(readBlock(page(), "languages") as object)).toEqual(["it"]);
     expect(r.pageLanguages).toEqual(["it"]);
     expect(r.settings).toEqual({ languages: ["it"] });
+  });
+
+  it("names the profile language when the page has no texts in it", async () => {
+    writer = profile(full, "ru");
+    expect((await writer.write({})).missingProfileLanguage).toBe("ru");
+    await writer.edit({ languages: { ru: { title: "Тренировки" } } });
+    expect(await writer.write({})).not.toHaveProperty("missingProfileLanguage");
+    for (const locale of ["en-GB", "pt-BR"]) {
+      expect(await profile(full, locale).write({})).not.toHaveProperty("missingProfileLanguage");
+    }
+    // a built-in language that the settings leave out is not missing
+    writer = profile(full, "it");
+    expect(await writer.write({ settings: { languages: ["en"] } })).not.toHaveProperty(
+      "missingProfileLanguage",
+    );
+    // a page without the block of added languages has none
+    templateText = styledTemplate.replace(/^const I18N.*\n/m, "");
+    const r = await profile(full, "ru").write({ path: "no-i18n.html" });
+    expect(r.missingProfileLanguage).toBe("ru");
   });
 
   it("matches the profile locale by full tag, then by language", () => {

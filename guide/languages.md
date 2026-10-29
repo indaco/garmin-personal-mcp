@@ -5,6 +5,12 @@ English and the language of your Garmin profile. The [page settings](dashboard.m
 choose other built-in languages, for example Italian only. You can add any language, and you can
 change the built-in texts.
 
+## When the dashboard does not have your language
+
+When the language of your Garmin profile is not built in and not added, for example Russian, the
+page shows English. The assistant tells you after it writes or updates the page, and offers to add
+the language. The settings menu of the page also says that the language is not in the page. When you add it, the page opens in your language.
+
 ## Add a language through your assistant
 
 Run the `dashboard-language` prompt. Give the language, for example "German". Without a language,
@@ -13,6 +19,8 @@ The assistant uses the language of the conversation. The assistant:
 1. gets the English texts from the `editDashboard` tool.
 2. translates them. Each `{placeholder}` stays as it is.
 3. saves them in the page with `editDashboard`.
+4. translates your custom widgets too. Their texts stay in your widget library, so each page gets
+   them.
 
 Reload the page. The **Language** menu shows the language by its own name, for example _Deutsch_.
 A text without a translation shows in English.
@@ -22,7 +30,8 @@ update with new texts, the update prompt tells the assistant which texts are mis
 
 To remove a language that you added, ask your assistant. For example: "Remove the German language
 from the page". The assistant calls `editDashboard` with `removeLanguages`. Built-in languages stay:
-the [page settings](dashboard.md#page-settings) choose them.
+the [page settings](dashboard.md#page-settings) choose them. When the settings add a built-in
+language, the assistant translates your custom widgets into it.
 
 To change one text of a built-in language, ask your assistant. For example: "In Italian, call the
 readiness widget _Forma di oggi_".
@@ -57,6 +66,7 @@ out. To add one:
 | `footer.license` | MIT License |
 | `menu.language` | Language |
 | `lang.auto` | Auto |
+| `lang.missing` | {language} is not in this page yet. Ask your assistant to add it. |
 | `themeGroup.auto` | Auto |
 | `themeGroup.dark` | Dark |
 | `themeGroup.light` | Light |
@@ -208,6 +218,8 @@ out. To add one:
 | `add.close` | Close |
 | `add.hiddenGroup` | Hidden on this board |
 | `add.none` | Every widget is on this board. |
+| `add.search` | Search widgets |
+| `add.noMatch` | No widget matches. |
 | `copy.title` | Copy layout |
 | `copy.hint` | This layout is saved in this browser only. To keep it in the page, paste this text to your assistant and ask it to save the dashboard layout. |
 | `copy.copy` | Copy |

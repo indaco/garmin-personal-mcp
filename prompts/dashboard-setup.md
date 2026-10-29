@@ -40,6 +40,11 @@ such a tool, ask the questions in chat as numbered lists, with the default first
    language. Then call `writeDashboard` again with the same `weeks`, `path` and the `notes`, without
    `settings`: the page keeps them.
 
+If a `writeDashboard` result has `missingWidgetTexts`, call `editDashboard` with the same `path` without
+changes, translate the English texts of those widgets (`customWidgets[].texts.en`) into the listed
+languages, keeping each `{placeholder}`, and call `editDashboard` with `widgetTexts` =
+{ "<widget id>": { "<code>": { "<key>": "<text>", ... } } }.
+
 Use only numbers of the digest. **Never invent, interpolate or estimate missing values.** If a value
 is missing, write "n/a". If a call fails, say which one and why in one line.
 
@@ -49,3 +54,5 @@ layout freeform cannot keep them.
 Finish with two lines in chat: the path of the page with the command to open it (`open` on macOS,
 `xdg-open` on Linux, `start` on Windows), and the settings that the page keeps. Later updates keep
 the settings: for a page with another file name, ask your assistant to update that file.
+If the last reply has `missingProfileLanguage`, add one line: my Garmin profile uses that language,
+the page has no texts in it and shows English, and the `dashboard-language` prompt adds the language.

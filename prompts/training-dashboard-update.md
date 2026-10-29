@@ -11,8 +11,16 @@ tools of the `garmin-personal` MCP server. Answer in my language.
 4. If the reply lists `languages` with `missing` texts, translate them as the `dashboard-language`
    prompt says, and call `editDashboard`{{pathWith}} to save them.
 
+If a `writeDashboard` result has `missingWidgetTexts`, call `editDashboard`{{pathWith}} without
+changes, translate the English texts of those widgets (`customWidgets[].texts.en`) into the listed
+languages, keeping each `{placeholder}`, and call `editDashboard` with `widgetTexts` =
+{ "<widget id>": { "<code>": { "<key>": "<text>", ... } } }{{pathArgument}}.
+
 Use only numbers of the digest. **Never invent, interpolate or estimate missing values.** If a value
 is missing, write "n/a". If a call fails, say which one and why in one line.
+
+If the reply has `missingProfileLanguage`, add one line: my Garmin profile uses that language, the
+page shows English, and the `dashboard-language` prompt adds the language.
 
 Finish with two lines in chat: the period that the dashboard covers now, with the number of new
 activities (`sync.newActivities`), and anything that was missing. If `sync.failedDays` is more than
