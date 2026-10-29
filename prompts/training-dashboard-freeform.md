@@ -309,5 +309,14 @@ to phone width (the tab bar scrolls horizontally, the page does not). Make the t
 keyboard. Put tooltips on every chart and units on every axis. Use your own visual identity: no
 third-party app names, logos or brand colours.
 
+Automatic refresh: call `scheduleDashboardRefresh` without arguments. If its `pages` do not have
+the `path` of the page, ask me once whether to update the page automatically. If your client has a
+tool for questions with choices, use it: "No" (the default), every day, weekdays (Monday to Friday)
+or once a week (then ask the day), at 07:00 unless I give another time. If `scheduled` is true, the
+schedule is for all the pages: offer `schedule` as the first choice after "No". Say that each
+automatic refresh replaces the data and removes the coach notes, and that the computer must be on.
+On a yes, call `scheduleDashboardRefresh` with `every`, `time`, `day` (once a week only) and the
+`path` of the page, and tell me the result in one line.
+
 Finish with two lines in chat: what is in the dashboard with the path of the page and the command
 to open it (`open` on macOS, `xdg-open` on Linux, `start` on Windows), and anything that was missing.

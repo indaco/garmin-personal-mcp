@@ -51,6 +51,15 @@ is missing, write "n/a". If a call fails, say which one and why in one line.
 Do not write or change the page yourself. Settings need a page from the template: a page designed with
 layout freeform cannot keep them.
 
+Automatic refresh: call `scheduleDashboardRefresh` without arguments. If its `pages` do not have
+the `path` of the page, ask me once whether to update the page automatically. If your client has a
+tool for questions with choices, use it: "No" (the default), every day, weekdays (Monday to Friday)
+or once a week (then ask the day), at 07:00 unless I give another time. If `scheduled` is true, the
+schedule is for all the pages: offer `schedule` as the first choice after "No". Say that each
+automatic refresh replaces the data and removes the coach notes, and that the computer must be on.
+On a yes, call `scheduleDashboardRefresh` with `every`, `time`, `day` (once a week only) and the
+`path` of the page, and tell me the result in one line.
+
 Finish with two lines in chat: the path of the page with the command to open it (`open` on macOS,
 `xdg-open` on Linux, `start` on Windows), and the settings that the page keeps. Later updates keep
 the settings: for a page with another file name, ask your assistant to update that file.

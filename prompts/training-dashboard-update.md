@@ -26,3 +26,7 @@ Finish with two lines in chat: the period that the dashboard covers now, with th
 activities (`sync.newActivities`), and anything that was missing. If `sync.failedDays` is more than
 0, name the dates in `sync.failedDates`. If `sync.failedSections` is not empty, name those sections
 (HR zones, fitness age, HRV) and say that they show as "n/a".
+
+Call `scheduleDashboardRefresh` without arguments. If its `pages` do not have this page, add one
+line: you can update the page automatically when I ask, for example "update it every Monday
+at 7".
