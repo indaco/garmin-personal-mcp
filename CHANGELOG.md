@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The changelog is generated and managed by [sley](https://github.com/indaco/sley).
 
+## v0.4.0 - 2026-10-29
+
+### 🚀 Enhancements
+
+- add the project website and its build ([830c4e5](https://github.com/indaco/garmin-personal-mcp/commit/830c4e5)) ([#117](https://github.com/indaco/garmin-personal-mcp/pull/117))
+- add the Munich and Munich dark dashboard themes ([4f8290a](https://github.com/indaco/garmin-personal-mcp/commit/4f8290a)) ([#114](https://github.com/indaco/garmin-personal-mcp/pull/114))
+
+### 🩹 Fixes
+
+- tell the schedule when a scheduled page is rebuilt ([041792a](https://github.com/indaco/garmin-personal-mcp/commit/041792a)) ([#113](https://github.com/indaco/garmin-personal-mcp/pull/113))
+
+### 💅 Refactors
+
+- move the page styles to a cascade layer and native nesting ([40434cb](https://github.com/indaco/garmin-personal-mcp/commit/40434cb)) ([#115](https://github.com/indaco/garmin-personal-mcp/pull/115))
+
+### 📖 Documentation
+
+- shorten the README now that the website exists ([78a6b44](https://github.com/indaco/garmin-personal-mcp/commit/78a6b44)) ([#118](https://github.com/indaco/garmin-personal-mcp/pull/118))
+
+### ❤️ Contributors
+
+- [@indaco](https://github.com/indaco)
+
 ## v0.3.2 - 2026-10-29
 
 ### 🩹 Fixes
