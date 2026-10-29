@@ -114,8 +114,10 @@ jobs:
       - name: Install the Chromium headless shell
         run: pnpm exec playwright-core install --only-shell chromium
 
+      # the release ships the npm package, so only the dashboard page; CI tests the website, and the
+      # website is deployed by hand
       - name: Page tests
-        run: pnpm test:page
+        run: pnpm test:page test/e2e/dashboard.e2e.ts
 
       - name: Package contents
         run: |
