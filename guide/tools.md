@@ -29,7 +29,9 @@ parameters. If an endpoint answers 400, the assistant can use `garminGet` to try
 `activityType` takes a parent type, such as `running` or `cycling`, or a subtype, such as
 `trail_running`. Garmin accepts a subtype only as `activitySubType`: when it refuses the type
 (HTTP 400), `listActivities` asks again with the subtype. When Garmin refuses both, it asks for
-the last 200 activities and keeps those whose type key is exactly `activityType`. `garminGet`
+the last 200 activities and keeps those whose type key is exactly `activityType`. `names` keeps
+the activities whose name contains one of the names, ignoring case. For this, `listActivities` asks
+for the last 200 activities of the window, then applies `limit`. `garminGet`
 decodes the query string before it sends it, so an encoded value such as
 `calendarDate=2026%2D10%2D24` also works.
 API reference: <https://developer.garmin.com/gc-developer-program/personal/swagger-docs/>

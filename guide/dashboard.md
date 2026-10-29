@@ -97,7 +97,13 @@ last week. Every widget about training follows the window. The widgets about tod
 readiness, fitness age and the 14-day recovery widgets. On a phone the window folds into one control,
 for example **Weeks: Last 12**, and the header stays at the top while you scroll.
 
-The URL keeps the board, the window and an open exercise. A reload or a shared link opens the same
+Below the window, **Activity names** shows only the activities with the names you choose, for
+example the sessions of a training plan. It opens a list of the names of the window on the current
+board, the most frequent first, with a search. The chosen names show next to the button: ✕ removes
+one. The training widgets and the tab counts follow it. The load widgets of the body
+do not: load safety, the load ratio and the share of all load count every activity.
+
+The URL keeps the board, the window, the chosen names and an open exercise. A reload or a shared link opens the same
 view.
 
 In a chart, a click on a legend item shows only that series. A second click on it shows all the

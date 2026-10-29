@@ -134,3 +134,8 @@ export function activitiesIn<T extends Activity>(acts: T[], from: string, to: st
     return d !== undefined && d >= from && d <= end;
   });
 }
+
+/** The activities named one of `names`; all of them when there are no names. */
+export function named<T extends Activity>(acts: T[], names: string[] | undefined): T[] {
+  return names?.length ? acts.filter((a) => a.name !== undefined && names.includes(a.name)) : acts;
+}

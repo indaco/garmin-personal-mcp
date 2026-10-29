@@ -301,6 +301,7 @@ textarea {
 }
 .menus,
 .window-bar,
+.names,
 .chips,
 .edit-bar {
   display: flex;
@@ -741,6 +742,7 @@ html.resizing * {
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   margin-top: 8px;
 }
 .catalogue {
@@ -770,6 +772,16 @@ html.resizing * {
 }
 .catalogue li > span {
   flex: 1;
+}
+.catalogue .count {
+  flex: none;
+}
+.catalogue .check {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
 }
 .catalogue .group {
   color: var(--muted);

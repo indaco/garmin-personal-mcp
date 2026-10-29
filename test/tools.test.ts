@@ -210,6 +210,14 @@ describe("summarize", () => {
 const refused = () =>
   new GarminApiError("GET /activitylist-service/activities/search/activities -> HTTP 400: bad");
 
+const namedIds = async (limit?: number, raw?: boolean) =>
+  JSON.parse(
+    await tools.listActivities("2026-09-01", "2026-10-27", undefined, limit, raw, [
+      "tempo",
+      "long RUN",
+    ]),
+  ).map((r: { id?: number; activityId?: number }) => r.id ?? r.activityId);
+
 describe("activities", () => {
   it("lists activities as summaries, limit 20 by default and 200 at most", async () => {
     api.getJson.mockResolvedValue([
@@ -270,6 +278,62 @@ describe("activities", () => {
       activitySubType: undefined,
       limit: "200",
     });
+  });
+
+  it("keeps the activities whose name contains one of the names, ignoring case", async () => {
+    api.getJson.mockResolvedValue([
+      { activityId: 1, activityName: "Tempo 5k" },
+      { activityId: 2, activityName: "Padel" },
+      { activityId: 3, activityName: "Long run Z2" },
+      { activityId: 4 },
+      { activityId: 5, activityName: "TEMPO 5k" },
+    ]);
+    expect(await namedIds()).toEqual([1, 3, 5]);
+    expect(api.getJson.mock.lastCall?.[1]).toMatchObject({
+      limit: "200",
+      startDate: "2026-09-01",
+      endDate: "2026-10-27",
+    });
+    expect(await namedIds(2)).toEqual([1, 3]);
+    expect(await namedIds(undefined, true)).toEqual([1, 3, 5]);
+  });
+
+  it("filters by name and by type together when Garmin refuses the type", async () => {
+    api.getJson
+      .mockRejectedValueOnce(refused())
+      .mockRejectedValueOnce(refused())
+      .mockResolvedValueOnce([
+        { activityId: 1, activityName: "Tempo", activityType: { typeKey: "cycling" } },
+        { activityId: 2, activityName: "Tempo", activityType: { typeKey: "running" } },
+        { activityId: 3, activityName: "Easy", activityType: { typeKey: "running" } },
+      ]);
+    const rows = JSON.parse(
+      await tools.listActivities(undefined, undefined, "running", 5, false, ["tempo"]),
+    );
+    expect(rows.map((r: { id: number }) => r.id)).toEqual([2]);
+  });
+
+  it("skips a list item that is not an object", async () => {
+    api.getJson.mockResolvedValueOnce([null, { activityId: 1, activityName: "Tempo" }]);
+    const named = await tools.listActivities(undefined, undefined, undefined, 5, false, ["tempo"]);
+    expect(JSON.parse(named)).toEqual([{ id: 1, name: "Tempo" }]);
+    api.getJson
+      .mockRejectedValueOnce(refused())
+      .mockRejectedValueOnce(refused())
+      .mockResolvedValueOnce([null, { activityId: 2, activityType: { typeKey: "running" } }]);
+    const typed = await tools.listActivities(undefined, undefined, "running", 5);
+    expect(JSON.parse(typed)).toEqual([{ id: 2, type: "running" }]);
+    api.getJson.mockResolvedValueOnce([null]);
+    expect(JSON.parse(await tools.listActivities())).toEqual([{}]);
+  });
+
+  it("does not filter for an empty list of names", async () => {
+    api.getJson.mockResolvedValue([{ activityId: 1, activityName: "A" }]);
+    const rows = JSON.parse(
+      await tools.listActivities(undefined, undefined, undefined, 5, false, [""]),
+    );
+    expect(rows.map((r: { id: number }) => r.id)).toEqual([1]);
+    expect(api.getJson.mock.lastCall?.[1]).toMatchObject({ limit: "5" });
   });
 
   it("does not ask again for an error that is not a 400", async () => {
@@ -784,6 +848,19 @@ describe("MCP tools", () => {
       activityType: "running",
     });
     expect(textOf(result)).toBe('[{"activityId":9}]');
+  });
+
+  it("listActivities passes the names", async () => {
+    api.getJson.mockResolvedValue([
+      { activityId: 1, activityName: "Tempo" },
+      { activityId: 2, activityName: "Easy" },
+    ]);
+    const client = await connectHandlers();
+    const result = await client.callTool({
+      name: "listActivities",
+      arguments: { names: ["tempo"] },
+    });
+    expect(JSON.parse(textOf(result))).toEqual([{ id: 1, name: "Tempo" }]);
   });
 
   it("the FIT tools read the activity id from their arguments", async () => {

@@ -34,7 +34,9 @@ export class GarminTools {
     activityType?: string,
     limit?: number,
     raw?: boolean,
+    names?: string[],
   ): Promise<string> {
+    const wanted = names?.map((n) => n.toLowerCase()).filter(Boolean) ?? [];
     const asked = limit == null || limit <= 0 ? 20 : Math.min(limit, 200);
     const search = (max: number, type?: string, subType?: string) =>
       this.api.getJson("/activitylist-service/activities/search/activities", {
@@ -47,15 +49,17 @@ export class GarminTools {
       });
     const refused = (e: unknown) =>
       activityType !== undefined && e instanceof GarminApiError && /-> HTTP 400\b/.test(e.message);
+    // shortcut: names are filtered in the last 200 activities of the window; page with start= when a window holds more
+    const max = wanted.length > 0 ? 200 : asked;
     let json: unknown;
     let local = false;
     try {
-      json = await search(asked, activityType);
+      json = await search(max, activityType);
     } catch (e) {
       if (!refused(e)) throw e;
       // activityType takes parent types only; Garmin answers 400 to a subtype such as trail_running
       try {
-        json = await search(asked, undefined, activityType);
+        json = await search(max, undefined, activityType);
         log("INFO", `activityType ${activityType} refused, asked as activitySubType`);
       } catch (e2) {
         if (!refused(e2)) throw e2;
@@ -68,15 +72,23 @@ export class GarminTools {
     if (!list) {
       return JSON.stringify(json);
     }
-    const rows = local
+    const named = (a: unknown) => {
+      const name = isObject(a) ? a.activityName : undefined;
+      return typeof name === "string" && wanted.some((n) => name.toLowerCase().includes(n));
+    };
+    const filtered = local || wanted.length > 0;
+    const rows = filtered
       ? list
           .filter(
-            (a) => field(isObject(a) ? a.activityType : undefined, "typeKey") === activityType,
+            (a) =>
+              (!local ||
+                field(isObject(a) ? a.activityType : undefined, "typeKey") === activityType) &&
+              (wanted.length === 0 || named(a)),
           )
           .slice(0, asked)
       : list;
     return JSON.stringify(
-      raw === true ? (local ? rows : json) : rows.map((a) => summarize(isObject(a) ? a : {})),
+      raw === true ? (filtered ? rows : json) : rows.map((a) => summarize(isObject(a) ? a : {})),
     );
   }
 
@@ -503,10 +515,18 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
           .optional(),
         limit: z.number().int().describe("Max number of activities, default 20").optional(),
         raw: z.boolean().describe("Return Garmin's raw JSON instead of the summary").optional(),
+        names: z
+          .array(z.string())
+          .describe(
+            "Activity names (optional): keep only the activities whose name contains one of them, ignoring case",
+          )
+          .optional(),
       }),
     },
     async (a) =>
-      text(await tools.listActivities(a.startDate, a.endDate, a.activityType, a.limit, a.raw)),
+      text(
+        await tools.listActivities(a.startDate, a.endDate, a.activityType, a.limit, a.raw, a.names),
+      ),
   );
   server.registerTool(
     "getActivity",

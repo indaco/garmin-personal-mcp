@@ -185,6 +185,64 @@ describe("the page", () => {
     expect(await again.page.inputValue("#from")).toBe("2026-10-05");
   });
 
+  it("shows only the chosen activity names, also after a reload", async () => {
+    const file = pageFile();
+    const { page, errors } = await open(browser, file);
+    await page.click(".names-open");
+    const top = () => page.$eval(".dialog", (d) => d.getBoundingClientRect().top);
+    const before = await top();
+    // the search hides the other names; the list keeps the boxes that it hides
+    await page.fill(".dialog .catalogue-search", "run");
+    expect(await top()).toBe(before);
+    expect(await page.locator(".dialog li[data-find]:visible").allTextContents()).toEqual([
+      "Easy Run12",
+      "Long Run10",
+      "Tempo Run6",
+    ]);
+    await page.check(".dialog label >> text=Long Run");
+    await page.fill(".dialog .catalogue-search", "strength a");
+    await page.check(".dialog label >> text=Strength A");
+    await page.fill(".dialog .catalogue-search", "zzz");
+    expect(await page.isVisible(".dialog >> text=No name matches.")).toBe(true);
+    await page.click(".dialog >> text=Done");
+    expect(await page.textContent(".names-open")).toContain("Activity names: 2 chosen");
+    // in the order of the list, the most frequent first
+    expect(await hash(page)).toBe("#all@2026-08-03_2026-10-26~Strength%20A,Long%20Run");
+    const chosen = [
+      ["all", "22"],
+      ["recovery", undefined],
+      ["running", "10"],
+      ["strengthTraining", "12"],
+      ["walking", "0"],
+      ["cycling", "0"],
+      ["racket", "0"],
+    ];
+    expect(await tabs(page)).toEqual(chosen);
+    // the running board lists only the running names, and keeps the chosen ones
+    await page.click("[data-tab=running]");
+    await page.click(".names-open");
+    expect(await page.locator(".dialog label").allTextContents()).toEqual([
+      "Easy Run",
+      "Long Run",
+      "Tempo Run",
+      "Track Intervals",
+      "City 10K",
+      "Riverside Half Marathon",
+      "Strength A",
+    ]);
+    await page.keyboard.press("Escape");
+
+    const again = await open(browser, file, { hash: "#all~Long%20Run,Strength%20A" });
+    expect(await tabs(again.page)).toEqual(chosen);
+    await again.page.click("[aria-label='Remove Long Run']");
+    expect((await tabs(again.page))[0]).toEqual(["all", "12"]);
+    await again.page.click(".names-open");
+    await again.page.click(".dialog >> text=Show all");
+    expect((await tabs(again.page))[0]).toEqual(["all", "75"]);
+    expect(await hash(again.page)).toBe("#all@2026-08-03_2026-10-26");
+    expect([...errors, ...again.errors]).toEqual([]);
+  });
+
   it("moves focus to the board with the skip link and keeps the view", async () => {
     const { page } = await open(browser, pageFile(), {
       hash: "#strengthTraining@2026-10-05_2026-10-26",

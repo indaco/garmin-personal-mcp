@@ -3,7 +3,7 @@ import * as metrics from "./metrics";
 import * as running from "./running";
 import * as strength from "./strength";
 import * as sports from "./sports";
-import { type Activity, activitiesIn, boardOrder, GROUPS, groupOf, weeksOf } from "./calc";
+import { type Activity, activitiesIn, boardOrder, GROUPS, groupOf, named, weeksOf } from "./calc";
 import { Chart, chart, destroyCharts, themeCharts } from "./charts";
 import { announce, h, keepFocus } from "./dom";
 import { dragTile, keyMove, resizeTile } from "./edit-drag";
@@ -284,6 +284,7 @@ function header(data: Data): HTMLElement {
       h("div", { class: "menus" }, accountMenu()),
     ),
     windowBar(inProgress),
+    namesBar(data),
     tabBar(data),
   );
 }
@@ -504,12 +505,121 @@ function windowBar(inProgress: boolean): HTMLElement {
   return h("div", { class: "window" }, toggle, bar);
 }
 
-function tabBar(data: Data): HTMLElement {
+/** The activity names to show, e.g. the sessions of a training plan; none shows every activity. */
+function namesBar(data: Data): HTMLElement | false {
+  const names = namesOf(data);
+  if (names.length === 0) return false;
+  const chosen = view.names ?? [];
+  return h(
+    "div",
+    { class: "names" },
+    h(
+      "button",
+      {
+        class: "chip names-open",
+        "aria-haspopup": "dialog",
+        "aria-pressed": String(chosen.length > 0),
+        onclick: () => namesDialog(data),
+      },
+      `${t("names.label")}: ${chosen.length > 0 ? t("names.count", { n: chosen.length }) : t("names.all")}`,
+      h("span", { "aria-hidden": "true" }, " ▾"),
+    ),
+    ...chosen.map((name) =>
+      h(
+        "button",
+        {
+          class: "chip small",
+          "aria-label": t("names.remove", { name }),
+          onclick: () => setNames(chosen.filter((x) => x !== name)),
+        },
+        name,
+        h("span", { "aria-hidden": "true" }, "✕"),
+      ),
+    ),
+  );
+}
+
+function setNames(names: string[]): void {
+  view = { ...view, names };
+  render();
+}
+
+/** The names of the window on the current board with their counts, the most frequent first; a chosen name stays, so it can be taken off. */
+function namesOf(data: Data): [string, number][] {
   const inWindow = activitiesIn(data.activities, view.from, view.to);
+  const onTab =
+    view.tab === "all" || view.tab === "recovery"
+      ? inWindow
+      : inWindow.filter((a) => groupOf(a) === view.tab);
+  const counts = new Map<string, number>();
+  for (const a of onTab) if (a.name) counts.set(a.name, (counts.get(a.name) ?? 0) + 1);
+  for (const n of view.names ?? []) if (!counts.has(n)) counts.set(n, 0);
+  return [...counts].toSorted((x, y) => y[1] - x[1] || x[0].localeCompare(y[0], lang));
+}
+
+/** A search and a check box for each name: with many names, the list scrolls and the search finds one. */
+function namesDialog(data: Data): void {
+  const list = h("ul", { class: "catalogue" });
+  const search = h("input", {
+    type: "search",
+    class: "catalogue-search",
+    placeholder: t("names.search"),
+    "aria-label": t("names.search"),
+    autofocus: true,
+    oninput: () => {
+      const q = findText(search.value.trim());
+      const items = [...list.querySelectorAll<HTMLElement>("li[data-find]")];
+      for (const li of items) li.hidden = !li.dataset.find!.includes(q);
+      noMatch.hidden = items.some((li) => !li.hidden);
+    },
+  });
+  const boxes = namesOf(data).map(([name, n]) => {
+    const box = h("input", {
+      type: "checkbox",
+      value: name,
+      checked: view.names?.includes(name) ?? false,
+      // the page behind the dialog follows each change
+      onchange: () => setNames(boxes.filter((b) => b.checked).map((b) => b.value)),
+    });
+    list.append(
+      h(
+        "li",
+        { "data-find": findText(name) },
+        h("label", { class: "check" }, box, h("span", {}, name)),
+        h("span", { class: "count" }, n),
+      ),
+    );
+    return box;
+  });
+  const noMatch = h("li", { class: "muted", hidden: true }, t("names.noMatch"));
+  list.append(noMatch);
+  const clear = h(
+    "button",
+    {
+      class: "btn",
+      onclick: () => {
+        for (const b of boxes) b.checked = false;
+        setNames([]);
+      },
+    },
+    t("names.clear"),
+  );
+  const finish = h("button", { class: "btn primary" }, t("edit.done"));
+  const d = dialog(
+    t("names.label"),
+    search,
+    list,
+    h("div", { class: "dialog-actions" }, clear, finish),
+  );
+  finish.addEventListener("click", () => d.close());
+}
+
+function tabBar(data: Data): HTMLElement {
+  const inWindow = named(activitiesIn(data.activities, view.from, view.to), view.names);
   const count = (tab: string) =>
     tab === "all" ? inWindow.length : inWindow.filter((a) => groupOf(a) === tab).length;
   const select = (tab: string) => {
-    view = { tab, from: view.from, to: view.to };
+    view = { tab, from: view.from, to: view.to, names: view.names };
     render();
     document.querySelector<HTMLElement>(`[role=tab][data-tab="${tab}"]`)?.focus();
   };
@@ -671,8 +781,9 @@ function tile(data: Data, inst: Instance, def: WidgetDef | undefined): HTMLEleme
 function ctxFor(data: Data, inst: Instance): Ctx {
   const type = inst.type ?? boardType();
   const all = activitiesIn(data.activities, view.from, view.to);
+  // the name filter too, so a comparison with the weeks before compares the same sessions
   const ofType = <A extends Activity>(acts: A[]) =>
-    type !== "all" ? acts.filter((a) => groupOf(a) === type) : acts;
+    named(type !== "all" ? acts.filter((a) => groupOf(a) === type) : acts, view.names);
   return {
     data,
     id: inst.id,
@@ -683,6 +794,7 @@ function ctxFor(data: Data, inst: Instance): Ctx {
     weeks: weeks.filter((w) => w >= view.from && w <= view.to),
     activities: ofType(all),
     ofType,
+    // every activity, also outside the chosen names: the body counts the load of all of them
     allActivities: all,
     lang,
     t,
