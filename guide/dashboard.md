@@ -132,7 +132,8 @@ some, and the browser asks before you close the page with them.
 You can also ask your assistant to change the layout, for example "hide the bedtime widget and move
 HRV to the top". The assistant uses the `editDashboard` tool.
 
-To make your own widget, see [Custom widgets](custom-widgets.md).
+To make your own widget, see [Custom widgets](custom-widgets.md). Your widgets stay in your widget
+library on your computer, and each page that you make gets them.
 
 ## Themes and languages
 
@@ -215,7 +216,8 @@ them.
 
 The page keeps its state in blocks of the file: the data, the layout, the custom widgets, the
 languages that you add and the [page settings](#page-settings). An update replaces only the data
-block and the block of the built-in languages.
+block and the block of the built-in languages, and adds the widgets of your widget library
+(`widgets.json` in the data folder).
 
 The browser saves the layout when you select **Done**, but only in that browser. To keep the layout
 in the page, select **Copy layout** and give the text to your assistant. The assistant saves it with

@@ -69,8 +69,11 @@ With this server, you can ask your assistant:
   [training-dashboard-update](#training-dashboard-update) adds only the new data, and your layout
   stays.
 - **Dashboard for you or for your coach**: [dashboard-setup](#dashboard-setup) makes a page with
-  only the sports and the data that you select. [dashboard-widget](#dashboard-widget) and
-  [dashboard-language](#dashboard-language) add a widget or a language.
+  only the sports and the data that you select. [dashboard-language](#dashboard-language) adds a
+  language.
+- **Your own widgets**: [dashboard-widget](#dashboard-widget) makes a widget from your idea. Your
+  widgets stay on your computer in your widget library, and each page that you make gets them, in
+  the languages of the page.
 
 ## Quick start
 

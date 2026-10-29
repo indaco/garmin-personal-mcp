@@ -1,47 +1,57 @@
 # Custom widgets
 
 A custom widget is a small piece of JavaScript that your assistant writes for you. The server keeps
-it in the page, and each update keeps it.
+it in the page and in your widget library, and each update keeps it.
 
-## Make a widget
+## Tutorial: your first widget
 
-Run the `dashboard-widget` prompt with your idea, for example "my longest ride of each month".
-The optional `path` argument, or a last word that ends in `.html`, picks the page file.
-The assistant:
+Each step is a request to your assistant, and what you then see.
+
+1. **Make it.** Run the `dashboard-widget` prompt with your idea, for example "my longest ride of
+   each month". Reload the page: the widget is on the board that fits the idea.
+2. **Change it.** Ask "Rename the longest-ride widget to Longest monthly ride", or "Show only the
+   last 6 months". Reload the page to see the change.
+3. **Translate it.** Run the `dashboard-language` prompt with a language, for example "German".
+   The page and your widgets change language together.
+4. **Use it again.** Ask "Write a dashboard for my coach in coach.html". Open the new page, then the
+   settings menu, **Edit layout** and **Add widget**: your widget is in the list.
+5. **Remove it.** Ask "Remove the longest-ride widget from this page": it stays in **Add widget**.
+   Ask "Forget the longest-ride widget": it also goes from your library.
+6. **Keep it.** Copy `widgets.json` from the data folder to back up your widgets, or to use them
+   on another computer.
+
+In Claude Code, step 1 is `/garmin-personal:dashboard-widget my longest ride of each month`.
+
+## How the assistant makes a widget
+
+The `dashboard-widget` prompt takes your idea. The optional `path` argument, or a last word that
+ends in `.html`, picks the page file. The assistant:
 
 1. reads the widget catalogue. If a built-in widget shows the same thing, the assistant adds that
    widget instead.
 2. writes the widget and saves it with the `editDashboard` tool.
 3. puts the widget on the board that fits the idea.
 
-Reload the page to see the widget. The assistant cannot open the page, so it cannot test the widget.
-
-You can also ask your assistant to change or remove a custom widget. The widget catalogue of the
-page (the settings menu, **Edit layout**, then **Add widget**) lists the custom widgets too.
+The assistant cannot open the page, so it cannot test the widget.
 
 ## Languages
 
 A custom widget keeps its texts by language: its title and every text that it shows. The assistant
-writes them in English and in each language of your page. When you add a language with the
-`dashboard-language` prompt, the assistant also translates your custom widgets. A text without a
-translation shows in English.
+writes them in English and in each language of your page. When a page gets a new language, from
+the `dashboard-language` prompt or from the page settings, the assistant also translates your
+custom widgets. A text without a translation shows in English.
 
 ## Your widget library
 
-The server also keeps each custom widget in `widgets.json` in the data folder. This file is your
-widget library. It stays on your computer: the server does not send it anywhere.
+Your widget library is `widgets.json` in the data folder. It stays on your computer: the server
+does not send it anywhere.
 
-- **A new page gets your widgets.** A page in another file (for example `coach.html`) and a page
-  that you make again from the template get every widget of the library. The widgets are in
-  **Add widget**; put them on a board there, or ask your assistant to.
-- **A changed widget goes to every page.** When you change a widget, each page gets the new version
-  at its next update.
-- **Remove from one page or from all.** Ask your assistant to remove a widget from the page
-  (`removeWidgets`): the widget stays in the library and in **Add widget**. Ask it to forget the
-  widget (`forgetWidgets`): the server also removes it from the library. Other pages keep their copy
-  until you remove it there.
-- **Back up or move.** Copy `widgets.json` to keep your widgets, or to use them on another
-  computer.
+- Each page gets every widget of the library: a new page, a page that you make again from the
+  template, and each update. A widget that is not on a board is in **Add widget**.
+- When you change a widget, each page gets the new version at its next update.
+- A widget removed from one page (`removeWidgets`) stays in the library. A forgotten widget
+  (`forgetWidgets`) leaves the library and this page; other pages keep their copy until you remove
+  it there.
 
 Widgets that you made before the library existed join it at the first update. When a page has a
 widget that is not in the library, the page keeps it.
