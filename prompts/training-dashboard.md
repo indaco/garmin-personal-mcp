@@ -35,5 +35,16 @@ they show as "n/a". If a call fails, say which one and why in one line.
 Do not write or change the page yourself, and do not call `getDashboardData`: the digest has what the
 notes need.
 
+Automatic refresh: call `scheduleDashboardRefresh` without arguments. If its `pages` do not have
+the `path` of the page, ask me once whether to update the page automatically. If your client has a
+tool for questions with choices, use it: "No" (the default), every day at 07:00, weekdays at 07:00,
+every Monday at 07:00. Say that I can also tell you when in my own words, in any language, for
+example "Monday and Thursday at 18" or "the first day of each month at 8". If `scheduled` is true,
+the schedule is for all the pages: offer `cron`, in words, as the first choice after "No". Say that
+each automatic refresh replaces the data and removes the coach notes, and that the computer must be
+on. On a yes, turn the answer into a cron expression and call `scheduleDashboardRefresh` with `cron`
+and the `path` of the page. Tell me the schedule and the `next` runs of the reply in my language, in
+one line.
+
 Finish with two lines in chat: the path of the page with the command to open it (`open` on macOS,
 `xdg-open` on Linux, `start` on Windows), and anything that was missing.{{layoutNote}}

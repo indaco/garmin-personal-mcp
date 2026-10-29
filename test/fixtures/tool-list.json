@@ -464,6 +464,28 @@
     }
   },
   {
+    "name": "scheduleDashboardRefresh",
+    "description": "Turns on, changes or stops the automatic refresh of a dashboard page. Use it only when the user\nasks for it or says yes to the question of a dashboard prompt. A job in the scheduler of the\ncomputer (launchd, cron or Task Scheduler) replaces the data of the page at the given times, also\nwith no assistant open. The refresh removes the coach notes, because old notes do not agree\nwith new data. The computer must be on at that time. The page must exist (writeDashboard first).\n`cron`: convert what the user says, in any language, into a 5-field cron expression in local\ntime: minute hour day-of-month month weekday, numbers only (0 = Sunday), e.g. \"0 7 * * 1-5\" for\nweekdays at 7. Two runs must be at least 1 hour apart. The cron is for all scheduled pages;\n`path` adds that page (default the main page); `off` stops the refresh of `path`, or of every\npage when no `path` is given. Without arguments it only reads. The reply has `next`, the next\nruns in local time: tell them to the user in their language, so they can check the schedule.",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "cron": {
+          "type": "string",
+          "description": "minute hour day-of-month month weekday, e.g. \"0 7 * * *\"; default 0 7 * * *"
+        },
+        "path": {
+          "type": "string",
+          "description": "The .html file; relative paths are inside the data dir"
+        },
+        "off": {
+          "type": "boolean",
+          "description": "Stop the refresh"
+        }
+      }
+    }
+  },
+  {
     "name": "writeDashboard",
     "description": "Writes the training dashboard page (default <data-dir>/garmin-dashboard.html) with the data of the\nlast `weeks` weeks, and returns its path and a short digest of the data (totals, weekly sums, load,\nbest efforts, races, strength top sets, HRV, recovery, fitness age, sync) for the coach notes.\nAn existing page keeps all its code, layout and widgets: only its data is replaced. A page from an\nolder template gets the new template and keeps its layout and widgets. Every page from the template\nalso gets the custom widgets of the widget library (<data-dir>/widgets.json), not placed on a board.\n`layout` writes a new page\nfrom the template: `preset` (the default widgets) or `blank` (empty boards). `page` writes your own\npage code instead; it must contain /* garmin-data:start */null/* garmin-data:end */. A replaced\npage is kept as <file>.bak. `notes`: at most 5 plain-text coach notes; the server escapes them.\n`settings` replace the page's settings (title, headline, sports, data to leave out, languages,\nthemes); without them the page keeps its own. The page holds only the data, languages and themes\nthey keep. `pageLanguages` in the result lists the languages of the page's Language menu, and\n`settings` the settings that the page keeps. `missingProfileLanguage` is the language of the Garmin\nprofile when the page has no texts in it (it shows English); editDashboard `languages` adds it.\n`missingWidgetTexts` lists the custom widgets that miss texts in a language of the page, with\nthose languages; editDashboard `widgetTexts` adds them.\n`preview: true` writes nothing: it returns the digest and the activities of each board.",
     "inputSchema": {

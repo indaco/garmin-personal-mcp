@@ -5,6 +5,7 @@ heart rate. The server writes the file, and the assistant writes the coach notes
 
 - [Make the dashboard](#make-the-dashboard)
 - [Update the dashboard](#update-the-dashboard)
+- [Update the dashboard on a schedule](#update-the-dashboard-on-a-schedule)
 - [Boards and widgets](#boards-and-widgets)
 - [Change the layout](#change-the-layout)
 - [Themes and languages](#themes-and-languages)
@@ -52,6 +53,72 @@ keeps your layout, custom widgets, languages and page settings, and it keeps the
 `.bak` file.
 
 Reload the page in the browser to see the new data.
+
+## Update the dashboard on a schedule
+
+This is optional. The server can update the data of your page at fixed times, also when no
+assistant is open.
+
+When you make a page with `training-dashboard` (all layouts) or `dashboard-setup`, the assistant
+asks one time if the page must update automatically:
+
+| Choice                | Schedule                   |
+| --------------------- | -------------------------- |
+| No (default)          | no automatic update        |
+| Every day at 07:00    | each day                   |
+| Weekdays at 07:00     | Monday to Friday           |
+| Every Monday at 07:00 | once a week                |
+| Your own words        | any schedule that you type |
+
+When a schedule is already set, the assistant offers it first, after "No". The
+`training-dashboard-update` prompt does not ask: it only reminds you that you can ask.
+
+You can also ask at any time. Say when in your own words, in any language, for example:
+
+- "Update my dashboard every day at 7."
+- "Update my dashboard on Monday and Thursday at 18."
+- "Aggiorna la mia dashboard ogni lunedì alle 8."
+- "Update my coach page on the first day of each month at 8."
+- "Stop the automatic update of my dashboard."
+- "When does my dashboard update?"
+
+The assistant turns your words into a cron expression and tells you the next three updates, so you
+can check that it understood you. Two updates must be at least 1 hour apart. Without a time, the
+update is every day at 07:00. All the pages that update automatically use the same schedule.
+
+- The update replaces the data of the page. It keeps the weeks, the layout, the custom widgets, the
+  languages and the settings.
+- It removes the coach notes, because old notes do not agree with the new data. To get new notes,
+  run the `training-dashboard-update` prompt.
+- The computer must be on at that time. A Mac that was asleep updates the page when it wakes up. A
+  Windows computer that was asleep or off updates the page when it starts again. Linux, and a Mac
+  that was off, skip that time.
+- The server adds one job to the scheduler of your computer: launchd on macOS, your crontab on
+  Linux, and Task Scheduler on Windows. The job reads the API key from the key file
+  (`GARMIN_API_KEY_FILE`), never from your MCP client configuration. Save the key in that file
+  first.
+- The job runs the server as you installed it. A server that `npx` starts schedules the latest
+  release through `npx`; a server installed with `npm install -g` schedules that copy. After you
+  change the Node.js version, set the schedule again.
+- Each update writes one line to `~/.cache/garmin-personal-mcp/refresh.log`.
+
+### From a terminal
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest schedule daily 07:00
+npx -y @indaco/garmin-personal-mcp@latest schedule weekdays 06:30
+npx -y @indaco/garmin-personal-mcp@latest schedule weekly monday 08:00 garmin-dashboard-coach.html
+npx -y @indaco/garmin-personal-mcp@latest schedule "0 18 * * 1,4"  # a cron expression
+npx -y @indaco/garmin-personal-mcp@latest schedule              # show the schedule
+npx -y @indaco/garmin-personal-mcp@latest schedule off          # stop all
+npx -y @indaco/garmin-personal-mcp@latest schedule off garmin-dashboard-coach.html
+npx -y @indaco/garmin-personal-mcp@latest refresh               # update now, once
+```
+
+A cron expression has 5 fields in local time: minute, hour, day of the month, month and weekday
+(0 is Sunday), with numbers, lists (`1,4`), ranges (`1-5`) and steps (`*/6`). A file name ends in
+`.html`. A relative path is in the data folder. `refresh` with a file name
+updates that page.
 
 ## Boards and widgets
 

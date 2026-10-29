@@ -131,6 +131,22 @@ describe("prompts", () => {
     }
   });
 
+  it("offers the automatic refresh when a page is made, and only mentions it on an update", async () => {
+    for (const text of [
+      await render("training-dashboard"),
+      await render("training-dashboard", { layout: "freeform" }),
+      await render("dashboard-setup"),
+    ]) {
+      expect(text).toContain("ask me once whether to update the page automatically");
+      expect(text).toContain("removes the coach notes");
+      expect(text).toContain("in my own words, in any language");
+      expect(text).toContain("call `scheduleDashboardRefresh` with `cron`");
+    }
+    const update = await render("training-dashboard-update");
+    expect(update).toContain("`scheduleDashboardRefresh` without arguments");
+    expect(update).not.toContain("ask me once");
+  });
+
   it("asks the setup questions with the built-in languages and themes, and the weeks", async () => {
     const text = await render("dashboard-setup", { weeks: "8" });
     expect(text).toContain("last **8 weeks** (today is 2026-10-28)");

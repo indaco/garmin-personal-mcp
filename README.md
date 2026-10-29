@@ -152,26 +152,27 @@ Ask "list my last 5 activities". The first time that a garmin-personal tool asks
 
 ## Tools
 
-| Tool                  | What it gives                                                          |
-| --------------------- | ---------------------------------------------------------------------- |
-| `listActivities`      | each activity with pace, HR, load and effect, by date, type or name    |
-| `getActivity`         | the details of one activity                                            |
-| `getActivityLaps`     | the laps of an activity, from its .FIT file                            |
-| `getActivitySets`     | the strength sets of an activity, with the muscles, from its .FIT file |
-| `getActivityWorkouts` | the planned workout of an activity: steps, targets and notes           |
-| `downloadActivityFit` | saves the .FIT file of an activity in the data folder                  |
-| `getHrvRange`         | HRV during the night                                                   |
-| `getDailyHeartRate`   | the heart rate of a day, with the resting HR                           |
-| `getSleep`            | the sleep of a night, or of up to 14 nights                            |
-| `getWeight`           | weight and body composition for a range of dates                       |
-| `getBodyBattery`      | how Body Battery charged and drained, for up to 14 days                |
-| `getHeartRateZones`   | your HR zones                                                          |
-| `getFitnessAge`       | fitness age against actual age                                         |
-| `getDailySummary`     | steps, stress and Body Battery, for a day or a range                   |
-| `getDashboardData`    | all the data of the dashboard in one call, with a local cache          |
-| `writeDashboard`      | writes the dashboard page                                              |
-| `editDashboard`       | changes the layout, the custom widgets and the languages of the page   |
-| `garminGet`           | all other GET endpoints of the Personal API                            |
+| Tool                       | What it gives                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------ |
+| `listActivities`           | each activity with pace, HR, load and effect, by date, type or name            |
+| `getActivity`              | the details of one activity                                                    |
+| `getActivityLaps`          | the laps of an activity, from its .FIT file                                    |
+| `getActivitySets`          | the strength sets of an activity, with the muscles, from its .FIT file         |
+| `getActivityWorkouts`      | the planned workout of an activity: steps, targets and notes                   |
+| `downloadActivityFit`      | saves the .FIT file of an activity in the data folder                          |
+| `getHrvRange`              | HRV during the night                                                           |
+| `getDailyHeartRate`        | the heart rate of a day, with the resting HR                                   |
+| `getSleep`                 | the sleep of a night, or of up to 14 nights                                    |
+| `getWeight`                | weight and body composition for a range of dates                               |
+| `getBodyBattery`           | how Body Battery charged and drained, for up to 14 days                        |
+| `getHeartRateZones`        | your HR zones                                                                  |
+| `getFitnessAge`            | fitness age against actual age                                                 |
+| `getDailySummary`          | steps, stress and Body Battery, for a day or a range                           |
+| `getDashboardData`         | all the data of the dashboard in one call, with a local cache                  |
+| `writeDashboard`           | writes the dashboard page                                                      |
+| `editDashboard`            | changes the layout, the custom widgets and the languages of the page           |
+| `scheduleDashboardRefresh` | updates a dashboard page automatically, at the times you say in your own words |
+| `garminGet`                | all other GET endpoints of the Personal API                                    |
 
 [Tools](guide/tools.md) gives the endpoints, the details of each tool and the data that the
 Personal API does not have.
@@ -240,6 +241,12 @@ value that ends in `.html` is the file, also in the first place.
 
 The first call sends approximately 35 requests to Garmin. Later calls use the local cache and send
 approximately 8.
+
+To update the page automatically, tell your assistant when, in your own words and in any language,
+for example "update my dashboard every Monday at 7". When it makes a page, the assistant also asks:
+no (the default), every day, weekdays or every Monday at 07:00, or your own words. The automatic
+update replaces the data and removes the coach notes. See
+[Update the dashboard on a schedule](guide/dashboard.md#update-the-dashboard-on-a-schedule).
 
 ### dashboard-setup
 

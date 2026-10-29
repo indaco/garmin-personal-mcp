@@ -34,7 +34,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 ## Rules
 
 - **stdout carries only MCP messages.** Do not use `console.log` in `src/`. Use `log()` from
-  `src/log.ts`.
+  `src/log.ts`. Only the `refresh` and `schedule` commands, which are not MCP, print to stdout.
 - **The API key and the access token stay secret.** Do not put them in the log, in an error message
   or in a tool result.
 - **The prompts never invent data.** A missing value or a failed call shows as "n/a". Keep this rule
