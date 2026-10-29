@@ -63,24 +63,15 @@ assistant chooses the tools and can combine their data. Some examples:
 
 ## Features
 
-- **Official and read-only**: uses the Garmin Connect Personal API. It writes nothing back.
-- **Nothing to install**: runs with `npx`.
-- **Laps and strength sets**: read from the original .FIT files, with the muscles of each set.
-- **Recovery data**: HRV, sleep, heart rate, stress and Body Battery.
-- **All of the Personal API**: [`garminGet`](#tools) reads the endpoints that have no tool of
-  their own.
-- **All stdio clients**: Claude Desktop, Claude Code, Codex and all other MCP clients that use
+- **Official and read-only**: uses the Garmin Connect Personal API, writes nothing back, and runs
+  with `npx`.
+- **All of your data**: laps and strength sets from the original .FIT files, with the muscles of
+  each set; HRV, sleep, heart rate, stress and Body Battery; [`garminGet`](#tools) for the other
+  endpoints.
+- **All stdio clients**: Claude Desktop, Claude Code, Codex and the other MCP clients that use
   stdio. Tested with Claude Desktop and Claude Code.
-- **Dashboard in less than a minute**: [training-dashboard](#training-dashboard) shows your
-  training load next to recovery, in widgets that you can move, resize, hide and add.
-  [training-dashboard-update](#training-dashboard-update) adds only the new data, and your layout
-  stays.
-- **Dashboard for you or for your coach**: [dashboard-setup](#dashboard-setup) makes a page with
-  only the sports and the data that you select. [dashboard-language](#dashboard-language) adds a
-  language.
-- **Your own widgets**: [dashboard-widget](#dashboard-widget) makes a widget from your idea. Your
-  widgets stay on your computer in your widget library, and each page that you make gets them, in
-  the languages of the page.
+- **A dashboard in less than a minute**: your training load next to recovery, for you or for your
+  coach, with your own widgets and languages. See [Dashboard](#dashboard).
 
 ## Quick start
 
@@ -216,25 +207,11 @@ The page is one HTML file, `garmin-dashboard.html` in the data folder. It works 
 In Claude Code, the arguments are in order and separated by spaces: first `weeks`, then `layout`.
 You can also give only the layout: `/garmin-personal:training-dashboard freeform`.
 
-With `preset` and `blank`, the assistant first asks for the title and the headline (the line under
-the title) of the page. Keep them or type your own. Updates and the automatic update keep them. When
-the page has other settings, for example only one sport, the assistant tells you these settings and
-asks you to keep them, to use the defaults or to type your own choice.
-
 The assistant gives you the path of the page and the command to open it. The page has a board for
-all your training, a Recovery board and a board for each sport, with 13 themes, in English and the
-language of your Garmin profile. If the dashboard does not have the language of your profile (for
-example Russian), the page shows English, and the assistant tells you and offers to add the
-language. The assistant asks if you want one more language. The page uses
-the training load, HR zones and training effect from Garmin. It labels each value that it
-calculates as an estimate, and a missing value shows as "n/a". Distances, paces,
-elevation and weights use the units of your Garmin profile: metric, or miles and pounds for
-Statute US and Statute UK (Statute UK keeps elevation in metres).
+all your training, a Recovery board and a board for each sport. A missing value shows as "n/a".
 
-To follow a training plan, choose its activity names above the boards: the page then shows only
-those activities, in the weeks of the window.
-
-[The dashboard guide](guide/dashboard.md) tells what each board shows and how to change the layout.
+[The dashboard guide](guide/dashboard.md) tells about the title and the headline, the boards, the
+themes and languages, the units and the activity-name filter, and how to change the layout.
 [The widget catalogue](guide/widgets.md) lists every widget.
 
 ### training-dashboard-update
@@ -250,13 +227,8 @@ your languages stay. Reload the page to see the new data.
 In Claude Code: `/garmin-personal:training-dashboard-update coach.html` updates `coach.html`. A
 value that ends in `.html` is the file, also in the first place.
 
-The first call sends approximately 35 requests to Garmin. Later calls use the local cache and send
-approximately 8.
-
-To update the page automatically, tell your assistant when, in your own words and in any language,
-for example "update my dashboard every Monday at 7". When it makes a page, the assistant also asks:
-no (the default), every day, weekdays or every Monday at 07:00, or your own words. The automatic
-update replaces the data and removes the coach notes. See
+To update the page automatically, tell your assistant when, in your own words, for example "update
+my dashboard every Monday at 7". See
 [Update the dashboard on a schedule](guide/dashboard.md#update-the-dashboard-on-a-schedule).
 
 ### dashboard-setup
