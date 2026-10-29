@@ -2,7 +2,7 @@
 // runner's training (a marathon block, races, strength, padel, rides, swims, hikes), HRV and recovery.
 // Seeded: the same seed and end date give the same data. With a page path it also fills the page
 // template (`pnpm build` first) and puts a sample-data note at the top. Without paths it writes the
-// site folder: demo-site/demo-data.json and demo-site/index.html.
+// demo of the website: dist-site/demo/demo-data.json and dist-site/demo/index.html.
 // `node scripts/demo-data.mjs [--weeks 52] [--end yyyy-MM-dd] [--seed 7] [data.json [page.html]]`
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
@@ -14,7 +14,9 @@ const { values: opt, positionals } = parseArgs({
   options: { weeks: { type: "string" }, end: { type: "string" }, seed: { type: "string" } },
 });
 const [outJson, outHtml] =
-  positionals.length > 0 ? positionals : ["demo-site/demo-data.json", "demo-site/index.html"];
+  positionals.length > 0
+    ? positionals
+    : ["dist-site/demo/demo-data.json", "dist-site/demo/index.html"];
 const WEEKS = Math.min(Math.max(Number(opt.weeks ?? 52), 1), 52);
 const now = new Date();
 const END =

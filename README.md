@@ -361,8 +361,8 @@ that test the key and the server.
 Read [CONTRIBUTING.md](CONTRIBUTING.md). It tells how to run the server from source, and it has
 the commands, the test rules and the code map.
 
-To build a demo site with a year of sample data, run `pnpm build`, then
-`node scripts/demo-data.mjs`. The script writes `demo-site/index.html` and `demo-site/demo-data.json`.
+To build the website with its demo dashboard (a year of sample data), run `pnpm build`, then
+`pnpm build:site`. The site is in `dist-site/`, and the demo in `dist-site/demo/index.html`.
 
 ## Credits
 

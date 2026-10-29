@@ -204,11 +204,8 @@ function main() {
   copyFileSync("assets/dashboard.gif", `${OUT}/dashboard.gif`);
   if (!existsSync("dist/dashboard.html"))
     throw new Error("the demo needs the dashboard template: run pnpm build first");
-  execFileSync(
-    "node",
-    ["scripts/demo-data.mjs", `${OUT}/demo/demo-data.json`, `${OUT}/demo/index.html`],
-    { stdio: "ignore" },
-  );
+  // the demo script writes into dist-site/demo/ by default; the page needs only its HTML
+  execFileSync("node", ["scripts/demo-data.mjs"], { stdio: "ignore" });
   rmSync(`${OUT}/demo/demo-data.json`);
   console.log(`${OUT}/ written: index.html, preview.html, the public files and demo/`);
 }
