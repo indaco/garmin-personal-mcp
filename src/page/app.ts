@@ -220,11 +220,19 @@ function render(): void {
 
 const REPO = "https://github.com/indaco/garmin-personal-mcp";
 
+/** When the server wrote the page, in the viewer's time zone; an older page has only the date. */
+function writtenAt(data: Data): string | undefined {
+  const at = new Date(data.updated ?? "");
+  if (Number.isNaN(at.getTime())) return data.generated && fmt.longDay(data.generated);
+  return new Intl.DateTimeFormat(lang, { dateStyle: "medium", timeStyle: "short" }).format(at);
+}
+
 /**
  * Where the data comes from and when it was written, the days that Garmin did not give (their values
  * show n/a), then the project, the server version that wrote the page, and the license.
  */
 function footer(data?: Data): HTMLElement {
+  const written = data && writtenAt(data);
   const failed = Number(data?.sync?.failedDays) || 0;
   // the server that wrote the page last, with its release notes
   const version = /^\d+\.\d+\.\d+$/.test(data?.server ?? "") ? data!.server : undefined;
@@ -236,7 +244,7 @@ function footer(data?: Data): HTMLElement {
         "div",
         { class: "source" },
         // no date in the data, no date in the footer
-        data.generated && h("p", {}, t("footer.updated", { date: fmt.longDay(data.generated) })),
+        written && h("p", {}, t("footer.updated", { date: written })),
         failed > 0 && h("p", { class: "gap" }, t("footer.failed", { n: failed })),
       ),
     h(

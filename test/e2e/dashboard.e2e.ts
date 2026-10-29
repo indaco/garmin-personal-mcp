@@ -367,9 +367,22 @@ describe("the page", () => {
   });
 
   it("tells in the footer when the data was written, and the days that Garmin did not give", async () => {
-    const { page, errors } = await open(browser, pageFile());
+    const { page, errors } = await open(
+      browser,
+      pageFile({
+        data: {
+          ...data,
+          v: DASHBOARD_VERSION,
+          server: serverVersion,
+          notes: [],
+          updated: "2026-10-27T05:30:00.000Z",
+        },
+      }),
+      { timezoneId: "Europe/Rome" },
+    );
+    // the date and time of the write, in the viewer's time zone
     expect(await page.textContent("footer .source")).toBe(
-      "Data from Garmin Connect, updated Oct 26, 2026",
+      "Data from Garmin Connect, updated Oct 27, 2026, 6:30 AM",
     );
     expect(await page.$("footer .gap")).toBeNull();
     expect(await page.getAttribute("footer a >> text=MIT License", "href")).toContain("LICENSE");
@@ -389,8 +402,9 @@ describe("the page", () => {
         },
       }),
     );
-    // data without the server version (an older page) shows none
+    // data without the server version and the write time (an older page) shows none, and the date
     expect(await failed.page.textContent("footer .made")).toBe("garmin-personal-mcp·MIT License");
+    expect(await failed.page.textContent("footer .source")).toMatch(/updated Oct 26, 2026Days not/);
     expect(await failed.page.textContent("footer .gap")).toBe(
       "Days not read from Garmin: 2 (their values show n/a)",
     );

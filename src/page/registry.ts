@@ -31,6 +31,8 @@ export interface Data {
   locale?: string;
   /** The version of the server that wrote the data, e.g. 0.2.0. */
   server?: string;
+  /** When the server wrote the page, as an ISO time; older pages have only `generated`. */
+  updated?: string;
 }
 
 /** What a widget gets to draw itself. Built-in and custom widgets get the same. */

@@ -109,7 +109,13 @@ describe("writeDashboard", () => {
     const r = await writer.write({ weeks: 8 });
     expect(r).toMatchObject({ path: file, page: "created", notes: 0 });
     expect(asked).toEqual([8]);
-    expect(readBlock(page(), "data")).toEqual({ ...data, v: 3, server: serverVersion, notes: [] });
+    expect(readBlock(page(), "data")).toEqual({
+      ...data,
+      v: 3,
+      server: serverVersion,
+      updated: expect.stringMatching(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/),
+      notes: [],
+    });
     expect(readBlock(page(), "layout")).toMatchObject({ base: "preset", boards: {} });
     expect(readBlock(page(), "widgets")).toEqual([]);
   });
