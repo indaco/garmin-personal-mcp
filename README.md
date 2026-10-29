@@ -43,6 +43,7 @@ With this server, you can ask your assistant:
 
 - Activities: "List my last 5 activities, with pace and heart rate."
 - Activities: "How much time did I spend in each HR zone on my runs this month?"
+- Activities: "How did my sessions named Tempo 5k and Long run change over the last 2 months?"
 - Laps: "Show the laps of my last run."
 - Strength: "Compare my sets of this week with the week before."
 - Strength: "Which muscles did I train most this week?"
@@ -153,7 +154,7 @@ Ask "list my last 5 activities". The first time that a garmin-personal tool asks
 
 | Tool                  | What it gives                                                          |
 | --------------------- | ---------------------------------------------------------------------- |
-| `listActivities`      | a summary of each activity, with pace, HR, training load and effect    |
+| `listActivities`      | each activity with pace, HR, load and effect, by date, type or name    |
 | `getActivity`         | the details of one activity                                            |
 | `getActivityLaps`     | the laps of an activity, from its .FIT file                            |
 | `getActivitySets`     | the strength sets of an activity, with the muscles, from its .FIT file |

@@ -451,6 +451,13 @@
         "raw": {
           "type": "boolean",
           "description": "Return Garmin's raw JSON instead of the summary"
+        },
+        "names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Activity names (optional): keep only the activities whose name contains one of them, ignoring case"
         }
       },
       "required": []
