@@ -21,6 +21,7 @@ pnpm test                # Vitest
 pnpm vitest run test/tools.test.ts -t "name"   # one test
 pnpm build               # dist/index.js, the page template, THIRD-PARTY-NOTICES.md
 pnpm build:site          # the website in dist-site/, after the build
+pnpm build:all           # both builds: the server and dashboard template, then the website
 pnpm test:page           # the dashboard page and the website in headless Chromium, after both builds
 pnpm guide               # write the generated parts of guide/
 ```

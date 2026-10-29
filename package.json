@@ -21,6 +21,7 @@
   "scripts": {
     "build": "tsdown && node scripts/build-template.mjs && node scripts/third-party-notices.mjs",
     "build:site": "tsdown -c tsdown.site.config.ts && node scripts/build-site.mjs",
+    "build:all": "pnpm build && pnpm build:site",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage",
     "test:page": "vitest run --config vitest.page.config.ts",
