@@ -350,6 +350,12 @@ from a tested template.
 
 This server uses the same key file as indaco/garmin-mcp and can share its data folder.
 
+## How this was built
+
+AI agents in Claude Code wrote the code, tests and docs of this project. I chose the design,
+reviewed each change and tested the server with my own Garmin data. The rules that the agents
+follow are in [AGENTS.md](AGENTS.md).
+
 ## License
 
 This project uses the [MIT License](LICENSE). `dist/index.js` and the dashboard page include
