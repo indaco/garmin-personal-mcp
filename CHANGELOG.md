@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The changelog is generated and managed by [sley](https://github.com/indaco/sley).
 
+## v0.3.1 - 2026-10-29
+
+### 🩹 Fixes
+
+- print the version and the help without starting the server ([71698c8](https://github.com/indaco/garmin-personal-mcp/commit/71698c8)) ([#106](https://github.com/indaco/garmin-personal-mcp/pull/106))
+
+### ❤️ Contributors
+
+- [@indaco](https://github.com/indaco)
+
 ## v0.3.0 - 2026-10-29
 
 ### 🚀 Enhancements
