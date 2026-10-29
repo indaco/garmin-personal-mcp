@@ -37,7 +37,7 @@ API reference: <https://developer.garmin.com/gc-developer-program/personal/swagg
 The Personal API does not have these Garmin Connect data, and their endpoints answer 404:
 
 - VO2 max, training status and readiness, race predictions and personal records;
-- weight, gear and activity weather;
+- gear and activity weather;
 - endurance and hill score, lactate threshold and exercise sets.
 
 When the dashboard needs one of these values, it calculates an estimate and labels it.
