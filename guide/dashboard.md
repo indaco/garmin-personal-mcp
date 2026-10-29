@@ -28,8 +28,13 @@ Run the `training-dashboard` prompt. It has two optional arguments:
 | `freeform` | The assistant designs the whole page from a long description. A build can take 25 minutes or more, and each page looks different. |
 
 With `preset` and `blank`, the assistant first asks for the title and the headline (the line under
-the title). Keep them or type your own. Later updates keep them, also the automatic update. The
-other settings of the page stay as they are.
+the title). Keep them or type your own. Later updates keep them, also the automatic update. When the
+page has other settings, for example only one sport or no sleep data, the assistant tells you these
+settings. When the page leaves out data, for example on a page for your coach, the assistant names
+that data and tells you that the defaults put it back into the page. Keep the settings (the
+default), or use the defaults: all sports, all data, English and the language of your Garmin
+profile, and all themes, opening in midnight. You can also type your own choice, for example "all
+sports, keep the rest".
 
 To set the sports and the data of the page too, for example for a page that you share with your
 coach, run `dashboard-setup`. See [Page settings](#page-settings).

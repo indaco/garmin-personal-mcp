@@ -211,7 +211,9 @@ In Claude Code, the arguments are in order and separated by spaces: first `weeks
 You can also give only the layout: `/garmin-personal:training-dashboard freeform`.
 
 With `preset` and `blank`, the assistant first asks for the title and the headline (the line under
-the title) of the page. Keep them or type your own. Updates and the automatic update keep them.
+the title) of the page. Keep them or type your own. Updates and the automatic update keep them. When
+the page has other settings, for example only one sport, the assistant tells you these settings and
+asks you to keep them, to use the defaults or to type your own choice.
 
 The assistant gives you the path of the page and the command to open it. The page has a board for
 all your training, a Recovery board and a board for each sport, with 11 themes, in English and the

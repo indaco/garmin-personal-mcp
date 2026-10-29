@@ -67,14 +67,43 @@ describe("prompts", () => {
   it("asks for a title and a headline on a preset or blank page, and keeps the other settings", async () => {
     for (const layout of ["preset", "blank"]) {
       const text = await render("training-dashboard", { layout });
-      expect(text).toContain(`"${en.title}" for a new`);
-      expect(text).toContain(`"${en.headline}" for a new page`);
+      expect(text).toContain(`else "${en.title}"`);
+      expect(text).toContain(`else "${en.headline}"`);
       expect(text).toContain(
         "`settings` = the `settings` of the\n   last result with `title` and `headline`",
       );
     }
     expect(await render("training-dashboard", { layout: "freeform" })).not.toContain(
       "Keep the title",
+    );
+  });
+
+  it("asks to keep the saved settings of a preset or blank page, or to use the defaults", async () => {
+    for (const layout of ["preset", "blank"]) {
+      const text = await render("training-dashboard", { weeks: "8", layout });
+      expect(text).toContain("1. Call `writeDashboard` with `preview` = true and `weeks` = 8.");
+      expect(text).toContain("only when `settings` has more than `title` and `headline`");
+      expect(text).toContain('"Keep these settings" (default)');
+      expect(text).toContain(
+        '"Use the defaults: all sports, all data, English and\n     the language of my Garmin profile, all themes, opens in midnight"',
+      );
+      expect(text).toContain('"all sports, keep the rest"');
+      expect(text).toContain(
+        "name each item it leaves out and say that the defaults put them back",
+      );
+      expect(text).toContain(
+        "If I typed my own choice, give `settings` = `settings` changed as I said.",
+      );
+      expect(text).toContain('"Keep the title" (default: the `title` of `settings`');
+      expect(text).toContain('"Keep the headline" (default: the `headline`\n     of `settings`');
+      expect(text).toContain(`\`weeks\` = 8 and \`layout\` = "${layout}". If I chose the`);
+      expect(text).toContain("also give `settings` = only the `title` and `headline`");
+      // the steps after the questions follow in order
+      expect(text.match(/^\d\. /gm)).toEqual(["1. ", "2. ", "3. ", "4. ", "5. ", "6. "]);
+      expect(text.includes("{{")).toBe(false);
+    }
+    expect(await render("training-dashboard", { layout: "freeform" })).not.toContain(
+      "Keep these settings",
     );
   });
 
