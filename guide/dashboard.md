@@ -61,6 +61,9 @@ When a new version of the server has a newer page template, the update writes th
 keeps your layout, custom widgets, languages and page settings, and it keeps the old page as a
 `.bak` file.
 
+The first update sends approximately 35 requests to Garmin. Later updates use the local cache and
+send approximately 8.
+
 Reload the page in the browser to see the new data.
 
 ## Update the dashboard on a schedule
@@ -135,6 +138,9 @@ updates that page.
 
 Each tab is a board: a grid of widgets with up to 3 columns. A board has 2 columns on a tablet and 1
 column on a phone. Each widget is 1, 2 or 3 columns wide.
+
+The page uses the training load, HR zones and training effect from Garmin. It labels each value that
+it calculates as an estimate, and a missing value shows as "n/a".
 
 The All board shows all types. The Recovery board shows readiness, fitness age, load against
 recovery and the 14-day recovery widgets: HRV, resting HR, sleep, sleep need, bedtime and Body
@@ -230,9 +236,10 @@ The **Language** menu has English, the language of your Garmin profile when it i
 languages that you add. The built-in languages are English, Italian, German, French, Spanish and
 Portuguese. The [page settings](#page-settings) can keep other built-in languages in the file. The
 page opens in the language of your Garmin profile until you choose one in the menu. _Auto_ follows
-the language of the browser. When the page has no texts in the language of your Garmin profile, the
-settings menu says so, with the name of the language. [Languages](languages.md) tells how to add a
-language.
+the language of the browser. When the page has no texts in the language of your Garmin profile (for
+example Russian), it shows English and the settings menu says so, with the name of the language.
+When it makes the page, the assistant tells you, offers to add that language, and asks if you want
+one more. [Languages](languages.md) tells how to add a language.
 
 ## Units
 
