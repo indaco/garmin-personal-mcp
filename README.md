@@ -18,49 +18,56 @@
 
 <p align="center">
   <b><a href="#quick-start">Quick start</a></b> &middot;
-  <b><a href="#prompts">Prompts</a></b> &middot;
-  <b><a href="#dashboard-setup">Dashboard setup</a></b> &middot;
+  <b><a href="#what-you-can-ask">What you can ask</a></b> &middot;
   <b><a href="#tools">Tools</a></b> &middot;
-  <b><a href="#presets-or-freeform">Presets or freeform</a></b> &middot;
-  <b><a href="guide/dashboard.md">Dashboard guide</a></b> &middot;
+  <b><a href="#dashboard">Dashboard</a></b> &middot;
   <b><a href="guide/how-it-works.md">How it works</a></b> &middot;
   <b><a href="guide/troubleshooting.md">Troubleshooting</a></b>
+</p>
+
+<p align="center">
+  An MCP server that lets your assistant read your Garmin data: activities, laps, strength sets,
+  sleep, HRV and more. Ask questions in the chat, or let the server build a training dashboard.
 </p>
 
 <p align="center">
   <img src="assets/dashboard.gif" alt="The training dashboard: the All board, load against recovery, the Run board, strength trends, edit mode (drag a widget to a new place, hide a widget, add widgets from the catalogue to an empty board), and the light and high-contrast themes" width="800">
 </p>
 <p align="center">
-  <sub><i>The training dashboard with demo data.</i></sub>
+  <sub><i>One thing you can build: the training dashboard, with demo data.</i></sub>
 </p>
 
-MCP server for the official Garmin Connect Personal API.
+## What you can ask
+
+With this server, you can ask your assistant:
+
+- Activities: "List my last 5 activities, with pace and heart rate."
+- Activities: "How much time did I spend in each HR zone on my runs this month?"
+- Laps: "Show the laps of my last run."
+- Strength: "Compare my sets of this week with the week before."
+- Strength: "Which muscles did I train most this week?"
+- Recovery: "How did I sleep this week, and how was my HRV?"
+- Recovery: "Show my steps, stress and Body Battery for the last 7 days."
+- All together: "My run on Saturday felt hard. Compare it with my sleep and HRV of the nights
+  before."
 
 ## Features
 
 - **Official and read-only**: uses the Garmin Connect Personal API. It writes nothing back.
 - **Nothing to install**: runs with `npx`.
-- **Laps and strength sets**: read from the original .FIT files.
-- **Recovery data**: HRV, sleep and heart rate.
-- **Dashboard in less than a minute**: [training-dashboard](#training-dashboard) shows your
-  training load next to recovery, in widgets that you can move, resize, hide and add. You can also
-  [let the assistant design the whole page](#presets-or-freeform).
-- **Your layout stays**: [training-dashboard-update](#training-dashboard-update) adds only the
-  new data.
-- **A page for you or for your coach**: [dashboard-setup](#dashboard-setup) makes a personal page,
-  or a page to share with your coach or personal trainer. You select the sports and the data. The
-  data that you do not select is not in the file.
-- **Extend it**: [dashboard-widget](#dashboard-widget) makes a new widget from your idea.
-  [dashboard-language](#dashboard-language) adds a language.
+- **Laps and strength sets**: read from the original .FIT files, with the muscles of each set.
+- **Recovery data**: HRV, sleep, heart rate, stress and Body Battery.
+- **All of the Personal API**: [`garminGet`](#tools) reads the endpoints that have no tool of
+  their own.
 - **All stdio clients**: Claude Desktop, Claude Code, Codex and all other MCP clients that use
   stdio. Tested with Claude Desktop and Claude Code.
-
-With this server, you can ask your assistant:
-
-- "List my last 5 activities, with pace and heart rate."
-- "Show the laps of my last run."
-- "Compare my sets of this week with the week before."
-- "How did I sleep this week, and how was my HRV?"
+- **Dashboard in less than a minute**: [training-dashboard](#training-dashboard) shows your
+  training load next to recovery, in widgets that you can move, resize, hide and add.
+  [training-dashboard-update](#training-dashboard-update) adds only the new data, and your layout
+  stays.
+- **Dashboard for you or for your coach**: [dashboard-setup](#dashboard-setup) makes a page with
+  only the sports and the data that you select. [dashboard-widget](#dashboard-widget) and
+  [dashboard-language](#dashboard-language) add a widget or a language.
 
 ## Quick start
 
@@ -136,15 +143,43 @@ show MCP prompts. In these clients, ask for the dashboard in your own words. The
 Ask "list my last 5 activities". The first time that a garmin-personal tool asks for permission, answer
 **Allow always** in Claude Desktop. In Claude Code, use `/permissions` and add `mcp__garmin-personal`.
 
-## Prompts
+## Tools
 
-In Claude Desktop, the prompts are in the **+** menu of the message box, under _garmin-personal_. In
-Claude Code, they are slash commands such as `/garmin-personal:training-dashboard`.
+| Tool                  | What it gives                                                          |
+| --------------------- | ---------------------------------------------------------------------- |
+| `listActivities`      | a summary of each activity, with pace, HR, training load and effect    |
+| `getActivity`         | the details of one activity                                            |
+| `getActivityLaps`     | the laps of an activity, from its .FIT file                            |
+| `getActivitySets`     | the strength sets of an activity, with the muscles, from its .FIT file |
+| `downloadActivityFit` | saves the .FIT file of an activity in the data folder                  |
+| `getHrvRange`         | HRV during the night                                                   |
+| `getDailyHeartRate`   | the heart rate of a day, with the resting HR                           |
+| `getSleep`            | the sleep of a night, or of up to 14 nights                            |
+| `getHeartRateZones`   | your HR zones                                                          |
+| `getFitnessAge`       | fitness age against actual age                                         |
+| `getDailySummary`     | steps, stress and Body Battery, for a day or a range                   |
+| `getDashboardData`    | all the data of the dashboard in one call, with a local cache          |
+| `writeDashboard`      | writes the dashboard page                                              |
+| `editDashboard`       | changes the layout, the custom widgets and the languages of the page   |
+| `garminGet`           | all other GET endpoints of the Personal API                            |
+
+[Tools](guide/tools.md) gives the endpoints, the details of each tool and the data that the
+Personal API does not have.
+
+## Dashboard
+
+The server makes a training dashboard with these prompts. In Claude Desktop, the prompts are in
+the **+** menu of the message box, under _garmin-personal_. In Claude Code, they are slash commands.
+
+| Prompt                                                  | What it does                           | Claude Code example                                 |
+| ------------------------------------------------------- | -------------------------------------- | --------------------------------------------------- |
+| [training-dashboard](#training-dashboard)               | makes the page                         | `/garmin-personal:training-dashboard 8`             |
+| [training-dashboard-update](#training-dashboard-update) | adds the new data, your layout stays   | `/garmin-personal:training-dashboard-update`        |
+| [dashboard-setup](#dashboard-setup)                     | makes a page for you or for your coach | `/garmin-personal:dashboard-setup`                  |
+| [dashboard-widget](#dashboard-widget)                   | makes a new widget from your idea      | `/garmin-personal:dashboard-widget my longest ride` |
+| [dashboard-language](#dashboard-language)               | adds a language to the page            | `/garmin-personal:dashboard-language German`        |
 
 The prompts remove all spaces around an argument, also the no-break space from a phone keyboard.
-
-After an update of the server, the prompts and tools change only in a new Claude Code session. In
-Claude Desktop, they change after a full restart.
 
 ### training-dashboard
 
@@ -160,11 +195,6 @@ The page is one HTML file, `garmin-dashboard.html` in the data folder. It works 
 - `blank` gives empty boards: you add the widgets that you want.
 - `freeform` lets the assistant design the whole page. This takes much longer, and each page looks
   different.
-
-| Client         | How to run it                                                               |
-| -------------- | --------------------------------------------------------------------------- |
-| Claude Desktop | **+** → _garmin-personal_ → `training-dashboard` → set the arguments → send |
-| Claude Code    | `/garmin-personal:training-dashboard 8`                                     |
 
 In Claude Code, the arguments are in order and separated by spaces: first `weeks`, then `layout`.
 You can also give only the layout: `/garmin-personal:training-dashboard freeform`.
@@ -190,11 +220,6 @@ your languages stay. Reload the page to see the new data.
 In Claude Code: `/garmin-personal:training-dashboard-update coach.html` updates `coach.html`. A
 value that ends in `.html` is the file, also in the first place.
 
-| Client         | How to run it                                                  |
-| -------------- | -------------------------------------------------------------- |
-| Claude Desktop | **+** → _garmin-personal_ → `training-dashboard-update` → send |
-| Claude Code    | `/garmin-personal:training-dashboard-update`                   |
-
 The first call sends approximately 35 requests to Garmin. Later calls use the local cache and send
 approximately 8.
 
@@ -212,11 +237,6 @@ languages and the themes. The server writes only the data that you select into t
 is not in the file, so you can send the file safely. A personal page and a shared page can be two
 files side by side. Each page keeps its settings on each update. The argument `weeks` is optional
 (default 12).
-
-| Client         | How to run it                                        |
-| -------------- | ---------------------------------------------------- |
-| Claude Desktop | **+** → _garmin-personal_ → `dashboard-setup` → send |
-| Claude Code    | `/garmin-personal:dashboard-setup`                   |
 
 [Page settings](guide/dashboard.md#page-settings) tells more.
 
@@ -240,28 +260,21 @@ text without a translation shows in English. To remove an added language, ask yo
 remove it: `editDashboard` with `removeLanguages`.
 [Languages](guide/languages.md) tells more.
 
-## Tools
+### Presets or freeform
 
-| Tool                  | What it gives                                                          |
-| --------------------- | ---------------------------------------------------------------------- |
-| `listActivities`      | a summary of each activity, with pace, HR, training load and effect    |
-| `getActivity`         | the details of one activity                                            |
-| `getActivityLaps`     | the laps of an activity, from its .FIT file                            |
-| `getActivitySets`     | the strength sets of an activity, with the muscles, from its .FIT file |
-| `downloadActivityFit` | saves the .FIT file of an activity in the data folder                  |
-| `getHrvRange`         | HRV during the night                                                   |
-| `getDailyHeartRate`   | the heart rate of a day, with the resting HR                           |
-| `getSleep`            | the sleep of a night, or of up to 14 nights                            |
-| `getHeartRateZones`   | your HR zones                                                          |
-| `getFitnessAge`       | fitness age against actual age                                         |
-| `getDailySummary`     | steps, stress and Body Battery, for a day or a range                   |
-| `getDashboardData`    | all the data of the dashboard in one call, with a local cache          |
-| `writeDashboard`      | writes the dashboard page                                              |
-| `editDashboard`       | changes the layout, the custom widgets and the languages of the page   |
-| `garminGet`           | all other GET endpoints of the Personal API                            |
+In many setup guides for Claude and Garmin, Claude reads the data and writes the whole dashboard
+page. With a preset, the server writes the page from a tested template, and Claude writes only the
+coach notes. My measurements for a first build, with Claude Code and Opus
+(other clients and models give other times and costs):
 
-[Tools](guide/tools.md) gives the endpoints, the details of each tool and the data that the
-Personal API does not have.
+| First build            | Time         | Cost         |
+| ---------------------- | ------------ | ------------ |
+| Preset                 | 34 s         | $0.16        |
+| Claude writes the page | 24 to 35 min | $6.6 to $9.2 |
+
+For a design of your own, use `layout` = `freeform`: Claude writes the page, as in those guides.
+
+[Presets or freeform](guide/presets.md) gives the measurements and the limits of the presets.
 
 ## Configuration
 
@@ -284,22 +297,6 @@ In Claude Code, add `--env GARMIN_DATA_DIR=/path/to/garmin-data` to `claude mcp 
 
 [The data folder](guide/tools.md#the-data-folder) lists the files that the server keeps and its
 log.
-
-## Presets or freeform
-
-In many setup guides for Claude and Garmin, Claude reads the data and writes the whole dashboard
-page. With a preset, the server writes the page from a tested template, and Claude writes only the
-coach notes. My measurements for a first build, with Claude Code and Opus
-(other clients and models give other times and costs):
-
-| First build            | Time         | Cost         |
-| ---------------------- | ------------ | ------------ |
-| Preset                 | 34 s         | $0.16        |
-| Claude writes the page | 24 to 35 min | $6.6 to $9.2 |
-
-For a design of your own, use `layout` = `freeform`: Claude writes the page, as in those guides.
-
-[Presets or freeform](guide/presets.md) gives the measurements and the limits of the presets.
 
 ## Security
 
@@ -339,14 +336,8 @@ To build a demo site with a year of sample data, run `pnpm build`, then
 The idea comes from [apratico/garmin-mcp](https://github.com/apratico/garmin-mcp) by Alessandro
 Praticò: a Java MCP server for the Garmin Personal API, where Claude writes the dashboard. I
 tested it in a fork, [indaco/garmin-mcp](https://github.com/indaco/garmin-mcp), and then made this
-server as a different solution:
-
-- **No Java**: the server runs with `npx`. You do not need Java 21 and a jar file.
-- **The server writes the page**: in garmin-mcp, Claude writes all of the dashboard HTML on each run. Here the server fills a tested template, and Claude writes only the coach notes. A first build takes seconds, not minutes ([measurements](#presets-or-freeform)).
-- **Updates keep your page**: [training-dashboard-update](#training-dashboard-update) adds only the new data, and your layout stays.
-- **Widgets that you control**: charts for training load, recovery, running and strength. In the page, you drag, resize, hide and add widgets, and select a theme.
-- **Setup by sport**: [dashboard-setup](#dashboard-setup) makes a page with only the sports and the data that you select, for you or for your coach.
-- **Languages and custom widgets**: [dashboard-language](#dashboard-language) and [dashboard-widget](#dashboard-widget) extend the page.
+server as a different solution. It runs with `npx`, without Java, and it writes the dashboard page
+from a tested template.
 
 This server uses the same key file as indaco/garmin-mcp and can share its data folder.
 
