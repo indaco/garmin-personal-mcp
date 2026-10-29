@@ -183,13 +183,13 @@ Personal API does not have.
 The server makes a training dashboard with these prompts. In Claude Desktop, the prompts are in
 the **+** menu of the message box, under _garmin-personal_. In Claude Code, they are slash commands.
 
-| Prompt                                                  | What it does                           | Claude Code example                                 |
-| ------------------------------------------------------- | -------------------------------------- | --------------------------------------------------- |
-| [training-dashboard](#training-dashboard)               | makes the page                         | `/garmin-personal:training-dashboard 8`             |
-| [training-dashboard-update](#training-dashboard-update) | adds the new data, your layout stays   | `/garmin-personal:training-dashboard-update`        |
-| [dashboard-setup](#dashboard-setup)                     | makes a page for you or for your coach | `/garmin-personal:dashboard-setup`                  |
-| [dashboard-widget](#dashboard-widget)                   | makes a new widget from your idea      | `/garmin-personal:dashboard-widget my longest ride` |
-| [dashboard-language](#dashboard-language)               | adds a language to the page            | `/garmin-personal:dashboard-language German`        |
+| Prompt                                                  | What it does                                                                              | Claude Code example                                 |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| [training-dashboard](#training-dashboard)               | makes the page                                                                            | `/garmin-personal:training-dashboard 8`             |
+| [training-dashboard-update](#training-dashboard-update) | adds the new data, your layout stays                                                      | `/garmin-personal:training-dashboard-update`        |
+| [dashboard-setup](#dashboard-setup)                     | makes a page for you or for your coach, with only the sports and the data that you select | `/garmin-personal:dashboard-setup`                  |
+| [dashboard-widget](#dashboard-widget)                   | makes a new widget from your idea                                                         | `/garmin-personal:dashboard-widget my longest ride` |
+| [dashboard-language](#dashboard-language)               | adds a language to the page                                                               | `/garmin-personal:dashboard-language German`        |
 
 The prompts remove all spaces around an argument, also the no-break space from a phone keyboard.
 
