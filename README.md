@@ -243,8 +243,9 @@ The first call sends approximately 35 requests to Garmin. Later calls use the lo
 approximately 8.
 
 To update the page automatically, tell your assistant when, in your own words and in any language,
-for example "update my dashboard every Monday at 7". The assistant also asks this when it makes a
-page. The automatic update replaces the data and removes the coach notes. See
+for example "update my dashboard every Monday at 7". When it makes a page, the assistant also asks:
+no (the default), every day, weekdays or every Monday at 07:00, or your own words. The automatic
+update replaces the data and removes the coach notes. See
 [Update the dashboard on a schedule](guide/dashboard.md#update-the-dashboard-on-a-schedule).
 
 ### dashboard-setup

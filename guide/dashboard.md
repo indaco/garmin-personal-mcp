@@ -57,8 +57,23 @@ Reload the page in the browser to see the new data.
 ## Update the dashboard on a schedule
 
 This is optional. The server can update the data of your page at fixed times, also when no
-assistant is open. When you make a page, the assistant asks if you want this. You can also ask at
-any time. Say when in your own words, in any language, for example:
+assistant is open.
+
+When you make a page with `training-dashboard` (all layouts) or `dashboard-setup`, the assistant
+asks one time if the page must update automatically:
+
+| Choice                | Schedule                   |
+| --------------------- | -------------------------- |
+| No (default)          | no automatic update        |
+| Every day at 07:00    | each day                   |
+| Weekdays at 07:00     | Monday to Friday           |
+| Every Monday at 07:00 | once a week                |
+| Your own words        | any schedule that you type |
+
+When a schedule is already set, the assistant offers it first, after "No". The
+`training-dashboard-update` prompt does not ask: it only reminds you that you can ask.
+
+You can also ask at any time. Say when in your own words, in any language, for example:
 
 - "Update my dashboard every day at 7."
 - "Update my dashboard on Monday and Thursday at 18."
