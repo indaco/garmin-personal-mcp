@@ -73,6 +73,8 @@ export class GarminDashboard {
     ]);
     // Garmin answers in metric whatever this setting says: it only tells the page what to show
     const units = isObject(settings) ? settings.measurementSystem : undefined;
+    // Garmin writes a locale as pt_BR; the page keeps the built-in language that matches it
+    const locale = isObject(settings) ? String(settings.preferredLocale).replace("_", "-") : "";
     const out: Json = {
       generated: today,
       weeks: w,
@@ -83,6 +85,7 @@ export class GarminDashboard {
       zones,
       fitnessAge,
       ...(typeof units === "string" && UNITS.includes(units) ? { units } : {}),
+      ...(/^[a-z]{2,3}(-[A-Z]{2})?$/.test(locale) ? { locale } : {}),
     };
     const activities = activitiesBetween(cache, start, today).map((a) => structuredClone(a));
     await this.#attachDetails(activities);
@@ -490,7 +493,8 @@ export function registerDashboard(server: McpServer, dashboard: GarminDashboard)
         "last `weeks` weeks (compact summaries, with strength sets and laps where they apply), the activities",
         "of the weeks before for the period comparison, daily HRV, and the last 14 days of sleep and daily",
         "summaries, and `units`: the measurement system of the Garmin profile (metric, statute_us or",
-        "statute_uk) that the page shows; the data itself is always metric. Keeps a local cache and",
+        "statute_uk) that the page shows; the data itself is always metric; `locale`: the language of",
+        "the Garmin profile, e.g. it or pt-BR. Keeps a local cache and",
         "fetches from Garmin only what is new since the last call, so a rebuild or an update needs few",
         "calls. `sync` in the result says what was fetched.",
       ].join("\n"),

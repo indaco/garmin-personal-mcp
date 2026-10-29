@@ -2,7 +2,13 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DashboardWriter, readBlock, templateVersion, withData } from "../src/dashboard-page";
+import {
+  DashboardWriter,
+  languagesOf,
+  readBlock,
+  templateVersion,
+  withData,
+} from "../src/dashboard-page";
 import { digest } from "../src/digest";
 import { DASHBOARD_VERSION } from "../src/prompts";
 
@@ -414,13 +420,33 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
     expect(s).toContain("@media (prefers-color-scheme:light){}");
   });
 
-  it("writes the built-in languages that the settings keep", async () => {
-    await writer.write({});
+  it("writes the built-in languages that the settings keep, else the one of the profile", async () => {
+    let r = await writer.write({});
+    expect(readBlock(page(), "languages")).toEqual({});
+    expect(r.pageLanguages).toEqual(["en"]);
+    // the writer reuses the data for a while: a new one for another profile
+    const fromItaly = JSON.stringify({ ...full, locale: "it" });
+    writer = new DashboardWriter(
+      async () => fromItaly,
+      dir,
+      async () => templateText,
+    );
+    r = await writer.write({});
     expect(Object.keys(readBlock(page(), "languages") as object)).toEqual(["it"]);
+    expect(r.pageLanguages).toEqual(["en", "it"]);
     await writer.write({ settings: { languages: ["en"] } });
     expect(readBlock(page(), "languages")).toEqual({});
-    await writer.write({ settings: { languages: ["it"] } });
+    r = await writer.write({ settings: { languages: ["it"] } });
     expect(Object.keys(readBlock(page(), "languages") as object)).toEqual(["it"]);
+    expect(r.pageLanguages).toEqual(["it"]);
+  });
+
+  it("matches the profile locale by full tag, then by language", () => {
+    expect(Object.keys(languagesOf({}, "it-CH"))).toEqual(["it"]);
+    expect(languagesOf({}, "en")).toEqual({});
+    expect(languagesOf({}, "xx")).toEqual({});
+    expect(languagesOf({}, undefined)).toEqual({});
+    expect(languagesOf({ languages: ["en"] }, "it")).toEqual({});
   });
 
   it("writes a path that starts with ~ in the home folder", async () => {

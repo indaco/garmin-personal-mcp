@@ -167,16 +167,16 @@ The `dashboard-setup` prompt asks you questions and writes a page with your answ
 ask your assistant directly, for example "make a dashboard for my coach without my sleep data". The
 assistant calls `writeDashboard` with `settings`:
 
-| Setting     | What it does                                                               | Default               |
-| ----------- | -------------------------------------------------------------------------- | --------------------- |
-| `title`     | replaces the title in every language                                       | the built-in title    |
-| `headline`  | replaces the line under the title in every language                        | the built-in headline |
-| `sports`    | the boards to keep, for example `running` and `cycling`                    | all                   |
-| `exclude`   | the data to leave out: `recovery`, `fitnessAge`, `zones`, `names`, `notes` | none                  |
-| `languages` | the built-in languages to keep: `en`, `it`                                 | all                   |
-| `language`  | the language that the page opens in: `auto` or a language code             | `auto`                |
-| `themes`    | the themes to keep                                                         | all                   |
-| `theme`     | the theme that the page opens in                                           | `midnight`            |
+| Setting     | What it does                                                               | Default                                        |
+| ----------- | -------------------------------------------------------------------------- | ---------------------------------------------- |
+| `title`     | replaces the title in every language                                       | the built-in title                             |
+| `headline`  | replaces the line under the title in every language                        | the built-in headline                          |
+| `sports`    | the boards to keep, for example `running` and `cycling`                    | all                                            |
+| `exclude`   | the data to leave out: `recovery`, `fitnessAge`, `zones`, `names`, `notes` | none                                           |
+| `languages` | the built-in languages to keep: `en`, `it`                                 | English and the language of the Garmin profile |
+| `language`  | the language that the page opens in: `auto` or a language code             | `auto`                                         |
+| `themes`    | the themes to keep                                                         | all                                            |
+| `theme`     | the theme that the page opens in                                           | `midnight`                                     |
 
 The server leaves the excluded data and sports out of the file, and out of the digest for the coach
 notes. A widget whose data is left out does not show. With `recovery` excluded, the page has no
