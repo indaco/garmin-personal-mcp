@@ -43,13 +43,21 @@ wrong, open an issue _before_ you write code.
 
 ## Development environment
 
-You need Node.js 22 or later and pnpm. With [devbox](https://www.jetify.com/devbox), `devbox shell`
-gives you Node 26, pnpm and prek. Without devbox, install pnpm with `npm install -g pnpm`. pnpm uses
-the version that the `packageManager` field in `package.json` sets, so you get the same pnpm as CI.
+You need three tools: Node.js 22 or later, pnpm, and [prek](https://prek.j178.dev) for the git
+hooks. Get them in one of two ways:
+
+- **With [devbox](https://www.jetify.com/devbox)**: run `devbox shell` in the repository. It gives
+  you Node 26, pnpm and prek.
+- **Without devbox**: install Node.js, then run `npm install -g pnpm`. To install prek, follow the
+  instructions on the prek website.
+
+In the two cases, pnpm uses the version in the `packageManager` field of `package.json`. CI uses
+the same version.
 
 ```bash
 git clone https://github.com/indaco/garmin-personal-mcp.git
 cd garmin-personal-mcp
+devbox shell             # with devbox only
 pnpm install
 pnpm build               # writes dist/index.js, dist/dashboard.html and THIRD-PARTY-NOTICES.md
 prek install             # the git hooks: format and lint on commit, typecheck and tests on push
