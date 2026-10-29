@@ -49,12 +49,19 @@ When the dashboard needs one of these values, it calculates an estimate and labe
 
 The data folder has:
 
-| File                   | Content                                                                |
-| ---------------------- | ---------------------------------------------------------------------- |
-| `fit/{id}.fit`         | the original .FIT files. The server downloads each file one time only. |
-| `exercises.json`       | the exercise catalogue of Garmin, for the muscles of each exercise     |
-| `dashboard-cache.json` | the dashboard data of the last calls                                   |
-| `widgets.json`         | your custom widgets: every dashboard page gets them                    |
+| File                                        | Content                                                                |
+| ------------------------------------------- | ---------------------------------------------------------------------- |
+| `fit/{id}.fit`                              | the original .FIT files. The server downloads each file one time only. |
+| `exercises.json`                            | the exercise catalogue of Garmin, for the muscles of each exercise     |
+| `dashboard-cache.json`                      | the dashboard data of the last calls                                   |
+| `widgets.json`                              | your custom widgets: every dashboard page gets them                    |
+| `auto-refresh.json`                         | the automatic update: its cron expression and its pages                |
+| `auto-refresh.cmd`, `auto-refresh-task.xml` | Windows only: the script and the task of the automatic update          |
 
 The server writes its log to `~/.cache/garmin-personal-mcp/garmin-personal-mcp.log`. When the log
 is larger than 1 MB, the server moves it to `garmin-personal-mcp.log.1` and starts a new log.
+
+The automatic update writes one line for each page to `~/.cache/garmin-personal-mcp/refresh.log`.
+Its job is outside the data folder: `~/Library/LaunchAgents/com.indaco.garmin-personal-mcp.refresh.plist`
+on macOS, a line that ends with `# garmin-personal-mcp refresh` in your crontab on Linux, and the
+task `garmin-personal-mcp refresh` in Task Scheduler on Windows.

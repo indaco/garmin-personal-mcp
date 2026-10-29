@@ -7,6 +7,7 @@ flowchart LR
     S -- "Bearer token, GET" --> G["Garmin Connect Personal API"]
     S -- "exercise catalogue, no token" --> E["connect.garmin.com"]
     S -- ".FIT files and caches" --> F[("~/workspace/garmin-data")]
+    J["System scheduler (launchd, cron, Task Scheduler)"] -- "refresh --auto" --> S
 ```
 
 - **Transport**: stdio. The client starts the server as a child process and sends JSON-RPC
@@ -29,6 +30,10 @@ flowchart LR
   app uses the same file. The server downloads it without your token and keeps a copy in
   `exercises.json`. It downloads a new copy after 30 days. If the download fails, the server uses
   the old copy and tries again after 10 minutes. Without a copy, the sets have no muscles.
+- **Automatic update**: `scheduleDashboardRefresh` adds one job to the scheduler of the computer
+  and writes the cron expression and the pages to `auto-refresh.json`. At each time, the scheduler
+  starts the server as a command, `refresh --auto`, without a client. The command updates the data
+  of each page and stops. It reads the API key from the key file. The job never holds the key.
 - **Dashboard cache**: each `getDashboardData` call keeps its data in `dashboard-cache.json`. The
   next call asks Garmin only for the days after the last call. It also asks again for the last two
   days, because Garmin can still add data to them. The sets and laps come from the .FIT files in

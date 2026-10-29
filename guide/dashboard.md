@@ -75,8 +75,9 @@ update is every day at 07:00. All the pages that update automatically use the sa
   languages and the settings.
 - It removes the coach notes, because old notes do not agree with the new data. To get new notes,
   run the `training-dashboard-update` prompt.
-- The computer must be on at that time. On macOS and Windows, a computer that was off or asleep
-  updates the page when it wakes up. Linux skips a time that it misses.
+- The computer must be on at that time. A Mac that was asleep updates the page when it wakes up. A
+  Windows computer that was asleep or off updates the page when it starts again. Linux, and a Mac
+  that was off, skip that time.
 - The server adds one job to the scheduler of your computer: launchd on macOS, your crontab on
   Linux, and Task Scheduler on Windows. The job reads the API key from the key file
   (`GARMIN_API_KEY_FILE`), never from your MCP client configuration. Save the key in that file
