@@ -52,6 +52,8 @@ export function registerPrompts(server: McpServer): void {
           ? renderDashboard(freeform, w)
           : render(renderDashboard(build, w), {
               layout,
+              title: en.title,
+              headline: en.headline,
               builtIn: Object.keys(BUILT_IN)
                 .map((code) => `${languageName(code)} (${code})`)
                 .join(", "),

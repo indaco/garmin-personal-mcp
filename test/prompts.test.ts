@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { en } from "../src/page/i18n/en";
 import { createServer } from "../src/server";
 import promptList from "./fixtures/prompt-list.json";
 
@@ -61,6 +62,20 @@ describe("prompts", () => {
     );
     expect(preset).toContain("German (de)");
     expect(preset.includes("{{") || blank.includes("{{")).toBe(false);
+  });
+
+  it("asks for a title and a headline on a preset or blank page, and keeps the other settings", async () => {
+    for (const layout of ["preset", "blank"]) {
+      const text = await render("training-dashboard", { layout });
+      expect(text).toContain(`"${en.title}" for a new`);
+      expect(text).toContain(`"${en.headline}" for a new page`);
+      expect(text).toContain(
+        "`settings` = the `settings` of the\n   last result with `title` and `headline`",
+      );
+    }
+    expect(await render("training-dashboard", { layout: "freeform" })).not.toContain(
+      "Keep the title",
+    );
   });
 
   it("takes a layout given as the only argument, as Claude Code passes it in weeks", async () => {

@@ -392,6 +392,23 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
     expect(Object.keys(r.digest.totals)).toEqual(["running"]);
   });
 
+  it("keeps a title and headline from the notes call through updates, refreshes and upgrades", async () => {
+    // an existing page with its own settings, then the training-dashboard prompt on a preset page
+    await writer.write({ settings: { exclude: ["zones"] } });
+    const first = await writer.write({ layout: "preset" });
+    const own = { ...first.settings, title: "Road to Rome", headline: "Marathon block" };
+    await writer.write({ notes: ["n"], settings: own });
+    const kept = { exclude: ["zones"], title: "Road to Rome", headline: "Marathon block" };
+    expect(readBlock(page(), "settings")).toEqual(kept);
+
+    await writer.write({ notes: ["new"] }); // training-dashboard-update
+    await writer.write({ onlyExisting: true }); // the automatic refresh
+    templateText = styledTemplate.replace('content="6"', 'content="7"');
+    expect((await writer.write({})).page).toBe("upgraded");
+    expect(readBlock(page(), "settings")).toEqual(kept);
+    expect(page()).toContain("<title>Road to Rome</title>");
+  });
+
   it("keeps the settings on an update and on a new layout; an argument replaces them", async () => {
     await writer.write({ settings: { exclude: ["zones"] } });
     expect(readBlock(page(), "settings")).toEqual({ exclude: ["zones"] });
