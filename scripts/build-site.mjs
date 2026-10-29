@@ -1,7 +1,8 @@
 // Writes dist-site/: the project website as one page, with its files and the demo dashboard.
 // The page comes from site/index.html, its partials, its styles and the bundled site script. The facts
 // come from the files that own them (package.json, the README, the theme list), so the site cannot
-// drift from the code. `pnpm build:site`, after `pnpm build` for the demo.
+// drift from the code. `pnpm build:site`, after `pnpm build` for the demo. dist-site/ is what a
+// server needs; `--preview <file>` also writes the page for a claude.ai preview, outside of it.
 import { execFileSync } from "node:child_process";
 import {
   copyFileSync,
@@ -13,6 +14,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 
 const read = (path) => readFileSync(path, "utf8");
 const OUT = "dist-site";
@@ -188,12 +190,16 @@ export function render({ root = ".", script = "", preview = false } = {}) {
 }
 
 function main() {
+  // a clean folder: nothing from an older build reaches the server
+  for (const name of readdirSync(OUT))
+    if (name !== ".script") rmSync(`${OUT}/${name}`, { recursive: true });
   const scriptDir = `${OUT}/.script`;
   const script = read(`${scriptDir}/${readdirSync(scriptDir).find((f) => f.endsWith(".js"))}`);
   rmSync(scriptDir, { recursive: true });
   mkdirSync(`${OUT}/demo`, { recursive: true });
   writeFileSync(`${OUT}/index.html`, render({ script }));
-  writeFileSync(`${OUT}/preview.html`, render({ script, preview: true }));
+  const { preview } = parseArgs({ options: { preview: { type: "string" } } }).values;
+  if (preview) writeFileSync(preview, render({ script, preview: true }));
   const vals = values(facts());
   for (const name of readdirSync("site/public")) {
     const from = `site/public/${name}`;
@@ -207,7 +213,9 @@ function main() {
   // the demo script writes into dist-site/demo/ by default; the page needs only its HTML
   execFileSync("node", ["scripts/demo-dashboard.mjs"], { stdio: "ignore" });
   rmSync(`${OUT}/demo/demo-data.json`);
-  console.log(`${OUT}/ written: index.html, preview.html, the public files and demo/`);
+  console.log(
+    `${OUT}/ written: index.html, the public files and demo/${preview ? `; ${preview}` : ""}`,
+  );
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main();
