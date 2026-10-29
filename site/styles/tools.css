@@ -1,0 +1,25 @@
+/* Tools */
+.tools {
+  grid-column: 1 / -1;
+  columns: 2;
+  column-gap: calc(var(--gap) * 3);
+}
+.tool {
+  break-inside: avoid;
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 15px;
+  & code {
+    color: var(--ink);
+    font-size: 13.5px;
+  }
+}
+.tools-note {
+  grid-column: 1 / -1;
+  margin-top: 24px;
+  font-size: 15px;
+  color: var(--muted);
+}

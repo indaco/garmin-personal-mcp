@@ -1,0 +1,139 @@
+/* Layout: one 12-column sport-identity grid; each sport owns a full colour field, stripe bands close each section. */
+:root {
+  color-scheme: light;
+  /* the logo's colours: sky and mint lead, deep teal, amber and slate complete the five sport fields */
+  --sky: #7cc4ff;
+  --mint: #3ecf8e;
+  --teal: #0b6e6e;
+  --amber: #f2c94c;
+  --slate: #c9d3dc;
+  --every: #0e1217;
+  --every-deep: #26303d;
+  --field-ink: #0e1217;
+  --on-deep: #ffffff;
+  --paper: #ffffff;
+  --bg: #ffffff;
+  --ink: #0e1217;
+  --text: #1a2230;
+  --muted: #55626e;
+  --link: #1b6ab0;
+  --rule: #d5dbe1;
+  --band: rgba(14, 18, 23, 0.045);
+  --code-bg: #0e1217;
+  --code-fg: #e6ebf2;
+  --promise-bg: #0e1217;
+  --promise-text: #c9d3dc;
+  --focus: #1b6ab0;
+  --display: "Hanken Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Hanken Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --code: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --gap: 16px;
+  --step: clamp(72px, 9vw, 128px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0e1217;
+    --every: #1c232d;
+    --every-deep: #2c3644;
+    --ink: #f2f5f8;
+    --text: #e6ebf2;
+    --muted: #8d99aa;
+    --link: #7cc4ff;
+    --rule: #26303d;
+    --band: rgba(230, 235, 242, 0.035);
+    --code-bg: #1c232d;
+    --promise-bg: #161c24;
+    --promise-text: #b4bfcc;
+    --focus: #f2c94c;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e1217;
+  --every: #1c232d;
+  --every-deep: #2c3644;
+  --ink: #f2f5f8;
+  --text: #e6ebf2;
+  --muted: #8d99aa;
+  --link: #7cc4ff;
+  --rule: #26303d;
+  --band: rgba(230, 235, 242, 0.035);
+  --code-bg: #1c232d;
+  --promise-bg: #161c24;
+  --promise-text: #b4bfcc;
+  --focus: #f2c94c;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 400 17px/1.5 var(--body);
+  -webkit-font-smoothing: antialiased;
+}
+::selection {
+  background: var(--sky);
+  color: var(--field-ink);
+}
+a {
+  color: var(--link);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+  &:where(:not(.cell)):hover {
+    color: var(--ink);
+  }
+}
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--display);
+  color: var(--ink);
+  text-wrap: balance;
+}
+p {
+  margin: 0;
+}
+code {
+  font-family: var(--code);
+  font-size: 0.86em;
+}
+html {
+  scrollbar-color: var(--rule) var(--bg);
+  scroll-behavior: smooth;
+}
+.wrap {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding-left: max(48px, env(safe-area-inset-left, 0px));
+  padding-right: max(48px, env(safe-area-inset-right, 0px));
+  position: relative;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: var(--gap);
+}
+.bands::before {
+  content: "";
+  position: absolute;
+  inset: 0 max(48px, env(safe-area-inset-right, 0px)) 0 max(48px, env(safe-area-inset-left, 0px));
+  pointer-events: none;
+  z-index: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 calc((100% - 11 * var(--gap)) / 12),
+    var(--band) calc((100% - 11 * var(--gap)) / 12) calc((100% - 11 * var(--gap)) / 12 + var(--gap))
+  );
+}
+.bands > * {
+  position: relative;
+  z-index: 1;
+}

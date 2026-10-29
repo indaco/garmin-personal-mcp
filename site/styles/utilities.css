@@ -1,0 +1,24 @@
+/* first stop for the keyboard: hidden until it has focus */
+.skip {
+  position: absolute;
+  top: 8px;
+  left: max(16px, env(safe-area-inset-left, 0px));
+  z-index: 40;
+  padding: 8px 14px;
+  background: var(--ink);
+  color: var(--bg);
+  font-weight: 600;
+  text-decoration: none;
+  translate: 0 -200%;
+  &:focus-visible {
+    translate: 0;
+  }
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

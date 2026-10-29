@@ -1,0 +1,110 @@
+/* Start */
+.steps {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  row-gap: 48px;
+}
+.step {
+  grid-column: span 4;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.num {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  font: 300 32px var(--display);
+}
+.step h3 {
+  font-weight: 600;
+  font-size: 21px;
+}
+.step p {
+  font-size: 16px;
+}
+pre {
+  margin: 0;
+  background: var(--code-bg);
+  color: var(--code-fg);
+  font: 500 13.5px/1.6 var(--code);
+  padding: 16px 18px;
+  overflow-x: auto;
+}
+.clients {
+  display: flex;
+  border-bottom: 2px solid var(--ink);
+  & button {
+    font: 600 14px var(--body);
+    background: none;
+    border: 0;
+    padding: 8px 12px;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 4px solid transparent;
+    margin-bottom: -2px;
+  }
+  & button[aria-selected="true"] {
+    color: var(--ink);
+    border-bottom-color: var(--mint);
+  }
+}
+.clientpane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  & p {
+    font-size: 14px;
+    color: var(--muted);
+  }
+}
+.pre-wrap {
+  position: relative;
+  & .copy {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 36px;
+    min-width: 76px;
+    padding: 0 14px;
+    font-size: 13px;
+  }
+}
+/* the sky field keeps dark ink in both themes */
+#start {
+  background: var(--sky);
+  color: var(--field-ink);
+  --ink: var(--field-ink);
+  --text: var(--field-ink);
+  --muted: var(--field-ink);
+  --link: var(--field-ink);
+  --focus: var(--field-ink);
+  --band: rgba(14, 18, 23, 0.06);
+  & a,
+  & .clients button,
+  & .clientpane p {
+    color: var(--field-ink);
+  }
+  & .num.f-running {
+    background: var(--paper);
+  }
+  & .clients button[aria-selected="true"] {
+    border-bottom-color: var(--ink);
+  }
+  & :focus-visible {
+    outline-color: var(--ink);
+  }
+}
+#start {
+  margin-block: 32px;
+  & .copy {
+    background: var(--paper);
+    color: var(--field-ink);
+  }
+  & .copy:hover {
+    background: var(--slate);
+  }
+}

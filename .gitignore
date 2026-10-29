@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-site/
 coverage/
 *.tgz
 .claude/
@@ -8,4 +9,3 @@ api-key
 *.fit
 *.zip
 garmin-dashboard.html
-demo-site/

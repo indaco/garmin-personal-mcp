@@ -6,6 +6,11 @@
 <p align="center"><b>Your Garmin training in Claude, Codex or any MCP client, through the official Personal API. Read-only, nothing to install.</b></p>
 
 <p align="center">
+  🌐 <a href="https://garmin-personal-mcp.indaco.dev/"><b>Website</b></a> &nbsp;&middot;&nbsp; 👉
+  <a href="https://garmin-personal-mcp.indaco.dev/demo/"><b>Try the live demo</b></a>
+</p>
+
+<p align="center">
   <a href="https://www.npmjs.com/package/@indaco/garmin-personal-mcp"><img src="https://img.shields.io/npm/v/@indaco/garmin-personal-mcp.svg" alt="npm version" /></a>
   <a href="https://codecov.io/gh/indaco/garmin-personal-mcp"><img src="https://codecov.io/gh/indaco/garmin-personal-mcp/branch/main/graph/badge.svg" alt="Code coverage" /></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg" alt="Node.js 22 or later" /></a>
@@ -183,13 +188,13 @@ Personal API does not have.
 The server makes a training dashboard with these prompts. In Claude Desktop, the prompts are in
 the **+** menu of the message box, under _garmin-personal_. In Claude Code, they are slash commands.
 
-| Prompt                                                  | What it does                           | Claude Code example                                 |
-| ------------------------------------------------------- | -------------------------------------- | --------------------------------------------------- |
-| [training-dashboard](#training-dashboard)               | makes the page                         | `/garmin-personal:training-dashboard 8`             |
-| [training-dashboard-update](#training-dashboard-update) | adds the new data, your layout stays   | `/garmin-personal:training-dashboard-update`        |
-| [dashboard-setup](#dashboard-setup)                     | makes a page for you or for your coach | `/garmin-personal:dashboard-setup`                  |
-| [dashboard-widget](#dashboard-widget)                   | makes a new widget from your idea      | `/garmin-personal:dashboard-widget my longest ride` |
-| [dashboard-language](#dashboard-language)               | adds a language to the page            | `/garmin-personal:dashboard-language German`        |
+| Prompt                                                  | What it does                                                                              | Claude Code example                                 |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| [training-dashboard](#training-dashboard)               | makes the page                                                                            | `/garmin-personal:training-dashboard 8`             |
+| [training-dashboard-update](#training-dashboard-update) | adds the new data, your layout stays                                                      | `/garmin-personal:training-dashboard-update`        |
+| [dashboard-setup](#dashboard-setup)                     | makes a page for you or for your coach, with only the sports and the data that you select | `/garmin-personal:dashboard-setup`                  |
+| [dashboard-widget](#dashboard-widget)                   | makes a new widget from your idea                                                         | `/garmin-personal:dashboard-widget my longest ride` |
+| [dashboard-language](#dashboard-language)               | adds a language to the page                                                               | `/garmin-personal:dashboard-language German`        |
 
 The prompts remove all spaces around an argument, also the no-break space from a phone keyboard.
 
@@ -361,8 +366,8 @@ that test the key and the server.
 Read [CONTRIBUTING.md](CONTRIBUTING.md). It tells how to run the server from source, and it has
 the commands, the test rules and the code map.
 
-To build a demo site with a year of sample data, run `pnpm build`, then
-`node scripts/demo-data.mjs`. The script writes `demo-site/index.html` and `demo-site/demo-data.json`.
+To build the website with its demo dashboard (a year of sample data), run `pnpm build:all`. The
+site is in `dist-site/`, and the demo in `dist-site/demo/index.html`.
 
 ## Credits
 

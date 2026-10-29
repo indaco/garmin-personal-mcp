@@ -1,0 +1,71 @@
+/* Header */
+.top {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  height: 64px;
+  border-bottom: 2px solid var(--ink);
+  font-size: 15px;
+}
+.mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  margin-right: auto;
+}
+.top nav {
+  display: flex;
+  gap: 28px;
+  & a {
+    color: var(--text);
+    text-decoration: none;
+  }
+  & a:hover {
+    color: var(--link);
+    text-decoration: underline;
+  }
+}
+.mode.menu {
+  display: none;
+}
+.menu .close {
+  display: none;
+}
+.menu[aria-expanded="true"] .bars {
+  display: none;
+}
+.menu[aria-expanded="true"] .close {
+  display: block;
+}
+.mode {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  cursor: pointer;
+  &:hover {
+    background: var(--ink);
+    color: var(--bg);
+  }
+  & svg {
+    width: 18px;
+    height: 18px;
+  }
+  & .sun {
+    display: none;
+  }
+}
+:root[data-mode="dark"] .mode .sun {
+  display: block;
+}
+:root[data-mode="dark"] .mode .moon {
+  display: none;
+}

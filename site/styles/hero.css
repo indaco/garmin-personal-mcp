@@ -1,0 +1,264 @@
+/* Hero */
+.hero {
+  padding-block: 56px 40px;
+  row-gap: 40px;
+}
+.lead {
+  grid-column: 1 / 6;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-width: 0;
+}
+.hero h1 {
+  font-weight: 300;
+  font-size: clamp(52px, 6.4vw, 92px);
+  line-height: 0.92;
+  letter-spacing: -0.035em;
+}
+.offer {
+  font-size: 22px;
+  line-height: 1.38;
+  max-width: 30ch;
+}
+.install {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  & h2 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--link);
+  }
+  & p {
+    font-size: 14px;
+    color: var(--muted);
+  }
+}
+/* 56px like the "every activity" basement, so the two dark bars sit on one line */
+.cmd {
+  display: flex;
+  min-height: 56px;
+  background: var(--code-bg);
+  color: var(--code-fg);
+  min-width: 0;
+  & code {
+    flex: 1;
+    min-width: 0;
+    align-self: center;
+    font-size: clamp(12.5px, 1.05vw, 15px);
+    padding: 12px 18px;
+    /* shrink first, wrap only when it still does not fit: never cut the command */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}
+.copy {
+  font: 600 15px var(--body);
+  background: var(--sky);
+  color: var(--field-ink);
+  border: 0;
+  padding: 0 22px;
+  cursor: pointer;
+  min-width: 92px;
+  &:hover {
+    background: var(--mint);
+  }
+  &[data-done] {
+    background: var(--mint);
+    color: var(--field-ink);
+  }
+}
+.wall {
+  grid-column: 6 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(150px, 1fr)) 56px;
+  gap: var(--gap);
+  min-width: 0;
+}
+.cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 18px;
+  color: var(--field-ink);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 15px;
+  animation: wipe 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+  overflow: hidden;
+  isolation: isolate;
+  & > svg {
+    width: 70%;
+    max-height: 70%;
+    align-self: center;
+  }
+  /* the hover flood: a deeper shade of the field, moved in and out by the script */
+  & .fx {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--deep);
+    transform: translateY(101%);
+  }
+  &.f-padel .fx {
+    inset: -50%;
+    transform: rotate(-45deg) translateX(-100%);
+  }
+  & .go {
+    position: absolute;
+    right: 18px;
+    top: 18px;
+    font-weight: 400;
+    opacity: 0;
+    transition: opacity 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  &:hover .go,
+  &:focus-visible .go {
+    opacity: 1;
+  }
+  &.running {
+    grid-column: span 2;
+    grid-row: span 2;
+  }
+  &:nth-child(2) {
+    animation-delay: 0.08s;
+  }
+  &:nth-child(3) {
+    animation-delay: 0.16s;
+  }
+  &:nth-child(4) {
+    animation-delay: 0.24s;
+  }
+  &:nth-child(5) {
+    animation-delay: 0.32s;
+  }
+  &:nth-child(6) {
+    animation-delay: 0.4s;
+  }
+}
+@keyframes wipe {
+  from {
+    clip-path: inset(0 0 40% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.f-running {
+  background: var(--sky);
+  color: var(--field-ink);
+  --deep: #4fa9ef;
+}
+.f-strength {
+  background: var(--mint);
+  color: var(--field-ink);
+  --deep: #22b574;
+}
+.f-swimming {
+  background: var(--teal);
+  color: var(--on-deep);
+  --deep: #085656;
+}
+.f-cycling {
+  background: var(--amber);
+  color: var(--field-ink);
+  --deep: #e3b42a;
+}
+.f-padel {
+  background: var(--slate);
+  color: var(--field-ink);
+  --deep: #aebbc7;
+}
+.f-every {
+  background: var(--every);
+  color: var(--sky);
+  --deep: var(--every-deep);
+}
+/* the thin basement under the wall: every other activity the watch records */
+.cell.f-every {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  padding-block: 0;
+  & > svg {
+    order: -1;
+    width: 26px;
+    height: 26px;
+    max-height: none;
+  }
+  /* the content sits on the right, so the hover label moves to the left end */
+  & .go {
+    top: 50%;
+    right: auto;
+    left: 18px;
+    translate: 0 -50%;
+  }
+}
+.data {
+  grid-column: 6 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px;
+  border-top: 2px solid var(--ink);
+  padding-top: 18px;
+  font-size: 15px;
+  line-height: 1.4;
+}
+.data b,
+dt {
+  display: block;
+  font-weight: 600;
+  color: var(--link);
+  margin-bottom: 4px;
+}
+.stripes {
+  display: grid;
+  grid-template-rows: repeat(5, 8px);
+  & i:nth-child(1) {
+    background: var(--sky);
+  }
+  & i:nth-child(3) {
+    background: var(--mint);
+  }
+  & i:nth-child(5) {
+    background: var(--teal);
+  }
+  &.warm i:nth-child(1) {
+    background: var(--amber);
+  }
+  &.warm i:nth-child(3) {
+    background: var(--slate);
+  }
+  &.warm i:nth-child(5) {
+    background: var(--sky);
+  }
+}
+section.block {
+  padding-block: var(--step);
+}
+.head {
+  grid-column: 1 / 6;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 48px;
+  & h2 {
+    font-weight: 300;
+    font-size: clamp(38px, 4.2vw, 60px);
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+  & p {
+    font-size: 19px;
+    max-width: 40ch;
+  }
+}

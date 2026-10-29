@@ -1,0 +1,24 @@
+/* Promise band */
+.promise {
+  background: var(--promise-bg);
+  color: var(--code-fg);
+  & .grid {
+    padding-block: 64px;
+    row-gap: 40px;
+  }
+  & .grid > div {
+    grid-column: span 3;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  & h3 {
+    color: var(--sky);
+    font-weight: 600;
+    font-size: 19px;
+  }
+  & p {
+    font-size: 15px;
+    color: var(--promise-text);
+  }
+}

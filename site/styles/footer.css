@@ -1,0 +1,17 @@
+footer {
+  padding-block: 40px 56px;
+  font-size: 14px;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+  align-items: center;
+  & .mark {
+    margin-right: 0;
+  }
+  /* own row, still a 75ch measure */
+  & .legal {
+    flex-basis: 100%;
+    padding-right: max(0px, calc(100% - 75ch));
+  }
+}

@@ -1,0 +1,11 @@
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .cell {
+    animation: none;
+  }
+  .sportfield {
+    transition: none;
+  }
+}

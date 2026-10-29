@@ -1,0 +1,118 @@
+<section class="block" id="start" aria-labelledby="start-h">
+  <div class="wrap bands">
+    <div class="grid">
+      <div class="head">
+        <h2 id="start-h">start in three steps.</h2>
+        <p>
+          You need {{node}} and a Garmin Connect account with access to the
+          <a href="https://developer.garmin.com/gc-developer-program/personal/">Personal API</a>.
+        </p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <span class="num f-running">1</span>
+          <h3>create a personal API key</h3>
+          <p>
+            Open
+            <a href="https://connect.garmin.com/app/settings/personalApiToken">the API key page</a>
+            in Garmin Connect web, select <i>Create Key</i> and choose the expiry. Garmin shows the
+            key only one time. Save it in a file that only you can read:
+          </p>
+          <pre><code>mkdir -p ~/.config/garmin-mcp
+nano ~/.config/garmin-mcp/api-key
+chmod 600 ~/.config/garmin-mcp/api-key</code></pre>
+          <p>You can also give the key in <code>GARMIN_PERSONAL_API_KEY</code>.</p>
+        </div>
+        <div class="step">
+          <span class="num f-strength">2</span>
+          <h3>connect your client</h3>
+          <div class="clients" role="tablist" aria-label="Client">
+            <button
+              type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="c-desktop"
+              id="t-desktop"
+            >
+              Claude Desktop
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="c-code"
+              id="t-code"
+            >
+              Claude Code
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="c-codex"
+              id="t-codex"
+            >
+              Codex
+            </button>
+          </div>
+          <div class="clientpane" role="tabpanel" id="c-desktop" aria-labelledby="t-desktop">
+            <p>
+              Settings → Developer → <i>Edit Config</i>. Add a top-level
+              <code>mcpServers</code> key, then quit Claude Desktop fully and start it again.
+            </p>
+            <div class="pre-wrap">
+              <pre><code id="cfg-desktop">{
+  "mcpServers": {
+    "garmin-personal": {
+      "command": "npx",
+      "args": ["-y", "{{package}}"]
+    }
+  }
+}</code></pre>
+              <button class="copy" type="button" data-copy="cfg-desktop">copy</button>
+            </div>
+          </div>
+          <div class="clientpane" role="tabpanel" id="c-code" aria-labelledby="t-code" hidden>
+            <p>This command adds the server to all your projects.</p>
+            <div class="pre-wrap">
+              <pre><code id="cfg-code">claude mcp add garmin-personal --scope user -- npx -y {{package}}</code></pre>
+              <button class="copy" type="button" data-copy="cfg-code">copy</button>
+            </div>
+          </div>
+          <div class="clientpane" role="tabpanel" id="c-codex" aria-labelledby="t-codex" hidden>
+            <p>
+              The first <code>npx</code> download can take longer than the default start time. In
+              <code>~/.codex/config.toml</code>, set <code>startup_timeout_sec = 60</code>.
+            </p>
+            <div class="pre-wrap">
+              <pre><code id="cfg-codex">codex mcp add garmin-personal -- npx -y {{package}}</code></pre>
+              <button class="copy" type="button" data-copy="cfg-codex">copy</button>
+            </div>
+          </div>
+          <p>
+            Other stdio MCP clients: command <code>npx</code>, arguments
+            <code>-y {{package}}</code>.
+          </p>
+        </div>
+        <div class="step">
+          <span class="num f-swimming">3</span>
+          <h3>ask your assistant</h3>
+          <p>
+            Start a new chat and ask about your training. To make the dashboard, run the
+            <code>training-dashboard</code> prompt.
+          </p>
+          <pre><code>List my last 5 activities, with pace and heart rate.</code></pre>
+          <p>
+            The server stores the .FIT files and the dashboard in
+            <code>~/workspace/garmin-data</code>. Set <code>GARMIN_DATA_DIR</code> to use a
+            different folder.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="stripes warm" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+</div>
