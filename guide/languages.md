@@ -219,7 +219,7 @@ out. To add one:
 | `notes.none` | No notes. |
 | `notes.disclaimer` | Training suggestions for the data up to {date}. Not medical advice. |
 | `w.kpis` | Overview |
-| `kpi.totals` | {km} km · {time} · {n} session\|{km} km · {time} · {n} sessions |
+| `kpi.totals` | {distance} · {time} · {n} session\|{distance} · {time} · {n} sessions |
 | `kpi.distance` | Distance · last 7 days |
 | `kpi.time` | Time · last 7 days |
 | `kpi.vs4w` | vs 4-week average |
@@ -378,7 +378,7 @@ out. To add one:
 | `te.anaerobic` | Anaerobic TE |
 | `w.aerobicFitness` | Aerobic fitness |
 | `af.runs` | Runs (older paler) |
-| `af.pace` | Pace (min/km) |
+| `af.pace` | Pace (min{unit}) |
 | `af.weekPace` | Weekly pace |
 | `af.efficiency` | Efficiency |
 | `af.effUnit` | m per heartbeat |
@@ -396,9 +396,9 @@ out. To add one:
 | `rp.none` | No best effort of 5 km or more in the selected weeks. |
 | `rp.note` | Estimate (Riegel) from the {d} in {time} on {date}. |
 | `w.longRuns` | Long runs and pace split |
-| `lr.share` | Longest run share of weekly km |
+| `lr.share` | Longest run share of weekly distance |
 | `lr.ascent` | Weekly ascent |
-| `lr.note` | Red weeks: the longest run is more than 35% of the week's km. The table shows races and runs over 15 km with laps. |
+| `lr.note` | Red weeks: the longest run is more than 35% of the week's distance. The table shows races and runs over 15 km with laps. |
 | `lr.first` | First half |
 | `lr.second` | Second half |
 | `lr.split` | Split |
@@ -426,9 +426,9 @@ out. To add one:
 | `ex.groupRow` | {n} exercise · {sets} completed sets\|{n} exercises · {sets} completed sets |
 | `ex.reps` | {n} rep\|{n} reps |
 | `ex.rest` | median rest {v} |
-| `ex.weight` | Top set (kg) |
-| `ex.e1rm` | Est. 1RM (kg) |
-| `ex.volume` | Volume (kg) |
+| `ex.weight` | Top set ({unit}) |
+| `ex.e1rm` | Est. 1RM ({unit}) |
+| `ex.volume` | Volume ({unit}) |
 | `ex.maxReps` | Max reps |
 | `ex.totalReps` | Total reps |
 | `ex.longest` | Longest set (s) |
@@ -456,7 +456,7 @@ out. To add one:
 | `wd.floors` | Floors |
 | `w.steps` | Daily steps |
 | `w.hikeVertical` | Vertical speed |
-| `hv.vam` | Vertical m per hour |
+| `hv.vam` | Vertical {unit} per hour |
 | `w.bikeDetails` | Rides |
 | `bd.outdoor` | Outdoor |
 | `bd.indoor` | Indoor |

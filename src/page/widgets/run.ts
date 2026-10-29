@@ -5,7 +5,7 @@ import type { Key } from "../i18n";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
 import { oneSession } from "./types";
-import { alpha, kpi, kpiRow, note, showAll, table, weekLabel, withUnit } from "./ui";
+import { alpha, kpi, kpiRow, note, showAll, table, weekLabel } from "./ui";
 
 /** The Run board: best efforts, races, aerobic fitness, intensity, form, run/walk, training effect, predictions, long runs. */
 
@@ -75,9 +75,9 @@ register({
         races.map((a) => [
           fmt.day(day(a)),
           a.name ?? "",
-          withUnit(ctx, fmt.num(num(a.km), 2), " km"),
+          fmt.dist(num(a.km), 2),
           fmt.hms(ctx.calc.seconds(a.duration)),
-          String(a.pace ?? ""),
+          ctx.calc.seconds(a.pace) > 0 ? fmt.pace(ctx.calc.seconds(a.pace)) : "",
           fmt.num(num(a.avgHR)),
           num(a.avgPowerW) === undefined ? fmt.na : `${fmt.num(num(a.avgPowerW))} W`,
           fmt.num(num(a.aerobicTE), 1),
@@ -103,7 +103,7 @@ register({
         datasets: [
           {
             label: t("af.runs"),
-            data: list.map((a) => ({ x: a.avgHR as number, y: calc.paceSeconds(a)! })),
+            data: list.map((a) => ({ x: a.avgHR as number, y: fmt.to.pace(calc.paceSeconds(a)!) })),
             // oldest pale, newest strong
             backgroundColor: list.map((_, i) => alpha(accent, 0.2 + (0.8 * (i + 1)) / list.length)),
             pointRadius: 4,
@@ -116,7 +116,7 @@ register({
           x: { title: { display: true, text: t("col.hr") } },
           y: {
             reverse: true,
-            title: { display: true, text: t("af.pace") },
+            title: { display: true, text: t("af.pace", { unit: fmt.unit.pace }) },
             ticks: { callback: (v) => fmt.hms(Number(v)) },
           },
         },
@@ -125,7 +125,7 @@ register({
             callbacks: {
               label: (c) => {
                 const a = list[c.dataIndex];
-                return `${fmt.day(day(a))} ${a.name ?? ""}: ${fmt.hms(c.parsed.y ?? 0)}/km · ${fmt.num(c.parsed.x ?? 0)} bpm`;
+                return `${fmt.day(day(a))} ${a.name ?? ""}: ${fmt.hms(c.parsed.y ?? 0)}${fmt.unit.pace} · ${fmt.num(c.parsed.x ?? 0)} bpm`;
               },
             },
           },
@@ -135,7 +135,7 @@ register({
     const weekly = ctx.weeks.map((_, i) => runs(ctx).filter((a) => weekOf(ctx, a) === i));
     const pace = weekly.map((w) => {
       const d = calc.timedDistance(w);
-      return d.km > 0 ? d.seconds / d.km : null;
+      return d.km > 0 ? fmt.to.pace(d.seconds / d.km) : null;
     });
     const eff = weekly.map((w) =>
       calc.mean(w.map((a) => calc.efficiency(a)).filter((v): v is number => v !== undefined)),
@@ -168,7 +168,7 @@ register({
             y: {
               reverse: true,
               ticks: { callback: (v) => fmt.hms(Number(v)) },
-              title: { display: true, text: t("af.pace") },
+              title: { display: true, text: t("af.pace", { unit: fmt.unit.pace }) },
             },
             y1: {
               position: "right",
@@ -181,7 +181,7 @@ register({
               callbacks: {
                 label: (c) =>
                   c.datasetIndex === 0
-                    ? `${c.dataset.label}: ${fmt.hms(c.parsed.y ?? 0)}/km`
+                    ? `${c.dataset.label}: ${fmt.hms(c.parsed.y ?? 0)}${fmt.unit.pace}`
                     : `${c.dataset.label}: ${fmt.num(c.parsed.y ?? undefined, 2)}`,
               },
             },
@@ -306,8 +306,8 @@ register({
           const rw = a.runWalk as Record<string, unknown>;
           return [
             fmt.day(day(a)),
-            String(rw.runPace ?? fmt.na),
-            String(a.pace ?? fmt.na),
+            paceText(ctx, rw.runPace),
+            paceText(ctx, a.pace),
             String(rw.walkTime ?? fmt.na),
           ];
         }),
@@ -417,7 +417,7 @@ register({
       const longest = Math.max(0, ...w.map((a) => num(a.km) ?? 0));
       return km > 0 ? (longest / km) * 100 : null;
     });
-    const ascent = weekly.map((w) => w.reduce((s, a) => s + (num(a.ascentM) ?? 0), 0));
+    const ascent = weekly.map((w) => fmt.to.elev(w.reduce((s, a) => s + (num(a.ascentM) ?? 0), 0)));
     ctx.chart(
       el,
       {
@@ -449,7 +449,7 @@ register({
             y1: {
               position: "right",
               grid: { drawOnChartArea: false },
-              title: { display: true, text: "m" },
+              title: { display: true, text: fmt.unit.elev },
             },
           },
         },
@@ -469,17 +469,21 @@ register({
           split.map(({ a, s }) => [
             fmt.day(day(a)),
             a.name ?? "",
-            `${fmt.hms(s!.first)}/km`,
-            `${fmt.hms(s!.second)}/km`,
+            fmt.pace(s!.first),
+            fmt.pace(s!.second),
             h(
               "span",
               { class: s!.kind === "positive" ? "bad" : s!.kind === "negative" ? "good" : "same" },
               t(`lr.${s!.kind}` as Key),
             ),
-            String(a.gap ?? fmt.na),
+            paceText(ctx, a.gap),
           ]),
           [2, 3, 5],
         ),
     );
   },
 });
+
+/** A pace of the data ("5:07/km") in the units of the page; n/a without one. */
+const paceText = (ctx: Ctx, v: unknown) =>
+  ctx.calc.seconds(v) > 0 ? ctx.fmt.pace(ctx.calc.seconds(v)) : ctx.fmt.na;

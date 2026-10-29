@@ -84,6 +84,14 @@ export class GarminTools {
     return JSON.stringify(await this.api.getJson(`/activity-service/activity/${activityId}`, {}));
   }
 
+  async getActivityWorkouts(activityId: number): Promise<string> {
+    // many fields of each step are null (equipment, weight, name): leaving them out keeps the answer short
+    return JSON.stringify(
+      await this.api.getJson(`/activity-service/activity/${activityId}/workouts`, {}),
+      (_, v: unknown) => (v === null ? undefined : v),
+    );
+  }
+
   async downloadActivityFit(activityId: number): Promise<string> {
     const fit = await this.fetchFit(activityId);
     return JSON.stringify({ path: resolve(fit), bytes: (await stat(fit)).size });
@@ -120,6 +128,27 @@ export class GarminTools {
     checkRange(fromDate, toDate);
     return JSON.stringify(
       await this.api.getJson("/sleep-service/sleep/dailySleepSummariesByDate", {
+        startDate: fromDate,
+        endDate: toDate,
+      }),
+    );
+  }
+
+  async getWeight(fromDate: string, toDate: string, includeAll?: boolean): Promise<string> {
+    // no day cap: one small row per day, and a weight trend needs months
+    // the spec says kilograms, but Garmin answers grams (72500 for 72.5 kg)
+    checkRange(fromDate, toDate, Infinity);
+    return JSON.stringify(
+      await this.api.getJson(`/weight-service/weight/range/${fromDate}/${toDate}`, {
+        includeAll: includeAll === true ? "true" : undefined,
+      }),
+    );
+  }
+
+  async getBodyBattery(fromDate: string, toDate: string): Promise<string> {
+    checkRange(fromDate, toDate);
+    return JSON.stringify(
+      await this.api.getJson("/wellness-service/wellness/bodyBattery/reports/daily", {
         startDate: fromDate,
         endDate: toDate,
       }),
@@ -409,15 +438,15 @@ function isDate(d: string): boolean {
   );
 }
 
-/** Throws unless from and to are real yyyy-MM-dd dates, from <= to, and the range has at most RANGE_DAYS days. */
-function checkRange(from: string, to: string): void {
+/** Throws unless from and to are real yyyy-MM-dd dates, from <= to, and the range has at most maxDays days. */
+function checkRange(from: string, to: string, maxDays = RANGE_DAYS): void {
   if (!isDate(from) || !isDate(to) || from > to) {
     throw new Error("fromDate and toDate must be real dates yyyy-MM-dd with fromDate <= toDate");
   }
   const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000 + 1;
-  if (days > RANGE_DAYS) {
+  if (days > maxDays) {
     throw new Error(
-      `A range has at most ${RANGE_DAYS} days; this one has ${days}. Ask for it in parts.`,
+      `A range has at most ${maxDays} days; this one has ${days}. Ask for it in parts.`,
     );
   }
 }
@@ -448,7 +477,7 @@ const dayOrRangeInput = z.object({
 });
 const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 
-/** Registers the 12 tools. */
+/** Registers the 15 tools. */
 export function registerTools(server: McpServer, tools: GarminTools): void {
   server.registerTool(
     "listActivities",
@@ -486,6 +515,22 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
       inputSchema: z.object({ activityId }),
     },
     async (a) => text(await tools.getActivity(a.activityId)),
+  );
+  server.registerTool(
+    "getActivityWorkouts",
+    {
+      description: [
+        "The planned workout that an activity followed, as created in Garmin Connect: its steps in",
+        "order, each with its intensity (warmup/active/rest/recovery/cooldown), its duration (time in",
+        "seconds, reps, or open), its target (cadence, heart rate, pace, or open, with low and high",
+        "values), the exercise for strength steps, and the coach's notes. A step with durationType",
+        "REPEAT_UNTIL_STEPS_CMPLT repeats the steps from stepIndex durationValue up to it, targetValue",
+        "times in all. Compare it with getActivitySets or getActivityLaps for plan against done.",
+        "An empty list means the activity followed no planned workout. Null fields are left out.",
+      ].join("\n"),
+      inputSchema: z.object({ activityId }),
+    },
+    async (a) => text(await tools.getActivityWorkouts(a.activityId)),
   );
   server.registerTool(
     "downloadActivityFit",
@@ -562,6 +607,41 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
           (f, t) => tools.getSleepRange(f, t),
         ),
       ),
+  );
+  server.registerTool(
+    "getWeight",
+    {
+      description: [
+        "Weight for a date range, yyyy-MM-dd: the latest weight of each day (with body fat, muscle",
+        "and bone mass, BMI and body water when a scale records them), the average of the range, and",
+        "the last weight before and the first after the range. Set includeAll=true for every entry",
+        "of each day. Weight, muscle mass and bone mass are in grams.",
+      ].join("\n"),
+      inputSchema: z.object({
+        fromDate: z.string().describe("From date yyyy-MM-dd"),
+        toDate: z.string().describe("To date yyyy-MM-dd"),
+        includeAll: z
+          .boolean()
+          .describe("Every weight entry of each day, not only the latest")
+          .optional(),
+      }),
+    },
+    async (a) => text(await tools.getWeight(a.fromDate, a.toDate, a.includeAll)),
+  );
+  server.registerTool(
+    "getBodyBattery",
+    {
+      description: [
+        "Body Battery for up to 14 days, yyyy-MM-dd: for each day how much it charged and drained,",
+        "its readings through the day, and the events that changed it (sleep, activities, stress,",
+        "naps) with their impact.",
+      ].join("\n"),
+      inputSchema: z.object({
+        fromDate: z.string().describe("From date yyyy-MM-dd"),
+        toDate: z.string().describe("To date yyyy-MM-dd"),
+      }),
+    },
+    async (a) => text(await tools.getBodyBattery(a.fromDate, a.toDate)),
   );
   server.registerTool(
     "getHeartRateZones",

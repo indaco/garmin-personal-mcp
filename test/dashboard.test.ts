@@ -150,6 +150,8 @@ let garminActivities: Record<string, unknown>[];
 let failingSleep: Set<string>;
 /** Path prefixes whose calls fail. */
 let failing: Set<string>;
+/** The measurementSystem of the profile settings. */
+let units: unknown;
 
 const cacheFile = () => join(dataDir, "dashboard-cache.json");
 const readCache = () => JSON.parse(readFileSync(cacheFile(), "utf8"));
@@ -206,6 +208,7 @@ function fakeGarmin(path: string, q: Record<string, string>) {
   if (path === "/usersummary-service/usersummary/daily") return { restingHeartRate: 50 };
   if (path === "/biometric-service/heartRateZones/v2") return [{ zone: 1 }];
   if (path.startsWith("/fitnessage-service/fitnessage/v2/")) return { fitnessAge: 40 };
+  if (path === "/userprofile-service/userprofile/settings") return { measurementSystem: units };
   throw new Error(`unexpected path ${path}`);
 }
 
@@ -216,6 +219,7 @@ beforeEach(() => {
   garminActivities = [];
   failingSleep = new Set();
   failing = new Set();
+  units = "metric";
   api.getJson.mockImplementation(async (path, q) => fakeGarmin(path, q));
   api.getBytes.mockResolvedValue(
     fitFile(
@@ -260,6 +264,7 @@ describe("getDashboardData", () => {
       prevEnd: "2026-10-11",
       zones: [{ zone: 1 }],
       fitnessAge: { fitnessAge: 40 },
+      units: "metric",
     });
     expect(out.activities.map((a: { id: number }) => a.id)).toEqual([1]);
     expect(out.previousActivities).toEqual([]);
@@ -274,9 +279,9 @@ describe("getDashboardData", () => {
     });
     expect(out.recovery).toHaveLength(14);
     expect(out.recovery[0]).toEqual({ date: "2026-10-13", sleepH: 7.5, rhr: 50 });
-    // 1 activity page + 1 HRV range + 14 days x 2 recovery calls + zones + fitness age
+    // 1 activity page + 1 HRV range + 14 days x 2 recovery calls + zones + fitness age + settings
     expect(out.sync).toEqual({
-      garminCalls: 32,
+      garminCalls: 33,
       newActivities: 1,
       failedDays: 0,
       failedDates: [],
@@ -311,7 +316,7 @@ describe("getDashboardData", () => {
     ]);
     expect(callsTo("/sleep-service").map(([, q]) => q.date)).toEqual(["2026-10-25", "2026-10-26"]);
     expect(out.activities.map((a: { id: number }) => a.id)).toEqual([4, 1]);
-    expect(out.sync).toMatchObject({ garminCalls: 8, newActivities: 1, cachedActivities: 2 });
+    expect(out.sync).toMatchObject({ garminCalls: 9, newActivities: 1, cachedActivities: 2 });
   });
 
   it("fetches the activities again when the cache has rows without a sport", async () => {
@@ -391,6 +396,18 @@ describe("getDashboardData", () => {
     expect(out.zones).toBeNull();
     expect(out.fitnessAge).toBeNull();
     expect(out.sync.failedSections).toEqual(["zones", "fitnessAge"]);
+    expect(Array.isArray(out.activities)).toBe(true);
+  });
+
+  it("passes on a known measurement system only, and builds without it when the settings fail", async () => {
+    units = "statute_uk";
+    expect(JSON.parse(await dashboard.getDashboardData(1)).units).toBe("statute_uk");
+    units = "nautical";
+    expect(JSON.parse(await dashboard.getDashboardData(1))).not.toHaveProperty("units");
+    failing.add("/userprofile-service/");
+    const out = JSON.parse(await dashboard.getDashboardData(1));
+    expect(out).not.toHaveProperty("units");
+    expect(out.sync.failedSections).toEqual(["units"]);
     expect(Array.isArray(out.activities)).toBe(true);
   });
 

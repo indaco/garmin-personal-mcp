@@ -63,13 +63,13 @@ register({
         fmt.hours(sum.seconds),
         t("tk.avg", { v: fmt.hours(sum.seconds / sum.sessions) }),
       ),
-      hasDistance && kpi(t("tk.distance"), `${fmt.num(sum.km, 1)} km`, vs(week.km, base.km)),
+      hasDistance && kpi(t("tk.distance"), fmt.dist(sum.km), vs(week.km, base.km)),
       hasDistance &&
         timed.km > 0 &&
         (ctx.type === "cycling"
-          ? kpi(t("tk.speed"), `${fmt.num(timed.km / (timed.seconds / 3600), 1)} km/h`)
-          : kpi(t("tk.pace"), `${fmt.hms(timed.seconds / timed.km)}/km`)),
-      ctx.type === "cycling" && kpi(t("tk.ascent"), `${fmt.num(ascent)} m`),
+          ? kpi(t("tk.speed"), fmt.speed(timed.km / (timed.seconds / 3600)))
+          : kpi(t("tk.pace"), fmt.pace(timed.seconds / timed.km))),
+      ctx.type === "cycling" && kpi(t("tk.ascent"), fmt.elev(ascent)),
       kpi(
         t("tk.hr"),
         withUnit(ctx, fmt.num(calc.mean(hr) ?? undefined), " bpm"),

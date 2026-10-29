@@ -46,8 +46,11 @@ With this server, you can ask your assistant:
 - Laps: "Show the laps of my last run."
 - Strength: "Compare my sets of this week with the week before."
 - Strength: "Which muscles did I train most this week?"
+- Workouts: "Did I do the reps and rests my workout planned?"
 - Recovery: "How did I sleep this week, and how was my HRV?"
 - Recovery: "Show my steps, stress and Body Battery for the last 7 days."
+- Recovery: "Did my Body Battery recover overnight this week, and which days drained it most?"
+- Body: "How has my weight changed over the last 3 months?"
 - All together: "My run on Saturday felt hard. Compare it with my sleep and HRV of the nights
   before."
 
@@ -151,10 +154,13 @@ Ask "list my last 5 activities". The first time that a garmin-personal tool asks
 | `getActivity`         | the details of one activity                                            |
 | `getActivityLaps`     | the laps of an activity, from its .FIT file                            |
 | `getActivitySets`     | the strength sets of an activity, with the muscles, from its .FIT file |
+| `getActivityWorkouts` | the planned workout of an activity: steps, targets and notes           |
 | `downloadActivityFit` | saves the .FIT file of an activity in the data folder                  |
 | `getHrvRange`         | HRV during the night                                                   |
 | `getDailyHeartRate`   | the heart rate of a day, with the resting HR                           |
 | `getSleep`            | the sleep of a night, or of up to 14 nights                            |
+| `getWeight`           | weight and body composition for a range of dates                       |
+| `getBodyBattery`      | how Body Battery charged and drained, for up to 14 days                |
 | `getHeartRateZones`   | your HR zones                                                          |
 | `getFitnessAge`       | fitness age against actual age                                         |
 | `getDailySummary`     | steps, stress and Body Battery, for a day or a range                   |
@@ -202,7 +208,9 @@ You can also give only the layout: `/garmin-personal:training-dashboard freeform
 The assistant gives you the path of the page and the command to open it. The page has a board for
 all your training, a Recovery board and a board for each sport, with 11 themes and English and
 Italian texts. It uses the training load, HR zones and training effect from Garmin. It labels each
-value that it calculates as an estimate, and a missing value shows as "n/a".
+value that it calculates as an estimate, and a missing value shows as "n/a". Distances, paces,
+elevation and weights use the units of your Garmin profile: metric, or miles and pounds for
+Statute US and Statute UK (Statute UK keeps elevation in metres).
 
 [The dashboard guide](guide/dashboard.md) tells what each board shows and how to change the layout.
 [The widget catalogue](guide/widgets.md) lists every widget.

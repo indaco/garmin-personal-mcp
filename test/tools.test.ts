@@ -325,6 +325,18 @@ describe("activities", () => {
       { date: "2026-10-27" },
     ],
     ["getSleep", ["2026-10-27"], "/sleep-service/sleep/dailySleep", { date: "2026-10-27" }],
+    [
+      "getWeight",
+      ["2026-07-01", "2026-10-27"],
+      "/weight-service/weight/range/2026-07-01/2026-10-27",
+      { includeAll: undefined },
+    ],
+    [
+      "getBodyBattery",
+      ["2026-10-21", "2026-10-27"],
+      "/wellness-service/wellness/bodyBattery/reports/daily",
+      { startDate: "2026-10-21", endDate: "2026-10-27" },
+    ],
     ["getHeartRateZones", [], "/biometric-service/heartRateZones/v2", {}],
     ["getFitnessAge", ["2026-10-27"], "/fitnessage-service/fitnessage/v2/2026-10-27", {}],
     [
@@ -355,6 +367,29 @@ describe("activities", () => {
     expect(api.getJson).toHaveBeenLastCalledWith("/y", {});
   });
 
+  it("getActivityWorkouts leaves out the null fields and keeps the rest", async () => {
+    api.getJson.mockResolvedValue([
+      {
+        workoutName: "Drills",
+        multisportSet: null,
+        steps: [
+          { stepIndex: 0, intensity: "WARMUP", durationValue: 600, targetValueLow: null },
+          { stepIndex: 1, intensity: "ACTIVE", targetType: "CADENCE", targetValue: 0, notes: "" },
+        ],
+      },
+    ]);
+    expect(JSON.parse(await tools.getActivityWorkouts(42))).toEqual([
+      {
+        workoutName: "Drills",
+        steps: [
+          { stepIndex: 0, intensity: "WARMUP", durationValue: 600 },
+          { stepIndex: 1, intensity: "ACTIVE", targetType: "CADENCE", targetValue: 0, notes: "" },
+        ],
+      },
+    ]);
+    expect(api.getJson).toHaveBeenCalledWith("/activity-service/activity/42/workouts", {});
+  });
+
   it("getSleepRange asks for the nights between two dates in one request", async () => {
     api.getJson.mockResolvedValue([{ calendarDate: "2026-10-27" }]);
     expect(await tools.getSleepRange("2026-10-21", "2026-10-27")).toBe(
@@ -365,6 +400,30 @@ describe("activities", () => {
       startDate: "2026-10-21",
       endDate: "2026-10-27",
     });
+  });
+
+  it("getWeight takes a range of months but refuses a date that is not real, without a request", async () => {
+    api.getJson.mockResolvedValue({});
+    await tools.getWeight("2025-10-28", "2026-10-27");
+    expect(api.getJson).toHaveBeenCalledOnce();
+    for (const [from, to] of [
+      ["2026-02-31", "2026-03-01"],
+      ["2026-10-27", "2026-10-01"],
+      ["../x", "2026-10-01"],
+    ]) {
+      await expect(tools.getWeight(from, to)).rejects.toThrow(/real dates/);
+    }
+    expect(api.getJson).toHaveBeenCalledOnce();
+  });
+
+  it("getBodyBattery accepts 14 days and refuses 15", async () => {
+    api.getJson.mockResolvedValue([]);
+    await tools.getBodyBattery("2026-10-01", "2026-10-14");
+    expect(api.getJson).toHaveBeenCalledOnce();
+    await expect(tools.getBodyBattery("2026-10-01", "2026-10-15")).rejects.toThrow(
+      /at most 14 days/,
+    );
+    expect(api.getJson).toHaveBeenCalledOnce();
   });
 
   it("getSleepRange accepts 14 days and refuses 15", async () => {
@@ -626,6 +685,7 @@ describe("MCP tools", () => {
 
   it.each([
     ["getActivity", { activityId: 42 }, "/activity-service/activity/42", {}],
+    ["getActivityWorkouts", { activityId: 42 }, "/activity-service/activity/42/workouts", {}],
     [
       "getHrvRange",
       { fromDate: "2026-10-01", toDate: "2026-10-27" },
@@ -639,6 +699,18 @@ describe("MCP tools", () => {
       { date: "2026-10-27" },
     ],
     ["getSleep", { date: "2026-10-27" }, "/sleep-service/sleep/dailySleep", { date: "2026-10-27" }],
+    [
+      "getWeight",
+      { fromDate: "2026-10-01", toDate: "2026-10-27", includeAll: true },
+      "/weight-service/weight/range/2026-10-01/2026-10-27",
+      { includeAll: "true" },
+    ],
+    [
+      "getBodyBattery",
+      { fromDate: "2026-10-21", toDate: "2026-10-27" },
+      "/wellness-service/wellness/bodyBattery/reports/daily",
+      { startDate: "2026-10-21", endDate: "2026-10-27" },
+    ],
     ["getHeartRateZones", {}, "/biometric-service/heartRateZones/v2", {}],
     ["getFitnessAge", { date: "2026-10-27" }, "/fitnessage-service/fitnessage/v2/2026-10-27", {}],
     [
