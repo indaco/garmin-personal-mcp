@@ -1,9 +1,11 @@
-/** The view in the URL hash, e.g. `#running@2026-09-07_2026-10-26` or `#strengthTraining/back-squat`, so a link opens it again. */
+/** The view in the URL hash, e.g. `#running@2026-09-07_2026-10-26~Tempo%205k` or `#strengthTraining/back-squat`, so a link opens it again. */
 export interface View {
   tab: string;
   /** Monday of the first and of the last week of the window. */
   from: string;
   to: string;
+  /** The activity names that the boards show; none shows all. */
+  names?: string[];
   /** An item the tab opens, such as a strength exercise. */
   item?: string;
 }
@@ -19,9 +21,12 @@ function itemOf(item: string | undefined): string | undefined {
 
 export function parseHash(hash: string, tabs: string[], weeks: string[]): View {
   const m =
-    /^#?([a-zA-Z]+)?(?:@(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2}))?(?:\/(.+))?$/.exec(hash) ?? [];
-  const [, tab, from, to, item] = m;
+    /^#?([a-zA-Z]+)?(?:@(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2}))?(?:~([^/]*))?(?:\/(.+))?$/.exec(
+      hash,
+    ) ?? [];
+  const [, tab, from, to, list, item] = m;
   const decoded = itemOf(item);
+  const names = (list ?? "").split(",").flatMap((n) => itemOf(n) ?? []);
   const window =
     from && to && from <= to && weeks.includes(from) && weeks.includes(to)
       ? { from, to }
@@ -29,10 +34,12 @@ export function parseHash(hash: string, tabs: string[], weeks: string[]): View {
   return {
     tab: tab && tabs.includes(tab) ? tab : "all",
     ...window,
+    ...(names.length > 0 ? { names } : {}),
     ...(decoded !== undefined ? { item: decoded } : {}),
   };
 }
 
 export function formatHash(v: View): string {
-  return `#${v.tab}@${v.from}_${v.to}${v.item ? `/${encodeURIComponent(v.item)}` : ""}`;
+  const names = v.names?.length ? `~${v.names.map(encodeURIComponent).join(",")}` : "";
+  return `#${v.tab}@${v.from}_${v.to}${names}${v.item ? `/${encodeURIComponent(v.item)}` : ""}`;
 }

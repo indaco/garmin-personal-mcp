@@ -8,6 +8,7 @@ import {
   groupsIn,
   isIndoor,
   mondayOf,
+  named,
   seconds,
   sessionSeconds,
   sportOf,
@@ -122,6 +123,15 @@ describe("time", () => {
   });
 });
 
+describe("named", () => {
+  it("keeps the activities with one of the names, all without names", () => {
+    const acts = [{ name: "Tempo" }, { name: "tempo" }, {}, { name: "Long run" }];
+    expect(named(acts, ["Tempo", "Long run"])).toEqual([acts[0], acts[3]]);
+    expect(named(acts, [])).toBe(acts);
+    expect(named(acts, undefined)).toBe(acts);
+  });
+});
+
 describe("URL hash", () => {
   const tabs = ["all", "running", "strengthTraining", "alpineSkiing"];
   const weeks = ["2026-10-05", "2026-10-12", "2026-10-19"];
@@ -137,6 +147,29 @@ describe("URL hash", () => {
       from: "2026-10-05",
       to: "2026-10-19",
       item: "back-squat",
+    });
+  });
+
+  it("reads the names between the window and the item", () => {
+    expect(parseHash("#running@2026-10-12_2026-10-19~Tempo%205k,a%2Cb%2Fc/x", tabs, weeks)).toEqual(
+      {
+        tab: "running",
+        from: "2026-10-12",
+        to: "2026-10-19",
+        names: ["Tempo 5k", "a,b/c"],
+        item: "x",
+      },
+    );
+    expect(parseHash("#all~Easy,%E0,", tabs, weeks)).toEqual({
+      tab: "all",
+      from: "2026-10-05",
+      to: "2026-10-19",
+      names: ["Easy"],
+    });
+    expect(parseHash("#all~", tabs, weeks)).toEqual({
+      tab: "all",
+      from: "2026-10-05",
+      to: "2026-10-19",
     });
   });
 
@@ -161,6 +194,9 @@ describe("URL hash", () => {
   it("writes the hash that it reads", () => {
     const s = { tab: "alpineSkiing", from: "2026-10-12", to: "2026-10-19", item: "x" };
     expect(parseHash(formatHash(s), tabs, weeks)).toEqual(s);
+    const n = { ...s, names: ["Tempo 5k", "a,b/c~d"] };
+    expect(parseHash(formatHash(n), tabs, weeks)).toEqual(n);
+    expect(formatHash({ ...s, names: [] })).toBe("#alpineSkiing@2026-10-12_2026-10-19/x");
     expect(formatHash({ tab: "all", from: "2026-10-05", to: "2026-10-19" })).toBe(
       "#all@2026-10-05_2026-10-19",
     );

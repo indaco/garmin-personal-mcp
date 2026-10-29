@@ -87,6 +87,13 @@ out. To add one:
 | `window.all` | All |
 | `window.from` | From week |
 | `window.to` | To week |
+| `names.label` | Activity names |
+| `names.all` | All |
+| `names.count` | {n} chosen\|{n} chosen |
+| `names.search` | Search names |
+| `names.noMatch` | No name matches. |
+| `names.remove` | Remove {name} |
+| `names.clear` | Show all |
 | `type.all` | All |
 | `type.recovery` | Recovery |
 | `type.running` | Run |
