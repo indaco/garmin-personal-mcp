@@ -105,24 +105,26 @@ call Garmin, so you do not need an API key.
 
 Where each part of the server and the page is.
 
-| File                                 | Content                                                                  |
-| ------------------------------------ | ------------------------------------------------------------------------ |
-| `src/index.ts`                       | the entry point: the stdio server, or a command of `src/cli.ts`          |
-| `src/cli.ts`                         | the `refresh` and `schedule` commands                                    |
-| `src/server.ts`                      | the MCP server with its tools and prompts                                |
-| `src/api-client.ts`                  | HTTP, the token and the retries                                          |
-| `src/tools.ts`, `src/fit.ts`         | the tools and the .FIT decoder                                           |
-| `src/dashboard.ts`                   | the `getDashboardData` tool and its cache                                |
-| `src/dashboard-page.ts`              | `writeDashboard` and `editDashboard`: the page file and its blocks       |
-| `src/schedule.ts`                    | `scheduleDashboardRefresh`: the cron, and the job for each system        |
-| `src/digest.ts`                      | the digest of the data for the coach notes                               |
-| `src/page/`                          | the dashboard page: app, layout, calculations, widgets, themes and texts |
-| `src/prompts.ts`                     | the prompts. The prompt texts are in `prompts/`.                         |
-| `src/config.ts`, `src/log.ts`        | the settings and the log                                                 |
-| `scripts/build-template.mjs`         | writes `dist/dashboard.html`                                             |
-| `scripts/third-party-notices.mjs`    | writes `THIRD-PARTY-NOTICES.md` after each build                         |
-| `scripts/fill-dashboard-fixture.mjs` | fills `dist/dashboard.html` with a data file, for screenshots and checks |
-| `scripts/demo-data.mjs`              | writes the demo site in `demo-site/`: sample data and the filled page    |
+| File                                 | Content                                                                   |
+| ------------------------------------ | ------------------------------------------------------------------------- |
+| `src/index.ts`                       | the entry point: the stdio server, or a command of `src/cli.ts`           |
+| `src/cli.ts`                         | the `refresh` and `schedule` commands                                     |
+| `src/server.ts`                      | the MCP server with its tools and prompts                                 |
+| `src/api-client.ts`                  | HTTP, the token and the retries                                           |
+| `src/tools.ts`, `src/fit.ts`         | the tools and the .FIT decoder                                            |
+| `src/dashboard.ts`                   | the `getDashboardData` tool and its cache                                 |
+| `src/dashboard-page.ts`              | `writeDashboard` and `editDashboard`: the page file and its blocks        |
+| `src/schedule.ts`                    | `scheduleDashboardRefresh`: the cron, and the job for each system         |
+| `src/digest.ts`                      | the digest of the data for the coach notes                                |
+| `src/page/`                          | the dashboard page: app, layout, calculations, widgets, themes and texts  |
+| `src/prompts.ts`                     | the prompts. The prompt texts are in `prompts/`.                          |
+| `src/config.ts`, `src/log.ts`        | the settings and the log                                                  |
+| `scripts/build-template.mjs`         | writes `dist/dashboard.html`                                              |
+| `scripts/third-party-notices.mjs`    | writes `THIRD-PARTY-NOTICES.md` after each build                          |
+| `scripts/fill-dashboard-fixture.mjs` | fills `dist/dashboard.html` with a data file, for screenshots and checks  |
+| `scripts/demo-data.mjs`              | writes the demo site in `demo-site/`: sample data and the filled page     |
+| `site/`                              | the project website: template, partials, styles, script and public files  |
+| `scripts/build-site.mjs`             | writes `dist-site/`: the website, with its facts from the code and README |
 
 ## Before you submit
 

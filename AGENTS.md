@@ -20,7 +20,8 @@ pnpm typecheck           # tsc --noEmit
 pnpm test                # Vitest
 pnpm vitest run test/tools.test.ts -t "name"   # one test
 pnpm build               # dist/index.js, the page template, THIRD-PARTY-NOTICES.md
-pnpm test:page           # the dashboard page in headless Chromium, after the build
+pnpm build:site          # the website in dist-site/, after the build
+pnpm test:page           # the dashboard page and the website in headless Chromium, after both builds
 pnpm guide               # write the generated parts of guide/
 ```
 
@@ -56,6 +57,6 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 
 ## Before you finish
 
-Run `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm build`. After a change to `src/page/`,
-also run `pnpm test:page`. A running client keeps the old server process: start a new session to
-see a changed tool or prompt.
+Run `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm build`. After a change to `src/page/` or
+`site/`, also run `pnpm build:site` and `pnpm test:page`. A running client keeps the old server
+process: start a new session to see a changed tool or prompt.
