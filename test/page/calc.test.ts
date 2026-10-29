@@ -184,6 +184,7 @@ describe("URL hash", () => {
   it("falls back to the All tab and every week", () => {
     const all = { tab: "all", from: "2026-10-05", to: "2026-10-19" };
     expect(parseHash("", tabs, weeks)).toEqual(all);
+    expect(parseHash("#running!x", tabs, weeks)).toEqual(all);
     expect(parseHash("#swimming@1999-01-04_2026-10-19", tabs, weeks)).toEqual(all);
     expect(parseHash("#running@2026-10-19_2026-10-05", tabs, weeks)).toEqual({
       ...all,

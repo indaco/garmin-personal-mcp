@@ -313,6 +313,20 @@ describe("activities", () => {
     expect(rows.map((r: { id: number }) => r.id)).toEqual([2]);
   });
 
+  it("skips a list item that is not an object", async () => {
+    api.getJson.mockResolvedValueOnce([null, { activityId: 1, activityName: "Tempo" }]);
+    const named = await tools.listActivities(undefined, undefined, undefined, 5, false, ["tempo"]);
+    expect(JSON.parse(named)).toEqual([{ id: 1, name: "Tempo" }]);
+    api.getJson
+      .mockRejectedValueOnce(refused())
+      .mockRejectedValueOnce(refused())
+      .mockResolvedValueOnce([null, { activityId: 2, activityType: { typeKey: "running" } }]);
+    const typed = await tools.listActivities(undefined, undefined, "running", 5);
+    expect(JSON.parse(typed)).toEqual([{ id: 2, type: "running" }]);
+    api.getJson.mockResolvedValueOnce([null]);
+    expect(JSON.parse(await tools.listActivities())).toEqual([{}]);
+  });
+
   it("does not filter for an empty list of names", async () => {
     api.getJson.mockResolvedValue([{ activityId: 1, activityName: "A" }]);
     const rows = JSON.parse(
