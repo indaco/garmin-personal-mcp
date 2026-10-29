@@ -5,14 +5,15 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Config } from "../src/config";
 import {
   AutoRefresh,
-  checkSchedule,
   cronLine,
+  cronOf,
   type Job,
-  parseSchedule,
+  nextRuns,
+  parseCron,
   plist,
   refreshPages,
   type Run,
-  schtasksArgs,
+  taskXml,
   withCronLine,
 } from "../src/schedule";
 
@@ -27,49 +28,87 @@ const NPX_ENTRY = "/home/u/.npm/_npx/1a2b/node_modules/pkg/dist/index.js";
 
 const failing: Run = async () => ({ code: 5, stdout: "", stderr: "Bootstrap failed: 5" });
 
-describe("schedules", () => {
-  it("reads the CLI forms, with 07:00 and Monday as defaults", () => {
-    expect(parseSchedule(["daily"])).toEqual({ every: "day", time: "07:00" });
-    expect(parseSchedule(["weekdays", "6:30"])).toEqual({ every: "weekday", time: "06:30" });
-    expect(parseSchedule(["weekly"])).toEqual({ every: "week", day: "monday", time: "07:00" });
-    expect(parseSchedule(["Weekly", "Friday", "18:05"])).toEqual({
-      every: "week",
-      day: "friday",
-      time: "18:05",
+describe("cron", () => {
+  it("reads lists, ranges and steps; 7 is Sunday", () => {
+    expect(parseCron(" 30  6,18 * * 1-5 ")).toEqual({
+      text: "30 6,18 * * 1-5",
+      times: [6 * 60 + 30, 18 * 60 + 30],
+      weekdays: [1, 2, 3, 4, 5],
     });
-    expect(checkSchedule({ day: "sunday" })).toEqual({
-      every: "week",
-      day: "sunday",
-      time: "07:00",
+    expect(parseCron("0 */6 1,15 1-12/3 7")).toMatchObject({
+      times: [0, 360, 720, 1080],
+      days: [1, 15],
+      months: [1, 4, 7, 10],
+      weekdays: [0],
     });
+    expect(parseCron("0 7 * * *").days).toBeUndefined();
   });
 
-  it("refuses a bad schedule with the forms in the message", () => {
-    for (const words of [["hourly"], ["daily", "25:00"], ["daily", "7"], ["daily", "7:00", "x"]]) {
-      expect(() => parseSchedule(words), words.join(" ")).toThrow(/daily \[HH:MM\]/);
+  it("refuses a bad expression, runs less than an hour apart, and a date that never comes", () => {
+    for (const bad of [
+      "0 7 * *",
+      "60 7 * * *",
+      "0 7 * * MON",
+      "0 7 0 * *",
+      "0 5-3 * * *",
+      "0 7 * * */0",
+    ]) {
+      expect(() => parseCron(bad), bad).toThrow(/^Cron/);
     }
-    expect(() => parseSchedule(["weekly", "someday"])).toThrow(/Day: one of/);
+    expect(() => parseCron("*/30 * * * *")).toThrow(/1 hour apart/);
+    expect(() => parseCron("30 23 * * *, 0 0")).toThrow(/^Cron/);
+    // 23:30 and 00:00 are 30 minutes apart across midnight
+    expect(() => parseCron("0,30 0,23 * * *")).toThrow(/1 hour apart/);
+    expect(() => parseCron("0 * * * *").times).not.toThrow();
+    expect(() => parseCron("0 7 31 2 *")).toThrow(/never comes/);
   });
 
-  it("writes launchd times: every day, weekdays, one day", () => {
-    const day = plist(job, checkSchedule({ every: "day", time: "07:05" }));
-    expect(day).toContain(
+  it("gives the next runs in local time; with day of month and weekday, either one runs", () => {
+    const from = new Date(2026, 9, 29, 12, 0); // Thursday
+    expect(nextRuns(parseCron("0 7,18 * * *"), from, 3)).toEqual([
+      "2026-10-29 18:00",
+      "2026-10-30 07:00",
+      "2026-10-30 18:00",
+    ]);
+    expect(nextRuns(parseCron("0 8 1 * 1"), from, 3)).toEqual([
+      "2026-11-01 08:00",
+      "2026-11-02 08:00",
+      "2026-11-09 08:00",
+    ]);
+    expect(nextRuns(parseCron("0 7 29 2 *"), from, 1)).toEqual(["2028-02-29 07:00"]);
+  });
+
+  it("reads the CLI forms, with 07:00 and Monday as defaults", () => {
+    expect(cronOf(["daily"])).toBe("0 7 * * *");
+    expect(cronOf(["weekdays", "6:30"])).toBe("30 6 * * 1-5");
+    expect(cronOf(["weekly"])).toBe("0 7 * * 1");
+    expect(cronOf(["Weekly", "Friday", "18:05"])).toBe("5 18 * * 5");
+    expect(cronOf(["0 18 * * 1,4"])).toBe("0 18 * * 1,4");
+    for (const words of [["hourly"], ["daily", "25:00"], ["daily", "7"], ["weekly", "someday"]]) {
+      expect(() => cronOf(words), words.join(" ")).toThrow(/daily \[HH:MM\]/);
+    }
+  });
+
+  it("writes launchd times: one dict per time, month and day", () => {
+    const daily = plist(job, parseCron("5 7 * * *"));
+    expect(daily).toContain(
       "<dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>5</integer></dict>",
     );
-    expect(
-      plist(job, checkSchedule({ every: "weekday" })).match(/<key>Weekday<\/key>/g),
-    ).toHaveLength(5);
-    expect(plist(job, checkSchedule({ every: "week", day: "sunday" }))).toContain(
-      "<key>Weekday</key><integer>0</integer>",
+    expect(daily).toContain("<string>/opt/node/bin/npx</string>");
+    expect(plist(job, parseCron("0 7 * * 1-5")).match(/<key>Weekday<\/key>/g)).toHaveLength(5);
+    expect(plist(job, parseCron("0 8 1 1,7 *"))).toContain(
+      "<dict><key>Month</key><integer>7</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>",
     );
-    expect(day).toContain("<string>/opt/node/bin/npx</string>");
+    // day of month or weekday: both kinds of dict
+    const either = plist(job, parseCron("0 8 1 * 1"));
+    expect(either).toContain("<key>Day</key><integer>1</integer>");
+    expect(either).toContain("<key>Weekday</key><integer>1</integer>");
   });
 
   it("writes cron lines with the user's paths quoted and % escaped", () => {
-    expect(cronLine(job, checkSchedule({ every: "weekday", time: "06:30" }))).toMatch(
-      /^30 6 \* \* 1,2,3,4,5 GARMIN_DATA_DIR='\/data\/it'\\''s 100\\%' .*>> '.*refresh\.log' 2>&1 # garmin-personal-mcp refresh$/,
+    expect(cronLine(job, parseCron("30 6 * * 1-5"))).toMatch(
+      /^30 6 \* \* 1-5 GARMIN_DATA_DIR='\/data\/it'\\''s 100\\%' .*>> '.*refresh\.log' 2>&1 # garmin-personal-mcp refresh$/,
     );
-    expect(cronLine(job, checkSchedule({ every: "day" }))).toMatch(/^0 7 \* \* \* /);
   });
 
   it("replaces only its own crontab line", () => {
@@ -81,11 +120,23 @@ describe("schedules", () => {
     expect(withCronLine(`${other}\n${mine}\n`, undefined)).toBe(`${other}\n`);
   });
 
-  it("writes schtasks days", () => {
-    expect(schtasksArgs("C:\\d\\a.cmd", checkSchedule({ every: "week", day: "monday" }))).toEqual(
-      expect.arrayContaining(["/SC", "WEEKLY", "/D", "MON", "/ST", "07:00"]),
+  it("writes Task Scheduler triggers for each time, and runs a missed time", () => {
+    const week = taskXml("C:\\d\\a.cmd", parseCron("0 7,19 * * 1,5"));
+    expect(week.match(/<CalendarTrigger>/g)).toHaveLength(2);
+    expect(week).toContain("<StartBoundary>2026-01-01T19:00:00</StartBoundary>");
+    expect(week).toContain(
+      "<ScheduleByWeek><WeeksInterval>1</WeeksInterval><DaysOfWeek><Monday /><Friday /></DaysOfWeek></ScheduleByWeek>",
     );
-    expect(schtasksArgs("C:\\d\\a.cmd", checkSchedule({}))).not.toContain("/D");
+    expect(week).toContain("<StartWhenAvailable>true</StartWhenAvailable>");
+    expect(taskXml("a.cmd", parseCron("0 7 * * *"))).toContain(
+      "<ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>",
+    );
+    expect(taskXml("a.cmd", parseCron("0 7 1,15 3 *"))).toContain(
+      "<ScheduleByMonth><DaysOfMonth><Day>1</Day><Day>15</Day></DaysOfMonth><Months><March /></Months></ScheduleByMonth>",
+    );
+    expect(taskXml("a.cmd", parseCron("0 7 * 12 6"))).toContain(
+      "<DaysOfWeek><Saturday /></DaysOfWeek><Months><December /></Months></ScheduleByMonthDayOfWeek>",
+    );
   });
 });
 
@@ -130,16 +181,18 @@ describe("AutoRefresh", () => {
       dir,
       "home/Library/LaunchAgents/com.indaco.garmin-personal-mcp.refresh.plist",
     );
-    await a.set({ schedule: { every: "week", day: "monday" } });
+    await a.set({ cron: "0 7 * * 1" });
     expect(readFileSync(plistFile, "utf8")).toContain("<key>Weekday</key><integer>1</integer>");
-    const s = await a.set({ path: "coach.html", schedule: { every: "day", time: "06:00" } });
+    const s = await a.set({ path: "coach.html", cron: "0 6 * * *" });
     expect(s).toMatchObject({
       scheduled: true,
-      schedule: { every: "day", time: "06:00" },
+      cron: "0 6 * * *",
       pages: [join(config.dataDir, "garmin-dashboard.html"), join(config.dataDir, "coach.html")],
       scheduler: "launchd",
       installed: true,
     });
+    expect(s.next).toHaveLength(3);
+    expect(s.next![0]).toMatch(/^\d{4}-\d\d-\d\d 06:00$/);
     expect(calls.filter((c) => c.args[0] === "bootstrap")).toHaveLength(2);
     expect(readFileSync(plistFile, "utf8")).not.toContain("Weekday");
 
@@ -154,11 +207,8 @@ describe("AutoRefresh", () => {
 
   it("keeps the schedule when only a page is added", async () => {
     const a = auto("linux");
-    await a.set({ schedule: { every: "weekday", time: "05:45" } });
-    expect((await a.set({ path: "coach.html" })).schedule).toEqual({
-      every: "weekday",
-      time: "05:45",
-    });
+    await a.set({ cron: "45 5 * * 1-5" });
+    expect((await a.set({ path: "coach.html" })).cron).toBe("45 5 * * 1-5");
   });
 
   it("keeps the other lines of the user's crontab", async () => {
@@ -185,15 +235,31 @@ describe("AutoRefresh", () => {
     );
   });
 
-  it("writes a script for the Windows task", async () => {
+  it("writes a script and a UTF-16 task file for the Windows task", async () => {
     const a = auto("win32");
-    await a.set({ schedule: { every: "week", day: "friday", time: "20:00" } });
+    await a.set({ cron: "0 20 * * 5" });
     const script = readFileSync(join(config.dataDir, "auto-refresh.cmd"), "utf8");
     expect(script).toContain('set "PATH=/opt/node/bin;%PATH%"');
     expect(script).toContain("npx.cmd");
-    expect(calls.find((c) => c.args[0] === "/Create")?.args).toEqual(
-      expect.arrayContaining(["/D", "FRI", "/ST", "20:00"]),
-    );
+    const taskFile = join(config.dataDir, "auto-refresh-task.xml");
+    const task = readFileSync(taskFile, "utf16le");
+    expect(task.startsWith("\ufeff<?xml")).toBe(true);
+    expect(task).toContain("<Friday />");
+    expect(calls.find((c) => c.args[0] === "/Create")?.args).toEqual([
+      "/Create",
+      "/F",
+      "/TN",
+      "garmin-personal-mcp refresh",
+      "/XML",
+      taskFile,
+    ]);
+    await a.off();
+    expect(existsSync(taskFile)).toBe(false);
+  });
+
+  it("refuses a bad cron before it changes anything", async () => {
+    await expect(auto("linux").set({ cron: "*/15 * * * *" })).rejects.toThrow(/1 hour apart/);
+    expect(calls).toEqual([]);
   });
 
   it("never puts the API key in the job", async () => {

@@ -139,6 +139,8 @@ describe("prompts", () => {
     ]) {
       expect(text).toContain("ask me once whether to update the page automatically");
       expect(text).toContain("removes the coach notes");
+      expect(text).toContain("in my own words, in any language");
+      expect(text).toContain("call `scheduleDashboardRefresh` with `cron`");
     }
     const update = await render("training-dashboard-update");
     expect(update).toContain("`scheduleDashboardRefresh` without arguments");

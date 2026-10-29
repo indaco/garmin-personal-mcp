@@ -56,31 +56,27 @@ Reload the page in the browser to see the new data.
 
 ## Update the dashboard on a schedule
 
-This is optional. The server can update the data of your page at a fixed time, also when no
+This is optional. The server can update the data of your page at fixed times, also when no
 assistant is open. When you make a page, the assistant asks if you want this. You can also ask at
-any time, for example:
+any time. Say when in your own words, in any language, for example:
 
 - "Update my dashboard every day at 7."
-- "Update my dashboard on weekdays at 6:30."
-- "Update my coach page every Monday at 8."
+- "Update my dashboard on Monday and Thursday at 18."
+- "Aggiorna la mia dashboard ogni lunedì alle 8."
+- "Update my coach page on the first day of each month at 8."
 - "Stop the automatic update of my dashboard."
 - "When does my dashboard update?"
 
-| Schedule  | When                            |
-| --------- | ------------------------------- |
-| Every day | each day at the time            |
-| Weekdays  | Monday to Friday at the time    |
-| Weekly    | one day of the week at the time |
-
-The time is 07:00 when you do not give one. All the pages that update automatically use the same
-schedule.
+The assistant turns your words into a cron expression and tells you the next three updates, so you
+can check that it understood you. Two updates must be at least 1 hour apart. Without a time, the
+update is every day at 07:00. All the pages that update automatically use the same schedule.
 
 - The update replaces the data of the page. It keeps the weeks, the layout, the custom widgets, the
   languages and the settings.
 - It removes the coach notes, because old notes do not agree with the new data. To get new notes,
   run the `training-dashboard-update` prompt.
-- The computer must be on at that time. A Mac that sleeps updates the page when it wakes up. Linux
-  and Windows skip a time that they miss.
+- The computer must be on at that time. On macOS and Windows, a computer that was off or asleep
+  updates the page when it wakes up. Linux skips a time that it misses.
 - The server adds one job to the scheduler of your computer: launchd on macOS, your crontab on
   Linux, and Task Scheduler on Windows. The job reads the API key from the key file
   (`GARMIN_API_KEY_FILE`), never from your MCP client configuration. Save the key in that file
@@ -96,13 +92,16 @@ schedule.
 npx -y @indaco/garmin-personal-mcp@latest schedule daily 07:00
 npx -y @indaco/garmin-personal-mcp@latest schedule weekdays 06:30
 npx -y @indaco/garmin-personal-mcp@latest schedule weekly monday 08:00 garmin-dashboard-coach.html
+npx -y @indaco/garmin-personal-mcp@latest schedule "0 18 * * 1,4"  # a cron expression
 npx -y @indaco/garmin-personal-mcp@latest schedule              # show the schedule
 npx -y @indaco/garmin-personal-mcp@latest schedule off          # stop all
 npx -y @indaco/garmin-personal-mcp@latest schedule off garmin-dashboard-coach.html
 npx -y @indaco/garmin-personal-mcp@latest refresh               # update now, once
 ```
 
-A file name ends in `.html`. A relative path is in the data folder. `refresh` with a file name
+A cron expression has 5 fields in local time: minute, hour, day of the month, month and weekday
+(0 is Sunday), with numbers, lists (`1,4`), ranges (`1-5`) and steps (`*/6`). A file name ends in
+`.html`. A relative path is in the data folder. `refresh` with a file name
 updates that page.
 
 ## Boards and widgets

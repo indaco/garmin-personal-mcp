@@ -28,5 +28,5 @@ activities (`sync.newActivities`), and anything that was missing. If `sync.faile
 (HR zones, fitness age, HRV) and say that they show as "n/a".
 
 Call `scheduleDashboardRefresh` without arguments. If its `pages` do not have this page, add one
-line: you can update the page automatically when I ask, for example "update it every Monday
-at 7".
+line: you can update the page automatically when I ask, in my own words, for example "update it
+every Monday at 7".

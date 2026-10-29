@@ -24,19 +24,39 @@ export const DAYS = [
   "friday",
   "saturday",
 ] as const;
-export type Day = (typeof DAYS)[number];
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+/** Garmin gets about 8 requests per refresh: two runs must be at least this far apart. */
+const MIN_GAP_MINUTES = 60;
 
-export interface Schedule {
-  every: "day" | "weekday" | "week";
-  /** Only for `week`. */
-  day?: Day;
-  /** HH:MM, 24 h. */
-  time: string;
+/** A 5-field cron expression in local time, read into its values. */
+export interface Cron {
+  text: string;
+  /** The run times of a day, as minutes after midnight, sorted. */
+  times: number[];
+  /** Days of the month, months (1-12) and weekdays (0 = Sunday); undefined = every. */
+  days?: number[];
+  months?: number[];
+  weekdays?: number[];
 }
 
 export interface Status {
   scheduled: boolean;
-  schedule?: Schedule;
+  cron?: string;
+  /** The next runs, local time. */
+  next?: string[];
   pages?: string[];
   scheduler?: string;
   /** False when the job is no longer in the system scheduler. */
@@ -45,7 +65,7 @@ export interface Status {
 }
 
 interface State {
-  schedule: Schedule;
+  cron: string;
   pages: string[];
 }
 
@@ -69,53 +89,109 @@ export const run: Run = (cmd, args, input) =>
   });
 
 const STATE_FILE = "auto-refresh.json";
+const DEFAULT_CRON = "0 7 * * *";
 const LABEL = "com.indaco.garmin-personal-mcp.refresh";
 const TASK = "garmin-personal-mcp refresh";
 const MARK = "# garmin-personal-mcp refresh";
-const FORMS = "daily [HH:MM], weekdays [HH:MM] or weekly <day> [HH:MM]";
+const FIELDS = [
+  ["minute", 0, 59],
+  ["hour", 0, 23],
+  ["day of month", 1, 31],
+  ["month", 1, 12],
+  ["weekday", 0, 7],
+] as const;
 
-/** A schedule with its defaults (07:00, Monday), or an error that lists the forms. */
-export function checkSchedule(s: Partial<Schedule> = {}): Schedule {
-  const every = s.every ?? (s.day ? "week" : "day");
-  const m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(s.time ?? "07:00");
-  if (!["day", "weekday", "week"].includes(every) || !m) {
-    throw new Error(`Schedule: ${FORMS}, e.g. weekly monday 07:00`);
+/** One cron field: *, n, a-b, with an optional /step, separated by commas. */
+function field(text: string, [label, min, max]: (typeof FIELDS)[number]): number[] {
+  const values = new Set<number>();
+  for (const part of text.split(",")) {
+    const m = /^(\*|(\d+)(?:-(\d+))?)(?:\/(\d+))?$/.exec(part);
+    const from = m?.[2] === undefined ? min : Number(m[2]);
+    const to = m?.[3] !== undefined ? Number(m[3]) : m?.[2] === undefined || m[4] ? max : from;
+    const step = m?.[4] === undefined ? 1 : Number(m[4]);
+    if (!m || from < min || to > max || from > to || step < 1) {
+      throw new Error(`Cron ${label}: "${part}" is not ${min}-${max}, a list, a range or a /step`);
+    }
+    for (let v = from; v <= to; v += step) values.add(label === "weekday" && v === 7 ? 0 : v);
   }
-  const time = `${m[1].padStart(2, "0")}:${m[2]}`;
-  if (every !== "week") return { every, time };
-  const day = s.day ?? "monday";
-  if (!DAYS.includes(day)) throw new Error(`Day: one of ${DAYS.join(", ")}`);
-  return { every, day, time };
+  return [...values].toSorted((a, b) => a - b);
 }
 
-/** The CLI words, e.g. ["weekly", "monday", "7:30"]. */
-export function parseSchedule(words: string[]): Schedule {
+/** Reads and checks a cron expression: numbers only, and at least an hour between two runs. */
+export function parseCron(text: string): Cron {
+  const parts = text.trim().split(/\s+/);
+  if (parts.length !== 5) {
+    throw new Error(
+      `Cron: 5 fields, minute hour day-of-month month weekday (0 = Sunday), e.g. "0 7 * * 1"`,
+    );
+  }
+  const [minutes, hours, days, months, weekdays] = parts.map((p, i) => field(p, FIELDS[i]));
+  const times = hours.flatMap((h) => minutes.map((m) => h * 60 + m)).toSorted((a, b) => a - b);
+  const gaps = times.map((t, i) => (i === 0 ? t + 24 * 60 : t) - (times.at(i - 1) ?? t));
+  if (times.length > 1 && Math.min(...gaps) < MIN_GAP_MINUTES) {
+    throw new Error("Cron: the runs must be at least 1 hour apart");
+  }
+  // as in cron, a field that starts with * is every day; with day of month and weekday, either one runs
+  const cron: Cron = {
+    text: parts.join(" "),
+    times,
+    ...(parts[2].startsWith("*") ? {} : { days }),
+    ...(parts[3].startsWith("*") ? {} : { months }),
+    ...(parts[4].startsWith("*") ? {} : { weekdays }),
+  };
+  if (nextRuns(cron, new Date(), 1).length === 0) throw new Error("Cron: this date never comes");
+  return cron;
+}
+
+/** The CLI forms: daily [HH:MM], weekdays [HH:MM], weekly <day> [HH:MM], or a cron expression. */
+export function cronOf(words: string[]): string {
+  if (words.length === 1 && words[0].trim().includes(" ")) return words[0];
   const [kind, ...rest] = words.map((w) => w.toLowerCase());
-  const every = ({ daily: "day", weekdays: "weekday", weekly: "week" } as const)[kind ?? ""];
-  if (!every) throw new Error(`Schedule: ${FORMS}`);
-  const day = every === "week" && rest[0] && !rest[0].includes(":") ? rest.shift() : undefined;
-  if (rest.length > 1) throw new Error(`Schedule: ${FORMS}`);
-  return checkSchedule({ every, day: day as Day | undefined, time: rest[0] });
+  const day =
+    kind === "weekly" && rest[0] && !rest[0].includes(":")
+      ? DAYS.indexOf(rest.shift() as (typeof DAYS)[number])
+      : 1;
+  const m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(rest[0] ?? "07:00");
+  const weekday = { daily: "*", weekdays: "1-5", weekly: String(day) }[kind ?? ""];
+  if (!weekday || !m || rest.length > 1 || day < 0) {
+    throw new Error(
+      'Schedule: daily [HH:MM], weekdays [HH:MM], weekly <day> [HH:MM] or a cron expression in quotes, e.g. "0 7 * * 1"',
+    );
+  }
+  return `${Number(m[2])} ${Number(m[1])} * * ${weekday}`;
 }
 
-/** "every Monday at 07:00". */
-export function describe(s: Schedule): string {
-  const when =
-    s.every === "day"
-      ? "every day"
-      : s.every === "weekday"
-        ? "every weekday"
-        : `every ${s.day![0].toUpperCase()}${s.day!.slice(1)}`;
-  return `${when} at ${s.time}`;
+/** Whether the job runs on that day. */
+function runsOn(c: Cron, d: Date): boolean {
+  if (c.months && !c.months.includes(d.getMonth() + 1)) return false;
+  const onDay = c.days?.includes(d.getDate());
+  const onWeekday = c.weekdays?.includes(d.getDay());
+  if (c.days && c.weekdays) return Boolean(onDay || onWeekday);
+  return (c.days ? onDay : c.weekdays ? onWeekday : true) ?? false;
 }
 
-/** The days of the week the job runs, 0 = Sunday; undefined = every day. */
-const weekdays = (s: Schedule) =>
-  s.every === "day" ? undefined : s.every === "weekday" ? [1, 2, 3, 4, 5] : [DAYS.indexOf(s.day!)];
+const pad = (n: number) => String(n).padStart(2, "0");
 
-const hourMinute = (s: Schedule) => s.time.split(":").map(Number) as [number, number];
+/** The next `count` runs after `from`, as local "YYYY-MM-DD HH:MM"; empty when the date never comes. */
+export function nextRuns(c: Cron, from: Date, count: number): string[] {
+  const runs: string[] = [];
+  // 8 years: a 29 February runs at least once in that time
+  for (let i = 0; i < 366 * 8 && runs.length < count; i++) {
+    const d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + i);
+    if (!runsOn(c, d)) continue;
+    for (const t of c.times) {
+      const at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(t / 60), t % 60);
+      if (at > from && runs.length < count) {
+        runs.push(
+          `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`,
+        );
+      }
+    }
+  }
+  return runs;
+}
 
-/** What the job runs: npx next to this node, so the job does not depend on the user's shell PATH. */
+/** What the job runs, with the environment it needs. */
 export interface Job {
   program: string;
   args: string[];
@@ -126,11 +202,34 @@ export interface Job {
 const xml = (s: string) =>
   s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
-export function plist(job: Job, s: Schedule): string {
-  const [hour, minute] = hourMinute(s);
-  const when = (weekdays(s) ?? [undefined]).map(
-    (d) =>
-      `    <dict>${d === undefined ? "" : `<key>Weekday</key><integer>${d}</integer>`}<key>Hour</key><integer>${hour}</integer><key>Minute</key><integer>${minute}</integer></dict>`,
+/** launchd has no cron syntax: each run time is a dict, and a run matches any dict of the array. */
+function calendar(c: Cron): Record<string, number>[] {
+  const months = c.months ?? [undefined];
+  const days: Record<string, number>[] =
+    c.days || c.weekdays
+      ? [
+          ...(c.days ?? []).map((d) => ({ Day: d })),
+          ...(c.weekdays ?? []).map((w) => ({ Weekday: w })),
+        ]
+      : [{}];
+  return c.times.flatMap((t) =>
+    months.flatMap((m) =>
+      days.map((d) => ({
+        ...(m === undefined ? {} : { Month: m }),
+        ...d,
+        Hour: Math.floor(t / 60),
+        Minute: t % 60,
+      })),
+    ),
+  );
+}
+
+export function plist(job: Job, c: Cron): string {
+  const when = calendar(c).map(
+    (e) =>
+      `    <dict>${Object.entries(e)
+        .map(([k, v]) => `<key>${k}</key><integer>${v}</integer>`)
+        .join("")}</dict>`,
   );
   const strings = (xs: string[]) => xs.map((x) => `    <string>${xml(x)}</string>`).join("\n");
   const env = Object.entries(job.env)
@@ -163,13 +262,12 @@ ${when.join("\n")}
 const sh = (s: string) => `'${s.replaceAll("'", `'\\''`)}'`;
 
 /** The crontab line; % is a newline for cron, so it is escaped. */
-export function cronLine(job: Job, s: Schedule): string {
-  const [hour, minute] = hourMinute(s);
+export function cronLine(job: Job, c: Cron): string {
   const env = Object.entries(job.env).map(([k, v]) => `${k}=${sh(v)}`);
   const command = [...env, sh(job.program), ...job.args.map(sh), ">>", sh(job.log), "2>&1"].join(
     " ",
   );
-  return `${minute} ${hour} * * ${weekdays(s)?.join(",") ?? "*"} ${command.replaceAll("%", "\\%")} ${MARK}`;
+  return `${c.text} ${command.replaceAll("%", "\\%")} ${MARK}`;
 }
 
 /** The crontab with our line replaced (or removed when `line` is undefined); other lines stay. */
@@ -178,7 +276,7 @@ export function withCronLine(crontab: string, line: string | undefined): string 
   return [...kept, ...(line ? [line] : [])].map((l) => `${l}\n`).join("");
 }
 
-/** The .cmd file the Windows task runs: /TR allows only 261 characters. */
+/** The .cmd file the Windows task runs. */
 export function windowsScript(job: Job): string {
   const env = Object.entries(job.env).map(([k, v]) =>
     k === "PATH" ? `set "PATH=${v};%PATH%"` : `set "${k}=${v}"`,
@@ -187,21 +285,58 @@ export function windowsScript(job: Job): string {
   return ["@echo off", ...env, `call ${command} >> "${job.log}" 2>&1`, ""].join("\r\n");
 }
 
-export function schtasksArgs(script: string, s: Schedule): string[] {
-  const days = weekdays(s)?.map((d) => DAYS[d].slice(0, 3).toUpperCase());
-  return [
-    "/Create",
-    "/F",
-    "/TN",
-    TASK,
-    "/TR",
-    `"${script}"`,
-    "/SC",
-    days ? "WEEKLY" : "DAILY",
-    ...(days ? ["/D", days.join(",")] : []),
-    "/ST",
-    s.time,
+const tags = (names: string[]) => names.map((n) => `<${n} />`).join("");
+
+/**
+ * The Task Scheduler task: schtasks /SC cannot say most cron schedules, so each run time is a calendar
+ * trigger. StartWhenAvailable runs a time that the computer missed, as launchd does.
+ */
+export function taskXml(script: string, c: Cron): string {
+  const months = `<Months>${tags((c.months ?? MONTHS.map((_, i) => i + 1)).map((m) => MONTHS[m - 1]))}</Months>`;
+  const weekdays = c.weekdays
+    ? `<DaysOfWeek>${tags(c.weekdays.map((w) => DAYS[w][0].toUpperCase() + DAYS[w].slice(1)))}</DaysOfWeek>`
+    : "";
+  const byMonth = (days: number[]) =>
+    `<ScheduleByMonth><DaysOfMonth>${days.map((d) => `<Day>${d}</Day>`).join("")}</DaysOfMonth>${months}</ScheduleByMonth>`;
+  const schedules = [
+    ...(c.days ? [byMonth(c.days)] : []),
+    ...(c.weekdays
+      ? [
+          c.months
+            ? `<ScheduleByMonthDayOfWeek><Weeks><Week>1</Week><Week>2</Week><Week>3</Week><Week>4</Week><Week>Last</Week></Weeks>${weekdays}${months}</ScheduleByMonthDayOfWeek>`
+            : `<ScheduleByWeek><WeeksInterval>1</WeeksInterval>${weekdays}</ScheduleByWeek>`,
+        ]
+      : []),
+    ...(c.days || c.weekdays
+      ? []
+      : [
+          c.months
+            ? byMonth(Array.from({ length: 31 }, (_, i) => i + 1))
+            : "<ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>",
+        ]),
   ];
+  const triggers = c.times.flatMap((t) =>
+    schedules.map(
+      (s) =>
+        `    <CalendarTrigger><StartBoundary>2026-01-01T${pad(Math.floor(t / 60))}:${pad(t % 60)}:00</StartBoundary>${s}</CalendarTrigger>`,
+    ),
+  );
+  return `<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo><Description>Updates the Garmin dashboard pages (${xml(c.text)})</Description></RegistrationInfo>
+  <Triggers>
+${triggers.join("\n")}
+  </Triggers>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <ExecutionTimeLimit>PT1H</ExecutionTimeLimit>
+  </Settings>
+  <Actions><Exec><Command>${xml(script)}</Command></Exec></Actions>
+</Task>
+`;
 }
 
 export class AutoRefresh {
@@ -224,6 +359,9 @@ export class AutoRefresh {
   get #script() {
     return join(this.config.dataDir, "auto-refresh.cmd");
   }
+  get #taskFile() {
+    return join(this.config.dataDir, "auto-refresh-task.xml");
+  }
   get #log() {
     return join(this.home, ".cache/garmin-personal-mcp/refresh.log");
   }
@@ -241,15 +379,17 @@ export class AutoRefresh {
     if (!state) return { scheduled: false };
     return {
       scheduled: true,
-      ...state,
+      cron: state.cron,
+      next: nextRuns(parseCron(state.cron), new Date(), 3),
+      pages: state.pages,
       scheduler: this.#scheduler,
       installed: await this.#installed(),
       log: this.#log,
     };
   }
 
-  /** Adds the page (default: the main dashboard) and sets the schedule, or keeps the current one. */
-  async set(o: { schedule?: Partial<Schedule>; path?: string }): Promise<Status> {
+  /** Adds the page (default: the main dashboard) and sets the cron, or keeps the current one. */
+  async set(o: { cron?: string; path?: string }): Promise<Status> {
     if (!this.#scheduler) throw new Error("Automatic refresh works on macOS, Linux and Windows");
     if (!existsSync(this.config.apiKeyFile)) {
       // the job must never hold the key, so it reads the key file
@@ -262,10 +402,10 @@ export class AutoRefresh {
       throw new Error(`${page} does not exist: make it first with the training-dashboard prompt`);
     }
     const old = await this.#state();
-    const schedule = o.schedule ? checkSchedule(o.schedule) : (old?.schedule ?? checkSchedule());
+    const cron = parseCron(o.cron ?? old?.cron ?? DEFAULT_CRON);
     const pages = [...new Set([...(old?.pages ?? []), page])];
-    await this.#install(schedule);
-    await writeFile(this.#stateFile, `${JSON.stringify({ schedule, pages }, null, 2)}\n`);
+    await this.#install(cron);
+    await writeFile(this.#stateFile, `${JSON.stringify({ cron: cron.text, pages }, null, 2)}\n`);
     return this.status();
   }
 
@@ -301,19 +441,21 @@ export class AutoRefresh {
     };
   }
 
-  async #install(s: Schedule): Promise<void> {
+  async #install(c: Cron): Promise<void> {
     await mkdir(dirname(this.#log), { recursive: true });
     const job = this.#job();
     if (this.platform === "darwin") {
       await mkdir(dirname(this.#plist), { recursive: true });
-      await writeFile(this.#plist, plist(job, s));
+      await writeFile(this.#plist, plist(job, c));
       await this.exec("launchctl", ["bootout", this.#domain(), this.#plist]);
       await this.#must("launchctl", ["bootstrap", this.#domain(), this.#plist]);
     } else if (this.platform === "linux") {
-      await this.#must("crontab", ["-"], withCronLine(await this.#crontab(), cronLine(job, s)));
+      await this.#must("crontab", ["-"], withCronLine(await this.#crontab(), cronLine(job, c)));
     } else {
       await writeFile(this.#script, windowsScript(job));
-      await this.#must("schtasks", schtasksArgs(this.#script, s));
+      // schtasks reads the task XML as UTF-16 with a byte order mark
+      await writeFile(this.#taskFile, Buffer.from(`\ufeff${taskXml(this.#script, c)}`, "utf16le"));
+      await this.#must("schtasks", ["/Create", "/F", "/TN", TASK, "/XML", this.#taskFile]);
     }
   }
 
@@ -326,6 +468,7 @@ export class AutoRefresh {
     } else {
       await this.exec("schtasks", ["/Delete", "/F", "/TN", TASK]);
       await rm(this.#script, { force: true });
+      await rm(this.#taskFile, { force: true });
     }
   }
 
@@ -395,20 +538,21 @@ export function registerSchedule(server: McpServer, auto: AutoRefresh): void {
       description: [
         "Turns on, changes or stops the automatic refresh of a dashboard page. Use it only when the user",
         "asks for it or says yes to the question of a dashboard prompt. A job in the scheduler of the",
-        "computer (launchd, cron or Task Scheduler) replaces the data of the page at the given time, also",
+        "computer (launchd, cron or Task Scheduler) replaces the data of the page at the given times, also",
         "with no assistant open. The refresh removes the coach notes, because old notes do not agree",
         "with new data. The computer must be on at that time. The page must exist (writeDashboard first).",
-        "Without arguments it only reads: `scheduled`, `schedule`, `pages`. `every` + `time` (+ `day`)",
-        "sets the schedule of all scheduled pages; `path` adds that page (default the main page); `off`",
-        "stops the refresh of `path`, or of every page when no `path` is given.",
+        "`cron`: convert what the user says, in any language, into a 5-field cron expression in local",
+        'time: minute hour day-of-month month weekday, numbers only (0 = Sunday), e.g. "0 7 * * 1-5" for',
+        "weekdays at 7. Two runs must be at least 1 hour apart. The cron is for all scheduled pages;",
+        "`path` adds that page (default the main page); `off` stops the refresh of `path`, or of every",
+        "page when no `path` is given. Without arguments it only reads. The reply has `next`, the next",
+        "runs in local time: tell them to the user in their language, so they can check the schedule.",
       ].join("\n"),
       inputSchema: z.object({
-        every: z
-          .enum(["day", "weekday", "week"])
-          .describe("day: every day; weekday: Monday to Friday; week: once a week on `day`")
+        cron: z
+          .string()
+          .describe('minute hour day-of-month month weekday, e.g. "0 7 * * *"; default 0 7 * * *')
           .optional(),
-        day: z.enum(DAYS).describe("The day for `every` = week, default monday").optional(),
-        time: z.string().describe("HH:MM, 24 h, default 07:00").optional(),
         path: z
           .string()
           .describe("The .html file; relative paths are inside the data dir")
@@ -416,15 +560,11 @@ export function registerSchedule(server: McpServer, auto: AutoRefresh): void {
         off: z.boolean().describe("Stop the refresh").optional(),
       }),
     },
-    async ({ every, day, time, path, off }) => {
-      const asked = every ?? day ?? time;
+    async ({ cron, path, off }) => {
       const status = off
         ? await auto.off(path)
-        : asked !== undefined || path !== undefined
-          ? await auto.set({
-              ...(asked !== undefined ? { schedule: { every, day, time } } : {}),
-              path,
-            })
+        : cron !== undefined || path !== undefined
+          ? await auto.set({ cron, path })
           : await auto.status();
       return { content: [{ type: "text" as const, text: JSON.stringify(status) }] };
     },

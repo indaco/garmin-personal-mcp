@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { loadConfig } from "./config";
-import { AutoRefresh, describe, parseSchedule, refreshPages, type Status } from "./schedule";
+import { AutoRefresh, cronOf, refreshPages, type Status } from "./schedule";
 import { createParts, createServer } from "./server";
 
 const [command, ...rest] = process.argv.slice(2);
@@ -16,19 +16,18 @@ async function cli(): Promise<string> {
     if (failed) process.exitCode = 1;
     return lines.join("\n");
   }
-  // schedule [daily|weekdays|weekly <day>] [HH:MM] [page.html] | schedule off [page.html]
+  // schedule [daily|weekdays|weekly <day>] [HH:MM] | schedule "<cron>" | schedule off; each with [page.html]
   const path = rest.at(-1)?.toLowerCase().endsWith(".html") ? rest.pop() : undefined;
   if (rest[0] === "off") return summary(await auto.off(path));
   if (rest.length === 0 && path === undefined) return summary(await auto.status());
-  return summary(
-    await auto.set({ ...(rest.length > 0 ? { schedule: parseSchedule(rest) } : {}), path }),
-  );
+  return summary(await auto.set({ ...(rest.length > 0 ? { cron: cronOf(rest) } : {}), path }));
 }
 
 function summary(s: Status): string {
   if (!s.scheduled) return "Automatic refresh is off.";
   return [
-    `Automatic refresh ${describe(s.schedule!)} (${s.scheduler}):`,
+    `Automatic refresh "${s.cron}" with ${s.scheduler}, next: ${s.next!.join(", ")}`,
+    "Pages:",
     ...s.pages!.map((p) => `  ${p}`),
     ...(s.installed ? [] : [`The job is missing from ${s.scheduler}: run the schedule again.`]),
     `Log: ${s.log}`,
