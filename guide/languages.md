@@ -1,8 +1,9 @@
 # Languages
 
-The dashboard has English and Italian built in. You can add any language, and you can change the
-built-in texts. The [page settings](dashboard.md#page-settings) can keep only one built-in
-language in the page, for example Italian only.
+The dashboard has English, Italian, German, French, Spanish and Portuguese built in. A page holds
+English and the language of your Garmin profile. The [page settings](dashboard.md#page-settings)
+choose other built-in languages, for example Italian only. You can add any language, and you can
+change the built-in texts.
 
 ## Add a language through your assistant
 

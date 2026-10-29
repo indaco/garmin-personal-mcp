@@ -137,7 +137,10 @@ export function registerPrompts(server: McpServer): void {
           title: en.title,
           headline: en.headline,
           languages: ["en", ...Object.keys(BUILT_IN)].join(", "),
-          languageNames: ["English", ...Object.keys(BUILT_IN).map(languageName)].join(" and "),
+          languageNames: new Intl.ListFormat("en").format([
+            "English",
+            ...Object.keys(BUILT_IN).map(languageName),
+          ]),
           themes: THEMES.map((t) => t.id).join(", "),
         }),
       ),

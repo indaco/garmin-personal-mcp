@@ -133,7 +133,7 @@ describe("prompts", () => {
   it("asks the setup questions with the built-in languages and themes, and the weeks", async () => {
     const text = await render("dashboard-setup", { weeks: "8" });
     expect(text).toContain("last **8 weeks** (today is 2026-10-28)");
-    expect(text).toContain('"All: English and Italian"');
+    expect(text).toContain('"All: English, Italian, German, French, Spanish, and Portuguese"');
     expect(text).toContain("the codes to keep: en, it");
     expect(text).toContain('options "Training + Recovery" (default) and "Type my own"');
     expect(text).toContain("system, midnight, graphite");

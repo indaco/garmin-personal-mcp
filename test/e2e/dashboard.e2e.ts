@@ -223,7 +223,9 @@ describe("the page", () => {
   });
 
   it("follows the browser language, and the language menu", async () => {
-    const { page } = await open(browser, pageFile(), { locale: "it-IT" });
+    const { page } = await open(browser, pageFile({ settings: { languages: ["en", "it"] } }), {
+      locale: "it-IT",
+    });
     expect(await page.textContent("h1")).toBe("Allenamento + Recupero");
     expect(await page.textContent("[data-tab=running]")).toContain("Corsa");
     await page.click(".account summary");
@@ -973,7 +975,11 @@ describe("overview widgets", () => {
   });
 
   it("shows the widgets in Italian", async () => {
-    const { page, errors } = await open(browser, pageFile(), { locale: "it-IT" });
+    const { page, errors } = await open(
+      browser,
+      pageFile({ settings: { languages: ["en", "it"] } }),
+      { locale: "it-IT" },
+    );
     expect(await page.textContent("[data-id=readiness] h2")).toBe("Prontezza di oggi");
     expect(await page.textContent(".totals")).toContain("sessioni");
     expect(errors).toEqual([]);

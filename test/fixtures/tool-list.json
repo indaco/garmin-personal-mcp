@@ -474,7 +474,7 @@
               "items": {
                 "type": "string"
               },
-              "description": "Languages to keep: en, it; when not set, English and the language of the Garmin profile"
+              "description": "Languages to keep: en, it, de, fr, es, pt; when not set, English and the language of the Garmin profile"
             },
             "language": {
               "type": "string",

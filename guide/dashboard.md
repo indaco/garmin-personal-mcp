@@ -139,8 +139,9 @@ To make your own widget, see [Custom widgets](custom-widgets.md).
 The settings menu has **Language** and **Theme**. The **Theme** menu has 11 themes: System, five dark themes, three light themes and two
 high-contrast themes. Midnight is the default.
 
-The **Language** menu has English, Italian and the languages that you add. The
-[page settings](#page-settings) can keep fewer themes and languages in the file. _Auto_ follows the
+The **Language** menu has English, the language of your Garmin profile when it is built in, and the
+languages that you add. The built-in languages are English, Italian, German, French, Spanish and
+Portuguese. The [page settings](#page-settings) can keep other built-in languages in the file. _Auto_ follows the
 language of the browser. [Languages](languages.md) tells how to add a language.
 
 ## Units
@@ -173,7 +174,7 @@ assistant calls `writeDashboard` with `settings`:
 | `headline`  | replaces the line under the title in every language                        | the built-in headline                          |
 | `sports`    | the boards to keep, for example `running` and `cycling`                    | all                                            |
 | `exclude`   | the data to leave out: `recovery`, `fitnessAge`, `zones`, `names`, `notes` | none                                           |
-| `languages` | the built-in languages to keep: `en`, `it`                                 | English and the language of the Garmin profile |
+| `languages` | the built-in languages to keep: `en`, `it`, `de`, `fr`, `es`, `pt`         | English and the language of the Garmin profile |
 | `language`  | the language that the page opens in: `auto` or a language code             | `auto`                                         |
 | `themes`    | the themes to keep                                                         | all                                            |
 | `theme`     | the theme that the page opens in                                           | `midnight`                                     |
