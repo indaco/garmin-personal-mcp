@@ -511,9 +511,13 @@ describe("edit mode", () => {
     await page.click(".edit-bar >> text=/Aggiungi widget/");
     expect(await focused(page)).toBe("Cerca widget");
     const shown = () => page.locator(".catalogue li:visible").allTextContents();
+    const top = () => page.$eval(".dialog", (d) => d.getBoundingClientRect().top);
+    const before = await top();
     // no case, no accents, and the English title works too
     await page.fill(".catalogue-search", "VOLUME SETTIMANALE");
     expect((await shown()).map((x) => x.slice(0, 18))).toEqual(["Volume settimanale"]);
+    // a shorter list does not move the dialog under the search box
+    expect(await top()).toBe(before);
     await page.fill(".catalogue-search", "coach notes");
     expect((await shown()).join("|")).toMatch(/^Nascosti.*\|Note del coach/);
     await page.fill(".catalogue-search", "zzz");

@@ -724,6 +724,11 @@ html.resizing * {
   padding: 16px;
   width: min(560px, calc(100vw - 32px));
 }
+/* a dialog with a search stays at the top: a centred one would jump as the list gets shorter */
+.dialog:has(.catalogue-search) {
+  margin-top: min(10vh, 80px);
+  margin-bottom: auto;
+}
 .dialog::backdrop {
   background: rgb(0 0 0 / 50%);
 }
