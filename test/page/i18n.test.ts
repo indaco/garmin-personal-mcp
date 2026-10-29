@@ -1,6 +1,6 @@
 import { Profile } from "@garmin/fitsdk";
 import { describe, expect, it, vi } from "vitest";
-import { addLanguages, formatter, pickLang, translator } from "../../src/page/i18n";
+import { addLanguages, formatter, pickLang, translator, widgetText } from "../../src/page/i18n";
 import { BUILT_IN } from "../../src/page/i18n/built-in";
 import { en } from "../../src/page/i18n/en";
 import { typeName } from "../../src/page/widgets/ui";
@@ -127,5 +127,25 @@ describe("formatter", () => {
     expect(f.pct(12.34)).toBe("+12%");
     expect(f.pct(-3)).toBe("-3%");
     expect(f.pct(0)).toBe("0%");
+  });
+});
+
+describe("widgetText", () => {
+  const texts = {
+    en: { title: "Ride", best: "Best" },
+    pt: { title: "Pedal" },
+    "pt-BR": { title: "Pedalada" },
+  };
+
+  it("takes the full tag, then the language, then English", () => {
+    expect(widgetText(texts, "pt-BR", "title")).toBe("Pedalada");
+    expect(widgetText(texts, "pt-PT", "title")).toBe("Pedal");
+    expect(widgetText(texts, "pt-BR", "best")).toBe("Best");
+    expect(widgetText(texts, "de", "title")).toBe("Ride");
+  });
+
+  it("gives nothing for a widget without the text or without texts", () => {
+    expect(widgetText(texts, "en", "nope")).toBeUndefined();
+    expect(widgetText(undefined, "en", "title")).toBeUndefined();
   });
 });

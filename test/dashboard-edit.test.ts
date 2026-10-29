@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -304,6 +304,13 @@ describe("widget library", () => {
     writeFileSync(libraryFile(), JSON.stringify([{ ...widget, id: "kpis" }]));
     await expect(writer.edit({})).rejects.toThrow(/built-in/);
     expect(readFileSync(libraryFile(), "utf8")).toContain("kpis");
+    writeFileSync(libraryFile(), "{}");
+    await expect(writer.edit({})).rejects.toThrow(/not a list of widgets/);
+  });
+
+  it("stops when the library cannot be read at all", async () => {
+    mkdirSync(libraryFile());
+    await expect(writer.edit({ widgets: [widget] })).rejects.toThrow(/EISDIR/);
   });
 });
 
@@ -344,6 +351,11 @@ describe("widget texts", () => {
     await expect(bad({ it: { "bad key": "x" } })).rejects.toThrow(/bad key/);
     await expect(bad({ it: { title: " " } })).rejects.toThrow(/it\.title/);
     await expect(bad({ it: { best: "{distanza} il {day}" } })).rejects.toThrow(/placeholders/);
+    // 41 texts of 500 characters: each is short enough, all together are not
+    const many = Object.fromEntries(
+      Array.from({ length: 41 }, (_, i) => [`k${i}`, "x".repeat(500)]),
+    );
+    await expect(bad({ de: many })).rejects.toThrow(/too long/);
     await expect(writer.edit({ widgetTexts: { nope: { it: { title: "x" } } } })).rejects.toThrow(
       /nope/,
     );
