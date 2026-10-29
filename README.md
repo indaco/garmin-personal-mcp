@@ -39,7 +39,8 @@
 
 ## What you can ask
 
-With this server, you can ask your assistant:
+Ask your assistant anything about your Garmin data, in your own words and in any language. The
+assistant chooses the tools and can combine their data. Some examples:
 
 - Activities: "List my last 5 activities, with pace and heart rate."
 - Activities: "How much time did I spend in each HR zone on my runs this month?"
