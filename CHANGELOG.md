@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The changelog is generated and managed by [sley](https://github.com/indaco/sley).
 
+## v0.3.2 - 2026-10-29
+
+### 🩹 Fixes
+
+- ask to keep the saved settings when the dashboard is rebuilt ([930fe59](https://github.com/indaco/garmin-personal-mcp/commit/930fe59)) ([#108](https://github.com/indaco/garmin-personal-mcp/pull/108))
+
+### 📖 Documentation
+
+- show the README questions as examples ([b677244](https://github.com/indaco/garmin-personal-mcp/commit/b677244)) ([#109](https://github.com/indaco/garmin-personal-mcp/pull/109))
+
+### ❤️ Contributors
+
+- [@indaco](https://github.com/indaco)
+
 ## v0.3.1 - 2026-10-29
 
 ### 🩹 Fixes
