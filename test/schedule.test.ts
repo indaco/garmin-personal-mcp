@@ -1,7 +1,9 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vitest";
+import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
+import { McpServer } from "@modelcontextprotocol/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Config } from "../src/config";
 import {
   AutoRefresh,
@@ -11,8 +13,12 @@ import {
   nextRuns,
   parseCron,
   plist,
+  realEntry,
   refreshPages,
+  registerSchedule,
+  run,
   type Run,
+  type Status,
   taskXml,
   withCronLine,
 } from "../src/schedule";
@@ -25,6 +31,12 @@ const job: Job = {
 };
 
 const NPX_ENTRY = "/home/u/.npm/_npx/1a2b/node_modules/pkg/dist/index.js";
+
+/** A crontab that fails with its message on stdout only. */
+const noStderr: Run = async (cmd, args) =>
+  cmd === "crontab" && args[0] === "-"
+    ? { code: 2, stdout: "crontab: no permission\n", stderr: "" }
+    : { code: 1, stdout: "", stderr: "" };
 
 const failing: Run = async () => ({ code: 5, stdout: "", stderr: "Bootstrap failed: 5" });
 
@@ -84,7 +96,13 @@ describe("cron", () => {
     expect(cronOf(["weekly"])).toBe("0 7 * * 1");
     expect(cronOf(["Weekly", "Friday", "18:05"])).toBe("5 18 * * 5");
     expect(cronOf(["0 18 * * 1,4"])).toBe("0 18 * * 1,4");
-    for (const words of [["hourly"], ["daily", "25:00"], ["daily", "7"], ["weekly", "someday"]]) {
+    for (const words of [
+      [],
+      ["hourly"],
+      ["daily", "25:00"],
+      ["daily", "7"],
+      ["weekly", "someday"],
+    ]) {
       expect(() => cronOf(words), words.join(" ")).toThrow(/daily \[HH:MM\]/);
     }
   });
@@ -134,6 +152,10 @@ describe("cron", () => {
     expect(taskXml("a.cmd", parseCron("0 7 1,15 3 *"))).toContain(
       "<ScheduleByMonth><DaysOfMonth><Day>1</Day><Day>15</Day></DaysOfMonth><Months><March /></Months></ScheduleByMonth>",
     );
+    // months only: every day of those months
+    expect(taskXml("a.cmd", parseCron("0 7 * 6 *"))).toContain(
+      "<Day>31</Day></DaysOfMonth><Months><June /></Months></ScheduleByMonth>",
+    );
     expect(taskXml("a.cmd", parseCron("0 7 * 12 6"))).toContain(
       "<DaysOfWeek><Saturday /></DaysOfWeek><Months><December /></Months></ScheduleByMonthDayOfWeek>",
     );
@@ -171,8 +193,13 @@ describe("AutoRefresh", () => {
   });
 
   it("is off until the user turns it on", async () => {
-    expect(await auto("darwin").status()).toEqual({ scheduled: false });
+    const a = auto("darwin");
+    expect(await a.status()).toEqual({ scheduled: false });
+    expect(await a.pages()).toEqual([]);
+    expect(await a.off()).toEqual({ scheduled: false });
     expect(calls).toEqual([]);
+    await a.set({});
+    expect(await a.pages()).toEqual([join(config.dataDir, "garmin-dashboard.html")]);
   });
 
   it("installs one launchd job, and a second page or schedule replaces it", async () => {
@@ -233,6 +260,20 @@ describe("AutoRefresh", () => {
     expect(crontab).toMatch(
       /'\/opt\/node\/bin\/npx' '-y' '@indaco\/garmin-personal-mcp@latest' 'refresh' '--auto'/,
     );
+  });
+
+  it("runs an installed copy with node.exe on Windows", async () => {
+    const installed = "C:\\npm\\node_modules\\pkg\\dist\\index.js";
+    await new AutoRefresh(config, "win32", join(dir, "home"), exec, "C:\\node", installed).set({});
+    expect(readFileSync(join(config.dataDir, "auto-refresh.cmd"), "utf8")).toContain(
+      `call "${join("C:\\node", "node.exe")}" "${installed}" "refresh" "--auto"`,
+    );
+  });
+
+  it("names the output of a command that fails without an error text", async () => {
+    await expect(
+      new AutoRefresh(config, "linux", join(dir, "home"), noStderr, "/n", NPX_ENTRY).set({}),
+    ).rejects.toThrow("crontab failed (2): crontab: no permission");
   });
 
   it("writes a script and a UTF-16 task file for the Windows task", async () => {
@@ -311,4 +352,64 @@ it("refreshPages goes on after a page fails", async () => {
   expect(r.failed).toBe(true);
   expect(r.lines[0]).toMatch(/failed a\.html: gone$/);
   expect(r.lines[1]).toMatch(/updated b\.html$/);
+});
+
+describe("run", () => {
+  it("passes the input and gives the exit code, stdout and stderr, without a shell", async () => {
+    const code =
+      "process.stdin.pipe(process.stdout); process.stderr.write('e'); process.exitCode = 3";
+    expect(await run(process.execPath, ["-e", code], "in $HOME")).toEqual({
+      code: 3,
+      stdout: "in $HOME",
+      stderr: "e",
+    });
+    expect((await run(process.execPath, ["-e", ""])).code).toBe(0);
+    // a process killed by a signal has no exit code: it counts as a failure
+    expect((await run(process.execPath, ["-e", "process.kill(process.pid, 'SIGTERM')"])).code).toBe(
+      1,
+    );
+  });
+
+  it("rejects a command that does not exist", async () => {
+    await expect(run("garmin-no-such-command", [])).rejects.toThrow(/ENOENT/);
+  });
+});
+
+it("realEntry gives the real path of the script, or nothing", () => {
+  const d = mkdtempSync(join(tmpdir(), "entry-"));
+  writeFileSync(join(d, "index.js"), "");
+  expect(realEntry(join(d, "index.js"))).toMatch(/[/\\]index\.js$/);
+  expect(realEntry(join(d, "missing.js"))).toBe("");
+  expect(realEntry(undefined)).toBe("");
+});
+
+describe("scheduleDashboardRefresh", () => {
+  const status: Status = { scheduled: true, cron: "0 7 * * *", pages: ["p"] };
+  const fake = {
+    status: vi.fn(async () => status),
+    set: vi.fn(async () => status),
+    off: vi.fn(async (): Promise<Status> => ({ scheduled: false })),
+  };
+
+  async function call(args: Record<string, unknown>): Promise<unknown> {
+    const server = new McpServer({ name: "t", version: "1" });
+    registerSchedule(server, fake as unknown as AutoRefresh);
+    const [clientEnd, serverEnd] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "t", version: "1" });
+    await server.connect(serverEnd);
+    await client.connect(clientEnd);
+    const r = await client.callTool({ name: "scheduleDashboardRefresh", arguments: args });
+    return JSON.parse((r.content as { text: string }[])[0].text);
+  }
+
+  it("reads without arguments, sets with a cron or a page, and stops with off", async () => {
+    expect(await call({})).toEqual(status);
+    expect(fake.status).toHaveBeenCalledOnce();
+    await call({ cron: "0 18 * * 1,4" });
+    expect(fake.set).toHaveBeenLastCalledWith({ cron: "0 18 * * 1,4", path: undefined });
+    await call({ path: "coach.html" });
+    expect(fake.set).toHaveBeenLastCalledWith({ cron: undefined, path: "coach.html" });
+    expect(await call({ off: true, path: "coach.html" })).toEqual({ scheduled: false });
+    expect(fake.off).toHaveBeenCalledWith("coach.html");
+  });
 });

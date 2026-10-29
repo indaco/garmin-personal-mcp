@@ -127,7 +127,8 @@ export function parseCron(text: string): Cron {
   }
   const [minutes, hours, days, months, weekdays] = parts.map((p, i) => field(p, FIELDS[i]));
   const times = hours.flatMap((h) => minutes.map((m) => h * 60 + m)).toSorted((a, b) => a - b);
-  const gaps = times.map((t, i) => (i === 0 ? t + 24 * 60 : t) - (times.at(i - 1) ?? t));
+  // the gap before each time; the first one is from the last time of the day before
+  const gaps = times.map((t, i) => (i === 0 ? t + 24 * 60 : t) - times[(i || times.length) - 1]);
   if (times.length > 1 && Math.min(...gaps) < MIN_GAP_MINUTES) {
     throw new Error("Cron: the runs must be at least 1 hour apart");
   }
@@ -164,10 +165,9 @@ export function cronOf(words: string[]): string {
 /** Whether the job runs on that day. */
 function runsOn(c: Cron, d: Date): boolean {
   if (c.months && !c.months.includes(d.getMonth() + 1)) return false;
-  const onDay = c.days?.includes(d.getDate());
-  const onWeekday = c.weekdays?.includes(d.getDay());
-  if (c.days && c.weekdays) return Boolean(onDay || onWeekday);
-  return (c.days ? onDay : c.weekdays ? onWeekday : true) ?? false;
+  if (c.days && c.weekdays) return c.days.includes(d.getDate()) || c.weekdays.includes(d.getDay());
+  if (c.days) return c.days.includes(d.getDate());
+  return c.weekdays?.includes(d.getDay()) ?? true;
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -479,7 +479,8 @@ export class AutoRefresh {
   }
 
   #domain(): string {
-    return `gui/${process.getuid?.() ?? 0}`;
+    // only macOS gets here, and it always has a user id
+    return `gui/${process.getuid!()}`;
   }
 
   /** The user's crontab; "" when there is none (crontab -l then exits with 1). */
@@ -502,7 +503,7 @@ export class AutoRefresh {
 }
 
 /** The real path of the running script, so the job does not follow a link that can change. */
-function realEntry(path: string | undefined): string {
+export function realEntry(path: string | undefined): string {
   try {
     return path ? realpathSync(path) : "";
   } catch {

@@ -107,7 +107,8 @@ Where each part of the server and the page is.
 
 | File                                 | Content                                                                  |
 | ------------------------------------ | ------------------------------------------------------------------------ |
-| `src/index.ts`                       | the stdio entry point, and the `refresh` and `schedule` commands         |
+| `src/index.ts`                       | the entry point: the stdio server, or a command of `src/cli.ts`          |
+| `src/cli.ts`                         | the `refresh` and `schedule` commands                                    |
 | `src/server.ts`                      | the MCP server with its tools and prompts                                |
 | `src/api-client.ts`                  | HTTP, the token and the retries                                          |
 | `src/tools.ts`, `src/fit.ts`         | the tools and the .FIT decoder                                           |
