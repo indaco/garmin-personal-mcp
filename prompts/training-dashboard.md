@@ -22,6 +22,11 @@ Answer in my language.
      or built in, and the new code.
    - Any other language: tell me to run the `dashboard-language` prompt with it.
 
+If a `writeDashboard` result has `missingWidgetTexts`, call `editDashboard` without
+changes, translate the English texts of those widgets (`customWidgets[].texts.en`) into the listed
+languages, keeping each `{placeholder}`, and call `editDashboard` with `widgetTexts` =
+{ "<widget id>": { "<code>": { "<key>": "<text>", ... } } }.
+
 Use only numbers of the digest. **Never invent, interpolate or estimate missing values.** If a value
 is missing, write "n/a". If `sync.failedDays` is more than 0, name the dates in `sync.failedDates`.
 If `sync.failedSections` is not empty, name those sections (HR zones, fitness age, HRV) and say that

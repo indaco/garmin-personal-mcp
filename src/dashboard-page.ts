@@ -71,6 +71,8 @@ export interface WriteResult {
   languages?: Record<string, { missing: string[] }>;
   /** The language of the Garmin profile when the page has no texts in it, e.g. ru: the page shows English. */
   missingProfileLanguage?: string;
+  /** The custom widgets that have no texts in some languages of the page, with those languages. */
+  missingWidgetTexts?: Record<string, string[]>;
 }
 
 export interface CustomWidget {
@@ -438,6 +440,7 @@ export class DashboardWriter {
       ...(page === undefined && missingLanguage(next, raw.locale)
         ? { missingProfileLanguage: raw.locale as string }
         : {}),
+      ...(page === undefined ? withMissing(widgetGaps(next, pageLanguages(next, own))) : {}),
     };
   }
 
@@ -758,6 +761,24 @@ function pageLanguages(page: string, s: Settings): string[] {
   return [...new Set(codes)];
 }
 
+/**
+ * For each custom widget with texts, the page languages it has no texts in. A widget without texts
+ * (written before widgets had them) shows fixed text, so there is nothing to add.
+ */
+function widgetGaps(page: string, languages: string[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const w of (readBlock(page, "widgets") as CustomWidget[] | null | undefined) ?? []) {
+    if (!w.texts) continue;
+    // the page shows a pt text for pt-BR, as it does for its own texts
+    const gaps = languages.filter((code) => !w.texts![code] && !w.texts![code.slice(0, 2)]);
+    if (gaps.length > 0) out[w.id] = gaps;
+  }
+  return out;
+}
+
+const withMissing = (gaps: Record<string, string[]>) =>
+  Object.keys(gaps).length > 0 ? { missingWidgetTexts: gaps } : {};
+
 /** True when the profile locale is not English, not built in and not added to the page. */
 function missingLanguage(page: string, locale: unknown): boolean {
   if (typeof locale !== "string" || !locale) return false;
@@ -814,6 +835,8 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         "they keep. `pageLanguages` in the result lists the languages of the page's Language menu, and",
         "`settings` the settings that the page keeps. `missingProfileLanguage` is the language of the Garmin",
         "profile when the page has no texts in it (it shows English); editDashboard `languages` adds it.",
+        "`missingWidgetTexts` lists the custom widgets that miss texts in a language of the page, with",
+        "those languages; editDashboard `widgetTexts` adds them.",
         "`preview: true` writes nothing: it returns the digest and the activities of each board.",
       ].join("\n"),
       inputSchema: z.object({

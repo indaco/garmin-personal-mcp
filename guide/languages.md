@@ -30,7 +30,8 @@ update with new texts, the update prompt tells the assistant which texts are mis
 
 To remove a language that you added, ask your assistant. For example: "Remove the German language
 from the page". The assistant calls `editDashboard` with `removeLanguages`. Built-in languages stay:
-the [page settings](dashboard.md#page-settings) choose them.
+the [page settings](dashboard.md#page-settings) choose them. When the settings add a built-in
+language, the assistant translates your custom widgets into it.
 
 To change one text of a built-in language, ask your assistant. For example: "In Italian, call the
 readiness widget _Forma di oggi_".

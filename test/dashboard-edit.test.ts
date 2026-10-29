@@ -324,6 +324,19 @@ describe("widget texts", () => {
     expect(r.pageLanguages).toEqual(["en"]);
   });
 
+  it("names the widgets that miss texts in a language of the page", async () => {
+    const old = { id: "old-widget", title: "Old", code: "x" };
+    await writer.edit({
+      widgets: [{ ...widget, texts }, old],
+      languages: { it: { title: "Allenamento" } },
+    });
+    const r = await writer.write({});
+    // a widget without texts shows fixed text: nothing to translate
+    expect(r.missingWidgetTexts).toEqual({ "longest-ride": ["it"] });
+    await writer.edit({ widgetTexts: { "longest-ride": { it: { title: "Uscita più lunga" } } } });
+    expect(await writer.write({})).not.toHaveProperty("missingWidgetTexts");
+  });
+
   it("refuses bad codes, keys, empty texts, changed placeholders and unknown widgets", async () => {
     const bad = (t: Record<string, Record<string, string>>) =>
       writer.edit({ widgets: [{ ...widget, texts: { ...texts, ...t } }] });

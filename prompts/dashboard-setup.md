@@ -40,6 +40,11 @@ such a tool, ask the questions in chat as numbered lists, with the default first
    language. Then call `writeDashboard` again with the same `weeks`, `path` and the `notes`, without
    `settings`: the page keeps them.
 
+If a `writeDashboard` result has `missingWidgetTexts`, call `editDashboard` with the same `path` without
+changes, translate the English texts of those widgets (`customWidgets[].texts.en`) into the listed
+languages, keeping each `{placeholder}`, and call `editDashboard` with `widgetTexts` =
+{ "<widget id>": { "<code>": { "<key>": "<text>", ... } } }.
+
 Use only numbers of the digest. **Never invent, interpolate or estimate missing values.** If a value
 is missing, write "n/a". If a call fails, say which one and why in one line.
 
