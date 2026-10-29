@@ -439,6 +439,7 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
     r = await writer.write({ settings: { languages: ["it"] } });
     expect(Object.keys(readBlock(page(), "languages") as object)).toEqual(["it"]);
     expect(r.pageLanguages).toEqual(["it"]);
+    expect(r.settings).toEqual({ languages: ["it"] });
   });
 
   it("matches the profile locale by full tag, then by language", () => {

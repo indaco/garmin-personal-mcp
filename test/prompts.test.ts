@@ -59,6 +59,7 @@ describe("prompts", () => {
     expect(await render("training-dashboard", { layout: "fancy" })).toContain(
       '`layout` = "preset"',
     );
+    expect(preset).toContain("German (de)");
     expect(preset.includes("{{") || blank.includes("{{")).toBe(false);
   });
 

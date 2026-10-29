@@ -52,6 +52,9 @@ export function registerPrompts(server: McpServer): void {
           ? renderDashboard(freeform, w)
           : render(renderDashboard(build, w), {
               layout,
+              builtIn: Object.keys(BUILT_IN)
+                .map((code) => `${languageName(code)} (${code})`)
+                .join(", "),
               layoutNote:
                 layout === "blank"
                   ? '\nThe page is an empty grid: tell me to add widgets with "Edit layout" and "Add widget".'

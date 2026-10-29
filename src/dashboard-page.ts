@@ -63,6 +63,8 @@ export interface WriteResult {
   digest: Digest;
   /** The languages of the page's Language menu, e.g. ["en", "it"]. */
   pageLanguages: string[];
+  /** The settings that the page keeps. */
+  settings: Settings;
   /** The texts that each language of the page still misses (they show in English). */
   languages?: Record<string, { missing: string[] }>;
 }
@@ -411,6 +413,7 @@ export class DashboardWriter {
       notes: own.exclude?.includes("notes") ? 0 : notes.length,
       digest: digest(filterData(raw, own)),
       pageLanguages: pageLanguages(next, own),
+      settings: own,
       ...(hasLanguages(next) ? { languages: missingTexts(next) } : {}),
     };
   }
@@ -677,7 +680,8 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         "page is kept as <file>.bak. `notes`: at most 5 plain-text coach notes; the server escapes them.",
         "`settings` replace the page's settings (title, headline, sports, data to leave out, languages,",
         "themes); without them the page keeps its own. The page holds only the data, languages and themes",
-        "they keep. `pageLanguages` in the result lists the languages of the page's Language menu.",
+        "they keep. `pageLanguages` in the result lists the languages of the page's Language menu, and",
+        "`settings` the settings that the page keeps.",
         "`preview: true` writes nothing: it returns the digest and the activities of each board.",
       ].join("\n"),
       inputSchema: z.object({
