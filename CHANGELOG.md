@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The changelog is generated and managed by [sley](https://github.com/indaco/sley).
 
+## v0.2.0 - 2026-10-29
+
+### 🚀 Enhancements
+
+- dashboard languages from the Garmin profile, and four more languages ([51a3b23](https://github.com/indaco/garmin-personal-mcp/commit/51a3b23)) ([#93](https://github.com/indaco/garmin-personal-mcp/pull/93))
+- show the dashboard in the units of the Garmin profile ([11ab4a3](https://github.com/indaco/garmin-personal-mcp/commit/11ab4a3)) ([#89](https://github.com/indaco/garmin-personal-mcp/pull/89))
+- add getWeight, getBodyBattery and getActivityWorkouts ([1202b2b](https://github.com/indaco/garmin-personal-mcp/commit/1202b2b)) ([#88](https://github.com/indaco/garmin-personal-mcp/pull/88))
+
+### 📖 Documentation
+
+- **tools:** remove weight from the data the Personal API does not have ([3e5cbae](https://github.com/indaco/garmin-personal-mcp/commit/3e5cbae)) ([#92](https://github.com/indaco/garmin-personal-mcp/pull/92))
+- lead the README with the MCP server, then the dashboard ([b01d14b](https://github.com/indaco/garmin-personal-mcp/commit/b01d14b)) ([#91](https://github.com/indaco/garmin-personal-mcp/pull/91))
+
+### ❤️ Contributors
+
+- [@indaco](https://github.com/indaco)
+
 ## v0.1.1 - 2026-10-28
 
 ### 🩹 Fixes
