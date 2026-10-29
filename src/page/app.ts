@@ -222,10 +222,12 @@ const REPO = "https://github.com/indaco/garmin-personal-mcp";
 
 /**
  * Where the data comes from and when it was written, the days that Garmin did not give (their values
- * show n/a), then the project and its license.
+ * show n/a), then the project, the server version that wrote the page, and the license.
  */
 function footer(data?: Data): HTMLElement {
   const failed = Number(data?.sync?.failedDays) || 0;
+  // the server that wrote the page last, with its release notes
+  const version = /^\d+\.\d+\.\d+$/.test(data?.server ?? "") ? data!.server : undefined;
   return h(
     "footer",
     { class: "foot" },
@@ -242,6 +244,9 @@ function footer(data?: Data): HTMLElement {
       { class: "made" },
       h("a", { class: "brand", href: REPO }, logo(), "garmin-personal-mcp"),
       "·",
+      version &&
+        h("a", { href: `${REPO}/releases/tag/v${version}`, rel: "noopener" }, `v${version}`),
+      version && "·",
       h("a", { href: `${REPO}/blob/main/LICENSE`, rel: "noopener" }, t("footer.license")),
     ),
   );

@@ -1,4 +1,5 @@
 import { readFileSync, statSync, writeFileSync } from "node:fs";
+import { version as serverVersion } from "../../package.json";
 import axe from "axe-core";
 import type { Browser, Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -314,13 +315,24 @@ describe("the page", () => {
     );
     expect(await page.$("footer .gap")).toBeNull();
     expect(await page.getAttribute("footer a >> text=MIT License", "href")).toContain("LICENSE");
+    // the version of the server that wrote the page, with its release notes
+    expect(await page.getAttribute(`footer a >> text=v${serverVersion}`, "href")).toMatch(
+      new RegExp(`/releases/tag/v${serverVersion}$`),
+    );
 
     const failed = await open(
       browser,
       pageFile({
-        data: { ...data, v: DASHBOARD_VERSION, notes: [], sync: { ...data.sync, failedDays: 2 } },
+        data: {
+          ...data,
+          v: DASHBOARD_VERSION,
+          notes: [],
+          sync: { ...data.sync, failedDays: 2 },
+        },
       }),
     );
+    // data without the server version (an older page) shows none
+    expect(await failed.page.textContent("footer .made")).toBe("garmin-personal-mcp·MIT License");
     expect(await failed.page.textContent("footer .gap")).toBe(
       "Days not read from Garmin: 2 (their values show n/a)",
     );

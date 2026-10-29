@@ -29,6 +29,8 @@ export interface Data {
   units?: Units;
   /** The language of the Garmin profile, e.g. it or pt-BR. */
   locale?: string;
+  /** The version of the server that wrote the data, e.g. 0.2.0. */
+  server?: string;
 }
 
 /** What a widget gets to draw itself. Built-in and custom widgets get the same. */

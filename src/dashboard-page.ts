@@ -17,6 +17,7 @@ import { preset } from "./page/presets";
 import { DATA_ITEMS, type Settings } from "./page/settings";
 import { THEMES } from "./page/theme";
 import { WIDGET_API } from "./page/widget-api";
+import { version } from "../package.json";
 import { DASHBOARD_VERSION } from "./prompts";
 import { writeAtomically } from "./tools";
 
@@ -252,6 +253,7 @@ export function withData(page: string, data: Json, s: Settings, notes: readonly 
   return writeBlock(next, "data", {
     ...filterData(data, s),
     v: DASHBOARD_VERSION,
+    server: version,
     notes: kept.map(escapeHtml),
   });
 }
