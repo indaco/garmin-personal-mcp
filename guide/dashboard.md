@@ -79,8 +79,10 @@ asks one time if the page must update automatically:
 | Every Monday at 07:00 | once a week                |
 | Your own words        | any schedule that you type |
 
-When a schedule is already set, the assistant offers it first, after "No". The
-`training-dashboard-update` prompt does not ask: it only reminds you that you can ask.
+When a schedule is already set, the assistant offers it first, after "No". When the page already
+updates automatically, the assistant does not ask: it tells you the schedule and the next update,
+and you can ask it to change or stop the schedule. The `training-dashboard-update`
+prompt does not ask: it only reminds you that you can ask.
 
 You can also ask at any time. Say when in your own words, in any language, for example:
 
