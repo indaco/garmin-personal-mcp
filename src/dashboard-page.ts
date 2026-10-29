@@ -28,6 +28,8 @@ import { writeAtomically } from "./tools";
  */
 
 export const DASHBOARD_FILE = "garmin-dashboard.html";
+/** The user's custom widgets, in the data dir: every page from the template gets them. */
+export const LIBRARY_FILE = "widgets.json";
 const MAX_NOTES = 5;
 const REUSE_MS = 15 * 60_000;
 
@@ -85,6 +87,8 @@ export interface EditOptions {
   /** Custom widgets to add, or to replace by id. */
   widgets?: CustomWidget[];
   removeWidgets?: string[];
+  /** Custom widgets to remove from the library and from this page. */
+  forgetWidgets?: string[];
   /** Texts of a language by key: added to the texts the page has. */
   languages?: Record<string, Record<string, string>>;
   /** Codes of languages that languages added, to remove. */
@@ -97,7 +101,7 @@ export interface EditResult {
   path: string;
   changed: boolean;
   layout: Layout;
-  customWidgets: { id: string; title: string; span: number; types?: string[] }[];
+  customWidgets: { id: string; title: string; span: number; types?: string[]; library: boolean }[];
   languages: Record<string, { missing: string[] }>;
   catalogue: {
     id: string;
@@ -397,6 +401,7 @@ export class DashboardWriter {
       );
     }
     if (page === undefined && next !== old) next = styled(next, own);
+    if (page === undefined) next = await this.#withLibrary(next, old);
     const raw = JSON.parse(await this.#data(weeks ?? weeksOf(old))) as Json;
     next = withData(next, raw, own, notes);
 
@@ -434,6 +439,7 @@ export class DashboardWriter {
     let page = old;
     let layout: ReturnType<typeof parseLayout>;
     let widgets: CustomWidget[];
+    let library: CustomWidget[];
     let texts: Record<string, Record<string, string>>;
     let settings: Settings;
     try {
@@ -450,6 +456,8 @@ export class DashboardWriter {
     } catch (e) {
       throw new Error(`${(e as Error).message} in ${target}`, { cause: e });
     }
+    library = await this.#library(widgets);
+    widgets = merged(widgets, library);
     let layoutChanged = false;
 
     if (o.layout !== undefined) {
@@ -459,8 +467,11 @@ export class DashboardWriter {
     for (const w of o.widgets ?? []) {
       const clean = checkWidget(w);
       widgets = [...widgets.filter((x) => x.id !== clean.id), clean];
+      library = [...library.filter((x) => x.id !== clean.id), clean];
     }
-    for (const id of o.removeWidgets ?? []) {
+    const forget = new Set(o.forgetWidgets);
+    library = library.filter((x) => !forget.has(x.id));
+    for (const id of [...(o.removeWidgets ?? []), ...forget]) {
       widgets = widgets.filter((x) => x.id !== id);
       for (const [board, list] of Object.entries(layout.boards)) {
         if (list.some((i) => i.widget === id)) {
@@ -505,8 +516,12 @@ export class DashboardWriter {
       layoutChanged ||
       o.widgets !== undefined ||
       o.removeWidgets !== undefined ||
+      o.forgetWidgets !== undefined ||
       o.languages !== undefined ||
       o.removeLanguages !== undefined;
+    if (o.widgets !== undefined || o.forgetWidgets !== undefined) {
+      await this.#saveLibrary(library);
+    }
     if (changed) {
       if (layoutChanged) layout = { ...layout, rev: newRev() };
       page = writeBlock(page, "layout", layout);
@@ -525,6 +540,7 @@ export class DashboardWriter {
         title,
         span: span ?? 1,
         ...(types ? { types } : {}),
+        library: library.some((l) => l.id === id),
       })),
       languages: missingTexts(page),
       // a widget whose data the page leaves out shows nothing there
@@ -540,6 +556,46 @@ export class DashboardWriter {
       widgetApi: WIDGET_API,
       ...(o.englishTexts ? { englishTexts: en } : {}),
     };
+  }
+
+  /**
+   * The widget library. Without a library file, the first page that has custom widgets starts it, so
+   * the widgets made before the library existed join it.
+   */
+  async #library(seed: CustomWidget[]): Promise<CustomWidget[]> {
+    const file = resolve(this.dataDir, LIBRARY_FILE);
+    let text: string;
+    try {
+      text = await readFile(file, "utf8");
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+      if (seed.length > 0) await this.#saveLibrary(seed);
+      return seed;
+    }
+    // an unreadable library stops the call: writing over it would lose the user's widgets
+    try {
+      const list: unknown = JSON.parse(text);
+      if (!Array.isArray(list)) throw new Error("not a list of widgets");
+      return list.map((w: CustomWidget) => checkWidget(w));
+    } catch (e) {
+      throw new Error(`${file}: ${(e as Error).message}; correct or delete the file`, { cause: e });
+    }
+  }
+
+  #saveLibrary(widgets: CustomWidget[]): Promise<void> {
+    return writeAtomically(
+      resolve(this.dataDir, LIBRARY_FILE),
+      `${JSON.stringify(widgets, null, 2)}\n`,
+    );
+  }
+
+  /** The page with the library in its widgets block; `old` is the page that it replaces, to start the library. */
+  async #withLibrary(page: string, old: string | undefined): Promise<string> {
+    if (!marker("widgets").test(page)) return page;
+    const own = (readBlock(page, "widgets") as CustomWidget[] | null) ?? [];
+    const before =
+      old === undefined ? [] : ((readBlock(old, "widgets") as CustomWidget[] | null) ?? []);
+    return writeBlock(page, "widgets", merged(own, await this.#library(before)));
   }
 
   /** The data for `weeks`; the same snapshot for 15 minutes, so the notes match the digest they come from. */
@@ -574,6 +630,12 @@ const TYPES = new Set<string>([
   ...Object.values(Profile.types.sport),
 ]);
 const spanOf = (v: unknown): Span => Math.min(3, Math.max(1, Math.round(Number(v) || 1))) as Span;
+
+/** The page's custom widgets and the library; the library version wins on the same id. */
+const merged = (own: CustomWidget[], library: CustomWidget[]) => [
+  ...own.filter((w) => !library.some((l) => l.id === w.id)),
+  ...library,
+];
 
 /** A custom widget that the page can run; throws with what is wrong. */
 function checkWidget(w: CustomWidget): CustomWidget {
@@ -674,7 +736,9 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         "last `weeks` weeks, and returns its path and a short digest of the data (totals, weekly sums, load,",
         "best efforts, races, strength top sets, HRV, recovery, fitness age, sync) for the coach notes.",
         "An existing page keeps all its code, layout and widgets: only its data is replaced. A page from an",
-        "older template gets the new template and keeps its layout and widgets. `layout` writes a new page",
+        "older template gets the new template and keeps its layout and widgets. Every page from the template",
+        "also gets the custom widgets of the widget library (<data-dir>/widgets.json), not placed on a board.",
+        "`layout` writes a new page",
         "from the template: `preset` (the default widgets) or `blank` (empty boards). `page` writes your own",
         "page code instead; it must contain /* garmin-data:start */null/* garmin-data:end */. A replaced",
         "page is kept as <file>.bak. `notes`: at most 5 plain-text coach notes; the server escapes them.",
@@ -755,7 +819,9 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         "custom widgets, the missing texts of each language, the catalogue of built-in widgets and `widgetApi`,",
         "the guide to writing a custom widget. `layout` replaces the whole layout (the text of the page's",
         "'Copy layout'); `place` adds widgets at the end of a board; `widgets` adds or replaces custom widgets",
-        "by id; `removeWidgets` removes them, also from the boards. `languages` adds texts by key, e.g.",
+        "by id and saves them in the widget library (<data-dir>/widgets.json), which every page from the",
+        "template gets; `removeWidgets` removes them from this page and its boards, `forgetWidgets` also",
+        "from the library. `languages` adds texts by key, e.g.",
         '{"de": {"title": "Training + Erholung"}}: keys and {placeholders} as in `englishTexts: true`; a',
         'text with "|" has a singular and a plural form. Missing texts show in English.',
         "`removeLanguages` removes languages that `languages` added.",
@@ -795,7 +861,14 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
             }),
           )
           .optional(),
-        removeWidgets: z.array(z.string()).describe("Ids of custom widgets").optional(),
+        removeWidgets: z
+          .array(z.string())
+          .describe("Ids of custom widgets to remove from this page")
+          .optional(),
+        forgetWidgets: z
+          .array(z.string())
+          .describe("Ids of custom widgets to remove from the library and from this page")
+          .optional(),
         languages: z
           .record(z.string(), z.record(z.string(), z.string()))
           .describe("Texts by language code and key")

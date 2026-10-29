@@ -235,3 +235,74 @@ describe("editDashboard", () => {
     expect(readBlock(page(), "i18n")).toEqual({ de: { title: "Training + Erholung" } });
   });
 });
+
+const libraryFile = () => join(dir, "widgets.json");
+const library = () => JSON.parse(readFileSync(libraryFile(), "utf8")) as { id: string }[];
+const ids = (p: string) => (readBlock(p, "widgets") as { id: string }[]).map((w) => w.id);
+const coach = () => readFileSync(join(dir, "coach.html"), "utf8");
+
+describe("widget library", () => {
+  it("saves a new custom widget in the library", async () => {
+    const r = await writer.edit({ widgets: [widget] });
+    expect(library()).toEqual([{ ...widget, span: 1 }]);
+    expect(r.customWidgets).toEqual([
+      { id: "longest-ride", title: "Longest ride", span: 1, library: true },
+    ]);
+  });
+
+  it("gives the library to a new page and to a page rebuilt from the template, not placed", async () => {
+    await writer.edit({ widgets: [widget], place: [{ board: "all", widget: "longest-ride" }] });
+    await writer.write({ path: "coach.html" });
+    expect(ids(coach())).toEqual(["longest-ride"]);
+    await writer.write({ layout: "blank" });
+    expect(ids(page())).toEqual(["longest-ride"]);
+    expect(JSON.stringify(layout().boards)).not.toContain("longest-ride");
+  });
+
+  it("brings a changed widget to the other pages on their next write", async () => {
+    await writer.edit({ widgets: [widget] });
+    await writer.write({ path: "coach.html" });
+    await writer.edit({ widgets: [{ ...widget, title: "Longest ride ever" }] });
+    await writer.write({ path: "coach.html" });
+    expect((readBlock(coach(), "widgets") as { title: string }[])[0].title).toBe(
+      "Longest ride ever",
+    );
+  });
+
+  it("starts the library from the page's widgets, and keeps widgets that only the page has", async () => {
+    const pageOnly = { id: "page-only", title: "Page only", code: "x", span: 1 };
+    writeFileSync(
+      file,
+      page().replace(
+        "/* garmin-widgets:start */[]",
+        () => `/* garmin-widgets:start */${JSON.stringify([pageOnly])}`,
+      ),
+    );
+    await writer.write({});
+    expect(library()).toEqual([pageOnly]);
+    writeFileSync(libraryFile(), JSON.stringify([{ ...widget, span: 1 }]));
+    await writer.write({});
+    expect(ids(page())).toEqual(["page-only", "longest-ride"]);
+  });
+
+  it("removes a widget from the page only, or forgets it everywhere", async () => {
+    await writer.edit({ widgets: [widget], place: [{ board: "all", widget: "longest-ride" }] });
+    await writer.edit({ removeWidgets: ["longest-ride"] });
+    expect(ids(page())).toEqual([]);
+    expect(library()).toHaveLength(1);
+    await writer.write({});
+    expect(ids(page())).toEqual(["longest-ride"]);
+    await writer.edit({ forgetWidgets: ["longest-ride"] });
+    expect(ids(page())).toEqual([]);
+    expect(library()).toEqual([]);
+  });
+
+  it("stops at a library it cannot read, and leaves it as it is", async () => {
+    writeFileSync(libraryFile(), "{ not json");
+    await expect(writer.edit({ widgets: [widget] })).rejects.toThrow(/widgets\.json/);
+    await expect(writer.write({ layout: "preset" })).rejects.toThrow(/widgets\.json/);
+    writeFileSync(libraryFile(), JSON.stringify([{ ...widget, id: "kpis" }]));
+    await expect(writer.edit({})).rejects.toThrow(/built-in/);
+    expect(readFileSync(libraryFile(), "utf8")).toContain("kpis");
+  });
+});

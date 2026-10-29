@@ -252,8 +252,9 @@ files side by side. Each page keeps its settings on each update. The argument `w
 ### dashboard-widget
 
 This prompt makes a new widget from your idea, for example "my longest ride of each month". The
-assistant writes a small widget, and `editDashboard` stores it in the page. The widget stays after
-each update. The argument `idea` is required. The argument `path` is optional: it is the file of the
+assistant writes a small widget, and `editDashboard` stores it in the page and in your widget
+library (`widgets.json` in the data folder). The widget stays after each update, and each new page
+gets it too. The argument `idea` is required. The argument `path` is optional: it is the file of the
 page, for example `coach.html`. In Claude Code:
 `/garmin-personal:dashboard-widget my longest ride each month coach.html`. Reload the page to see
 the widget.

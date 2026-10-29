@@ -11,6 +11,10 @@ MCP server. Answer in my language.
    board that fits the idea (`all` if no board fits){{pathArgument}}.
 5. If the reply has an error, fix the widget and call `editDashboard` again{{pathWith}}, at most 2 times.
 
+The server also saves the widget in my widget library, so each new page gets it. To remove a
+widget from this page only, use `removeWidgets`; to remove it from the library too, use
+`forgetWidgets`.
+
 You cannot open the page, so the widget is not tested. A widget that fails shows its error in its own
 tile, and the rest of the page works.
 

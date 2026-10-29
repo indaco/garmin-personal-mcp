@@ -19,6 +19,26 @@ Reload the page to see the widget. The assistant cannot open the page, so it can
 You can also ask your assistant to change or remove a custom widget. The widget catalogue of the
 page (the settings menu, **Edit layout**, then **Add widget**) lists the custom widgets too.
 
+## Your widget library
+
+The server also keeps each custom widget in `widgets.json` in the data folder. This file is your
+widget library. It stays on your computer: the server does not send it anywhere.
+
+- **A new page gets your widgets.** A page in another file (for example `coach.html`) and a page
+  that you make again from the template get every widget of the library. The widgets are in
+  **Add widget**; put them on a board there, or ask your assistant to.
+- **A changed widget goes to every page.** When you change a widget, each page gets the new version
+  at its next update.
+- **Remove from one page or from all.** Ask your assistant to remove a widget from the page
+  (`removeWidgets`): the widget stays in the library and in **Add widget**. Ask it to forget the
+  widget (`forgetWidgets`): the server also removes it from the library. Other pages keep their copy
+  until you remove it there.
+- **Back up or move.** Copy `widgets.json` to keep your widgets, or to use them on another
+  computer.
+
+Widgets that you made before the library existed join it at the first update. When a page has a
+widget that is not in the library, the page keeps it.
+
 ## When a widget fails
 
 The page runs each widget in its own tile. When a widget fails, its tile shows the error, and the
