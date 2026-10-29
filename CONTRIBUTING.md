@@ -122,7 +122,7 @@ Where each part of the server and the page is.
 | `scripts/build-template.mjs`         | writes `dist/dashboard.html`                                                         |
 | `scripts/third-party-notices.mjs`    | writes `THIRD-PARTY-NOTICES.md` after each build                                     |
 | `scripts/fill-dashboard-fixture.mjs` | fills `dist/dashboard.html` with a data file, for screenshots and checks             |
-| `scripts/demo-data.mjs`              | writes the demo of the website in `dist-site/demo/`: sample data and the filled page |
+| `scripts/demo-dashboard.mjs`         | writes the demo of the website in `dist-site/demo/`: sample data and the filled page |
 | `site/`                              | the project website: template, partials, styles, script and public files             |
 | `scripts/build-site.mjs`             | writes `dist-site/`: the website, with its facts from the code and README            |
 

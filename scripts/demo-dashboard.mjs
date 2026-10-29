@@ -3,7 +3,7 @@
 // Seeded: the same seed and end date give the same data. With a page path it also fills the page
 // template (`pnpm build` first) and puts a sample-data note at the top. Without paths it writes the
 // demo of the website: dist-site/demo/demo-data.json and dist-site/demo/index.html.
-// `node scripts/demo-data.mjs [--weeks 52] [--end yyyy-MM-dd] [--seed 7] [data.json [page.html]]`
+// `node scripts/demo-dashboard.mjs [--weeks 52] [--end yyyy-MM-dd] [--seed 7] [data.json [page.html]]`
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { parseArgs } from "node:util";
