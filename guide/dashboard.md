@@ -223,7 +223,7 @@ library on your computer, and each page that you make gets them.
 
 ## Themes and languages
 
-The settings menu has **Language** and **Theme**. The **Theme** menu has 11 themes: System, five dark themes, three light themes and two
+The settings menu has **Language** and **Theme**. The **Theme** menu has 13 themes: System, six dark themes, four light themes and two
 high-contrast themes. Midnight is the default.
 
 The **Language** menu has English, the language of your Garmin profile when it is built in, and the
