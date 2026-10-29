@@ -1,8 +1,25 @@
+import { version } from "../package.json";
 import type { DashboardWriter } from "./dashboard-page";
 import { type AutoRefresh, cronOf, refreshPages, type Status } from "./schedule";
 
 /** The commands for a terminal or a scheduler; any other start is the MCP server. */
-export const COMMANDS = ["refresh", "schedule"];
+export const COMMANDS = ["refresh", "schedule", "--version", "-v", "--help", "-h"];
+
+export const HELP = `Usage: garmin-personal-mcp [command]
+
+Without a command, the MCP server starts on stdin and stdout.
+
+Commands:
+  refresh [page.html]                 update a dashboard page
+                                      (default: <data-dir>/garmin-dashboard.html)
+  refresh --auto                      update the pages that have a schedule
+  schedule                            show the schedule
+  schedule [daily|weekdays|weekly <day>] [HH:MM] [page.html]
+                                      update a page automatically
+  schedule "<cron>" [page.html]       the same, with a cron expression
+  schedule off [page.html]            stop the automatic update
+  -v, --version                       show the version
+  -h, --help                          show this help`;
 
 export interface CliResult {
   code: number;
@@ -11,7 +28,7 @@ export interface CliResult {
 }
 
 /**
- * Runs `refresh [page.html | --auto]` or
+ * Runs `--version` (`-v`), `--help` (`-h`), `refresh [page.html | --auto]` or
  * `schedule [daily|weekdays|weekly <day>] [HH:MM] | "<cron>" | off`, each with an optional page.
  * Not MCP, so the result may go to stdout.
  */
@@ -21,6 +38,8 @@ export async function cli(
   auto: Pick<AutoRefresh, "pages" | "status" | "set" | "off">,
   writer: () => Pick<DashboardWriter, "write">,
 ): Promise<CliResult> {
+  if (command === "--version" || command === "-v") return { code: 0, stdout: version };
+  if (command === "--help" || command === "-h") return { code: 0, stdout: HELP };
   try {
     if (command === "refresh") {
       const pages = args[0] === "--auto" ? await auto.pages() : [args[0] ?? ""];
