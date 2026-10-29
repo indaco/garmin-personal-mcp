@@ -6,6 +6,11 @@
 <p align="center"><b>Your Garmin training in Claude, Codex or any MCP client, through the official Personal API. Read-only, nothing to install.</b></p>
 
 <p align="center">
+  🌐 <a href="https://garmin-personal-mcp.indaco.dev/"><b>Website</b></a> &nbsp;&middot;&nbsp; 👉
+  <a href="https://garmin-personal-mcp.indaco.dev/demo/"><b>Try the live demo</b></a>
+</p>
+
+<p align="center">
   <a href="https://www.npmjs.com/package/@indaco/garmin-personal-mcp"><img src="https://img.shields.io/npm/v/@indaco/garmin-personal-mcp.svg" alt="npm version" /></a>
   <a href="https://codecov.io/gh/indaco/garmin-personal-mcp"><img src="https://codecov.io/gh/indaco/garmin-personal-mcp/branch/main/graph/badge.svg" alt="Code coverage" /></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg" alt="Node.js 22 or later" /></a>
