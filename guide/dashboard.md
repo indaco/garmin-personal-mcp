@@ -5,6 +5,7 @@ heart rate. The server writes the file, and the assistant writes the coach notes
 
 - [Make the dashboard](#make-the-dashboard)
 - [Update the dashboard](#update-the-dashboard)
+- [Update the dashboard on a schedule](#update-the-dashboard-on-a-schedule)
 - [Boards and widgets](#boards-and-widgets)
 - [Change the layout](#change-the-layout)
 - [Themes and languages](#themes-and-languages)
@@ -52,6 +53,54 @@ keeps your layout, custom widgets, languages and page settings, and it keeps the
 `.bak` file.
 
 Reload the page in the browser to see the new data.
+
+## Update the dashboard on a schedule
+
+This is optional. The server can update the data of your page at a fixed time, also when no
+assistant is open. When you make a page, the assistant asks if you want this. You can also ask at
+any time, for example:
+
+- "Update my dashboard every day at 7."
+- "Update my dashboard on weekdays at 6:30."
+- "Update my coach page every Monday at 8."
+- "Stop the automatic update of my dashboard."
+- "When does my dashboard update?"
+
+| Schedule  | When                            |
+| --------- | ------------------------------- |
+| Every day | each day at the time            |
+| Weekdays  | Monday to Friday at the time    |
+| Weekly    | one day of the week at the time |
+
+The time is 07:00 when you do not give one. All the pages that update automatically use the same
+schedule.
+
+- The update replaces the data of the page. It keeps the weeks, the layout, the custom widgets, the
+  languages and the settings.
+- It removes the coach notes, because old notes do not agree with the new data. To get new notes,
+  run the `training-dashboard-update` prompt.
+- The computer must be on at that time. A Mac that sleeps updates the page when it wakes up. Linux
+  and Windows skip a time that they miss.
+- The server adds one job to the scheduler of your computer: launchd on macOS, your crontab on
+  Linux, and Task Scheduler on Windows. The job reads the API key from the key file
+  (`GARMIN_API_KEY_FILE`), never from your MCP client configuration. Save the key in that file
+  first.
+- Each update writes one line to `~/.cache/garmin-personal-mcp/refresh.log`.
+
+### From a terminal
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest schedule daily 07:00
+npx -y @indaco/garmin-personal-mcp@latest schedule weekdays 06:30
+npx -y @indaco/garmin-personal-mcp@latest schedule weekly monday 08:00 garmin-dashboard-coach.html
+npx -y @indaco/garmin-personal-mcp@latest schedule              # show the schedule
+npx -y @indaco/garmin-personal-mcp@latest schedule off          # stop all
+npx -y @indaco/garmin-personal-mcp@latest schedule off garmin-dashboard-coach.html
+npx -y @indaco/garmin-personal-mcp@latest refresh               # update now, once
+```
+
+A file name ends in `.html`. A relative path is in the data folder. `refresh` with a file name
+updates that page.
 
 ## Boards and widgets
 

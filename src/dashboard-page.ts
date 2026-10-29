@@ -48,6 +48,8 @@ export interface WriteOptions {
   path?: string;
   /** Replaces the settings of the page; without it, the page keeps its own. */
   settings?: Settings;
+  /** Refuse to make a new page: for the scheduled `refresh` command, not a tool argument. */
+  onlyExisting?: boolean;
 }
 
 export interface PreviewResult {
@@ -355,6 +357,7 @@ export class DashboardWriter {
     page,
     path,
     settings,
+    onlyExisting,
   }: WriteOptions): Promise<WriteResult> {
     if (layout && page) {
       throw new Error(
@@ -370,6 +373,9 @@ export class DashboardWriter {
     const asked = settings === undefined ? undefined : checkSettings(settings);
     const target = this.#target(path);
     const old = await readExisting(target);
+    if (onlyExisting && old === undefined) {
+      throw new Error(`${target} does not exist: make it first with the training-dashboard prompt`);
+    }
     let oldSettings: Settings;
     let unreadable = false;
     try {
@@ -647,16 +653,18 @@ export class DashboardWriter {
 
   /** The page file: relative paths sit in the data dir; only .html files. */
   #target(path: string | undefined): string {
-    // ~ is the home folder, as the user types it in a shell
-    const target = resolve(
-      this.dataDir,
-      (path ?? DASHBOARD_FILE).replace(/^~(?=$|[/\\])/, homedir()),
-    );
-    if (!/\.html$/i.test(target)) {
-      throw new Error(`The dashboard must be an .html file: ${target}`);
-    }
-    return target;
+    return pageTarget(this.dataDir, path);
   }
+}
+
+/** The absolute page file: a relative path is inside the data dir; only .html files. */
+export function pageTarget(dataDir: string, path: string | undefined): string {
+  // ~ is the home folder, as the user types it in a shell
+  const target = resolve(dataDir, (path || DASHBOARD_FILE).replace(/^~(?=$|[/\\])/, homedir()));
+  if (!/\.html$/i.test(target)) {
+    throw new Error(`The dashboard must be an .html file: ${target}`);
+  }
+  return target;
 }
 
 /** The boards: All, Recovery, the type boards, and a board for any other SDK sport. */

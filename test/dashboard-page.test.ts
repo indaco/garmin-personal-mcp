@@ -278,6 +278,13 @@ describe("writeDashboard", () => {
     expect(existsSync(file)).toBe(false);
   });
 
+  it("with onlyExisting, updates a page but never makes a new one", async () => {
+    await expect(writer.write({ onlyExisting: true })).rejects.toThrow(/does not exist/);
+    expect(existsSync(file)).toBe(false);
+    await writer.write({});
+    expect((await writer.write({ onlyExisting: true })).page).toBe("updated");
+  });
+
   it("writes a relative path inside the data dir, and only .html files", async () => {
     const r = await writer.write({ path: "boards/mine.html" });
     expect(r.path).toBe(join(dir, "boards/mine.html"));
