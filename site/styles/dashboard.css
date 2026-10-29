@@ -2,32 +2,48 @@
 .dash .head {
   grid-column: 1 / 7;
 }
+/* the dark frame of the GIF ends in a 56px bar with the demo action joined to its right end, like the
+   install bar and its copy button */
 .shot {
   grid-column: 1 / 9;
   margin: 0;
   background: var(--code-bg);
-  padding: 14px;
+  padding: 14px 14px 0;
   align-self: start;
   & img {
     display: block;
     width: 100%;
     height: auto;
   }
+  & .shot-image:hover img {
+    opacity: 0.9;
+  }
   & figcaption {
-    color: var(--sky);
-    font-size: 13px;
-    padding-top: 10px;
     display: flex;
-    flex-wrap: wrap;
+    align-items: center;
     justify-content: space-between;
-    gap: 4px 16px;
-  }
-  & figcaption a {
+    gap: 16px;
+    min-height: 56px;
+    margin-right: -14px;
     color: var(--sky);
-    font-weight: 600;
+    font-size: 14px;
   }
-  & figcaption a:hover {
-    color: var(--mint);
+  & .demo-go {
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    padding: 0 22px;
+    background: var(--sky);
+    color: var(--field-ink);
+    font-weight: 600;
+    font-size: 15px;
+    text-decoration: none;
+    &:hover {
+      background: var(--mint);
+      color: var(--field-ink);
+    }
   }
 }
 .facts {
