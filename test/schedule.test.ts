@@ -23,6 +23,8 @@ const job: Job = {
   log: "/home/u/.cache/garmin-personal-mcp/refresh.log",
 };
 
+const NPX_ENTRY = "/home/u/.npm/_npx/1a2b/node_modules/pkg/dist/index.js";
+
 const failing: Run = async () => ({ code: 5, stdout: "", stderr: "Bootstrap failed: 5" });
 
 describe("schedules", () => {
@@ -100,7 +102,7 @@ describe("AutoRefresh", () => {
     return { code: 0, stdout: "", stderr: "" };
   };
   const auto = (platform: NodeJS.Platform) =>
-    new AutoRefresh(config, platform, join(dir, "home"), exec, "/opt/node/bin");
+    new AutoRefresh(config, platform, join(dir, "home"), exec, "/opt/node/bin", NPX_ENTRY);
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), "schedule-"));
@@ -169,6 +171,18 @@ describe("AutoRefresh", () => {
     expect((await a.status()).installed).toBe(true);
     await a.off();
     expect(crontab).toBe("15 3 * * * backup.sh\n");
+  });
+
+  it("runs an installed copy with its node, and a copy in the npx cache with npx", async () => {
+    const installed = "/usr/local/lib/node_modules/pkg/dist/index.js";
+    await new AutoRefresh(config, "linux", join(dir, "home"), exec, "/opt/node/bin", installed).set(
+      {},
+    );
+    expect(crontab).toContain(`'/opt/node/bin/node' '${installed}' 'refresh' '--auto'`);
+    await auto("linux").set({});
+    expect(crontab).toMatch(
+      /'\/opt\/node\/bin\/npx' '-y' '@indaco\/garmin-personal-mcp@latest' 'refresh' '--auto'/,
+    );
   });
 
   it("writes a script for the Windows task", async () => {

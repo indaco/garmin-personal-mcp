@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
@@ -211,6 +211,8 @@ export class AutoRefresh {
     private readonly home = homedir(),
     private readonly exec: Run = run,
     private readonly nodeDir = dirname(process.execPath),
+    /** The running dist/index.js: a global or local install, or a copy in the npx cache. */
+    private readonly entry = realEntry(process.argv[1]),
   ) {}
 
   get #stateFile() {
@@ -283,9 +285,11 @@ export class AutoRefresh {
 
   #job(): Job {
     const win = this.platform === "win32";
+    // npm can prune the npx cache, so a server started by npx schedules npx with the latest release
+    const npx = this.entry === "" || /[/\\]_npx[/\\]/.test(this.entry);
     return {
-      program: join(this.nodeDir, win ? "npx.cmd" : "npx"),
-      args: ["-y", `${name}@latest`, "refresh", "--auto"],
+      program: join(this.nodeDir, npx ? (win ? "npx.cmd" : "npx") : win ? "node.exe" : "node"),
+      args: [...(npx ? ["-y", `${name}@latest`] : [this.entry]), "refresh", "--auto"],
       env: {
         GARMIN_DATA_DIR: this.config.dataDir,
         GARMIN_API_KEY_FILE: this.config.apiKeyFile,
@@ -351,6 +355,15 @@ export class AutoRefresh {
   async #state(): Promise<State | undefined> {
     const text = await readFile(this.#stateFile, "utf8").catch(() => undefined);
     return text === undefined ? undefined : (JSON.parse(text) as State);
+  }
+}
+
+/** The real path of the running script, so the job does not follow a link that can change. */
+function realEntry(path: string | undefined): string {
+  try {
+    return path ? realpathSync(path) : "";
+  } catch {
+    return "";
   }
 }
 

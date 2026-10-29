@@ -85,6 +85,9 @@ schedule.
   Linux, and Task Scheduler on Windows. The job reads the API key from the key file
   (`GARMIN_API_KEY_FILE`), never from your MCP client configuration. Save the key in that file
   first.
+- The job runs the server as you installed it. A server that `npx` starts schedules the latest
+  release through `npx`; a server installed with `npm install -g` schedules that copy. After you
+  change the Node.js version, set the schedule again.
 - Each update writes one line to `~/.cache/garmin-personal-mcp/refresh.log`.
 
 ### From a terminal
