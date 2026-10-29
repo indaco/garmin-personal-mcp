@@ -21,7 +21,7 @@ such a tool, ask the questions in chat as numbered lists, with the default first
      HR zones, activity names. For me, all are selected by default; for a shared page, ask about each
      one. The server leaves out of the file what I do not select.
    - **Coach notes**: include (default) or leave out.
-   - **Languages**: options "English and the language of my Garmin profile, opens in the browser
+   - **Languages**: options "English and the language of my Garmin profile, opens in the profile
      language" (default), "All: {{languageNames}}", "English only" and "Italian only". Say that I can
      type another choice, for example "English and Italian, opens in Italian".
    - **Themes**: options "All 11 themes, opens in midnight" (default), "Midnight only" and "Paper

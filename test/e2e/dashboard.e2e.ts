@@ -234,6 +234,19 @@ describe("the page", () => {
     expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
   });
 
+  it("opens in the language of the Garmin profile, until the reader picks one", async () => {
+    const file = pageFile({
+      data: { ...data, locale: "pt-BR" },
+      settings: { languages: ["en", "pt"] },
+    });
+    const { page } = await open(browser, file, { locale: "en-US" });
+    expect(await page.evaluate(() => document.documentElement.lang)).toBe("pt");
+    await page.click(".account summary");
+    expect(await page.inputValue("#lang")).toBe("pt");
+    await page.selectOption("#lang", "auto");
+    expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
+  });
+
   it("shows the title, the sports, the data and the menus of its settings", async () => {
     const { page, errors } = await open(
       browser,

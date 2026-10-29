@@ -106,7 +106,14 @@ export function start(): void {
     const def = compile(w);
     if (def) registerCustom(def);
   }
-  setLanguage(langChoice);
+  // without a choice, the page opens in the language of the Garmin profile when it has it
+  const own = G.data?.locale ?? "";
+  setLanguage(
+    store.get("garmin-lang") ??
+      S.language ??
+      [own, own.slice(0, 2)].find((code) => code in LANGUAGE_NAMES) ??
+      "auto",
+  );
   const data = G.data;
   if (data) {
     const present = new Set(data.activities.map(groupOf));

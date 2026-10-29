@@ -141,8 +141,9 @@ high-contrast themes. Midnight is the default.
 
 The **Language** menu has English, the language of your Garmin profile when it is built in, and the
 languages that you add. The built-in languages are English, Italian, German, French, Spanish and
-Portuguese. The [page settings](#page-settings) can keep other built-in languages in the file. _Auto_ follows the
-language of the browser. [Languages](languages.md) tells how to add a language.
+Portuguese. The [page settings](#page-settings) can keep other built-in languages in the file. The
+page opens in the language of your Garmin profile until you choose one in the menu. _Auto_ follows
+the language of the browser. [Languages](languages.md) tells how to add a language.
 
 ## Units
 
@@ -168,16 +169,16 @@ The `dashboard-setup` prompt asks you questions and writes a page with your answ
 ask your assistant directly, for example "make a dashboard for my coach without my sleep data". The
 assistant calls `writeDashboard` with `settings`:
 
-| Setting     | What it does                                                               | Default                                        |
-| ----------- | -------------------------------------------------------------------------- | ---------------------------------------------- |
-| `title`     | replaces the title in every language                                       | the built-in title                             |
-| `headline`  | replaces the line under the title in every language                        | the built-in headline                          |
-| `sports`    | the boards to keep, for example `running` and `cycling`                    | all                                            |
-| `exclude`   | the data to leave out: `recovery`, `fitnessAge`, `zones`, `names`, `notes` | none                                           |
-| `languages` | the built-in languages to keep: `en`, `it`, `de`, `fr`, `es`, `pt`         | English and the language of the Garmin profile |
-| `language`  | the language that the page opens in: `auto` or a language code             | `auto`                                         |
-| `themes`    | the themes to keep                                                         | all                                            |
-| `theme`     | the theme that the page opens in                                           | `midnight`                                     |
+| Setting     | What it does                                                               | Default                                                |
+| ----------- | -------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `title`     | replaces the title in every language                                       | the built-in title                                     |
+| `headline`  | replaces the line under the title in every language                        | the built-in headline                                  |
+| `sports`    | the boards to keep, for example `running` and `cycling`                    | all                                                    |
+| `exclude`   | the data to leave out: `recovery`, `fitnessAge`, `zones`, `names`, `notes` | none                                                   |
+| `languages` | the built-in languages to keep: `en`, `it`, `de`, `fr`, `es`, `pt`         | English and the language of the Garmin profile         |
+| `language`  | the language that the page opens in: `auto` or a language code             | the profile language when the page has it, else `auto` |
+| `themes`    | the themes to keep                                                         | all                                                    |
+| `theme`     | the theme that the page opens in                                           | `midnight`                                             |
 
 The server leaves the excluded data and sports out of the file, and out of the digest for the coach
 notes. A widget whose data is left out does not show. With `recovery` excluded, the page has no
