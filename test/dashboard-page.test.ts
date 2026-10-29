@@ -11,6 +11,7 @@ import {
 } from "../src/dashboard-page";
 import { digest } from "../src/digest";
 import { DASHBOARD_VERSION } from "../src/prompts";
+import { version as serverVersion } from "../package.json";
 
 const template = (version: number, extra = "") => `<!doctype html>
 <meta name="garmin-template" content="${version}">
@@ -80,6 +81,7 @@ describe("writeDashboard", () => {
     );
     expect(readBlock(cut, "data")).toMatchObject({
       v: DASHBOARD_VERSION,
+      server: serverVersion,
       activities: [],
       notes: [],
     });
@@ -107,7 +109,7 @@ describe("writeDashboard", () => {
     const r = await writer.write({ weeks: 8 });
     expect(r).toMatchObject({ path: file, page: "created", notes: 0 });
     expect(asked).toEqual([8]);
-    expect(readBlock(page(), "data")).toEqual({ ...data, v: 3, notes: [] });
+    expect(readBlock(page(), "data")).toEqual({ ...data, v: 3, server: serverVersion, notes: [] });
     expect(readBlock(page(), "layout")).toMatchObject({ base: "preset", boards: {} });
     expect(readBlock(page(), "widgets")).toEqual([]);
   });
