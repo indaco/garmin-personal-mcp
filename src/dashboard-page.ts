@@ -256,6 +256,7 @@ export function withData(page: string, data: Json, s: Settings, notes: readonly 
     ...filterData(data, s),
     v: DASHBOARD_VERSION,
     server: version,
+    updated: new Date().toISOString(),
     notes: kept.map(escapeHtml),
   });
 }

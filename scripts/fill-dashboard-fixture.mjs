@@ -5,7 +5,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-// the server version that withData adds, so the footer shows it as on a page the server wrote
+// the server version and write time that withData adds, so the footer shows them as on a page the
+// server wrote
 const { version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 
 // the block format of writeBlock in src/dashboard-page.ts
@@ -20,7 +21,11 @@ export const fill = (page, block, value) =>
 
 /** The template with every block filled; the layout defaults to the preset. */
 export function fillPage(template, data, layout = null) {
-  let page = fill(template, "data", { ...data, server: version });
+  let page = fill(template, "data", {
+    updated: new Date().toISOString(),
+    ...data,
+    server: version,
+  });
   page = fill(page, "layout", layout);
   page = fill(page, "widgets", []);
   return fill(page, "i18n", {});
