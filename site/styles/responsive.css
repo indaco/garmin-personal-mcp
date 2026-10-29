@@ -1,0 +1,146 @@
+@media (max-width: 1100px) {
+  .lead,
+  .wall,
+  .data,
+  .head,
+  .dash .head,
+  .shot,
+  .facts {
+    grid-column: 1 / -1;
+  }
+  .sportfield {
+    grid-column: 1 / 6;
+  }
+  .qs,
+  .note {
+    grid-column: 6 / -1;
+  }
+  .step {
+    grid-column: span 6;
+  }
+  .promise .grid > div {
+    grid-column: span 6;
+  }
+  .tools {
+    columns: 1;
+  }
+}
+@media (max-width: 720px) {
+  .wrap {
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .bands::before {
+    display: none;
+  }
+  .top {
+    gap: 8px;
+    & nav {
+      display: none;
+    }
+  }
+  .mode.menu {
+    display: grid;
+  }
+  /* the open menu: a full-width panel under the header, one link per line */
+  .top nav.open {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: absolute;
+    top: 64px;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    background: var(--bg);
+    border-bottom: 2px solid var(--ink);
+    padding: 0 max(16px, env(safe-area-inset-right, 0px)) 4px
+      max(16px, env(safe-area-inset-left, 0px));
+    /* about 44px per row: compact, still a full tap target */
+    & a {
+      font-size: 17px;
+      font-weight: 400;
+      color: var(--ink);
+      padding-block: 9px;
+      border-bottom: 1px solid var(--rule);
+    }
+    & a:last-child {
+      border-bottom: 0;
+    }
+  }
+  .hero {
+    padding-top: 36px;
+  }
+  .offer {
+    font-size: 19px;
+  }
+  .wall {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(4, 150px) 56px;
+  }
+  .data {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .sportfield,
+  .qs,
+  .note,
+  .step,
+  .promise .grid > div {
+    grid-column: 1 / -1;
+  }
+  .sportfield {
+    min-height: 220px;
+    flex-direction: row;
+    align-items: flex-end;
+    & svg {
+      width: 40%;
+    }
+  }
+  .qs li {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .qs q {
+    font-size: 20px;
+  }
+  .tool {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .cmd code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 14px;
+  }
+  pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .pre-wrap pre {
+    padding-top: 44px;
+  }
+}
+/* phones: the mark on its own line, the links together on the next */
+@media (max-width: 720px) {
+  footer {
+    column-gap: 24px;
+    & .mark {
+      flex-basis: 100%;
+    }
+  }
+}
+/* icons only: one row of six equal tabs on phones and tablets in portrait */
+@media (max-width: 900px) {
+  .tab span {
+    display: none;
+  }
+  .tab {
+    padding: 8px;
+    justify-content: center;
+  }
+  .picker {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}

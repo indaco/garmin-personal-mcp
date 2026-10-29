@@ -1,0 +1,22 @@
+# garmin-personal-mcp
+
+> An MCP server that lets your assistant read your Garmin data through the official, read-only Garmin Connect Personal API: activities, laps, strength sets, sleep, HRV and more. It runs with `npx -y {{package}}` in every stdio MCP client and needs {{node}} and a Garmin Personal API key. It can also write a training dashboard: one offline HTML file.
+
+The server is read-only: it writes nothing back to Garmin. Laps and strength sets come from the original .FIT files. A missing value or a failed call shows as "n/a"; the server and its prompts never invent data. Garmin does not endorse this project, and the project has no affiliation with Garmin.
+
+## Docs
+
+- [README](https://github.com/indaco/garmin-personal-mcp/blob/main/README.md): quick start, client setup, what you can ask, the tools and the dashboard prompts
+- [How it works](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/how-it-works.md): transport, authentication with the API key, laps and sets from the .FIT files, the automatic update and the dashboard cache
+- [Tools](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/tools.md): every tool, its endpoints, and the data that the Personal API does not have
+- [Dashboard](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md): make and update the page, boards and widgets, themes, languages and page settings
+- [Troubleshooting](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/troubleshooting.md): problems and their solutions
+
+## Optional
+
+- [Presets](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/presets.md): presets or freeform: why the server writes the page, with measurements
+- [Widgets](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/widgets.md): the built-in widgets and the preset of each board
+- [Custom widgets](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/custom-widgets.md): make a widget from your own idea
+- [Languages](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/languages.md): the page texts and how to add a language
+- [npm package](https://www.npmjs.com/package/@indaco/garmin-personal-mcp)
+- [Security](https://github.com/indaco/garmin-personal-mcp/blob/main/SECURITY.md): how the server protects your data and how to report a vulnerability

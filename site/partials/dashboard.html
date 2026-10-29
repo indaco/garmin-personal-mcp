@@ -1,0 +1,71 @@
+<section class="block dash" id="dashboard" aria-labelledby="dash-h">
+  <div class="wrap bands">
+    <div class="grid">
+      <div class="head">
+        <h2 id="dash-h">your training dashboard, written by the server.</h2>
+        <p>
+          Your training load next to HRV, sleep and resting heart rate. The server writes the page
+          from its template, and your assistant writes only the coach notes. The page is the same in
+          every client.
+        </p>
+      </div>
+      <figure class="shot">
+        <img
+          src="dashboard.gif"
+          width="800"
+          height="500"
+          alt="The training dashboard: the All board, load against recovery, the Run board, strength trends, edit mode (drag a widget to a new place, hide a widget, add widgets from the catalogue to an empty board), and the light and high-contrast themes"
+        />
+        <figcaption>
+          <span>The training dashboard, with demo data.</span>
+          <a href="demo/index.html">Open the demo dashboard</a>
+        </figcaption>
+      </figure>
+      <dl class="facts">
+        <div>
+          <dt>one HTML file</dt>
+          <dd>Works offline. Chart.js is inside, and the page's own code sends no requests.</dd>
+        </div>
+        <div>
+          <dt>less than a minute</dt>
+          <dd>with the preset or the blank layout.</dd>
+        </div>
+        <div>
+          <dt>a board for each sport</dt>
+          <dd>
+            plus a board for all your training and a Recovery board. Move, resize, hide and add
+            widgets.
+          </dd>
+        </div>
+        <div>
+          <dt>your layout stays</dt>
+          <dd>
+            An update replaces only the data and the coach notes. Updates can also run on a
+            schedule.
+          </dd>
+        </div>
+        <div>
+          <dt>{{themeCount}} themes, your languages</dt>
+          <dd>{{themeGroups}}. Munich and Munich dark use the colours of this site.</dd>
+        </div>
+      </dl>
+      <div class="prompts">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">prompt</th>
+              <th scope="col">what it does</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{prompts}}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="stripes" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+</div>

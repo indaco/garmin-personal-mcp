@@ -1,0 +1,8 @@
+{
+  "url": "https://garmin-personal-mcp.indaco.dev/",
+  "description": "Your Garmin training in your assistant, through the official Garmin Connect Personal API. Read-only, nothing to install.",
+  "author": {
+    "name": "indaco",
+    "url": "https://github.com/indaco"
+  }
+}
