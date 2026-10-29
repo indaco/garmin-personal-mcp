@@ -114,6 +114,10 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # the site tests load the built website; its demo needs the dashboard template
+      - name: Build the website
+        run: pnpm build:site
+
       # playwright-core in the lockfile picks the browser build; the cache keeps it between runs.
       # The image has the system libraries already, so no apt download (--with-deps took 10 min once).
       - name: Browser version
