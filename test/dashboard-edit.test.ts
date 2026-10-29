@@ -308,6 +308,16 @@ describe("widget library", () => {
     await expect(writer.edit({})).rejects.toThrow(/not a list of widgets/);
   });
 
+  it("reads a page whose widgets block is null as a page without widgets", async () => {
+    writeFileSync(
+      file,
+      page().replace("/* garmin-widgets:start */[]", "/* garmin-widgets:start */null"),
+    );
+    await writer.write({});
+    expect(readBlock(page(), "widgets")).toEqual([]);
+    expect(statSync(libraryFile(), { throwIfNoEntry: false })).toBeUndefined();
+  });
+
   it("stops when the library cannot be read at all", async () => {
     mkdirSync(libraryFile());
     await expect(writer.edit({ widgets: [widget] })).rejects.toThrow(/EISDIR/);
@@ -351,6 +361,12 @@ describe("widget texts", () => {
     await expect(bad({ it: { "bad key": "x" } })).rejects.toThrow(/bad key/);
     await expect(bad({ it: { title: " " } })).rejects.toThrow(/it\.title/);
     await expect(bad({ it: { best: "{distanza} il {day}" } })).rejects.toThrow(/placeholders/);
+    await expect(bad({ it: { title: "Uscita {n}" } })).rejects.toThrow(
+      /keep the placeholders \(none\)/,
+    );
+    await expect(bad({ it: null as unknown as Record<string, string> })).rejects.toThrow(
+      /it: texts by key/,
+    );
     // 41 texts of 500 characters: each is short enough, all together are not
     const many = Object.fromEntries(
       Array.from({ length: 41 }, (_, i) => [`k${i}`, "x".repeat(500)]),

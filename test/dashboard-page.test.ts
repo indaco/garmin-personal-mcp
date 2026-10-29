@@ -463,6 +463,10 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
     expect(await writer.write({ settings: { languages: ["en"] } })).not.toHaveProperty(
       "missingProfileLanguage",
     );
+    // a page without the block of added languages has none
+    templateText = styledTemplate.replace(/^const I18N.*\n/m, "");
+    const r = await profile(full, "ru").write({ path: "no-i18n.html" });
+    expect(r.missingProfileLanguage).toBe("ru");
   });
 
   it("matches the profile locale by full tag, then by language", () => {

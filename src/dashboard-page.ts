@@ -571,7 +571,7 @@ export class DashboardWriter {
       customWidgets: widgets.map((w) => ({
         id: w.id,
         title: w.title,
-        span: w.span ?? 1,
+        span: spanOf(w.span),
         ...(w.types ? { types: w.types } : {}),
         ...(w.texts ? { texts: w.texts } : {}),
         library: library.some((l) => l.id === w.id),
@@ -711,7 +711,12 @@ function checkWidgetTexts(w: CustomWidget): CustomWidget["texts"] {
       problems.push(`bad language code ${lang}`);
       continue;
     }
-    for (const [key, text] of Object.entries(entries ?? {})) {
+    // a hand-edited widgets.json can hold anything here
+    if (!entries || typeof entries !== "object" || Array.isArray(entries)) {
+      problems.push(`${lang}: texts by key`);
+      continue;
+    }
+    for (const [key, text] of Object.entries(entries)) {
       const english = texts.en?.[key];
       if (!/^[a-zA-Z][\w.-]{0,40}$/.test(key)) problems.push(`bad key ${key}`);
       else if (typeof text !== "string" || !text.trim() || text.length > 500)
