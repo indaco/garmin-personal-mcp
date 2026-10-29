@@ -181,17 +181,31 @@ describe("site sections", () => {
     ).toBe(1);
   });
 
+  it("keeps the same height for every sport, on a desktop and on a phone", async () => {
+    const { page } = await site();
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      const heights = new Set<number>();
+      for (const tab of await page.$$(".picker [role=tab]")) {
+        await tab.click();
+        heights.add(await page.$eval("#ask", (e) => Math.round(e.getBoundingClientRect().height)));
+      }
+      expect([width, heights.size]).toEqual([width, 1]);
+    }
+  });
+
   it("selects the sport of a hero cell, with its note for the questions written for the page", async () => {
     const { page } = await site();
     await page.click(".wall .f-padel");
     expect(await page.textContent("#sportname")).toBe("padel");
-    expect(await page.isVisible("#authored")).toBe(true);
+    expect(await page.textContent(".qs-set.on .qs-note")).toContain("written for this page");
     await page.click(".wall .f-every");
     expect(await page.textContent("#sportname")).toBe("every activity");
-    expect([await page.isVisible("#every-note"), await page.isVisible("#authored")]).toEqual([
-      true,
-      false,
-    ]);
+    expect(await page.textContent(".qs-set.on .qs-note")).toContain(
+      "Any activity your Garmin records",
+    );
+    await page.click(".wall .f-strength");
+    expect(await page.$(".qs-set.on .qs-note")).toBeNull();
   });
 
   it("shows one client pane at a time, and the arrow keys move between the clients", async () => {

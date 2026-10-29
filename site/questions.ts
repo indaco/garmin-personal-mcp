@@ -49,4 +49,13 @@ export const QUESTIONS: Record<string, [question: string, tools: string][]> = {
 /** The sports whose questions are written for the page, not taken from the README. */
 export const AUTHORED = new Set(["swimming", "cycling", "padel"]);
 
+/** The line under the questions of a sport, or "". */
+export function note(sport: string): string {
+  if (sport === "every")
+    return "Any activity your Garmin records works the same way: walks, hikes, yoga, HIIT and more.";
+  if (AUTHORED.has(sport))
+    return "These examples are written for this page. Any question about an activity works the same way.";
+  return "";
+}
+
 export const label = (sport: string) => (sport === "every" ? "every activity" : sport);

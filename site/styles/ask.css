@@ -78,8 +78,23 @@
     color: inherit;
   }
 }
-.qs {
+.qs-stack {
   grid-column: 5 / -1;
+  display: grid;
+}
+.qs-set {
+  grid-area: 1 / 1;
+  visibility: hidden;
+  &.on {
+    visibility: visible;
+  }
+}
+.qs-note {
+  margin-top: 18px;
+  font-size: 15px;
+  color: var(--muted);
+}
+.qs {
   list-style: none;
   margin: 0;
   padding: 0;

@@ -1,4 +1,4 @@
-import { AUTHORED, label, QUESTIONS } from "../questions";
+import { label, note, QUESTIONS } from "../questions";
 import { byId } from "./dom";
 import { arrowKeys, selectTab } from "./tabs";
 
@@ -7,7 +7,36 @@ export function ask(): void {
   const picker = document.querySelector<HTMLElement>(".picker");
   if (!picker) return;
   const field = byId("sportfield");
-  const list = byId("qs");
+  const stack = byId("qs");
+
+  // every set of questions sits in the same grid cell, so the section is as tall as the tallest set
+  // whichever sport is selected; only the selected set is visible and in the accessibility tree
+  for (const [sport, list] of Object.entries(QUESTIONS)) {
+    const set = document.createElement("div");
+    set.className = "qs-set";
+    set.dataset.sport = sport;
+    const ol = document.createElement("ol");
+    ol.className = "qs";
+    for (const [question, tools] of list) {
+      const li = document.createElement("li");
+      const q = document.createElement("q");
+      q.textContent = question;
+      const via = document.createElement("span");
+      via.className = "via";
+      via.textContent = tools;
+      li.append(q, via);
+      ol.append(li);
+    }
+    set.append(ol);
+    const text = note(sport);
+    if (text) {
+      const p = document.createElement("p");
+      p.className = "qs-note";
+      p.textContent = text;
+      set.append(p);
+    }
+    stack.append(set);
+  }
 
   const select = (sport: string) => {
     for (const b of picker.querySelectorAll<HTMLElement>('[role="tab"]'))
@@ -16,20 +45,8 @@ export function ask(): void {
     field.className = `sportfield f-${sport}`;
     byId("sportname").textContent = label(sport);
     byId("sportpicto").setAttribute("href", `#p-${sport}`);
-    byId("authored").hidden = !AUTHORED.has(sport);
-    byId("every-note").hidden = sport !== "every";
-    list.replaceChildren(
-      ...(QUESTIONS[sport] ?? []).map(([question, tools]) => {
-        const li = document.createElement("li");
-        const q = document.createElement("q");
-        q.textContent = question;
-        const via = document.createElement("span");
-        via.className = "via";
-        via.textContent = tools;
-        li.append(q, via);
-        return li;
-      }),
-    );
+    for (const set of stack.querySelectorAll<HTMLElement>(".qs-set"))
+      set.classList.toggle("on", set.dataset.sport === sport);
   };
 
   for (const sport of Object.keys(QUESTIONS)) {
