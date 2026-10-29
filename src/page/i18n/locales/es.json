@@ -12,6 +12,7 @@
   "footer.license": "Licencia MIT",
   "menu.language": "Idioma",
   "lang.auto": "Automático",
+  "lang.missing": "{language} aún no está en esta página. Pide a tu asistente que añada el idioma.",
   "themeGroup.auto": "Automático",
   "themeGroup.dark": "Oscuros",
   "themeGroup.light": "Claros",

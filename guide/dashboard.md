@@ -143,7 +143,9 @@ The **Language** menu has English, the language of your Garmin profile when it i
 languages that you add. The built-in languages are English, Italian, German, French, Spanish and
 Portuguese. The [page settings](#page-settings) can keep other built-in languages in the file. The
 page opens in the language of your Garmin profile until you choose one in the menu. _Auto_ follows
-the language of the browser. [Languages](languages.md) tells how to add a language.
+the language of the browser. When the page has no texts in the language of your Garmin profile, the
+settings menu says so, with the name of the language. [Languages](languages.md) tells how to add a
+language.
 
 ## Units
 

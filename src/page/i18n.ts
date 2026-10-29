@@ -27,7 +27,7 @@ export function addLanguages(extra: unknown): void {
 }
 
 /** A language by its own name, e.g. "Deutsch" for de. */
-function languageName(code: string): string {
+export function languageName(code: string): string {
   try {
     const name = new Intl.DisplayNames([code], { type: "language" }).of(code);
     return name ? name[0].toUpperCase() + name.slice(1) : code;

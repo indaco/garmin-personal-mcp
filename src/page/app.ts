@@ -10,12 +10,14 @@ import { dragTile, keyMove, resizeTile } from "./edit-drag";
 import { icon, logo } from "./icons";
 import {
   addLanguages,
+  CATALOGUES,
   formatter,
   type Key,
   LANGUAGE_NAMES,
   pickLang,
   type T,
   translator,
+  languageName,
 } from "./i18n";
 import {
   add,
@@ -293,6 +295,7 @@ function accountMenu(): HTMLElement {
       !editing && h("hr", { class: "menu-sep" }),
       // one language needs no menu
       Object.keys(LANGUAGE_NAMES).length > 1 && languageMenu(),
+      missingLanguage(),
       shownThemes().length > 1 && themeMenu(),
     ),
   );
@@ -316,6 +319,17 @@ function languageMenu(): HTMLElement {
     ),
   );
   return h("label", { class: "menu" }, h("span", {}, t("menu.language")), select);
+}
+
+/** A note when the page has no texts in the language of the Garmin profile, by its own name. */
+function missingLanguage(): HTMLElement | false {
+  const own = G.data?.locale ?? "";
+  if (!own || [own, own.slice(0, 2)].some((code) => code in CATALOGUES)) return false;
+  return h(
+    "p",
+    { class: "muted small menu-note" },
+    t("lang.missing", { language: languageName(own) }),
+  );
 }
 
 /** The themes of the page: the ones the settings keep. */

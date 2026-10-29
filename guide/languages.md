@@ -9,7 +9,7 @@ change the built-in texts.
 
 When the language of your Garmin profile is not built in and not added, for example Russian, the
 page shows English. The assistant tells you after it writes or updates the page, and offers to add
-the language. When you add it, the page opens in your language.
+the language. The settings menu of the page also says that the language is not in the page. When you add it, the page opens in your language.
 
 ## Add a language through your assistant
 
@@ -63,6 +63,7 @@ out. To add one:
 | `footer.license` | MIT License |
 | `menu.language` | Language |
 | `lang.auto` | Auto |
+| `lang.missing` | {language} is not in this page yet. Ask your assistant to add it. |
 | `themeGroup.auto` | Auto |
 | `themeGroup.dark` | Dark |
 | `themeGroup.light` | Light |

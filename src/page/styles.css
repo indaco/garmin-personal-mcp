@@ -1176,6 +1176,10 @@ table.data .num {
   display: grid;
   gap: 4px;
 }
+.menu-note {
+  max-width: 240px;
+  margin: 0;
+}
 .menu-sep {
   width: 100%;
   margin: 0;

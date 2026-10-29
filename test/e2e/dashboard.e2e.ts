@@ -247,6 +247,24 @@ describe("the page", () => {
     expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
   });
 
+  it("says when the page has no texts in the language of the Garmin profile", async () => {
+    const { page, errors } = await open(browser, pageFile({ data: { ...data, locale: "ru" } }), {
+      locale: "ru-RU",
+    });
+    expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
+    await page.click(".account summary");
+    expect(await page.textContent(".menu-note")).toBe(
+      "Русский is not in this page yet. Ask your assistant to add it.",
+    );
+    expect(errors).toEqual([]);
+    const pt = await open(
+      browser,
+      pageFile({ data: { ...data, locale: "pt-BR" }, settings: { languages: ["en", "pt"] } }),
+    );
+    await pt.page.click(".account summary");
+    expect(await pt.page.locator(".menu-note").count()).toBe(0);
+  });
+
   it("shows the title, the sports, the data and the menus of its settings", async () => {
     const { page, errors } = await open(
       browser,
