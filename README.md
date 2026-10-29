@@ -343,11 +343,12 @@ does not endorse this project, and the project has no affiliation with Garmin.
 
 ## Problems and solutions
 
-| Problem                            | Solution                                                                                                                        |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| The server does not start          | Make sure that Node.js is version 22 or later: `node --version`.                                                                |
-| Claude Desktop does not find `npx` | GUI apps do not read your shell profile. Use the absolute path of `npx` (`which npx`) as the `command`.                         |
-| Changes have no effect             | The client keeps the old server process. Restart the client: a new Claude Code session, or quit and start Claude Desktop again. |
+| Problem                            | Solution                                                                                                                             |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| The server does not start          | Make sure that Node.js is version 22 or later: `node --version`.                                                                     |
+| Claude Desktop does not find `npx` | GUI apps do not read your shell profile. Use the absolute path of `npx` (`which npx`) as the `command`.                              |
+| Changes have no effect             | The client keeps the old server process. Restart the client: a new Claude Code session, or quit and start Claude Desktop again.      |
+| Which version runs                 | `npx -y @indaco/garmin-personal-mcp@latest --version` (or `-v`) prints the version and stops. `--help` (or `-h`) lists the commands. |
 
 [Problems and solutions](guide/troubleshooting.md) has more problems, the log files, and commands
 that test the key and the server.

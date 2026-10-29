@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cli, summary } from "../src/cli";
+import { version } from "../package.json";
+import { cli, HELP, summary } from "../src/cli";
 import type { Status } from "../src/schedule";
 
 const on: Status = {
@@ -31,6 +32,19 @@ function fakes() {
 }
 
 describe("cli", () => {
+  it("prints the version with --version or -v", async () => {
+    const f = fakes();
+    for (const flag of ["--version", "-v"])
+      expect(await cli(flag, [], f.auto, f.writer)).toEqual({ code: 0, stdout: version });
+  });
+
+  it("prints the help with --help or -h", async () => {
+    const f = fakes();
+    for (const flag of ["--help", "-h"])
+      expect(await cli(flag, [], f.auto, f.writer)).toEqual({ code: 0, stdout: HELP });
+    expect(HELP).toMatch(/^Usage: garmin-personal-mcp/);
+  });
+
   it("refreshes one page, or the scheduled pages, and exits with 1 when one fails", async () => {
     const f = fakes();
     const one = await cli("refresh", ["a.html"], f.auto, f.writer);
@@ -125,6 +139,12 @@ describe("the entry point", () => {
     expect(s.serveStdio.mock.results[0].value).toHaveProperty("server");
     expect(s.run).not.toHaveBeenCalled();
     expect(s.stdout).not.toHaveBeenCalled();
+  });
+
+  it.each(["--version", "-v", "--help", "-h"])("runs %s without the server", async (flag) => {
+    const s = await start([flag]);
+    expect(s.serveStdio).not.toHaveBeenCalled();
+    expect(s.run).toHaveBeenCalledWith(flag, [], expect.anything(), expect.any(Function));
   });
 
   it("runs a command: its output, its errors and its exit code", async () => {
