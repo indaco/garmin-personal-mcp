@@ -57,6 +57,8 @@ export interface PreviewResult {
   /** The activities of each board in the period, before the `sports` setting. */
   boards: Record<string, number>;
   digest: Digest;
+  /** The settings of the page, or the given ones: a new build can ask whether to keep them. */
+  settings: Settings;
 }
 
 export interface WriteResult {
@@ -189,6 +191,13 @@ const same = (a: Settings, b: Settings) => JSON.stringify(a) === JSON.stringify(
 function settingsOf(page: string | undefined): Settings {
   const s = page === undefined ? undefined : readBlock(page, "settings");
   return s && typeof s === "object" ? (s as Settings) : {};
+}
+
+/** The settings block of the page cannot be read: only new settings, or a new file, help. */
+function unreadable(e: unknown, target: string): Error {
+  return new Error(`${(e as Error).message} in ${target}: give new settings, or delete the file`, {
+    cause: e,
+  });
 }
 
 /** The number of items for each key. */
@@ -339,12 +348,18 @@ export class DashboardWriter {
     const run = this.#queue.then(async () => {
       const target = this.#target(options.path);
       const old = await readExisting(target);
-      const settings = options.settings ? checkSettings(options.settings) : settingsOf(old);
+      let settings: Settings;
+      try {
+        settings = options.settings ? checkSettings(options.settings) : settingsOf(old);
+      } catch (e) {
+        throw options.settings ? e : unreadable(e, target);
+      }
       const data = JSON.parse(await this.#data(options.weeks ?? weeksOf(old))) as Json;
       return {
         path: target,
         boards: countBy(listOf(data.activities), groupOf),
         digest: digest(filterData(data, settings)),
+        settings,
       };
     });
     this.#queue = run.catch(() => {});
@@ -378,19 +393,14 @@ export class DashboardWriter {
       throw new Error(`${target} does not exist: make it first with the training-dashboard prompt`);
     }
     let oldSettings: Settings;
-    let unreadable = false;
+    let broken = false;
     try {
       oldSettings = settingsOf(old);
     } catch (e) {
       // without readable settings, a shared page could get data it must not have: only new settings help
-      if (asked === undefined) {
-        throw new Error(
-          `${(e as Error).message} in ${target}: give new settings, or delete the file`,
-          { cause: e },
-        );
-      }
+      if (asked === undefined) throw unreadable(e, target);
       oldSettings = {};
-      unreadable = true;
+      broken = true;
     }
     const own = asked ?? oldSettings;
 
@@ -409,7 +419,7 @@ export class DashboardWriter {
       kind = old === undefined ? "created" : "replaced";
     } else if (
       templateVersion(old) > 0 &&
-      (templateVersion(old) < templateVersion(template) || !same(own, oldSettings) || unreadable)
+      (templateVersion(old) < templateVersion(template) || !same(own, oldSettings) || broken)
     ) {
       // a newer template or new settings: the user's state lives in the blocks, so it moves over as it is
       next = writeBlock(template, "layout", readBlock(old, "layout") ?? null);
@@ -853,7 +863,8 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         "profile when the page has no texts in it (it shows English); editDashboard `languages` adds it.",
         "`missingWidgetTexts` lists the custom widgets that miss texts in a language of the page, with",
         "those languages; editDashboard `widgetTexts` adds them.",
-        "`preview: true` writes nothing: it returns the digest and the activities of each board.",
+        "`preview: true` writes nothing: it returns the digest, the activities of each board and the",
+        "`settings` of the page.",
       ].join("\n"),
       inputSchema: z.object({
         weeks: z.number().int().describe("Weeks to cover, default 12, max 52").optional(),
@@ -903,7 +914,9 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
           .optional(),
         preview: z
           .boolean()
-          .describe("Write nothing: return the digest and the activities of each board")
+          .describe(
+            "Write nothing: return the digest, the activities of each board and the page settings",
+          )
           .optional(),
       }),
     },

@@ -519,6 +519,10 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
     await expect(writer.write({ settings: { sports: ["chess"] } })).rejects.toThrow(
       /sports: unknown chess/,
     );
+    // a bad argument is not a broken page: no "delete the file"
+    await expect(writer.preview({ settings: { sports: ["chess"] } })).rejects.toThrow(
+      /^Settings: sports: unknown chess$/,
+    );
     await expect(writer.write({ settings: { themes: ["neon"] } })).rejects.toThrow(/themes/);
     await expect(writer.write({ settings: { theme: "ocean", themes: ["paper"] } })).rejects.toThrow(
       /theme: one of paper/,
@@ -537,8 +541,47 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
 
   it("previews without writing: the boards of all activities and the digest of the settings", async () => {
     const r = await writer.preview({ settings: { sports: ["cycling"] } });
+    expect(r.settings).toEqual({ sports: ["cycling"] });
     expect(r.boards).toEqual({ running: 1, cycling: 1 });
     expect(Object.keys(r.digest.totals)).toEqual(["road_biking"]);
     expect(existsSync(file)).toBe(false);
+  });
+
+  it("previews with the settings that the page keeps, or none for a new page", async () => {
+    expect((await writer.preview({})).settings).toEqual({});
+    await writer.write({ settings: { sports: ["cycling"], title: "Rides" } });
+    expect((await writer.preview({})).settings).toEqual({ sports: ["cycling"], title: "Rides" });
+  });
+
+  it("goes back to the default settings on a new layout, with only the title and headline kept", async () => {
+    // the training-dashboard prompt: "Use the defaults" on a page with one sport
+    await writer.write({ settings: { sports: ["cycling"], exclude: ["zones"], title: "Rides" } });
+    const { title } = (await writer.preview({})).settings;
+    const r = await writer.write({ layout: "preset", settings: { title } });
+    expect(r.settings).toEqual({ title: "Rides" });
+    const d = readBlock(page(), "data") as Full;
+    expect(d.activities.map((a) => a.id)).toEqual([1, 2]);
+    expect(d.zones).toEqual(full.zones);
+    // a page without a title or headline: no settings at all
+    await writer.write({ layout: "preset", settings: {} });
+    expect((await writer.preview({})).settings).toEqual({});
+  });
+
+  it("names the file and the way out when the settings block of the page cannot be read", async () => {
+    await writer.write({ settings: { sports: ["cycling"] } });
+    writeFileSync(
+      file,
+      page().replace(/garmin-settings:start \*\/.*?\/\*/, "garmin-settings:start */{oops/*"),
+    );
+    const way =
+      /settings block of the page is not valid JSON in .*garmin-dashboard\.html: give new settings, or delete the file/;
+    await expect(writer.preview({})).rejects.toThrow(way);
+    await expect(writer.write({ layout: "preset" })).rejects.toThrow(way);
+    // new settings replace the broken block
+    expect((await writer.preview({ settings: { sports: ["running"] } })).settings).toEqual({
+      sports: ["running"],
+    });
+    await writer.write({ layout: "preset", settings: {} });
+    expect((await writer.preview({})).settings).toEqual({});
   });
 });

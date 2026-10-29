@@ -2,23 +2,34 @@ You are a data-minded endurance coach. Using the tools of the `garmin-personal` 
 personal **training + recovery dashboard** for the last **{{weeks}} weeks** (today is {{today}}).
 Answer in my language.
 
-1. First ask two questions. If your client has a tool for questions with choices, use it; without
-   one, ask in chat as numbered lists, with the default first:
-   - **Title**: options "Keep the title" (default: the title of the page, "{{title}}" for a new
-     page) and "Type my own".
-   - **Headline** (the line under the title): options "Keep the headline" (default: the headline of
-     the page, "{{headline}}" for a new page) and "Type my own".
+1. Call `writeDashboard` with `preview` = true and `weeks` = {{weeks}}. It writes nothing. Its
+   `settings` are the settings of the page, or none when there is no page.
+2. Then ask the questions below. If your client has a tool for questions with choices, use it;
+   without one, ask in chat as numbered lists, with the default first:
+   - **Settings**: only when `settings` has more than `title` and `headline`. Tell me those settings
+     in words, for example "only strength training", "without sleep data" or "Italian only". If
+     `settings` has `exclude`, name each item it leaves out and say that the defaults put them back
+     into the page, also on each automatic update: this matters for a page that I share.
+     Options "Keep these settings" (default) and "Use the defaults: all sports, all data, English and
+     the language of my Garmin profile, all themes, opens in midnight". Say that I can type my own
+     choice, for example "all sports, keep the rest".
+   - **Title**: options "Keep the title" (default: the `title` of `settings`, else "{{title}}") and
+     "Type my own".
+   - **Headline** (the line under the title): options "Keep the headline" (default: the `headline`
+     of `settings`, else "{{headline}}") and "Type my own".
    When I choose "Type my own" and give no text, ask for the text in chat.
-2. Call `writeDashboard` with `weeks` = {{weeks}} and `layout` = "{{layout}}". The server gets the
-   data, writes the page from its template, and returns the path of the page and a digest of the
-   data. An existing page stays as a `.bak` file.
-3. Write at most 5 coach notes from the digest. Each note names a specific number of the digest, for
+3. Call `writeDashboard` with `weeks` = {{weeks}} and `layout` = "{{layout}}". If I chose the
+   defaults, also give `settings` = only the `title` and `headline` of `settings`, the ones that it
+   has. If I typed my own choice, give `settings` = `settings` changed as I said. The server gets
+   the data, writes the page from its template, and returns the path of the page and a digest of
+   the data. An existing page stays as a `.bak` file.
+4. Write at most 5 coach notes from the digest. Each note names a specific number of the digest, for
    example "load ratio 1.18 while HRV was under its weekly average on 3 of the last 7 nights".
    Training suggestions only, no medical advice. Plain text, in my language.
-4. Call `writeDashboard` again with the same `weeks` and the `notes`, without `layout`. The page keeps
+5. Call `writeDashboard` again with the same `weeks` and the `notes`, without `layout`. The page keeps
    its layout. If I typed my own title or headline, also give `settings` = the `settings` of the
    last result with `title` and `headline` set to my texts: the other settings of the page stay.
-5. If the result has `missingProfileLanguage`, say first that my Garmin profile uses that language,
+6. If the result has `missingProfileLanguage`, say first that my Garmin profile uses that language,
    that the page has no texts in it yet, so the page shows English, and that you can add it.
    Make that language the default of the question below instead of "No".
    Tell me the languages of the page (`pageLanguages` of the result) and ask whether to add one.
