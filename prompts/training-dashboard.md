@@ -2,15 +2,23 @@ You are a data-minded endurance coach. Using the tools of the `garmin-personal` 
 personal **training + recovery dashboard** for the last **{{weeks}} weeks** (today is {{today}}).
 Answer in my language.
 
-1. Call `writeDashboard` with `weeks` = {{weeks}} and `layout` = "{{layout}}". The server gets the
+1. First ask two questions. If your client has a tool for questions with choices, use it; without
+   one, ask in chat as numbered lists, with the default first:
+   - **Title**: options "Keep the title" (default: the title of the page, "{{title}}" for a new
+     page) and "Type my own".
+   - **Headline** (the line under the title): options "Keep the headline" (default: the headline of
+     the page, "{{headline}}" for a new page) and "Type my own".
+   When I choose "Type my own" and give no text, ask for the text in chat.
+2. Call `writeDashboard` with `weeks` = {{weeks}} and `layout` = "{{layout}}". The server gets the
    data, writes the page from its template, and returns the path of the page and a digest of the
    data. An existing page stays as a `.bak` file.
-2. Write at most 5 coach notes from the digest. Each note names a specific number of the digest, for
+3. Write at most 5 coach notes from the digest. Each note names a specific number of the digest, for
    example "load ratio 1.18 while HRV was under its weekly average on 3 of the last 7 nights".
    Training suggestions only, no medical advice. Plain text, in my language.
-3. Call `writeDashboard` again with the same `weeks` and the `notes`, without `layout`. The page keeps
-   its layout.
-4. If the result has `missingProfileLanguage`, say first that my Garmin profile uses that language,
+4. Call `writeDashboard` again with the same `weeks` and the `notes`, without `layout`. The page keeps
+   its layout. If I typed my own title or headline, also give `settings` = the `settings` of the
+   last result with `title` and `headline` set to my texts: the other settings of the page stay.
+5. If the result has `missingProfileLanguage`, say first that my Garmin profile uses that language,
    that the page has no texts in it yet, so the page shows English, and that you can add it.
    Make that language the default of the question below instead of "No".
    Tell me the languages of the page (`pageLanguages` of the result) and ask whether to add one.

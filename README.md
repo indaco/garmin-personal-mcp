@@ -210,6 +210,9 @@ The page is one HTML file, `garmin-dashboard.html` in the data folder. It works 
 In Claude Code, the arguments are in order and separated by spaces: first `weeks`, then `layout`.
 You can also give only the layout: `/garmin-personal:training-dashboard freeform`.
 
+With `preset` and `blank`, the assistant first asks for the title and the headline (the line under
+the title) of the page. Keep them or type your own. Updates and the automatic update keep them.
+
 The assistant gives you the path of the page and the command to open it. The page has a board for
 all your training, a Recovery board and a board for each sport, with 11 themes, in English and the
 language of your Garmin profile. If the dashboard does not have the language of your profile (for

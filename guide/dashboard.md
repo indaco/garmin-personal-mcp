@@ -27,8 +27,12 @@ Run the `training-dashboard` prompt. It has two optional arguments:
 | `blank`    | An empty grid on each board. You add the widgets that you want.                                                                   |
 | `freeform` | The assistant designs the whole page from a long description. A build can take 25 minutes or more, and each page looks different. |
 
-To set the title, the sports and the data of the page first, for example for a page that you share
-with your coach, run `dashboard-setup`. See [Page settings](#page-settings).
+With `preset` and `blank`, the assistant first asks for the title and the headline (the line under
+the title). Keep them or type your own. Later updates keep them, also the automatic update. The
+other settings of the page stay as they are.
+
+To set the sports and the data of the page too, for example for a page that you share with your
+coach, run `dashboard-setup`. See [Page settings](#page-settings).
 
 With `preset` and `blank`, the assistant does not write the page. The server writes the page from
 its template, and the assistant writes only the coach notes. The page is the same in every client.
