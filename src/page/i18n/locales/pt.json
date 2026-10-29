@@ -26,6 +26,8 @@
   "theme.light": "Claro",
   "theme.paper": "Papel",
   "theme.mist": "Névoa",
+  "theme.munich": "Munique",
+  "theme.munichDark": "Munique escuro",
   "theme.hcDark": "Alto contraste escuro",
   "theme.hcLight": "Alto contraste claro",
   "window.label": "Semanas",

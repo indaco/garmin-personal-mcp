@@ -80,6 +80,8 @@ out. To add one:
 | `theme.light` | Light |
 | `theme.paper` | Paper |
 | `theme.mist` | Mist |
+| `theme.munich` | Munich |
+| `theme.munichDark` | Munich dark |
 | `theme.hcDark` | High contrast dark |
 | `theme.hcLight` | High contrast light |
 | `window.label` | Weeks |

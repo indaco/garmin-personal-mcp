@@ -559,7 +559,7 @@
               "items": {
                 "type": "string"
               },
-              "description": "Themes to keep: system, midnight, graphite, ocean, forest, plum, light, paper, mist, hcDark, hcLight"
+              "description": "Themes to keep: system, midnight, graphite, ocean, forest, plum, munichDark, light, paper, mist, munich, hcDark, hcLight"
             },
             "theme": {
               "type": "string",

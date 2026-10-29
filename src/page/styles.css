@@ -137,6 +137,54 @@
   --bad: #b00020;
   --warn: #7a5200;
 }
+/* Munich and Munich dark: the logo's colours (sky, mint, teal, amber, slate) as on the project
+   website, with square corners and no drop shadows. */
+:root[data-theme="munich"] {
+  --bg: #fff;
+  --panel: #fff;
+  --panel2: #f2f5f8;
+  --line: #d5dbe1;
+  --text: #1a2230;
+  --muted: #55626e;
+  --accent: #1b6ab0;
+  --good: #11784d;
+  --bad: #b3261e;
+  --warn: #8a6100;
+  --running: #1b6ab0;
+  --strengthTraining: #11784d;
+  --walking: #8a4f1d;
+  --hiking: #5f6b1a;
+  --cycling: #8a6100;
+  --swimming: #0b6e6e;
+  --racket: #55626e;
+  --generic: #3c4a57;
+  --corner: 0;
+  --lift: none;
+  color-scheme: light;
+}
+:root[data-theme="munichDark"] {
+  --bg: #0e1217;
+  --panel: #161c24;
+  --panel2: #1c232d;
+  --line: #26303d;
+  --text: #e6ebf2;
+  --muted: #8d99aa;
+  --accent: #7cc4ff;
+  --good: #3ecf8e;
+  --bad: #ef5a5a;
+  --warn: #f2c94c;
+  --running: #7cc4ff;
+  --strengthTraining: #3ecf8e;
+  --walking: #e0a070;
+  --hiking: #b8c96a;
+  --cycling: #f2c94c;
+  --swimming: #4fd1d9;
+  --racket: #b4bfcc;
+  --generic: #8d99aa;
+  --corner: 0;
+  --lift: none;
+  color-scheme: dark;
+}
 @media (prefers-color-scheme: light) {
   :root[data-theme="system"] {
     --bg: #f6f7f9;
@@ -233,7 +281,7 @@ h2 {
   top: -40px;
   z-index: 60;
   padding: 6px 12px;
-  border-radius: 8px;
+  border-radius: var(--corner, 8px);
   background: var(--accent);
   color: var(--bg);
 }
@@ -319,14 +367,14 @@ textarea {
 select {
   background: var(--panel2);
   border: 1px solid var(--control-border);
-  border-radius: 8px;
+  border-radius: var(--corner, 8px);
   padding: 5px 8px;
 }
 .btn,
 .chip {
   background: var(--panel2);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--corner, 999px);
   padding: 5px 12px;
   cursor: pointer;
   display: inline-flex;
@@ -351,9 +399,9 @@ select {
   margin: 0 0 14px;
   padding: 8px 12px;
   border: 1px solid var(--accent);
-  border-radius: 12px;
+  border-radius: var(--corner, 12px);
   background: var(--panel);
-  box-shadow: 0 6px 18px rgb(0 0 0 / 25%);
+  box-shadow: var(--lift, 0 6px 18px rgb(0 0 0 / 25%));
 }
 .edit-bar .spacer {
   flex: 1;
@@ -413,7 +461,7 @@ select {
 .count {
   font-size: 11px;
   background: var(--panel2);
-  border-radius: 999px;
+  border-radius: var(--corner, 999px);
   padding: 0 7px;
 }
 .icon {
@@ -533,7 +581,7 @@ select {
   margin: 0 0 14px;
   padding: 12px 14px;
   border: 1px solid var(--accent);
-  border-radius: 12px;
+  border-radius: var(--corner, 12px);
   background: color-mix(in srgb, var(--accent) 10%, var(--panel));
 }
 .banner p {
@@ -550,14 +598,14 @@ select {
   padding: 32px;
   text-align: center;
   border: 1px dashed var(--line);
-  border-radius: 14px;
+  border-radius: var(--corner, 14px);
 }
 
 /* Tiles */
 .tile {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--corner, 14px);
   padding: 14px 16px;
   min-width: 0;
 }
@@ -586,17 +634,17 @@ select {
   top: 0;
   z-index: 50;
   outline: 2px solid var(--accent);
-  box-shadow: 0 24px 48px rgb(0 0 0 / 45%);
+  box-shadow: var(--lift, 0 24px 48px rgb(0 0 0 / 45%));
   pointer-events: none;
 }
 .tile.picked {
   outline: 2px solid var(--accent);
-  box-shadow: 0 16px 36px rgb(0 0 0 / 40%);
+  box-shadow: var(--lift, 0 16px 36px rgb(0 0 0 / 40%));
 }
 .tile-slot {
   box-sizing: border-box;
   border: 2px dashed var(--accent);
-  border-radius: 14px;
+  border-radius: var(--corner, 14px);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 html.dragging,
@@ -620,7 +668,7 @@ html.resizing * {
   place-items: center;
   cursor: ew-resize;
   touch-action: none;
-  border-radius: 7px;
+  border-radius: var(--corner, 7px);
 }
 .resize::after {
   content: "";
@@ -643,7 +691,7 @@ html.resizing * {
   transform: translateY(-50%);
   z-index: 6;
   padding: 4px 8px;
-  border-radius: 8px;
+  border-radius: var(--corner, 8px);
   background: var(--accent);
   color: var(--bg);
   font-size: 12px;
@@ -659,7 +707,7 @@ html.resizing * {
 }
 .guides div {
   border: 1.5px dashed color-mix(in srgb, var(--accent) 70%, transparent);
-  border-radius: 14px;
+  border-radius: var(--corner, 14px);
   background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 @media (max-width: 700px) {
@@ -675,7 +723,7 @@ html.resizing * {
 .tool {
   background: var(--panel2);
   border: 1px solid var(--control-border);
-  border-radius: 6px;
+  border-radius: var(--corner, 6px);
   min-width: 26px;
   height: 26px;
   cursor: pointer;
@@ -721,7 +769,7 @@ html.resizing * {
   background: var(--panel);
   color: var(--text);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--corner, 14px);
   padding: 16px;
   width: min(560px, calc(100vw - 32px));
 }
@@ -767,7 +815,7 @@ html.resizing * {
   margin-bottom: 8px;
   background: var(--panel2);
   border: 1px solid var(--control-border);
-  border-radius: 8px;
+  border-radius: var(--corner, 8px);
   padding: 6px 10px;
 }
 .catalogue li > span {
@@ -792,7 +840,7 @@ html.resizing * {
   width: 100%;
   background: var(--panel2);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--corner, 8px);
   padding: 8px;
   font-family: ui-monospace, monospace;
   font-size: 12px;
@@ -814,7 +862,7 @@ html.resizing * {
 .badge {
   background: var(--panel2);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--corner, 10px);
   padding: 10px 12px;
   min-width: 0;
 }
@@ -933,7 +981,7 @@ table.data .num {
   font-size: 11px;
   border: 1px solid var(--warn);
   color: var(--warn);
-  border-radius: 999px;
+  border-radius: var(--corner, 999px);
   padding: 0 6px;
 }
 .linkish {
@@ -1010,9 +1058,9 @@ table.data .num {
   width: 220px;
   background: var(--panel2);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--corner, 8px);
   padding: 8px 10px;
-  box-shadow: 0 6px 20px rgb(0 0 0 / 30%);
+  box-shadow: var(--lift, 0 6px 20px rgb(0 0 0 / 30%));
   pointer-events: none;
 }
 .more {
@@ -1051,7 +1099,7 @@ table.data .num {
 .search {
   background: var(--panel2);
   border: 1px solid var(--control-border);
-  border-radius: 8px;
+  border-radius: var(--corner, 8px);
   padding: 5px 10px;
   color: var(--text);
   font: inherit;
@@ -1088,7 +1136,7 @@ table.data .num {
 .detail {
   margin-top: 12px;
   border: 1px solid var(--accent);
-  border-radius: 10px;
+  border-radius: var(--corner, 10px);
   padding: 12px;
 }
 .detail-head {
@@ -1169,7 +1217,7 @@ table.data .num {
   width: 32px;
   height: 32px;
   border: 1px solid var(--line);
-  border-radius: 50%;
+  border-radius: var(--corner, 50%);
   background: var(--panel2);
   color: var(--muted);
   list-style: none;
@@ -1197,9 +1245,9 @@ table.data .num {
   min-width: 220px;
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--corner, 12px);
   background: var(--panel);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.3);
+  box-shadow: var(--lift, 0 8px 24px rgb(0 0 0 / 0.3));
 }
 .account-panel .menu {
   display: grid;

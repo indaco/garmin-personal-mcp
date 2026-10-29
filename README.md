@@ -217,7 +217,7 @@ the page has other settings, for example only one sport, the assistant tells you
 asks you to keep them, to use the defaults or to type your own choice.
 
 The assistant gives you the path of the page and the command to open it. The page has a board for
-all your training, a Recovery board and a board for each sport, with 11 themes, in English and the
+all your training, a Recovery board and a board for each sport, with 13 themes, in English and the
 language of your Garmin profile. If the dashboard does not have the language of your profile (for
 example Russian), the page shows English, and the assistant tells you and offers to add the
 language. The assistant asks if you want one more language. The page uses

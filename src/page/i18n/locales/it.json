@@ -26,6 +26,8 @@
   "theme.light": "Chiaro",
   "theme.paper": "Carta",
   "theme.mist": "Nebbia",
+  "theme.munich": "Monaco",
+  "theme.munichDark": "Monaco scuro",
   "theme.hcDark": "Alto contrasto scuro",
   "theme.hcLight": "Alto contrasto chiaro",
   "window.label": "Settimane",
