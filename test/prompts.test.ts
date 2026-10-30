@@ -78,6 +78,13 @@ describe("prompts", () => {
     );
   });
 
+  it("asks for a language with at most 4 options and names the other languages", async () => {
+    const text = await render("training-dashboard");
+    // AskUserQuestion takes 2 to 4 options, and the built-in languages are 5
+    expect(text).toContain("at most 4 options in all");
+    expect(text).toContain("offer at most 3 languages. Name the other built-in languages");
+  });
+
   it("asks to keep the saved settings of a preset or blank page, or to use the defaults", async () => {
     for (const layout of ["preset", "blank"]) {
       const text = await render("training-dashboard", { weeks: "8", layout });
