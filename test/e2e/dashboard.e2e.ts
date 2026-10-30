@@ -1198,6 +1198,14 @@ describe("type boards", () => {
     expect(await page.textContent("[data-id=racePredictor]")).toContain("Estimate (Riegel)");
     // a small multiple for each running form metric in the data
     expect(await page.$$eval("[data-id=runningForm] .multiple", (m) => m.length)).toBe(7);
+    // the efficiency of the aerobic runs, last 4 weeks against the first 4
+    expect(await page.textContent("[data-id=aerobicFitness] .kpi-label")).toBe(
+      "Aerobic-run efficiency · last 4 weeks",
+    );
+    expect(await page.textContent("[data-id=aerobicFitness] .kpi-value")).toMatch(/^\d\.\d\d$/);
+    expect(await page.textContent("[data-id=aerobicFitness] .kpi-sub")).toContain(
+      "vs first 4 weeks",
+    );
     // the 5 km and 10 km of each run over time
     expect(
       await page.$$eval("[data-id=bestEfforts] .sr-only thead th", (h) =>

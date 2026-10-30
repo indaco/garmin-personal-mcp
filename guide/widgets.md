@@ -28,7 +28,7 @@ it by hand.
 | Time in HR zones | `hrZones` | Minutes in HR zones 1-5 each week. | all and each type | 1 |
 | Best efforts | `bestEfforts` | The fastest 1 km, mile, 5 km, 10 km, half marathon and marathon in the window, and the pace of the fastest 5 km and 10 km of each week. | running | 1 |
 | Races | `races` | Each race with its time, pace, HR, power and aerobic training effect. | running | 2 |
-| Aerobic fitness | `aerobicFitness` | Pace against HR of each run (older runs paler), and weekly pace and efficiency (metres per heartbeat). | running | 2 |
+| Aerobic fitness | `aerobicFitness` | Pace against HR of each run (older runs paler), weekly pace, and the efficiency (metres per heartbeat) of the runs below Z4: each run, the weekly mean and the last weeks against the first. | running | 2 |
 | Easy and hard running | `intensityShare` | The share of running time in Z1-2 (easy) and Z4-5 (hard) each week. | running | 1 |
 | Running form | `runningForm` | Weekly cadence, ground contact, stride, vertical oscillation and ratio, and power, one small chart for each: cadence and ground contact first, the others under Show all. | running | 3 |
 | Run Walk Run | `runWalk` | Run Walk Run sessions: the pace of the run segments, the overall pace and the walk time. | running | 1 |

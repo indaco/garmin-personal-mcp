@@ -5,7 +5,7 @@ import type { Key } from "../i18n";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
 import { oneSession } from "./types";
-import { alpha, kpi, kpiRow, note, showAll, table, weekLabel } from "./ui";
+import { alpha, delta, kpi, kpiRow, note, showAll, table, weekLabel } from "./ui";
 
 /** The Run board: best efforts, races, aerobic fitness, intensity, form, run/walk, training effect, predictions, long runs. */
 
@@ -192,9 +192,45 @@ register({
       const d = calc.timedDistance(w);
       return d.km > 0 ? fmt.to.pace(d.seconds / d.km) : null;
     });
-    const eff = weekly.map((w) =>
-      calc.mean(w.map((a) => calc.efficiency(a)).filter((v): v is number => v !== undefined)),
-    );
+    // intervals, tempo runs and races raise HR for other reasons: efficiency counts the runs below zone 4
+    const z4 = calc.zonesOf(ctx.data.zones).floors[3];
+    const aerobic = (a: Activity) =>
+      z4 === undefined || (typeof a.avgHR === "number" && a.avgHR < z4);
+    const effOf = (w: Activity[]) =>
+      calc.mean(
+        w
+          .filter(aerobic)
+          .map((a) => calc.efficiency(a))
+          .filter((v): v is number => v !== undefined),
+      );
+    const eff = weekly.map(effOf);
+    const points = runs(ctx)
+      .filter((a) => aerobic(a) && calc.efficiency(a) !== undefined && weekOf(ctx, a) >= 0)
+      .toReversed();
+    // the first and the last weeks of the window; a short window compares its halves
+    const n = Math.min(4, Math.floor(ctx.weeks.length / 2));
+    const now = effOf(weekly.slice(-n).flat());
+    const before = effOf(weekly.slice(0, n).flat());
+    if (n > 0) {
+      append(
+        el,
+        kpiRow(
+          kpi(
+            t("af.aerobicEff", { n }),
+            now === null ? fmt.na : fmt.num(now, 2),
+            now !== null &&
+              before !== null &&
+              h(
+                "span",
+                {},
+                delta(ctx, calc.change(now, before), "up"),
+                " ",
+                t("af.vsFirst", { n }),
+              ),
+          ),
+        ),
+      );
+    }
     ctx.chart(
       el,
       {
@@ -215,6 +251,18 @@ register({
               borderColor: ctx.color("good"),
               yAxisID: "y1",
               spanGaps: true,
+            },
+            {
+              label: t("af.aerobicRuns"),
+              data: points.map((a) => ({
+                // the category axis places a point by its label; Chart.js types only number
+                x: weekLabel(ctx, ctx.weeks[weekOf(ctx, a)]) as unknown as number,
+                y: calc.efficiency(a)!,
+              })),
+              borderColor: alpha(ctx.color("good"), 0.5),
+              backgroundColor: alpha(ctx.color("good"), 0.5),
+              showLine: false,
+              yAxisID: "y1",
             },
           ],
         },
@@ -237,7 +285,9 @@ register({
                 label: (c) =>
                   c.datasetIndex === 0
                     ? `${c.dataset.label}: ${fmt.hms(c.parsed.y ?? 0)}${fmt.unit.pace}`
-                    : `${c.dataset.label}: ${fmt.num(c.parsed.y ?? undefined, 2)}`,
+                    : c.datasetIndex === 2
+                      ? `${fmt.day(day(points[c.dataIndex]))} ${points[c.dataIndex].name ?? ""}: ${fmt.num(c.parsed.y ?? undefined, 2)}`
+                      : `${c.dataset.label}: ${fmt.num(c.parsed.y ?? undefined, 2)}`,
               },
             },
           },
@@ -245,6 +295,7 @@ register({
       },
       180,
     );
+    append(el, note(t(z4 === undefined ? "af.noZones" : "af.aerobicNote")));
   },
 });
 
