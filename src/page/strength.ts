@@ -178,8 +178,13 @@ export interface ExerciseStats {
   /** Oldest first. */
   sessions: ExerciseSession[];
   best1rm?: number;
-  /** Change in % from the first to the last session: 1RM, max reps or longest set, by kind. */
+  /**
+   * Change in % of the 1RM, max reps or longest set, by kind: the best of the last 3 sessions against the
+   * best of the first 3, or the last session against the first with under 6 sessions.
+   */
   change: number | null;
+  /** The last sessions over 14 days or more against as many sessions before them. See progress(). */
+  status: "up" | "stalled" | "down" | null;
   medianRest?: number;
   completedSets: number;
 }
@@ -219,7 +224,10 @@ export function exerciseStats(acts: Activity[]): ExerciseStats[] {
     const kind = sessions.some((s) => s.top) ? "weight" : sets.every(timed) ? "time" : "reps";
     const measure = (s: ExerciseSession) =>
       kind === "weight" ? s.e1rm : kind === "reps" ? s.maxReps : s.longest;
-    const values = sessions.map(measure).filter((v): v is number => typeof v === "number" && v > 0);
+    const measured = sessions
+      .map((s) => ({ date: s.date, v: measure(s) }))
+      .filter((x): x is { date: string; v: number } => typeof x.v === "number" && x.v > 0);
+    const values = measured.map((x) => x.v);
     const rests = sessions
       .flatMap((s) => s.sets.filter(completed).map((x) => x.restSec))
       .filter((v): v is number => typeof v === "number");
@@ -232,13 +240,34 @@ export function exerciseStats(acts: Activity[]): ExerciseStats[] {
       sessions,
       ...(e1rms.length > 0 ? { best1rm: Math.max(...e1rms) } : {}),
       change:
-        values.length > 1 && values[0] > 0
-          ? ((values.at(-1)! - values[0]) / values[0]) * 100
-          : null,
+        values.length >= 6
+          ? pct(Math.max(...values.slice(-3)), Math.max(...values.slice(0, 3)))
+          : values.length > 1
+            ? pct(values.at(-1)!, values[0])
+            : null,
+      // the time of a set follows the lap button or the plan, not strength: it can vary tenfold
+      status: kind === "time" ? null : progress(measured),
       ...(rests.length > 0 ? { medianRest: median(rests) } : {}),
       completedSets: sessions.reduce((s, x) => s + x.sets.filter(completed).length, 0),
     };
   });
+}
+
+const pct = (now: number, before: number) => ((now - before) / before) * 100;
+
+/**
+ * The last sessions, at least 3 and over 14 days or more, against as many sessions just before them:
+ * up when they set a new best, down when their best is more than 5% under, else stalled. A lift done
+ * twice a week needs more than 3 sessions for 14 days; one lucky day long ago does not count.
+ */
+function progress(m: { date: string; v: number }[]): ExerciseStats["status"] {
+  let k = 3;
+  while (k < m.length && m.at(-1)!.date < addDays(m.at(-k)!.date, 14)) k++;
+  if (m.length <= k) return null;
+  const recent = Math.max(...m.slice(-k).map((x) => x.v));
+  const before = Math.max(...m.slice(Math.max(0, m.length - 2 * k), -k).map((x) => x.v));
+  if (recent > before) return "up";
+  return recent < before * 0.95 ? "down" : "stalled";
 }
 
 export function median(values: number[]): number | undefined {

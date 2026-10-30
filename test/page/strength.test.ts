@@ -9,6 +9,7 @@ import {
   setsByCategory,
   slug,
 } from "../../src/page/strength";
+import { addDays } from "../../src/dates";
 
 const squat = (sets: Record<string, number>[]) => ({
   exercise: "Back Squat",
@@ -53,6 +54,15 @@ const acts = [
     exercises: [squat([{ reps: 8, kg: 55, restSec: 60 }]), pushUp],
   },
 ];
+
+/** Pull-up sessions, one each `days` days from 1 Sep, with these max reps. */
+const pullUps = (reps: number[], days = 7) =>
+  exerciseStats(
+    reps.map((n, i) => ({
+      start: `${addDays("2026-09-01", i * days)} 18:00:00`,
+      exercises: [{ exercise: "Pull Up", sets: [{ reps: n }] }],
+    })),
+  )[0];
 
 describe("sets", () => {
   it("counts a set as done when it has reps, or time without reps", () => {
@@ -178,6 +188,48 @@ describe("exercise stats", () => {
     ])[0];
     expect(timed.kind).toBe("time");
     expect(timed.sessions[0].longest).toBe(50);
+  });
+
+  it("compares the best of the last 3 sessions with the best of the first 3 from 6 sessions", () => {
+    // one good first day and one bad last day do not decide the change
+    expect(pullUps([12, 8, 8, 10, 10, 6]).change).toBe(((10 - 12) / 12) * 100);
+    expect(pullUps([8, 9, 10, 12, 11, 10]).change).toBe(((12 - 10) / 10) * 100);
+    // under 6 sessions: the first against the last
+    expect(pullUps([8, 9, 10, 12, 11]).change).toBe(((11 - 8) / 8) * 100);
+  });
+
+  it("marks a lift progressing, stalled or down against the sessions just before the last ones", () => {
+    expect(pullUps([8, 9, 10, 11]).status).toBe("up");
+    expect(pullUps([8, 10, 9, 10, 10]).status).toBe("stalled");
+    // more than 5% under the best of the sessions before
+    expect(pullUps([8, 10, 9, 9, 9]).status).toBe("down");
+    expect(pullUps([20, 20, 19, 19, 19]).status).toBe("stalled");
+    // one lucky day long ago does not block a new best: only as many sessions before count
+    expect(pullUps([14, 8, 8, 8, 9, 9, 9, 10, 10, 10]).status).toBe("up");
+  });
+
+  it("takes the sessions of 14 days or more, so a lift done twice a week gets a status too", () => {
+    // every 3 days: the last 6 sessions span 15 days, against the 4 before them
+    expect(pullUps([8, 9, 10, 10, 10, 10, 10, 10, 10, 10], 3).status).toBe("stalled");
+    expect(pullUps([8, 9, 10, 10, 10, 10, 10, 10, 10, 11], 3).status).toBe("up");
+  });
+
+  it("gives no status to a timed exercise: its set time follows the lap button, not strength", () => {
+    const hold = exerciseStats(
+      [60, 45, 50, 30, 30].map((seconds, i) => ({
+        start: `${addDays("2026-09-01", i * 7)} 18:00:00`,
+        exercises: [{ exercise: "Plank", sets: [{ reps: 1, seconds }] }],
+      })),
+    )[0];
+    expect(hold.kind).toBe("time");
+    expect(hold.status).toBeNull();
+  });
+
+  it("gives no status without sessions before the last 14 days, or before 4 sessions", () => {
+    expect(pullUps([8, 9, 10]).status).toBeNull();
+    // 4 sessions over 18 days: all of them are the last 14 days or more
+    expect(pullUps([10, 9, 10, 10], 6).status).toBeNull();
+    expect(pullUps([10, 9, 10, 10], 7).status).toBe("stalled");
   });
 
   it("makes a URL name of the exercise", () => {

@@ -183,7 +183,7 @@ register({
 
     const open = stats.find((s) => calc.slug(s.name) === ctx.item);
     if (open) append(el, detail(ctx, open));
-    append(el, note(t("rec.estimate")));
+    append(el, note(t("ex.changeNote")), note(t("rec.estimate")));
     noSets(el, ctx, "ex.noSets");
   },
 });
@@ -296,6 +296,16 @@ function exerciseTable(
               },
               s.name,
             ),
+            // the state of the lift now, apart from the change since its first sessions
+            (s.status === "stalled" || s.status === "down") &&
+              h(
+                "span",
+                {
+                  class: "tag",
+                  title: t(s.status === "stalled" ? "ex.stalledHint" : "ex.downHint"),
+                },
+                t(s.status === "stalled" ? "ex.stalled" : "ex.down"),
+              ),
           ),
           h("td", { class: "num" }, String(s.sessions.length)),
           h("td", { class: "num" }, fmt.day(last.date)),

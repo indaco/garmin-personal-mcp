@@ -54,6 +54,7 @@ assistant chooses the tools and can combine their data. Some examples:
 - Strength: "Compare my sets of this week with the week before."
 - Strength: "Which muscles did I train most this week?"
 - Strength: "What was my heaviest squat set this month, and what 1RM does it suggest?"
+- Strength: "Which of my lifts have stalled over the last 6 weeks?"
 - Strength: "How long did I rest between sets in my last strength session?"
 - Strength: "How much weight did I lift in total in each strength session this month?"
 - Workouts: "Did I do the reps and rests my workout planned?"

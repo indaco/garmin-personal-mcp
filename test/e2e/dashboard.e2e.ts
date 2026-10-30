@@ -1400,8 +1400,7 @@ describe("type boards", () => {
   });
 });
 
-const rows = (page: Page) =>
-  page.$$eval(".ex-row", (r) => r.map((x) => x.firstElementChild!.textContent));
+const rows = (page: Page) => page.$$eval(".ex-row .linkish", (r) => r.map((x) => x.textContent));
 
 describe("strength board", () => {
   it("shows the Strength widgets", async () => {
@@ -1443,6 +1442,30 @@ describe("strength board", () => {
         "1 strength session has no sets (past the 30 newest without a saved .FIT file, or not readable): its week is left out.",
       );
     expect(await page.innerText("[data-id=exercises]")).toContain("1 strength session has no sets");
+    expect(errors).toEqual([]);
+  });
+
+  it("tags the stalled lifts next to their name and says what the change compares", async () => {
+    const { page, errors } = await open(browser, pageFile(), { hash: "#strengthTraining" });
+    // the tag is the lift's state now, apart from the change since its first sessions
+    const tagged = await page.$$eval(".ex-row td:first-child .tag", (t) =>
+      t.map((x) => [
+        x.parentElement!.querySelector(".linkish")!.textContent,
+        x.textContent,
+        (x as HTMLElement).title,
+      ]),
+    );
+    // the plank is timed: it gets no tag
+    expect(tagged).toEqual([
+      [
+        "Barbell Bench Press",
+        "stalled",
+        "No new best in the last sessions (14 days or more) against as many sessions before them",
+      ],
+    ]);
+    expect(await page.innerText("[data-id=exercises]")).toContain(
+      "Change: the best of the last 3 sessions against the best of the first 3",
+    );
     expect(errors).toEqual([]);
   });
 

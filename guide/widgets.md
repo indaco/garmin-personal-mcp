@@ -39,7 +39,7 @@ it by hand.
 | Workout trend | `workoutTrend` | The same workout (runs with the same name, without the place that Garmin puts before it) across weeks: pace, HR, efficiency and running form, up to 3 workouts side by side; intervals by their work laps. Only on a page with the workout comparison (setting workouts). | running | 3 |
 | Sets per movement | `setsPerCategory` | Completed sets of each movement category each week. | strengthTraining | 2 |
 | Muscle-group balance | `muscleBalance` | Average weekly sets of each muscle group against 10-20, and the push:pull ratio. | strengthTraining | 1 |
-| Exercises | `exercises` | Each exercise by muscle group, with sort, search and group filter; a row opens its trend and its sessions. | strengthTraining | 3 |
+| Exercises | `exercises` | Each exercise by muscle group, with sort, search and group filter, and a tag on a stalled or falling lift; a row opens its trend and its sessions. | strengthTraining | 3 |
 | Sessions | `strengthSessions` | Each strength session with its exercises and sets in order, the last 6 first, the others under Show all. | strengthTraining | 3 |
 | Pace and walks | `walkDetails` | Weekly pace and average HR, and steps, cadence and body battery change of each walk. | walking, hiking | 2 |
 | Daily steps | `steps` | Daily steps against the goal, and floors, for the last 14 days. | - | 1 |

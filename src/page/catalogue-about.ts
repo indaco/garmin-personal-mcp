@@ -54,7 +54,7 @@ export const ABOUT: Record<string, string> = {
   setsPerCategory: "Completed sets of each movement category each week.",
   muscleBalance: "Average weekly sets of each muscle group against 10-20, and the push:pull ratio.",
   exercises:
-    "Each exercise by muscle group, with sort, search and group filter; a row opens its trend and its sessions.",
+    "Each exercise by muscle group, with sort, search and group filter, and a tag on a stalled or falling lift; a row opens its trend and its sessions.",
   strengthSessions:
     "Each strength session with its exercises and sets in order, the last 6 first, the others under Show all.",
   walkDetails:

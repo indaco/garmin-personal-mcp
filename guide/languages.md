@@ -467,6 +467,11 @@ out. To add one:
 | `ex.top` | Last top set |
 | `ex.best` | Best est. 1RM |
 | `ex.change` | Change |
+| `ex.stalled` | stalled |
+| `ex.down` | down |
+| `ex.stalledHint` | No new best in the last sessions (14 days or more) against as many sessions before them |
+| `ex.downHint` | The best of the last sessions (14 days or more) is more than 5% under the best of as many sessions before them |
+| `ex.changeNote` | Change: the best of the last 3 sessions against the best of the first 3 (under 6 sessions, the last against the first). The tag compares the last sessions (at least 3, over 14 days or more) with as many sessions before them: stalled when they set no new best, down when their best is more than 5% under. 1RM, max reps or longest set, by exercise; a timed exercise gets no tag, as its set time follows the lap button. |
 | `ex.trend` | Trend |
 | `ex.groupRow` | {n} exercise · {sets} completed sets\|{n} exercises · {sets} completed sets |
 | `ex.reps` | {n} rep\|{n} reps |
