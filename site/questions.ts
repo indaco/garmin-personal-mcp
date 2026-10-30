@@ -23,6 +23,15 @@ export const QUESTIONS: Record<string, [question: string, tools: string][]> = {
   strength: [
     ["Compare my sets of this week with the week before.", "getActivitySets"],
     ["Which muscles did I train most this week?", "getActivitySets"],
+    [
+      "What was my heaviest squat set this month, and what 1RM does it suggest?",
+      "listActivities · getActivitySets",
+    ],
+    ["How long did I rest between sets in my last strength session?", "getActivitySets"],
+    [
+      "How much weight did I lift in total in each strength session this month?",
+      "listActivities · getActivitySets",
+    ],
     ["Did I do the reps and rests my workout planned?", "getActivityWorkouts · getActivitySets"],
   ],
   swimming: [
