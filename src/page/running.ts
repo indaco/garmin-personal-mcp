@@ -45,17 +45,22 @@ export type SplitKind = "negative" | "even" | "positive";
 
 /**
  * The pace of the first and the second half of the distance, from the laps. "even" is within 1% (about
- * 3 s/km at 5:00/km); a faster second half is a negative split.
+ * 3 s/km at 5:00/km); a faster second half is a negative split. With HR on every lap, `drift` is the
+ * drop in % of speed per heartbeat from the first to the second half (cardiac drift, Pa:HR).
  */
 export function splitOf(
-  laps: { km?: unknown; time?: unknown }[],
-): { first: number; second: number; kind: SplitKind } | undefined {
+  laps: { km?: unknown; time?: unknown; avgHR?: unknown }[],
+): { first: number; second: number; kind: SplitKind; drift?: number } | undefined {
   const parts = laps
-    .map((l) => ({ km: typeof l.km === "number" ? l.km : 0, sec: seconds(l.time) }))
+    .map((l) => ({
+      km: typeof l.km === "number" ? l.km : 0,
+      sec: seconds(l.time),
+      hr: typeof l.avgHR === "number" && l.avgHR > 0 ? l.avgHR : undefined,
+    }))
     .filter((l) => l.km > 0 && l.sec > 0);
   if (parts.length < 2) return undefined;
   const half = parts.reduce((s, l) => s + l.km, 0) / 2;
-  const sum = { first: { km: 0, sec: 0 }, second: { km: 0, sec: 0 } };
+  const sum = { first: { km: 0, sec: 0, beats: 0 }, second: { km: 0, sec: 0, beats: 0 } };
   let done = 0;
   for (const l of parts) {
     // a lap across the middle counts for its share on each side
@@ -63,17 +68,24 @@ export function splitOf(
     const ratio = before / l.km;
     sum.first.km += before;
     sum.first.sec += l.sec * ratio;
+    sum.first.beats += l.sec * ratio * (l.hr ?? 0);
     sum.second.km += l.km - before;
     sum.second.sec += l.sec * (1 - ratio);
+    sum.second.beats += l.sec * (1 - ratio) * (l.hr ?? 0);
     done += l.km;
   }
   const first = sum.first.sec / sum.first.km;
   const second = sum.second.sec / sum.second.km;
   const diff = (second - first) / first;
+  // speed per heartbeat = km / beats; beats are HR x seconds (the /60 cancels out in the ratio)
+  const drift = parts.every((l) => l.hr)
+    ? (1 - sum.second.km / sum.second.beats / (sum.first.km / sum.first.beats)) * 100
+    : undefined;
   return {
     first,
     second,
     kind: Math.abs(diff) <= 0.01 ? "even" : diff < 0 ? "negative" : "positive",
+    ...(drift === undefined ? {} : { drift }),
   };
 }
 

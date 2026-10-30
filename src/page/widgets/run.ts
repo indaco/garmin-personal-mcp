@@ -458,14 +458,22 @@ register({
     );
     const split = runs(ctx)
       .filter((a) => Array.isArray(a.laps) && (a.race === true || (num(a.km) ?? 0) > 15))
-      .map((a) => ({ a, s: calc.splitOf(a.laps as { km?: unknown; time?: unknown }[]) }))
+      .map((a) => ({ a, s: calc.splitOf(a.laps as Parameters<typeof calc.splitOf>[0]) }))
       .filter((x) => x.s);
     append(
       el,
       note(t("lr.note")),
       split.length > 0 &&
         table(
-          [t("col.date"), t("col.name"), t("lr.first"), t("lr.second"), t("lr.split"), t("lr.gap")],
+          [
+            t("col.date"),
+            t("col.name"),
+            t("lr.first"),
+            t("lr.second"),
+            t("lr.split"),
+            t("lr.drift"),
+            t("lr.gap"),
+          ],
           split.map(({ a, s }) => [
             fmt.day(day(a)),
             a.name ?? "",
@@ -476,9 +484,12 @@ register({
               { class: s!.kind === "positive" ? "bad" : s!.kind === "negative" ? "good" : "same" },
               t(`lr.${s!.kind}` as Key),
             ),
+            s!.drift === undefined
+              ? fmt.na
+              : h("span", { class: s!.drift > 5 ? "bad" : "good" }, `${fmt.num(s!.drift, 1)}%`),
             paceText(ctx, a.gap),
           ]),
-          [2, 3, 5],
+          [2, 3, 5, 6],
         ),
     );
   },

@@ -49,6 +49,7 @@ describe("HR zones", () => {
 });
 
 const lap = (km: number, time: string) => ({ km, time });
+const hr = (km: number, time: string, avgHR: number) => ({ km, time, avgHR });
 
 describe("pace split", () => {
   it("compares the pace of the first and the second half", () => {
@@ -56,6 +57,24 @@ describe("pace split", () => {
     expect(negative).toEqual({ first: 310, second: 295, kind: "negative" });
     expect(splitOf([lap(1, "5:00"), lap(1, "5:01")])?.kind).toBe("even");
     expect(splitOf([lap(1, "5:00"), lap(1, "5:20")])?.kind).toBe("positive");
+  });
+
+  it("gives the HR drift: the drop of pace per heartbeat from the first to the second half", () => {
+    // same pace, HR 150 then 159: efficiency drops by 1 - 150/159 = 5.66 %
+    const s = splitOf([
+      hr(1, "5:00", 150),
+      hr(1, "5:00", 150),
+      hr(1, "5:00", 159),
+      hr(1, "5:00", 159),
+    ]);
+    expect(s?.drift).toBeCloseTo((1 - 150 / 159) * 100, 6);
+    // a lap across the middle counts for its share of time on each side
+    const across = splitOf([hr(1, "5:00", 150), hr(1, "5:00", 160), hr(1, "5:00", 160)]);
+    expect(across?.drift).toBeCloseTo((1 - (150 * 2 + 160) / 3 / 160) * 100, 6);
+  });
+
+  it("has no drift when a lap has no HR", () => {
+    expect(splitOf([hr(1, "5:00", 150), lap(1, "5:00")])?.drift).toBeUndefined();
   });
 
   it("has no split without two laps of distance", () => {

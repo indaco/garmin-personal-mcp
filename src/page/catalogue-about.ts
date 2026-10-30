@@ -45,7 +45,7 @@ export const ABOUT: Record<string, string> = {
   racePredictor:
     "Predicted 5 km, 10 km, half marathon and marathon times (Riegel), from the best effort of 5 km or more.",
   longRuns:
-    "The share of the longest run in each week's km (flagged above 35%), weekly ascent, and the pace split of races and long runs.",
+    "The share of the longest run in each week's km (flagged above 35%), weekly ascent, and the pace split and HR drift of races and long runs.",
   setsPerCategory: "Completed sets of each movement category each week.",
   muscleBalance: "Average weekly sets of each muscle group against 10-20, and the push:pull ratio.",
   exercises:
