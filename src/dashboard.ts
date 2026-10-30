@@ -87,17 +87,8 @@ export class GarminDashboard {
       ...(typeof units === "string" && UNITS.includes(units) ? { units } : {}),
       ...(/^[a-z]{2,3}(-[A-Z]{2})?$/.test(locale) ? { locale } : {}),
     };
-    const activities = activitiesBetween(cache, start, today).map((a) => structuredClone(a));
-    await this.#attachDetails(activities);
-    out.activities = activities;
-    out.previousActivities = activitiesBetween(cache, prevStart, addDays(start, -1)).map(compact);
-    out.hrv = between(objectAt(cache, "hrv"), start, today);
-    out.recovery = between(
-      objectAt(cache, "recovery"),
-      addDays(today, -(RECOVERY_DAYS - 1)),
-      today,
-    );
     const cached = Object.keys(objectAt(cache, "activities"));
+    // the small parts first: a reader that stops early still sees them
     out.sync = {
       garminCalls: sync.calls, // one-time .FIT downloads for new sets and laps not included
       newActivities: cached.filter((id) => !before.has(id)).length,
@@ -106,7 +97,17 @@ export class GarminDashboard {
       failedSections: sync.failedSections,
       cachedActivities: cached.length,
     };
-    return JSON.stringify(out);
+    out.hrv = between(objectAt(cache, "hrv"), start, today);
+    out.recovery = between(
+      objectAt(cache, "recovery"),
+      addDays(today, -(RECOVERY_DAYS - 1)),
+      today,
+    );
+    const activities = activitiesBetween(cache, start, today).map((a) => structuredClone(a));
+    await this.#attachDetails(activities);
+    out.activities = activities;
+    out.previousActivities = activitiesBetween(cache, prevStart, addDays(start, -1)).map(compact);
+    return jsonByLines(out);
   }
 
   // ------------------------------------------------------------------ sync
@@ -476,6 +477,18 @@ function asString(v: unknown): string {
 function asLong(v: unknown): number {
   if (typeof v === "number") return Math.trunc(v);
   return typeof v === "string" && /^[+-]?\d+$/.test(v) ? Number(v) : 0;
+}
+
+/** One key and one list row on each line, so a reader that pages by lines can read it all. */
+export function jsonByLines(out: Json): string {
+  const entries = Object.entries(out).filter(([, v]) => v !== undefined);
+  return `{\n${entries.map(keyLine).join(",\n")}\n}`;
+}
+
+function keyLine([k, v]: [string, unknown]): string {
+  return Array.isArray(v) && v.length > 0
+    ? `${JSON.stringify(k)}:[\n${v.map((x) => JSON.stringify(x)).join(",\n")}\n]`
+    : `${JSON.stringify(k)}:${JSON.stringify(v)}`;
 }
 
 // ------------------------------------------------------------------ MCP registration

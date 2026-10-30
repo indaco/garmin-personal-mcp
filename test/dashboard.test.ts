@@ -14,6 +14,7 @@ import { GarminApiError, type GarminApiClient } from "../src/api-client";
 import {
   covered,
   GarminDashboard,
+  jsonByLines,
   recoveryRefreshFrom,
   recoveryRow,
   toFetch,
@@ -249,6 +250,23 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe("jsonByLines", () => {
+  it("is the same JSON value as JSON.stringify, with one row on each line", () => {
+    const value = {
+      a: 1,
+      gone: undefined,
+      empty: [],
+      rows: [{ x: 1 }, { x: [2, 3] }],
+      o: { y: null },
+    };
+    const text = jsonByLines(value);
+    expect(JSON.parse(text)).toEqual(JSON.parse(JSON.stringify(value)));
+    expect(text).toBe(
+      '{\n"a":1,\n"empty":[],\n"rows":[\n{"x":1},\n{"x":[2,3]}\n],\n"o":{"y":null}\n}',
+    );
+  });
+});
+
 describe("getDashboardData", () => {
   it("fetches everything on the first call and keeps it in the cache", async () => {
     garminActivities = [
@@ -302,6 +320,24 @@ describe("getDashboardData", () => {
     });
     expect(Object.keys(cache.activities)).toEqual(["1"]);
     expect(cache.activities["1"]).not.toHaveProperty("laps");
+  });
+
+  it("gives the small parts first and each activity on its own line", async () => {
+    garminActivities = [activity(1, "2026-10-20"), activity(2, "2026-10-19")];
+    const text = await dashboard.getDashboardData(2);
+    const lines = text.split("\n");
+
+    expect(Object.keys(JSON.parse(text)).slice(-5)).toEqual([
+      "sync",
+      "hrv",
+      "recovery",
+      "activities",
+      "previousActivities",
+    ]);
+    const first = lines.indexOf('"activities":[');
+    expect(JSON.parse(lines[first + 1].replace(/,$/, ""))).toMatchObject({ id: 1 });
+    expect(JSON.parse(lines[first + 2])).toMatchObject({ id: 2 });
+    expect(lines[first + 3]).toBe("],");
   });
 
   it("asks Garmin only for the last two days on the next call", async () => {
