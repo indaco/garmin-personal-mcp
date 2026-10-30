@@ -307,6 +307,8 @@ describe("getDashboardData", () => {
     // 1 activity page + 1 HRV range + 14 days x 2 recovery calls + zones + fitness age + settings
     expect(out.sync).toEqual({
       garminCalls: 33,
+      // the laps of the one activity
+      fitDownloads: 1,
       newActivities: 1,
       failedDays: 0,
       failedDates: [],
@@ -598,6 +600,27 @@ describe("getDashboardData", () => {
     );
     expect(withLaps({ activities: demo })).toEqual(withLaps(saved));
     expect(withLaps(saved)).toContain(88);
+  });
+
+  it("counts the .FIT files that an update downloads", async () => {
+    garminActivities = [
+      activity(90, "2026-10-26", "strength_training"),
+      activity(91, "2026-10-25"),
+      activity(92, "2026-10-24"),
+    ];
+    // sets and laps of the strength session come from one file
+    expect(JSON.parse(await dashboard.getDashboardData(1)).sync.fitDownloads).toBe(3);
+    expect(JSON.parse(await dashboard.getDashboardData(1)).sync.fitDownloads).toBe(0);
+  });
+
+  it("leaves out the laps of an activity whose file has none", async () => {
+    garminActivities = [activity(93, "2026-10-26", "strength_training")];
+    api.getBytes.mockResolvedValueOnce(
+      fitFile([Profile.MesgNum.SET, { setType: 1, repetitions: 5, weight: 60, duration: 20 }]),
+    );
+    const [a] = JSON.parse(await dashboard.getDashboardData(1)).activities;
+    expect(a.exercises).toHaveLength(1);
+    expect(a).not.toHaveProperty("laps");
   });
 
   it("reports a detail that cannot be read on the activity", async () => {
