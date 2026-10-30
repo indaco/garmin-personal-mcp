@@ -384,6 +384,23 @@ describe("coach prompts", () => {
     expect(latest).not.toContain("`limit` = 100");
   });
 
+  it("strength-review says what to compare when a set has no e1RM, no reps or another form", async () => {
+    const text = (await render("strength-review")).replace(/\s+/g, " ");
+    expect(text).toContain(
+      "A set with 0 reps was not done: leave it and its `restSec` out of every count and median.",
+    );
+    expect(text).toContain(
+      'When the top set has more than 12 reps, its e1RM is "n/a" and the change in % is of its weight.',
+    );
+    expect(text).toContain(
+      'When the previous session has the exercise in another form (timed sets against sets with reps, or sets without weight against sets with weight), show its comparison as "n/a".',
+    );
+    // a search by name in step 1 already holds this session and the previous ones
+    expect(text).toContain(
+      "3. When step 1 called `listActivities` with `names`, use its rows; otherwise call `listActivities` with `names` = [the session's name] and `limit` = 100",
+    );
+  });
+
   it("reviews a strength session by id, by name, or the latest one", async () => {
     const byId = await render("strength-review", { activity: "21000000456" });
     expect(byId).toContain("The strength session is the activity with `activityId` = 21000000456.");
