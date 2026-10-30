@@ -11,6 +11,8 @@ import { log } from "./log";
 type Json = Record<string, unknown>;
 
 const DAY_MS = 24 * 3600_000;
+/** The activities of one search page; a larger page without a date window can answer HTTP 500. */
+const SEARCH_PAGE = 100;
 
 /**
  * MCP tools over the Garmin Connect Personal API (read-only). Every tool returns a JSON string.
@@ -38,15 +40,26 @@ export class GarminTools {
   ): Promise<string> {
     const wanted = names?.map((n) => n.toLowerCase()).filter(Boolean) ?? [];
     const asked = limit == null || limit <= 0 ? 20 : Math.min(limit, 200);
-    const search = (max: number, type?: string, subType?: string) =>
-      this.api.getJson("/activitylist-service/activities/search/activities", {
-        start: "0",
-        limit: String(max),
-        startDate,
-        endDate,
-        activityType: type,
-        activitySubType: subType,
-      });
+    // pages of 100: Garmin answers HTTP 500 to one page of about 200 activities without a date window
+    const search = async (max: number, type?: string, subType?: string) => {
+      const all: unknown[] = [];
+      for (let start = 0; start < max; start += SEARCH_PAGE) {
+        const size = Math.min(SEARCH_PAGE, max - start);
+        const json = await this.api.getJson("/activitylist-service/activities/search/activities", {
+          start: String(start),
+          limit: String(size),
+          startDate,
+          endDate,
+          activityType: type,
+          activitySubType: subType,
+        });
+        const page = Array.isArray(json) ? json : firstArray(json);
+        if (!page) return start === 0 ? json : all;
+        all.push(...page);
+        if (page.length < size) break;
+      }
+      return all;
+    };
     const refused = (e: unknown) =>
       activityType !== undefined && e instanceof GarminApiError && /-> HTTP 400\b/.test(e.message);
     // shortcut: names are filtered in the last 200 activities of the window; page with start= when a window holds more

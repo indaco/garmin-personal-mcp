@@ -218,6 +218,10 @@ const namedIds = async (limit?: number, raw?: boolean) =>
     ]),
   ).map((r: { id?: number; activityId?: number }) => r.id ?? r.activityId);
 
+/** n activities named Drill, with ids from `from`. */
+const drills = (from: number, n: number) =>
+  Array.from({ length: n }, (_, i) => ({ activityId: from + i, activityName: "Drill" }));
+
 describe("activities", () => {
   it("lists activities as summaries, limit 20 by default and 200 at most", async () => {
     api.getJson.mockResolvedValue([
@@ -238,13 +242,30 @@ describe("activities", () => {
     );
     await tools.listActivities("2026-10-01", "2026-10-27", "running", 500);
     expect(api.getJson.mock.lastCall?.[1]).toMatchObject({
-      limit: "200",
+      limit: "100",
       startDate: "2026-10-01",
       endDate: "2026-10-27",
       activityType: "running",
     });
     await tools.listActivities(undefined, undefined, undefined, 0);
     expect(api.getJson.mock.lastCall?.[1]).toMatchObject({ limit: "20" });
+  });
+
+  it("asks in pages of 100: Garmin answers HTTP 500 to one page of about 200 activities", async () => {
+    api.getJson.mockResolvedValueOnce(drills(0, 100)).mockResolvedValueOnce(drills(100, 40));
+    const rows = JSON.parse(
+      await tools.listActivities(undefined, undefined, undefined, 5, false, ["drill"]),
+    );
+    expect(rows).toHaveLength(5);
+    expect(api.getJson.mock.calls.map(([, q]) => [q.start, q.limit])).toEqual([
+      ["0", "100"],
+      ["100", "100"],
+    ]);
+    // a short page is the end: no third page
+    api.getJson.mockClear();
+    api.getJson.mockResolvedValueOnce(drills(0, 30));
+    await tools.listActivities(undefined, undefined, undefined, 200);
+    expect(api.getJson).toHaveBeenCalledTimes(1);
   });
 
   it("asks again with activitySubType when Garmin refuses a subtype as activityType", async () => {
@@ -276,7 +297,7 @@ describe("activities", () => {
     expect(api.getJson.mock.lastCall?.[1]).toMatchObject({
       activityType: undefined,
       activitySubType: undefined,
-      limit: "200",
+      limit: "100",
     });
   });
 
@@ -290,7 +311,7 @@ describe("activities", () => {
     ]);
     expect(await namedIds()).toEqual([1, 3, 5]);
     expect(api.getJson.mock.lastCall?.[1]).toMatchObject({
-      limit: "200",
+      limit: "100",
       startDate: "2026-09-01",
       endDate: "2026-10-27",
     });
