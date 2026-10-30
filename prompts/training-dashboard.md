@@ -34,8 +34,9 @@ Answer in my language.
    Make that language the default of the question below instead of "No".
    Tell me the languages of the page (`pageLanguages` of the result) and ask whether to add one.
    If your client has a tool for questions with choices, use it, with "No" as the default and the
-   built-in languages that the page does not have: {{builtIn}}. Say that I can type any other
-   language.
+   built-in languages that the page does not have: {{builtIn}}. The tool takes
+   at most 4 options in all, so offer at most 3 languages. Name the other built-in languages in the
+   question, and say that I can type one of them or any other language.
    - A built-in language: call `writeDashboard` with the same `weeks` and `notes`, and `settings` =
      the `settings` of the last result, with `languages` = the codes of `pageLanguages` that are `en`
      or built in, and the new code.
