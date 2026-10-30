@@ -3,7 +3,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     coverage: {
-      provider: "istanbul",
+      provider: "v8",
       include: ["src/**/*.ts"],
       // the page code that builds and changes the DOM: only the e2e tests in Chromium run it
       exclude: [
