@@ -104,7 +104,7 @@ export function start(): void {
   addLanguages(G.i18n);
   // English stays in the script for missing texts, but a page can leave it out of the menu
   if (S.languages && !S.languages.includes("en")) delete LANGUAGE_NAMES.en;
-  withhold(S.exclude ?? []);
+  withhold(S);
   for (const w of Array.isArray(G.widgets) ? G.widgets : []) {
     const def = compile(w);
     if (def) registerCustom(def);

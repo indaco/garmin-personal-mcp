@@ -13,6 +13,7 @@ it by hand.
 | Weekly volume | `weeklyVolume` | Time, distance, sessions or load of each week, stacked by type, with a 4-week average line. | all and each type | 2 |
 | Intensity minutes | `intensityMinutes` | Moderate + 2 x vigorous minutes of the activities each week, against 150 minutes. | all and each type | 1 |
 | Load safety | `loadSafety` | Weekly load with its change against the week before (flagged above +10%), and 7-day monotony and strain (Foster). | - | 3 |
+| Fitness, fatigue and form | `fitnessFatigue` | Fitness (42-day) and fatigue (7-day) averages of the daily load, and form: fitness minus fatigue, to time a taper. | - | 3 |
 | Consistency | `calendar` | A heatmap of the training minutes of each day; a day shows its activities on hover or touch. | all and each type | 3 |
 | Load vs recovery | `loadVsRecovery` | Daily load by type (bars) with nightly HRV (line). | all and each type | 3 |
 | HRV | `hrv` | Nightly HRV of the last 14 days with its 7-day average and the balanced range. | - | 1 |
@@ -26,15 +27,16 @@ it by hand.
 | Summary | `typeKpis` | Sessions, time, distance with pace or speed, HR, Garmin load and its share, and the last 7 days against the 4-week average. | all and each type | 3 |
 | Each week | `typeWeekly` | Time, distance or sessions of each week. | all and each type | 2 |
 | Time in HR zones | `hrZones` | Minutes in HR zones 1-5 each week. | all and each type | 1 |
-| Best efforts | `bestEfforts` | The fastest 1 km, mile, 5 km, 10 km, half marathon and marathon in the window. | running | 1 |
+| Best efforts | `bestEfforts` | The fastest 1 km, mile, 5 km, 10 km, half marathon and marathon in the window, and the pace of the fastest 5 km and 10 km of each week. | running | 1 |
 | Races | `races` | Each race with its time, pace, HR, power and aerobic training effect. | running | 2 |
-| Aerobic fitness | `aerobicFitness` | Pace against HR of each run (older runs paler), and weekly pace and efficiency (metres per heartbeat). | running | 2 |
+| Aerobic fitness | `aerobicFitness` | Pace against HR of each run (older runs paler), weekly pace, and the efficiency (metres per heartbeat) of the runs below Z4: each run, the weekly mean and the last weeks against the first. | running | 2 |
 | Easy and hard running | `intensityShare` | The share of running time in Z1-2 (easy) and Z4-5 (hard) each week. | running | 1 |
 | Running form | `runningForm` | Weekly cadence, ground contact, stride, vertical oscillation and ratio, and power, one small chart for each: cadence and ground contact first, the others under Show all. | running | 3 |
 | Run Walk Run | `runWalk` | Run Walk Run sessions: the pace of the run segments, the overall pace and the walk time. | running | 1 |
 | Training effect | `trainingEffect` | Aerobic and anaerobic training effect of each run, and the training effect labels of each week. | running | 2 |
 | Race predictor | `racePredictor` | Predicted 5 km, 10 km, half marathon and marathon times (Riegel), from the best effort of 5 km or more. | running | 1 |
-| Long runs and pace split | `longRuns` | The share of the longest run in each week's km (flagged above 35%), weekly ascent, and the pace split of races and long runs. | running | 2 |
+| Long runs and pace split | `longRuns` | The share of the longest run in each week's km (flagged above 35%), weekly ascent, and the pace split and HR drift of races and long runs. | running | 2 |
+| Workout trend | `workoutTrend` | The same workout (runs with the same name, without the place that Garmin puts before it) across weeks: pace, HR, efficiency and running form, up to 3 workouts side by side; intervals by their work laps. Only on a page with the workout comparison (setting workouts). | running | 3 |
 | Sets per movement | `setsPerCategory` | Completed sets of each movement category each week. | strengthTraining | 2 |
 | Muscle-group balance | `muscleBalance` | Average weekly sets of each muscle group against 10-20, and the push:pull ratio. | strengthTraining | 1 |
 | Exercises | `exercises` | Each exercise by muscle group, with sort, search and group filter; a row opens its trend and its sessions. | strengthTraining | 3 |
@@ -53,8 +55,8 @@ every board. _Width_ is the default width in columns.
 
 | Board | Widgets, in order |
 | ----- | ----------------- |
-| all | `kpis`, `readiness`, `calendar`, `periodComparison`, `records`, `weeklyVolume`, `intensityMinutes`, `loadSafety`, `loadVsRecovery`, `activities`, `coachNotes` |
-| running | `typeKpis`, `typeWeekly`, `hrZones`, `bestEfforts`, `races`, `aerobicFitness`, `intensityShare`, `runningForm`, `runWalk`, `trainingEffect`, `racePredictor`, `longRuns`, `activities` |
+| all | `kpis`, `readiness`, `calendar`, `periodComparison`, `records`, `weeklyVolume`, `intensityMinutes`, `loadSafety`, `fitnessFatigue`, `loadVsRecovery`, `activities`, `coachNotes` |
+| running | `typeKpis`, `typeWeekly`, `hrZones`, `bestEfforts`, `races`, `aerobicFitness`, `intensityShare`, `runningForm`, `runWalk`, `trainingEffect`, `racePredictor`, `longRuns`, `workoutTrend`, `activities` |
 | strengthTraining | `typeKpis`, `typeWeekly`, `hrZones`, `setsPerCategory`, `muscleBalance`, `exercises`, `strengthSessions` |
 | walking | `typeKpis`, `typeWeekly`, `hrZones`, `walkDetails`, `steps`, `activities` |
 | hiking | `typeKpis`, `typeWeekly`, `hrZones`, `hikeVertical`, `activities` |

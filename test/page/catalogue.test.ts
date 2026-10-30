@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GROUPS } from "../../src/page/calc";
-import { CATALOGUE } from "../../src/page/catalogue";
+import { CATALOGUE, inPage } from "../../src/page/catalogue";
 import { ABOUT } from "../../src/page/catalogue-about";
 import { en } from "../../src/page/i18n/en";
 import { preset } from "../../src/page/presets";
@@ -24,6 +24,19 @@ describe("widget catalogue", () => {
 
   it("has a description for exactly the catalogue widgets", () => {
     expect(Object.keys(ABOUT).toSorted()).toEqual(CATALOGUE.map((c) => c.id).toSorted());
+  });
+
+  it("has an opt-in widget only on a page that turns it on and keeps its data", () => {
+    const trend = CATALOGUE.find((c) => c.id === "workoutTrend")!;
+    expect(inPage(trend, {})).toBe(false);
+    expect(inPage(trend, { workouts: true })).toBe(true);
+    expect(inPage(trend, { workouts: true, exclude: ["names"] })).toBe(false);
+    expect(
+      inPage(
+        CATALOGUE.find((c) => c.id === "kpis")!,
+        {},
+      ),
+    ).toBe(true);
   });
 
   it("gives a board of any other SDK sport the preset of the Other board", () => {

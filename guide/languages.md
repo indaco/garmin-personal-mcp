@@ -320,6 +320,12 @@ out. To add one:
 | `ls.ramp` | Change vs week before (%) |
 | `ls.note` | All activities. Red weeks rose more than 10%; a week in progress is not flagged. Monotony and strain (Foster) are estimates. |
 | `ls.estimated` | Some loads are estimates: the activity has no Garmin load. |
+| `w.fitnessFatigue` | Fitness, fatigue and form |
+| `ff.fitness` | Fitness · 42 days |
+| `ff.fatigue` | Fatigue · 7 days |
+| `ff.form` | Form |
+| `ff.note` | All activities. Fitness and fatigue are the daily load averaged over about 42 and 7 days. Form is the fitness minus the fatigue of the day before: below 0 you carry fatigue, above 0 you are fresh, as in a taper before a race. |
+| `ff.short` | The data starts less than 6 weeks before this window, so fitness reads low in the first weeks. |
 | `w.loadVsRecovery` | Load vs recovery |
 | `lvr.hrv` | HRV (ms) |
 | `lvr.note` | Daily load by type (bars) and nightly HRV (line). |
@@ -395,6 +401,7 @@ out. To add one:
 | `w.bestEfforts` | Best efforts |
 | `be.distance` | Distance |
 | `be.activity` | Activity |
+| `be.trendNote` | The chart shows the pace of the fastest 5 km and 10 km of each week, from any run: a week without a hard run shows a slower pace. |
 | `w.races` | Races |
 | `races.none` | No races in the selected weeks. |
 | `te.aerobic` | Aerobic TE |
@@ -405,6 +412,11 @@ out. To add one:
 | `af.weekPace` | Weekly pace |
 | `af.efficiency` | Efficiency |
 | `af.effUnit` | m per heartbeat |
+| `af.aerobicRuns` | Aerobic runs |
+| `af.aerobicEff` | Aerobic-run efficiency · last week\|Aerobic-run efficiency · last {n} weeks |
+| `af.vsFirst` | vs first week\|vs first {n} weeks |
+| `af.aerobicNote` | Efficiency (metres per heartbeat) counts only aerobic runs, with an average HR below zone 4: intervals, tempo runs and races raise HR for other reasons. Higher is better. |
+| `af.noZones` | Efficiency (metres per heartbeat) counts every run: the data has no HR zones to pick the aerobic runs. Higher is better. |
 | `w.intensityShare` | Easy and hard running |
 | `is.easy` | Z1-2 (easy) |
 | `is.hard` | Z4-5 (hard) |
@@ -421,14 +433,24 @@ out. To add one:
 | `w.longRuns` | Long runs and pace split |
 | `lr.share` | Longest run share of weekly distance |
 | `lr.ascent` | Weekly ascent |
-| `lr.note` | Red weeks: the longest run is more than 35% of the week's distance. The table shows races and runs over 15 km with laps. |
+| `lr.note` | Red weeks: the longest run is more than 35% of the week's distance. The table shows races and runs over 15 km with laps. HR drift is the drop in distance per heartbeat from the first to the second half: under 5% shows a solid aerobic base. |
 | `lr.first` | First half |
 | `lr.second` | Second half |
 | `lr.split` | Split |
 | `lr.gap` | Grade-adjusted pace |
+| `lr.drift` | HR drift |
 | `lr.positive` | positive |
 | `lr.negative` | negative |
 | `lr.even` | even |
+| `w.workoutTrend` | Workout trend |
+| `wt.none` | No run name repeats in this period. Give the sessions of a training plan the same name to compare them across weeks. |
+| `wt.pick` | Workouts to compare |
+| `wt.metric` | Metric |
+| `wt.vsFirst` | vs first session |
+| `wt.reps` | Reps |
+| `wt.fade` | Fade |
+| `wt.note` | Pick up to 3 workouts: runs with the same name. The place that Garmin puts before " - " does not count: "Riverside - Drill Workout" and "Hillview - Drill Workout" are one workout. The Weeks bar at the top sets the weeks to compare. For a structured workout (laps that mark a warm-up, rest or cool-down), pace, HR, cadence and power come from the work laps; else from the whole run. Fade is the pace of the last rep against the first of the same workout step, when the reps have the same distance or time. Ground contact, vertical ratio and stride are of the whole run. |
+| `wt.left` | {name}: {n} session has no work laps and is left out, so reps compare with reps. The sessions with work laps start on {from}. Each update downloads the laps of the last 8 runs of each workout and keeps them.\|{name}: {n} sessions have no work laps and are left out, so reps compare with reps. The sessions with work laps start on {from}. Each update downloads the laps of the last 8 runs of each workout and keeps them. |
 | `w.setsPerCategory` | Sets per movement |
 | `ex.sets` | Completed sets |
 | `w.muscleBalance` | Muscle-group balance |

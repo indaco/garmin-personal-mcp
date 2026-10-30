@@ -85,7 +85,7 @@ describe("prompts", () => {
       expect(text).toContain("only when `settings` has more than `title` and `headline`");
       expect(text).toContain('"Keep these settings" (default)');
       expect(text).toContain(
-        '"Use the defaults: all sports, all data, English and\n     the language of my Garmin profile, all themes, opens in midnight"',
+        '"Use the defaults: all sports, all data, English and\n     the language of my Garmin profile, all themes, opens in midnight, no workout comparison"',
       );
       expect(text).toContain('"all sports, keep the rest"');
       expect(text).toContain(
@@ -321,5 +321,85 @@ describe("widget and language prompts", () => {
     const plain = await render("dashboard-language", { language: "German" });
     expect(plain).not.toContain("`path`");
     expect(plain).toContain("call `writeDashboard` first");
+  });
+});
+
+describe("workout comparison", () => {
+  it("asks for it in every prompt that makes a page, when runs repeat a name", async () => {
+    for (const layout of ["preset", "blank"]) {
+      const text = await render("training-dashboard", { layout });
+      expect(text).toContain("**Workout comparison**: only when `repeatedRuns` is not empty");
+      expect(text).toContain("give `settings` with `workouts` = true");
+    }
+    const freeform = await render("training-dashboard", { layout: "freeform" });
+    expect(freeform).toContain("If\n`repeatedRuns` of its `digest` is not empty");
+    expect(freeform).toContain(
+      "`window.GARMIN_SETTINGS = /* garmin-settings:start */null/* garmin-settings:end */;`",
+    );
+    expect(freeform).toContain('give `settings` = { "workouts": true }');
+    expect(freeform).toContain("10. **Workout trend**, only when I said yes");
+    const setup = await render("dashboard-setup");
+    expect(setup).toContain("ask about the **Workout comparison**, only when `repeatedRuns`");
+    expect(setup).toContain("`workouts` (true when I said yes to the workout comparison)");
+    // an update keeps the choice of the page and asks nothing
+    expect(await render("training-dashboard-update")).not.toContain("Workout comparison");
+  });
+});
+
+describe("coach prompts", () => {
+  it("reviews a run by id, by name, or the latest run", async () => {
+    const byId = await render("run-review", { activity: " 21000000123 " });
+    expect(byId).toContain("`activityId` = 21000000123.");
+    expect(byId).toContain("Today is\n2026-10-28.");
+    expect(byId).toContain('a failed call shows as "n/a"');
+    expect(byId.includes("{{")).toBe(false);
+    const byName = await render("run-review", { activity: "Riverside" });
+    expect(byName).toContain('`names` = ["Riverside"] and `limit` = 100');
+    // the slash command can pass only the first word of the name
+    expect(byName).toContain(
+      "when the runs have more than one name, list the 5 most recent with date and name and ask me which one",
+    );
+    expect(await render("run-review")).toContain(
+      "Call `listActivities` and take the most recent run",
+    );
+  });
+
+  it("checks race readiness with the race, the goal and the plan", async () => {
+    const text = await render("race-readiness", {
+      date: "2026-11-15",
+      distance: "half",
+      goal: "1:45:00",
+    });
+    expect(text).toContain("Race: half on 2026-11-15, goal time 1:45:00.");
+    // the digest from a preview, not the whole getDashboardData result
+    expect(text).toContain("Call `writeDashboard` with `preview` = true and `weeks` = 12.");
+    expect(text).toContain(
+      "Call `listActivities` with `startDate` = 2026-08-05 and `limit` = 100.",
+    );
+    expect(text).toContain("my goal time of 1:45:00");
+    expect(text).toContain("from the goal time when it is realistic");
+    expect(text).not.toContain("is missing");
+    expect(text.includes("{{")).toBe(false);
+  });
+
+  it("reads the race date and goal by their shape from any slot, as the slash command passes them", async () => {
+    // "/garmin-personal:race-readiness half marathon 2026-11-15 1:45:00" fills the slots in order
+    const text = await render("race-readiness", {
+      date: "half",
+      distance: "marathon",
+      goal: "2026-11-15 1:45:00",
+    });
+    expect(text).toContain("Race: half marathon on 2026-11-15, goal time 1:45:00.");
+  });
+
+  it("asks for a missing race date or distance, and predicts only without a goal", async () => {
+    const text = await render("race-readiness", { distance: "10k" });
+    expect(text).toContain("Race: 10k on a date not given.");
+    expect(text).toContain("The race date or distance is missing: ask me for it");
+    expect(text).toContain("I have no goal time: give the prediction only.");
+    expect(text).toContain("split, from the prediction.");
+    expect(await render("race-readiness", { date: "2026-11-15" })).toContain(
+      "Race: distance not given on 2026-11-15.",
+    );
   });
 });

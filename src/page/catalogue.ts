@@ -1,7 +1,7 @@
 import { GROUPS } from "./calc";
 import type { Key } from "./i18n/en";
 import type { Span } from "./layout";
-import type { DataItem } from "./settings";
+import type { DataItem, Settings } from "./settings";
 
 /**
  * The built-in widgets: id, title, the types they can show (none for a widget without a type) and width.
@@ -17,7 +17,13 @@ export interface CatalogueEntry {
   minSpan?: Span;
   /** The data the widget shows: a page without it has no such widget. */
   needs?: DataItem;
+  /** The page setting that turns the widget on: a page without it has no such widget. */
+  optIn?: "workouts";
 }
+
+/** Whether a page with these settings has the widget. */
+export const inPage = (c: CatalogueEntry, s: Settings) =>
+  !(c.needs && s.exclude?.includes(c.needs)) && !(c.optIn && s[c.optIn] !== true);
 
 export const CATALOGUE: readonly CatalogueEntry[] = [
   {
@@ -66,6 +72,11 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
   {
     id: "loadSafety",
     title: "w.loadSafety",
+    span: 3,
+  },
+  {
+    id: "fitnessFatigue",
+    title: "w.fitnessFatigue",
     span: 3,
   },
   {
@@ -196,6 +207,14 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
     title: "w.longRuns",
     types: ["running"],
     span: 2,
+  },
+  {
+    id: "workoutTrend",
+    title: "w.workoutTrend",
+    types: ["running"],
+    span: 3,
+    needs: "names",
+    optIn: "workouts",
   },
   {
     id: "setsPerCategory",

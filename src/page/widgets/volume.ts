@@ -3,7 +3,18 @@ import { type Activity, dayOf, groupOf, groupsIn, sessionSeconds } from "../calc
 import { append, h } from "../dom";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
-import { alpha, typeName, kpi, kpiRow, maxHR, note, picker, weekLabel, windowEnd } from "./ui";
+import {
+  alpha,
+  everyActivity,
+  typeName,
+  kpi,
+  kpiRow,
+  maxHR,
+  note,
+  picker,
+  weekLabel,
+  windowEnd,
+} from "./ui";
 
 /** The heat of a calendar day by its training minutes. */
 const level = (m: number) => (m === 0 ? 0 : m < 30 ? 1 : m < 60 ? 2 : m < 90 ? 3 : 4);
@@ -200,6 +211,77 @@ register({
       },
     });
     append(el, note(t("ls.note")), estimated && note(t("ls.estimated")));
+  },
+});
+
+register({
+  id: "fitnessFatigue",
+  render(el, ctx) {
+    const { t, fmt, calc } = ctx;
+    const max = maxHR(ctx);
+    const end = windowEnd(ctx);
+    const acts = everyActivity(ctx);
+    if (acts.every((a) => !calc.loadOf(a, max))) return ctx.empty(el);
+    const days: string[] = [];
+    for (let d = ctx.from; d <= end; d = addDays(d, 1)) days.push(d);
+    // the period before the window warms the averages up, so fitness does not start at 0
+    const first = acts
+      .map(dayOf)
+      .filter((d): d is string => d !== undefined)
+      .toSorted()[0];
+    const all = calc.fitnessFatigue(
+      calc.dailyLoads(acts, first < ctx.from ? first : ctx.from, end, max),
+    );
+    const skip = all.fitness.length - days.length;
+    const [fitness, fatigue, form] = [all.fitness, all.fatigue, all.form].map((x) => x.slice(skip));
+    append(
+      el,
+      kpiRow(
+        kpi(t("ff.fitness"), fmt.num(fitness.at(-1))),
+        kpi(t("ff.fatigue"), fmt.num(fatigue.at(-1))),
+        kpi(t("ff.form"), fmt.num(form.at(-1))),
+      ),
+    );
+    ctx.chart(
+      el,
+      {
+        type: "bar",
+        data: {
+          labels: days.map((d) => fmt.day(d)),
+          datasets: [
+            {
+              type: "line" as const,
+              label: t("ff.fitness"),
+              data: fitness,
+              borderColor: ctx.color("accent"),
+              pointRadius: 0,
+            },
+            {
+              type: "line" as const,
+              label: t("ff.fatigue"),
+              data: fatigue,
+              borderColor: ctx.color("warn"),
+              pointRadius: 0,
+            },
+            {
+              type: "bar" as const,
+              label: t("ff.form"),
+              data: form,
+              backgroundColor: form.map((v) => alpha(ctx.color(v < 0 ? "bad" : "good"), 0.5)),
+            },
+          ],
+        },
+        options: { scales: { y: { title: { display: true, text: t("m.load") } } } },
+      },
+      240,
+    );
+    append(
+      el,
+      note(t("ff.note")),
+      // 42 days is the fitness time constant
+      skip < 42 && note(t("ff.short")),
+      acts.some((a) => calc.loadOf(a, max)?.estimate) && note(t("ls.estimated")),
+    );
   },
 });
 

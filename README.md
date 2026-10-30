@@ -72,6 +72,8 @@ assistant chooses the tools and can combine their data. Some examples:
   stdio. Tested with Claude Desktop and Claude Code.
 - **A dashboard in less than a minute**: your training load next to recovery, for you or for your
   coach, with your own widgets and languages. See [Dashboard](#dashboard).
+- **Coach prompts**: a review of one run against its planned workout, and a readiness check before a
+  race. See [Coach prompts](#coach-prompts).
 
 ## Quick start
 
@@ -210,6 +212,12 @@ You can also give only the layout: `/garmin-personal:training-dashboard freeform
 The assistant gives you the path of the page and the command to open it. The page has a board for
 all your training, a Recovery board and a board for each sport. A missing value shows as "n/a".
 
+When your runs repeat a name, for example the "Tempo Run" of a training plan, the assistant asks
+whether to compare those workouts across weeks. The default is no. A yes adds the Workout trend
+widget. The server downloads the laps of the last 8 runs of each workout once and keeps them, so
+the comparison grows with each update. See
+[Page settings](guide/dashboard.md#page-settings).
+
 [The dashboard guide](guide/dashboard.md) tells about the title and the headline, the boards, the
 themes and languages, the units and the activity-name filter, and how to change the layout.
 [The widget catalogue](guide/widgets.md) lists every widget.
@@ -241,7 +249,7 @@ page is for:
   for example HR zones yes, fitness age and sleep no.
 
 Then the assistant asks for the file (any name or path), the title, the headline, the sports, the
-languages and the themes. The server writes only the data that you select into the file. Other data
+languages and the themes, and whether to compare the workouts that your runs repeat. The server writes only the data that you select into the file. Other data
 is not in the file, so you can send the file safely. A personal page and a shared page can be two
 files side by side. Each page keeps its settings on each update. The argument `weeks` is optional
 (default 12).
@@ -284,6 +292,47 @@ coach notes. My measurements for a first build, with Claude Code and Opus
 For a design of your own, use `layout` = `freeform`: Claude writes the page, as in those guides.
 
 [Presets or freeform](guide/presets.md) gives the measurements and the limits of the presets.
+
+## Coach prompts
+
+These prompts answer in the chat. They do not change a dashboard.
+
+| Prompt                            | What it does                                                | Claude Code example                                       |
+| --------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------- |
+| [run-review](#run-review)         | reviews one run as a coach                                  | `/garmin-personal:run-review`                             |
+| [race-readiness](#race-readiness) | tells if you are ready for a race, with a plan for its pace | `/garmin-personal:race-readiness 2026-11-15 half 1:45:00` |
+
+A missing value shows as "n/a": the assistant does not estimate it.
+
+### run-review
+
+The assistant compares the steps of the planned workout with the laps of the run: the target, what
+the lap did, and hit or miss. For intervals, it gives the fade from the first rep to the last. For a
+steady run, it gives the HR drift: the drop in distance per heartbeat from the first half to the
+second half. It ends with the sleep and HRV of the night after the run, and a short coach note.
+
+| Argument   | Values                                                     | Default      |
+| ---------- | ---------------------------------------------------------- | ------------ |
+| `activity` | an activity id, or words of the activity name (`Long Run`) | the last run |
+
+### race-readiness
+
+The assistant reads the server's summary of 12 weeks (a `writeDashboard` preview, which writes
+nothing) and the laps of your long runs. It gives the days to the race, the weekly run distance and
+load, the long runs with their pace split and HR drift, and whether your load drops in the last 2
+weeks (the taper). It predicts your race time from your best efforts of 5 km or more (Riegel, an
+estimate: the fastest prediction counts), compares it with your goal, and checks the HRV and sleep of
+the last 7 nights. It ends with a target pace for each quarter of the race.
+
+| Argument   | Values                                         | Default                  |
+| ---------- | ---------------------------------------------- | ------------------------ |
+| `date`     | the race date, `yyyy-MM-dd`                    | none: the assistant asks |
+| `distance` | `5k`, `10k`, `half`, `marathon`, or a distance | none: the assistant asks |
+| `goal`     | your goal time, for example `1:45:00`          | no goal: prediction only |
+
+In Claude Code, give the values in any order: a value in the form `yyyy-MM-dd` is the date, a value
+in the form `1:45:00` is the goal, and the other words are the distance. For example
+`/garmin-personal:race-readiness half marathon 2026-11-15`.
 
 ## Configuration
 

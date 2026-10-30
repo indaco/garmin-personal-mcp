@@ -7,7 +7,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { parseArgs } from "node:util";
-import { fillPage } from "./fill-dashboard-fixture.mjs";
+import { asServer, fillPage } from "./fill-dashboard-fixture.mjs";
 
 const { values: opt, positionals } = parseArgs({
   allowPositionals: true,
@@ -539,13 +539,9 @@ activities.forEach((a, n) => (a.id = 30500000000 + n * 7919 + ri(0, 7000)));
 const withId = activities.map(({ id, ...a }) => ({ id, ...a }));
 const dayOf = (a) => a.start.slice(0, 10);
 const current = withId.filter((a) => dayOf(a) >= START).toReversed();
-// the details that getDashboardData attaches (src/dashboard.ts attachDetails): laps for the 3 newest
-// activities, races and runs over 15 km, sets for the 30 newest strength sessions
-let strengthSessions = 0;
-current.forEach((a, n) => {
-  if (a.exercises && strengthSessions++ >= 30) delete a.exercises;
-  if (a.laps && !(n < 3 || a.race || a.km > 15)) delete a.laps;
-});
+// only the details that getDashboardData attaches, for a page with the workout comparison that has
+// updated for months: every repeated run has its .FIT file saved
+asServer(current, true, true);
 const previous = withId
   .filter((a) => dayOf(a) < START)
   .toReversed()
@@ -678,11 +674,13 @@ console.log(
 const LAYOUT_KEY = "garmin-layout:";
 const NOTE = `<style>.demo-note{max-width:1440px;margin:12px auto 0;padding:0 16px}.demo-note p{margin:0;padding:8px 12px;border:1px solid var(--warn);border-radius:8px;background:var(--panel);color:var(--text)}.demo-note strong{color:var(--warn)}</style>
     <script>try{localStorage.removeItem("${LAYOUT_KEY}"+location.pathname)}catch(e){}</script>
-    <div class="demo-note" role="note"><p><strong>Sample data.</strong> A demo of garmin-personal-mcp with made-up activities, not a real Garmin account. Not affiliated with or endorsed by Garmin. Try Edit layout in the settings menu: your changes last until you reload the page.</p></div>
+    <div class="demo-note" role="note"><p><strong>Sample data.</strong> A demo of garmin-personal-mcp with made-up activities, not a real Garmin account. Not affiliated with or endorsed by Garmin. It shows a page that has updated for a year, so Workout trend has the laps of every session. Try Edit layout in the settings menu: your changes last until you reload the page.</p></div>
     <div id="app"></div>`;
 
 if (outHtml) {
-  const page = fillPage(readFileSync("dist/dashboard.html", "utf8"), data);
+  const page = fillPage(readFileSync("dist/dashboard.html", "utf8"), data, null, {
+    workouts: true,
+  });
   if (!page.includes('<div id="app"></div>')) throw new Error("dist/dashboard.html has no #app");
   if (!page.includes(LAYOUT_KEY)) throw new Error(`dist/dashboard.html has no ${LAYOUT_KEY} key`);
   mkdirSync(dirname(outHtml), { recursive: true });

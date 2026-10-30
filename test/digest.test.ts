@@ -4,6 +4,15 @@ import { sessionSeconds } from "../src/page/calc";
 
 const squat = (sets: Record<string, number>[]) => ({ exercise: "Back Squat", sets });
 
+/** A run named Easy Run on a day. */
+const run = (day: string, type = "running") => ({
+  name: "Easy Run",
+  type,
+  start: `${day} 07:00:00`,
+  km: 5,
+  duration: "30:00",
+});
+
 /** A small getDashboardData result, most recent activity first, as the server returns it. */
 const data = {
   generated: "2026-10-26",
@@ -213,6 +222,30 @@ describe("digest", () => {
       achievableFitnessAge: 31.2,
     });
     expect(d.sync).toEqual(data.sync);
+  });
+
+  it("counts the run names that repeat: the workouts that the dashboard can compare across weeks", () => {
+    expect(d.repeatedRuns).toEqual({});
+    const more = digest({
+      ...data,
+      activities: [
+        ...data.activities,
+        run("2026-10-12", "trail_running"),
+        run("2026-10-05"),
+        { ...run("2026-10-04", "cycling"), name: "City 10K" },
+      ],
+    });
+    // runs only: a ride of the same name does not count
+    expect(more.repeatedRuns).toEqual({ "Easy Run": 3 });
+    // the place that Garmin puts before the workout does not count
+    const places = digest({
+      ...data,
+      activities: [
+        { ...run("2026-10-12"), name: "Riverside - Drill Workout" },
+        { ...run("2026-10-05"), name: "Hillview - Drill Workout" },
+      ],
+    });
+    expect(places.repeatedRuns).toEqual({ "Drill Workout": 2 });
   });
 
   it("skips an activity without a start date", () => {

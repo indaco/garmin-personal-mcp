@@ -30,10 +30,16 @@ such a tool, ask the questions in chat as numbered lists, with the default first
    Ask which sports to keep (multiple choice) from the boards of `boards`, with their number of
    activities. With more than 4 boards, show the 3 largest and say that I can type the others.
    Default: all.
+   In the same call, ask about the **Workout comparison**, only when `repeatedRuns` of the `digest`
+   is not empty and I kept the activity names. Name the workouts of `repeatedRuns` with their number
+   of runs. Options "No" (default) and "Yes, compare them across weeks". Say that a yes adds the
+   Workout trend widget for those runs (when I keep the running board), and that the page then
+   downloads the laps of the last 8 runs of each workout, once: this build takes longer.
 4. Call `writeDashboard` with `weeks` = {{weeks}}, the `path` and `settings`:
    `title`, `headline`, `sports` (the boards to keep), `exclude` (from `recovery`, `fitnessAge`,
    `zones`, `names`, `notes`), `languages` (the codes to keep: {{languages}}), `language` (the one it
-   opens in), `themes`, `theme`. Leave out a setting that keeps its default. If there is no page at
+   opens in), `themes`, `theme`, `workouts` (true when I said yes to the workout comparison). Leave
+   out a setting that keeps its default. If there is no page at
    the path, also give `layout` = "preset".
 5. Unless I left out the coach notes: write at most 5 coach notes from the digest. Each note names a
    specific number of the digest. Training suggestions only, no medical advice. Plain text, in my

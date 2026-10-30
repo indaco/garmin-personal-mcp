@@ -18,7 +18,7 @@ export function createParts(config: Config) {
   const tools = new GarminTools(api, config.dataDir);
   const dashboard = new GarminDashboard(tools, api, config.dataDir);
   const writer = new DashboardWriter(
-    (weeks) => dashboard.getDashboardData(weeks),
+    (weeks, workouts) => dashboard.getDashboardData(weeks, workouts),
     config.dataDir,
     template,
   );

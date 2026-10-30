@@ -8,7 +8,7 @@ import { weeksCovered } from "./dashboard";
 import { type Digest, digest } from "./digest";
 import { Profile } from "@garmin/fitsdk";
 import { type Activity, GROUPS, groupOf } from "./page/calc";
-import { CATALOGUE } from "./page/catalogue";
+import { CATALOGUE, inPage } from "./page/catalogue";
 import { ABOUT } from "./page/catalogue-about";
 import { BUILT_IN } from "./page/i18n/built-in";
 import { type Catalogue, en } from "./page/i18n/en";
@@ -300,6 +300,7 @@ export function checkSettings(s: Settings): Settings {
         "language",
         "themes",
         "theme",
+        "workouts",
       ].includes(k),
   );
   if (unknown.length > 0) problems.push(`unknown settings ${unknown.join(", ")}`);
@@ -317,6 +318,8 @@ export function checkSettings(s: Settings): Settings {
     problems.push("language: auto or a code such as en, it or pt-BR");
   if (s.theme !== undefined && !(s.themes ?? themeIds).includes(s.theme))
     problems.push(`theme: one of ${(s.themes ?? themeIds).join(", ")}`);
+  if (s.workouts !== undefined && typeof s.workouts !== "boolean")
+    problems.push("workouts: true or false");
   if (problems.length > 0) throw new Error(`Settings: ${problems.join("; ")}`);
   return {
     ...s,
@@ -329,10 +332,10 @@ export class DashboardWriter {
   /** Writes run one at a time, so two calls never mix their pages. */
   #queue: Promise<unknown> = Promise.resolve();
   /** The data of the last call: a second call soon after (to add the notes) uses the same snapshot. */
-  #last: { weeks: number; at: number; json: string } | undefined;
+  #last: { weeks: number; workouts: boolean; at: number; json: string } | undefined;
 
   constructor(
-    private readonly getData: (weeks?: number) => Promise<string>,
+    private readonly getData: (weeks?: number, workouts?: boolean) => Promise<string>,
     private readonly dataDir: string,
     private readonly template: () => Promise<string>,
   ) {}
@@ -354,7 +357,9 @@ export class DashboardWriter {
       } catch (e) {
         throw options.settings ? e : unreadable(e, target);
       }
-      const data = JSON.parse(await this.#data(options.weeks ?? weeksOf(old))) as Json;
+      const data = JSON.parse(
+        await this.#data(options.weeks ?? weeksOf(old), settings.workouts === true),
+      ) as Json;
       return {
         path: target,
         boards: countBy(listOf(data.activities), groupOf),
@@ -437,8 +442,12 @@ export class DashboardWriter {
       );
     }
     if (page === undefined && next !== old) next = styled(next, own);
+    // a page that Claude wrote keeps its settings in its block too, so its updates filter the same way
+    if (page !== undefined && marker("settings").test(next)) {
+      next = writeBlock(next, "settings", Object.keys(own).length > 0 ? own : null);
+    }
     if (page === undefined) next = await this.#withLibrary(next, old);
-    const raw = JSON.parse(await this.#data(weeks ?? weeksOf(old))) as Json;
+    const raw = JSON.parse(await this.#data(weeks ?? weeksOf(old), own.workouts === true)) as Json;
     next = withData(next, raw, own, notes);
 
     let backup: string | undefined;
@@ -597,16 +606,14 @@ export class DashboardWriter {
       })),
       pageLanguages: pageLanguages(page, settings),
       languages: missingTexts(page),
-      // a widget whose data the page leaves out shows nothing there
-      catalogue: CATALOGUE.filter((c) => !c.needs || !settings.exclude?.includes(c.needs)).map(
-        (c) => ({
-          id: c.id,
-          title: en[c.title],
-          ...(c.types ? { types: c.types } : {}),
-          span: c.span,
-          about: ABOUT[c.id],
-        }),
-      ),
+      // a widget whose data the page leaves out, or that the page has not turned on, shows nothing there
+      catalogue: CATALOGUE.filter((c) => inPage(c, settings)).map((c) => ({
+        id: c.id,
+        title: en[c.title],
+        ...(c.types ? { types: c.types } : {}),
+        span: c.span,
+        about: ABOUT[c.id],
+      })),
       widgetApi: WIDGET_API,
       ...(o.englishTexts ? { englishTexts: en } : {}),
     };
@@ -653,12 +660,18 @@ export class DashboardWriter {
   }
 
   /** The data for `weeks`; the same snapshot for 15 minutes, so the notes match the digest they come from. */
-  async #data(weeks: number | undefined): Promise<string> {
+  async #data(weeks: number | undefined, workouts: boolean): Promise<string> {
     const covered = weeksCovered(weeks);
     const last = this.#last;
-    if (last && last.weeks === covered && Date.now() - last.at < REUSE_MS) return last.json;
-    const json = await this.getData(weeks);
-    this.#last = { weeks: covered, at: Date.now(), json };
+    if (
+      last &&
+      last.weeks === covered &&
+      last.workouts === workouts &&
+      Date.now() - last.at < REUSE_MS
+    )
+      return last.json;
+    const json = await this.getData(weeks, workouts);
+    this.#last = { weeks: covered, workouts, at: Date.now(), json };
     return json;
   }
 
@@ -909,6 +922,12 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
               .describe(`Themes to keep: ${THEMES.map((t) => t.id).join(", ")}`)
               .optional(),
             theme: z.string().describe("Default theme").optional(),
+            workouts: z
+              .boolean()
+              .describe(
+                "Compare the same run workout across weeks (Workout trend widget): the server loads the laps of the last 8 sessions of each repeated run name, and of older ones whose .FIT file is saved; off when not set",
+              )
+              .optional(),
           })
           .describe("The page settings; replaces the page's own")
           .optional(),

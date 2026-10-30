@@ -3,7 +3,9 @@ personal **training + recovery dashboard** for the last **{{weeks}} weeks** (tod
 Answer in my language.
 
 1. Call `writeDashboard` with `preview` = true and `weeks` = {{weeks}}. It writes nothing. Its
-   `settings` are the settings of the page, or none when there is no page.
+   `settings` are the settings of the page, or none when there is no page, and its `digest` has
+   `repeatedRuns`: the workouts with more than one run (a run name without the place that Garmin
+   puts before " - ").
 2. Then ask the questions below. If your client has a tool for questions with choices, use it;
    without one, ask in chat as numbered lists, with the default first:
    - **Settings**: only when `settings` has more than `title` and `headline`. Tell me those settings
@@ -11,18 +13,25 @@ Answer in my language.
      `settings` has `exclude`, name each item it leaves out and say that the defaults put them back
      into the page, also on each automatic update: this matters for a page that I share.
      Options "Keep these settings" (default) and "Use the defaults: all sports, all data, English and
-     the language of my Garmin profile, all themes, opens in midnight". Say that I can type my own
-     choice, for example "all sports, keep the rest".
+     the language of my Garmin profile, all themes, opens in midnight, no workout comparison". Say
+     that I can type my own choice, for example "all sports, keep the rest".
    - **Title**: options "Keep the title" (default: the `title` of `settings`, else "{{title}}") and
      "Type my own".
    - **Headline** (the line under the title): options "Keep the headline" (default: the `headline`
      of `settings`, else "{{headline}}") and "Type my own".
+   - **Workout comparison**: only when `repeatedRuns` is not empty and `settings` has no `workouts`.
+     Name the workouts of `repeatedRuns` with their number of runs. Options "No" (default) and "Yes,
+     compare them across weeks". Say that a yes adds the Workout trend widget for those runs, and
+     that the page then downloads the laps of the last 8 runs of each workout, once: this build
+     takes longer.
    When I choose "Type my own" and give no text, ask for the text in chat.
 3. Call `writeDashboard` with `weeks` = {{weeks}} and `layout` = "{{layout}}". If I chose the
    defaults, also give `settings` = only the `title` and `headline` of `settings`, the ones that it
-   has. If I typed my own choice, give `settings` = `settings` changed as I said. The server gets
-   the data, writes the page from its template, and returns the path of the page and a digest of
-   the data. An existing page stays as a `.bak` file.
+   has. If I typed my own choice, give `settings` = `settings` changed as I said. If I said yes to
+   the workout comparison, give `settings` with `workouts` = true: added to the settings of this
+   step, or to `settings` when this step gives none. The server gets the data, writes the page from
+   its template, and returns the path of the page and a digest of the data. An existing page stays
+   as a `.bak` file.
 4. Write at most 5 coach notes from the digest. Each note names a specific number of the digest, for
    example "load ratio 1.18 while HRV was under its weekly average on 3 of the last 7 nights".
    Training suggestions only, no medical advice. Plain text, in my language.

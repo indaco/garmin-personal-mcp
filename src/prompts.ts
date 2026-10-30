@@ -26,6 +26,8 @@ export function registerPrompts(server: McpServer): void {
   const widgetPrompt = load("dashboard-widget.md");
   const languagePrompt = load("dashboard-language.md");
   const setupPrompt = load("dashboard-setup.md");
+  const reviewPrompt = load("run-review.md");
+  const readinessPrompt = load("race-readiness.md");
 
   const dashboardDescription =
     "Build a personal training + recovery dashboard (volume, load, HRV, sleep) from Garmin data";
@@ -175,6 +177,69 @@ export function registerPrompts(server: McpServer): void {
           language: language || "my language (the language of this chat)",
           pathArgument: pathPart(path),
           pathWith: pathWith(path),
+        }),
+      );
+    },
+  );
+
+  const reviewDescription =
+    "Review a run as a coach: planned workout against the laps, rep fade, HR drift, recovery";
+  server.registerPrompt(
+    "run-review",
+    {
+      description: reviewDescription,
+      argsSchema: z.object({
+        activity: z
+          .string()
+          .describe("An activity id, or words of its name; empty = the latest run")
+          .optional(),
+      }),
+    },
+    (args) => {
+      const activity = arg(args.activity);
+      const find = /^\d+$/.test(activity)
+        ? `The run is the activity with \`activityId\` = ${activity}.`
+        : activity
+          ? `Call \`listActivities\` with \`names\` = ${JSON.stringify([activity])} and \`limit\` = 100, and keep the runs (a type that ends in \`running\`). My words can be only the start of the name: when the runs have more than one name, list the 5 most recent with date and name and ask me which one. Then take the most recent run of that name.`
+          : "Call `listActivities` and take the most recent run (a type that ends in `running`).";
+      return result(reviewDescription, render(reviewPrompt, { today: localToday(), find }));
+    },
+  );
+
+  const readinessDescription =
+    "Check if you are ready for a race: training block, taper, predicted time, recovery, race plan";
+  server.registerPrompt(
+    "race-readiness",
+    {
+      description: readinessDescription,
+      argsSchema: z.object({
+        date: z.string().describe("The race date, yyyy-MM-dd").optional(),
+        distance: z.string().describe("5k, 10k, half, marathon, or a distance in km").optional(),
+        goal: z.string().describe("Your goal time, e.g. 1:45:00; empty = no goal").optional(),
+      }),
+    },
+    (args) => {
+      // Claude Code passes arguments by position: read the date and the time by their shape from any slot
+      const words = [args.date, args.distance, args.goal].map(arg).join(" ").split(/\s+/);
+      const date = words.find((w) => /^\d{4}-\d{2}-\d{2}$/.test(w)) ?? "";
+      const goal = words.find((w) => /^\d{1,2}:\d{2}(:\d{2})?$/.test(w)) ?? "";
+      const distance = words.filter((w) => w && w !== date && w !== goal).join(" ");
+      return result(
+        readinessDescription,
+        render(readinessPrompt, {
+          today: localToday(),
+          startDate: addDays(localToday(), -7 * 12),
+          race: `${distance || "distance not given"} on ${date || "a date not given"}${goal ? `, goal time ${goal}` : ""}`,
+          missing:
+            date && distance
+              ? ""
+              : "The race date or distance is missing: ask me for it before you call a tool.\n",
+          goalLine: goal
+            ? `Compare it with my goal time of ${goal}: the gap, and whether the goal is realistic.`
+            : "I have no goal time: give the prediction only.",
+          planFrom: goal
+            ? "from the goal time when it is realistic, else from the prediction"
+            : "from the prediction",
         }),
       );
     },

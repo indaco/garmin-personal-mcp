@@ -5,6 +5,7 @@ import {
   changeClass,
   dailyLoads,
   epley,
+  fitnessFatigue,
   intensityMinutes,
   loadOf,
   loadRatio,
@@ -43,6 +44,32 @@ describe("zones", () => {
     ];
     expect(zonesOf(raw)).toEqual({ maxHR: 188, floors: [94, 113, 132, 150, 169] });
     expect(zonesOf(undefined)).toEqual({ floors: [] });
+  });
+});
+
+describe("fitness, fatigue and form", () => {
+  it("reaches the daily load when the load stays the same", () => {
+    const f = fitnessFatigue(Array.from({ length: 400 }, () => 100));
+    expect(f.fitness.at(-1)).toBeCloseTo(100, 1);
+    expect(f.fatigue.at(-1)).toBeCloseTo(100, 1);
+    expect(f.form.at(-1)).toBeCloseTo(0, 1);
+  });
+
+  it("starts at 0 and moves 1/42 and 1/7 of the way to each day's load", () => {
+    const f = fitnessFatigue([42, 0]);
+    expect(f.fitness[0]).toBeCloseTo(1, 6);
+    expect(f.fatigue[0]).toBeCloseTo(6, 6);
+    // form is the fitness minus the fatigue of the day before
+    expect(f.form).toEqual([0, 1 - 6]);
+  });
+
+  it("drops fatigue faster than fitness on rest days, so form rises", () => {
+    const f = fitnessFatigue([
+      ...Array.from({ length: 60 }, () => 100),
+      ...Array.from({ length: 10 }, () => 0),
+    ]);
+    expect(f.form[59]).toBeLessThan(0);
+    expect(f.form.at(-1)).toBeGreaterThan(0);
   });
 });
 

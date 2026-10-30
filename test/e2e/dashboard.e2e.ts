@@ -38,6 +38,9 @@ async function runningPace(activities: unknown[]): Promise<string | null> {
     .textContent();
 }
 const hash = (page: Page) => page.evaluate(() => location.hash);
+/** A copy of the object without the given fields. */
+const without = (o: object, fields: string[]) =>
+  Object.fromEntries(Object.entries(o).filter(([k]) => !fields.includes(k)));
 /** Opens edit mode from the settings menu. */
 async function startEdit(page: Page): Promise<void> {
   await page.click(".account summary");
@@ -53,6 +56,7 @@ const ALL_PRESET = [
   "weeklyVolume",
   "intensityMinutes",
   "loadSafety",
+  "fitnessFatigue",
   "loadVsRecovery",
   "activities",
   "coachNotes",
@@ -795,7 +799,8 @@ async function problems(page: Page): Promise<string[]> {
 
 describe("accessibility", () => {
   it("has no serious problem on the boards, in edit mode and in the light and both Munich themes", async () => {
-    const { page } = await open(browser, pageFile());
+    // with the opt-in workout trend, so every widget of the Run board is checked
+    const { page } = await open(browser, pageFile({ settings: { workouts: true } }));
     for (const tab of ["all", "recovery", "running", "strengthTraining"]) {
       await page.click(`[data-tab=${tab}]`);
       expect([tab, await problems(page)]).toEqual([tab, []]);
@@ -918,7 +923,7 @@ describe("focus", () => {
     await page.focus("[aria-label='Move Weekly volume']");
     for (const key of ["Space", "ArrowRight", "Space"]) await page.keyboard.press(key);
     expect(await focused(page)).toBe("Move Weekly volume");
-    expect(await page.textContent("#announce")).toBe("Weekly volume moved to position 7 of 11");
+    expect(await page.textContent("#announce")).toBe("Weekly volume moved to position 7 of 12");
     // a hidden tile gives focus to the tile in its place
     await page.focus("[aria-label='Hide Weekly volume']");
     await page.keyboard.press("Enter");
@@ -1198,6 +1203,189 @@ describe("type boards", () => {
     expect(await page.textContent("[data-id=racePredictor]")).toContain("Estimate (Riegel)");
     // a small multiple for each running form metric in the data
     expect(await page.$$eval("[data-id=runningForm] .multiple", (m) => m.length)).toBe(7);
+    // the efficiency of the aerobic runs, last 4 weeks against the first 4
+    expect(await page.textContent("[data-id=aerobicFitness] .kpi-label")).toBe(
+      "Aerobic-run efficiency · last 4 weeks",
+    );
+    expect(await page.textContent("[data-id=aerobicFitness] .kpi-value")).toMatch(/^\d\.\d\d$/);
+    expect(await page.textContent("[data-id=aerobicFitness] .kpi-sub")).toContain(
+      "vs first 4 weeks",
+    );
+    // the 5 km and 10 km of each run over time
+    expect(
+      await page.$$eval("[data-id=bestEfforts] .sr-only thead th", (h) =>
+        h.map((x) => x.textContent),
+      ),
+    ).toEqual(["5 km", "10 km"]);
+    // the laps of the fixture have HR, so every long run has a drift
+    const drift = await page.$$eval("[data-id=longRuns] table.data tbody tr", (r) =>
+      r.map((x) => x.children[5].textContent),
+    );
+    expect(drift.length).toBeGreaterThan(0);
+    for (const d of drift) expect(d).toMatch(/^-?\d+\.\d%$/);
+  });
+
+  it("compares the same workout across weeks, up to 3 workouts, intervals by their work laps", async () => {
+    // the Run board has the workout trend only when the page turns it on
+    const { page, errors } = await open(browser, pageFile({ settings: { workouts: true } }), {
+      hash: "#running",
+    });
+    expect(await tiles(page)).toContain("workoutTrend");
+    const tile = "[data-id=workoutTrend]";
+    const pressed = () =>
+      page.$$eval(`${tile} [aria-pressed=true]`, (b) => b.map((x) => x.textContent));
+    const kpis = () => page.$$eval(`${tile} .kpi-label`, (k) => k.map((x) => x.textContent));
+    // the repeated run names only, with their session count; the first one and pace are chosen
+    expect(
+      await page.$$eval(`${tile} .chip`, (b) => b.slice(0, 4).map((x) => x.textContent)),
+    ).toEqual(["Long Run (10)", "Track Intervals (6)", "Easy Run (12)", "Tempo Run (6)"]);
+    expect(await pressed()).toEqual(["Long Run (10)", "Pace / speed"]);
+    // the 8 newest sessions, the others behind "Show all"
+    expect(await page.$$eval(`${tile} table.data tbody tr:not([hidden])`, (r) => r.length)).toBe(8);
+    expect(await page.textContent(`${tile} .btn.more`)).toBe("Show all 10");
+    await page.click(`${tile} >> text=Track Intervals (6)`);
+    expect(await kpis()).toEqual(["Long Run", "Track Intervals"]);
+    await page.click(`${tile} >> text=Easy Run (12)`);
+    await page.click(`${tile} >> text=Tempo Run (6)`);
+    // a fourth workout replaces the first
+    expect(await kpis()).toEqual(["Track Intervals", "Easy Run", "Tempo Run"]);
+    // the table shows the sessions of the first workout: intervals with reps and fade
+    expect(await page.textContent(`${tile} h3`)).toBe("Track Intervals");
+    const head = await page.$$eval(`${tile} table.data th`, (h) => h.map((x) => x.textContent));
+    expect(head.slice(-2)).toEqual(["Reps", "Fade"]);
+    const reps = await page.$$eval(`${tile} table.data tbody tr`, (r) =>
+      r.map((x) => x.children[x.children.length - 2].textContent),
+    );
+    expect(reps).toEqual(["7", "7", "7", "7", "7", "7"]);
+    await page.click(`${tile} >> text=Avg HR`);
+    expect(await page.textContent(`${tile} .kpi-value`)).toMatch(/^\d+ bpm$/);
+    expect(await chartsWithoutTooltip(page)).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
+  it("groups the runs of one workout whatever place Garmin puts in their name", async () => {
+    let n = 0;
+    const activities = data.activities.map((a: { name: string }) =>
+      a.name === "Tempo Run"
+        ? { ...a, name: `${n++ % 2 ? "Hillview" : "Riverside"} - Tempo Run` }
+        : a,
+    );
+    const { page } = await open(
+      browser,
+      pageFile({
+        data: { ...data, activities, v: DASHBOARD_VERSION },
+        settings: { workouts: true },
+      }),
+      { hash: "#running" },
+    );
+    const chips = await page.$$eval("[data-id=workoutTrend] .chip", (b) =>
+      b.map((x) => x.textContent),
+    );
+    expect(chips).toContain("Tempo Run (6)");
+    expect(chips.some((c) => c?.includes(" - "))).toBe(false);
+  });
+
+  it("leaves out an interval session without work laps, so reps compare with reps", async () => {
+    const intervals = data.activities.filter((a: { name: string }) => a.name === "Track Intervals");
+    const oldest = intervals.at(-1);
+    const activities = data.activities.map((a: object) =>
+      a === oldest ? { ...a, laps: undefined } : a,
+    );
+    const { page } = await open(
+      browser,
+      pageFile({
+        data: { ...data, activities, v: DASHBOARD_VERSION },
+        settings: { workouts: true },
+      }),
+      { hash: "#running" },
+    );
+    const tile = "[data-id=workoutTrend]";
+    await page.click(`${tile} >> text=Track Intervals (6)`);
+    await page.click(`${tile} >> text=Long Run (10)`);
+    expect(await page.$$eval(`${tile} table.data tbody tr`, (r) => r.length)).toBe(5);
+    expect(await page.textContent(tile)).toContain(
+      "Track Intervals: 1 session has no work laps and is left out, so reps compare with reps.",
+    );
+    // the oldest session left out: the compared ones start with the next one
+    expect(await page.textContent(tile)).toContain("The sessions with work laps start on Aug 27.");
+  });
+
+  it("lets a workout go, but keeps at least one", async () => {
+    const { page } = await open(browser, pageFile({ settings: { workouts: true } }), {
+      hash: "#running",
+    });
+    const tile = "[data-id=workoutTrend]";
+    const kpis = () => page.$$eval(`${tile} .kpi-label`, (k) => k.map((x) => x.textContent));
+    await page.click(`${tile} >> text=Track Intervals (6)`);
+    await page.click(`${tile} >> text=Long Run (10)`);
+    expect(await kpis()).toEqual(["Track Intervals"]);
+    await page.click(`${tile} >> text=Track Intervals (6)`);
+    expect(await kpis()).toEqual(["Track Intervals"]);
+  });
+
+  it("covers the edge cases of the run widgets", async () => {
+    // without HR zones, the efficiency counts every run, and says so
+    let { page } = await open(
+      browser,
+      pageFile({ data: { ...data, zones: [], v: DASHBOARD_VERSION } }),
+      { hash: "#running" },
+    );
+    expect(await page.textContent("[data-id=aerobicFitness]")).toContain("counts every run");
+    // one week: no first and last weeks to compare, no trend of best efforts
+    ({ page } = await open(browser, pageFile(), { hash: "#running@2026-10-19_2026-10-19" }));
+    expect(await page.$$eval("[data-id=aerobicFitness] .kpi", (k) => k.length)).toBe(0);
+    expect(await page.$$eval("[data-id=bestEfforts] canvas", (c) => c.length)).toBe(0);
+    // laps without HR: the long runs have no drift
+    const noHr = data.activities.map((a: { laps?: Record<string, unknown>[] }) =>
+      a.laps ? { ...a, laps: a.laps.map((l) => without(l, ["avgHR"])) } : a,
+    );
+    ({ page } = await open(
+      browser,
+      pageFile({ data: { ...data, activities: noHr, v: DASHBOARD_VERSION } }),
+      { hash: "#running" },
+    ));
+    const drift = await page.$$eval("[data-id=longRuns] table.data tbody tr", (r) =>
+      r.map((x) => x.children[5].textContent),
+    );
+    expect(drift.length).toBeGreaterThan(0);
+    expect(new Set(drift)).toEqual(new Set(["n/a"]));
+  });
+
+  it("says when fitness has too little data before the window, and shows nothing without load", async () => {
+    let { page } = await open(
+      browser,
+      pageFile({ data: { ...data, previousActivities: [], v: DASHBOARD_VERSION } }),
+    );
+    expect(await page.textContent("[data-id=fitnessFatigue]")).toContain(
+      "The data starts less than 6 weeks before this window",
+    );
+    ({ page } = await open(
+      browser,
+      pageFile({
+        data: {
+          ...data,
+          activities: data.activities.map((a: object) => without(a, ["trainingLoad", "avgHR"])),
+          previousActivities: data.previousActivities.map((a: object) =>
+            without(a, ["trainingLoad", "avgHR"]),
+          ),
+          v: DASHBOARD_VERSION,
+        },
+      }),
+    ));
+    expect(await page.$$eval("[data-id=fitnessFatigue] .empty", (e) => e.length)).toBe(1);
+  });
+
+  it("says how to compare workouts when no run name repeats", async () => {
+    const activities = data.activities.map((a: object, i: number) => ({ ...a, name: `Run ${i}` }));
+    const { page } = await open(
+      browser,
+      pageFile({
+        data: { ...data, activities, v: DASHBOARD_VERSION },
+        settings: { workouts: true },
+      }),
+      { hash: "#running" },
+    );
+    expect(await page.textContent("[data-id=workoutTrend]")).toContain("No run name repeats");
   });
 
   it("says one session so far instead of a trend", async () => {

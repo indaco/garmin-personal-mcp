@@ -20,4 +20,6 @@ export interface Settings {
   themes?: string[];
   /** The theme before the reader picks one. */
   theme?: string;
+  /** Compare the same run workout across weeks: the server loads the laps of its last sessions. Off when not set. */
+  workouts?: boolean;
 }

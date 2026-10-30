@@ -5,6 +5,21 @@ last **{{weeks}} weeks** (today is {{today}}).
 The point of this dashboard is what social training apps do not show: how training load and
 recovery (HRV, sleep, resting heart rate, body battery) move together. Answer in my language.
 
+## Workout comparison
+
+First call `writeDashboard` with `preview` = true and `weeks` = {{weeks}}. It writes nothing. If
+`repeatedRuns` of its `digest` is not empty, ask me one question before you design the page: whether
+to compare those workouts across weeks. Name them with their number of runs. If your client has a
+tool for questions with choices, use it: "No" (default) and "Yes, compare them across weeks". Say
+that a yes adds a Workout trend section, and that the page then downloads the laps of the last 8
+runs of each workout, once: this build takes longer. On a yes:
+
+- Put this line first in the first script of the page:
+  `window.GARMIN_SETTINGS = /* garmin-settings:start */null/* garmin-settings:end */;`
+- In the first `writeDashboard` call that writes the page, give `settings` = { "workouts": true }.
+  The page keeps it, so its updates load the laps too.
+- Add the Workout trend section to the Run board (below).
+
 ## 1. The data
 
 You design the page; the server puts the data into it. The page reads the data as `DATA`: the result
@@ -13,8 +28,8 @@ of `getDashboardData` with `weeks` = {{weeks}}, which has:
 - `zones`: my HR zones. `fitnessAge`: Garmin's fitness age.
 - `activities`: the activities from {{startDate}} to {{today}}, most recent first, as compact
   summaries. Strength activities have `exercises`: sets, rest, and the primary and secondary
-  muscles of each exercise. The 3 most recent activities, every race and every run over 15 km
-  have `laps` (km splits, intervals, warm-up and cool-down).
+  muscles of each exercise. The 3 most recent activities, every race, every run over 15 km and
+  every run whose name repeats have `laps` (km splits, intervals, warm-up and cool-down).
 - `previousActivities`: the activities from {{prevStartDate}} to {{prevEndDate}}, with the fields
   for the period comparison.
 - `hrv`: one row for each night: `hrv`, `weeklyAvg`, `status`, and the balanced range `low` to
@@ -243,6 +258,14 @@ charts ("one session so far"). Trends start at 2 sessions.
 9. **Long runs and pace split**: the long run share for each week (flag it above 35%), and the
    split type of each race and long run. Also grade-adjusted pace against pace, and ascent for
    each week.
+10. **Workout trend**, only when I said yes to the workout comparison: the runs of the same workout
+   across weeks (the run name without the place that Garmin puts before " - "), up to 3 workouts
+   side by side, with a choice of metric: pace, avg HR, efficiency, cadence, ground contact,
+   vertical ratio, stride and power. For a run whose laps mark a warm-up,
+   rest or cool-down, take pace, HR, cadence and power from its work laps (intensity `active` or
+   `interval`) of 20 m and 8 s or more: a shorter one is a lap that the watch adds between steps. Show the
+   reps and the fade: the pace of the last rep against the first of the same workout step (`step`,
+   the step with the most reps), only when those reps have the same distance or time (within 15%).
 
 **Walk** adds pace and avg HR for each week, and steps, cadence and body battery change for each
 walk. It also adds daily steps against the goal, with floors (last 14 days). **Hike** adds

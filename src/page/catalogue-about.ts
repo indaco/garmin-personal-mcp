@@ -15,6 +15,8 @@ export const ABOUT: Record<string, string> = {
     "Moderate + 2 x vigorous minutes of the activities each week, against 150 minutes.",
   loadSafety:
     "Weekly load with its change against the week before (flagged above +10%), and 7-day monotony and strain (Foster).",
+  fitnessFatigue:
+    "Fitness (42-day) and fatigue (7-day) averages of the daily load, and form: fitness minus fatigue, to time a taper.",
   calendar:
     "A heatmap of the training minutes of each day; a day shows its activities on hover or touch.",
   loadVsRecovery: "Daily load by type (bars) with nightly HRV (line).",
@@ -31,10 +33,11 @@ export const ABOUT: Record<string, string> = {
     "Sessions, time, distance with pace or speed, HR, Garmin load and its share, and the last 7 days against the 4-week average.",
   typeWeekly: "Time, distance or sessions of each week.",
   hrZones: "Minutes in HR zones 1-5 each week.",
-  bestEfforts: "The fastest 1 km, mile, 5 km, 10 km, half marathon and marathon in the window.",
+  bestEfforts:
+    "The fastest 1 km, mile, 5 km, 10 km, half marathon and marathon in the window, and the pace of the fastest 5 km and 10 km of each week.",
   races: "Each race with its time, pace, HR, power and aerobic training effect.",
   aerobicFitness:
-    "Pace against HR of each run (older runs paler), and weekly pace and efficiency (metres per heartbeat).",
+    "Pace against HR of each run (older runs paler), weekly pace, and the efficiency (metres per heartbeat) of the runs below Z4: each run, the weekly mean and the last weeks against the first.",
   intensityShare: "The share of running time in Z1-2 (easy) and Z4-5 (hard) each week.",
   runningForm:
     "Weekly cadence, ground contact, stride, vertical oscillation and ratio, and power, one small chart for each: cadence and ground contact first, the others under Show all.",
@@ -45,7 +48,9 @@ export const ABOUT: Record<string, string> = {
   racePredictor:
     "Predicted 5 km, 10 km, half marathon and marathon times (Riegel), from the best effort of 5 km or more.",
   longRuns:
-    "The share of the longest run in each week's km (flagged above 35%), weekly ascent, and the pace split of races and long runs.",
+    "The share of the longest run in each week's km (flagged above 35%), weekly ascent, and the pace split and HR drift of races and long runs.",
+  workoutTrend:
+    "The same workout (runs with the same name, without the place that Garmin puts before it) across weeks: pace, HR, efficiency and running form, up to 3 workouts side by side; intervals by their work laps. Only on a page with the workout comparison (setting workouts).",
   setsPerCategory: "Completed sets of each movement category each week.",
   muscleBalance: "Average weekly sets of each muscle group against 10-20, and the push:pull ratio.",
   exercises:
