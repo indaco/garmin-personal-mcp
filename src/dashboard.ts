@@ -4,6 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { type GarminApiClient, GarminApiError } from "./api-client";
 import { addDays, localToday } from "./dates";
+import { digest } from "./digest";
 import { log } from "./log";
 import { type GarminTools, firstArray, summarize, writeAtomically } from "./tools";
 
@@ -87,17 +88,8 @@ export class GarminDashboard {
       ...(typeof units === "string" && UNITS.includes(units) ? { units } : {}),
       ...(/^[a-z]{2,3}(-[A-Z]{2})?$/.test(locale) ? { locale } : {}),
     };
-    const activities = activitiesBetween(cache, start, today).map((a) => structuredClone(a));
-    await this.#attachDetails(activities);
-    out.activities = activities;
-    out.previousActivities = activitiesBetween(cache, prevStart, addDays(start, -1)).map(compact);
-    out.hrv = between(objectAt(cache, "hrv"), start, today);
-    out.recovery = between(
-      objectAt(cache, "recovery"),
-      addDays(today, -(RECOVERY_DAYS - 1)),
-      today,
-    );
     const cached = Object.keys(objectAt(cache, "activities"));
+    // the small parts first: a reader that stops early still sees them
     out.sync = {
       garminCalls: sync.calls, // one-time .FIT downloads for new sets and laps not included
       newActivities: cached.filter((id) => !before.has(id)).length,
@@ -106,7 +98,17 @@ export class GarminDashboard {
       failedSections: sync.failedSections,
       cachedActivities: cached.length,
     };
-    return JSON.stringify(out);
+    out.hrv = between(objectAt(cache, "hrv"), start, today);
+    out.recovery = between(
+      objectAt(cache, "recovery"),
+      addDays(today, -(RECOVERY_DAYS - 1)),
+      today,
+    );
+    const activities = activitiesBetween(cache, start, today).map((a) => structuredClone(a));
+    await this.#attachDetails(activities);
+    out.activities = activities;
+    out.previousActivities = activitiesBetween(cache, prevStart, addDays(start, -1)).map(compact);
+    return jsonByLines(out);
   }
 
   // ------------------------------------------------------------------ sync
@@ -478,6 +480,18 @@ function asLong(v: unknown): number {
   return typeof v === "string" && /^[+-]?\d+$/.test(v) ? Number(v) : 0;
 }
 
+/** One key and one list row on each line, so a reader that pages by lines can read it all. */
+export function jsonByLines(out: Json): string {
+  const entries = Object.entries(out).filter(([, v]) => v !== undefined);
+  return `{\n${entries.map(keyLine).join(",\n")}\n}`;
+}
+
+function keyLine([k, v]: [string, unknown]): string {
+  return Array.isArray(v) && v.length > 0
+    ? `${JSON.stringify(k)}:[\n${v.map((x) => JSON.stringify(x)).join(",\n")}\n]`
+    : `${JSON.stringify(k)}:${JSON.stringify(v)}`;
+}
+
 // ------------------------------------------------------------------ MCP registration
 
 /** The measurement systems of a Garmin profile. */
@@ -497,13 +511,21 @@ export function registerDashboard(server: McpServer, dashboard: GarminDashboard)
         "the Garmin profile, e.g. it or pt-BR. Keeps a local cache and",
         "fetches from Garmin only what is new since the last call, so a rebuild or an update needs few",
         "calls. `sync` in the result says what was fetched.",
+        "`digest`, first in the result: the server's totals for the whole period and for each",
+        "Monday-Sunday week (sessions, km, hours, load), the training load of the last 7 and 28 days,",
+        "best efforts, races and strength top sets; quote them instead of your own sums. For another",
+        "date range, use the activities: each one is on its own line.",
       ].join("\n"),
       inputSchema: z.object({
         weeks: z.number().int().describe("Weeks to cover, default 12, max 52").optional(),
       }),
     },
-    async (a) => ({
-      content: [{ type: "text" as const, text: await dashboard.getDashboardData(a.weeks) }],
-    }),
+    async (a) => {
+      const data = JSON.parse(await dashboard.getDashboardData(a.weeks)) as Json;
+      // only in the tool result: the page data and the widgets' ctx.data stay without it
+      return {
+        content: [{ type: "text" as const, text: jsonByLines({ digest: digest(data), ...data }) }],
+      };
+    },
   );
 }

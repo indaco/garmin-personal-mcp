@@ -27,7 +27,9 @@ tokens also grow.
 The data causes two more problems:
 
 - Claude Code saves a large tool result to a file. The Read tool shows only the first 37,000
-  characters of a file that is one line long. Without Bash, Claude cannot read the rest.
+  characters of a file that is one line long. Without Bash, Claude cannot read the rest. In our
+  runs, the result was one line. Now each activity is on its own line, so Read can show the file in
+  parts.
 - Claude Desktop has no Bash. Also, one reply has an output limit: 128,000 tokens in our runs. A
   whole page probably does not fit in one reply.
 
@@ -48,7 +50,8 @@ and models give other times and costs.
 
 In one run where Claude wrote the page, Claude also gave wrong totals in chat, because it did not
 see all the data. With the template, Claude reads a digest of about 7 KB that has every number for
-the notes. A check of each run found no invented number in the notes.
+the notes. A check of each run found no invented number in the notes. The `getDashboardData` result
+now also starts with this digest, so the totals come from the server and not from the assistant.
 
 In these runs, Claude also copied the data into the page. With `freeform`, the server puts the data
 in, so a build costs less. The page code still takes time and tokens.
