@@ -59,10 +59,14 @@ export function facts(root = ".") {
     .map((l) => l.match(/^\|\s*`(\w+)`\s*\|\s*(.+?)\s*\|$/))
     .filter(Boolean)
     .map(([, name, text]) => ({ name, text }));
-  const prompts = section(readme, "## Dashboard")
-    .map((l) => l.match(/^\|\s*\[([\w-]+)\]\([^)]*\)\s*\|\s*(.+?)\s*\|/))
-    .filter(Boolean)
-    .map(([, name, text]) => ({ name, text }));
+  // the prompt tables of the README: the first column links the prompt's section
+  const promptTable = (heading) =>
+    section(readme, heading)
+      .map((l) => l.match(/^\|\s*\[([\w-]+)\]\([^)]*\)\s*\|\s*(.+?)\s*\|/))
+      .filter(Boolean)
+      .map(([, name, text]) => ({ name, text }));
+  const prompts = promptTable("## Dashboard");
+  const coachPrompts = promptTable("## Coach prompts");
   const themes = [
     ...read(`${root}/src/page/theme.ts`).matchAll(/\{ id: "(\w+)", group: "(\w+)" \}/g),
   ].map(([, id, group]) => ({ id, group }));
@@ -79,6 +83,7 @@ export function facts(root = ".") {
     site,
     tools,
     prompts,
+    coachPrompts,
     themes,
     questions,
     package: `${pkg.name}@latest`,
@@ -158,13 +163,15 @@ export function values(f) {
     tools: f.tools
       .map((t) => `<div class="tool"><code>${t.name}</code><span>${cell(t.text)}</span></div>`)
       .join("\n"),
-    prompts: f.prompts
-      .map((p) => `<tr><td><code>${p.name}</code></td><td>${cell(p.text)}</td></tr>`)
-      .join("\n"),
+    prompts: promptRows(f.prompts),
+    coachPrompts: promptRows(f.coachPrompts),
     themeCount: String(f.themes.length),
     themeGroups: themeGroups(f.themes),
   };
 }
+
+const promptRows = (list) =>
+  list.map((p) => `<tr><td><code>${p.name}</code></td><td>${cell(p.text)}</td></tr>`).join("\n");
 
 function fill(text, vals) {
   return text.replace(/\{\{(\w+)\}\}/g, (all, name) => {

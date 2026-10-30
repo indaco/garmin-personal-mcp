@@ -206,6 +206,17 @@ describe("site sections", () => {
     }
   });
 
+  it("shows the coach prompts with the running questions only", async () => {
+    const { page } = await site();
+    const shown = () => page.isVisible("#coach-prompts");
+    expect(await shown()).toBe(true);
+    expect(await page.textContent("#coach-prompts")).toContain("race-readiness");
+    await page.click(".picker [data-sport=cycling]");
+    expect(await shown()).toBe(false);
+    await page.click(".picker [data-sport=running]");
+    expect(await shown()).toBe(true);
+  });
+
   it("selects the sport of a hero cell, with its note for the questions written for the page", async () => {
     const { page } = await site();
     await page.click(".wall .f-padel");

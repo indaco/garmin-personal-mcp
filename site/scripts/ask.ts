@@ -37,6 +37,10 @@ export function ask(): void {
     }
     stack.append(set);
   }
+  // the coach prompts are about running: they go with its questions, and the shared cell keeps the
+  // section as tall for every sport
+  const coach = document.getElementById("coach-prompts");
+  if (coach) stack.querySelector('.qs-set[data-sport="running"]')?.append(coach);
 
   const select = (sport: string) => {
     for (const b of picker.querySelectorAll<HTMLElement>('[role="tab"]'))

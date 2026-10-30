@@ -8,6 +8,7 @@ export interface Facts {
   site: { url: string; description: string };
   tools: Entry[];
   prompts: Entry[];
+  coachPrompts: Entry[];
   themes: { id: string; group: string }[];
   questions: string[];
   package: string;
