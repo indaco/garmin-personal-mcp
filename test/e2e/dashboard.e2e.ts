@@ -53,6 +53,7 @@ const ALL_PRESET = [
   "weeklyVolume",
   "intensityMinutes",
   "loadSafety",
+  "fitnessFatigue",
   "loadVsRecovery",
   "activities",
   "coachNotes",
@@ -918,7 +919,7 @@ describe("focus", () => {
     await page.focus("[aria-label='Move Weekly volume']");
     for (const key of ["Space", "ArrowRight", "Space"]) await page.keyboard.press(key);
     expect(await focused(page)).toBe("Move Weekly volume");
-    expect(await page.textContent("#announce")).toBe("Weekly volume moved to position 7 of 11");
+    expect(await page.textContent("#announce")).toBe("Weekly volume moved to position 7 of 12");
     // a hidden tile gives focus to the tile in its place
     await page.focus("[aria-label='Hide Weekly volume']");
     await page.keyboard.press("Enter");

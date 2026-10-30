@@ -75,6 +75,25 @@ export function monotony(daily: number[]) {
   return { weekLoad, monotony: value, strain: value === null ? null : weekLoad * value };
 }
 
+/**
+ * Fitness (42-day) and fatigue (7-day) as exponential averages of the daily loads, from 0 on the first
+ * day. Form is the fitness minus the fatigue of the day before: how fresh the day starts.
+ */
+export function fitnessFatigue(daily: number[]) {
+  const fitness: number[] = [];
+  const fatigue: number[] = [];
+  let ctl = 0;
+  let atl = 0;
+  for (const load of daily) {
+    ctl += (load - ctl) / 42;
+    atl += (load - atl) / 7;
+    fitness.push(ctl);
+    fatigue.push(atl);
+  }
+  const form = daily.map((_, i) => (i === 0 ? 0 : fitness[i - 1] - fatigue[i - 1]));
+  return { fitness, fatigue, form };
+}
+
 export function mean(values: number[]): number | null {
   return values.length > 0 ? values.reduce((s, v) => s + v, 0) / values.length : null;
 }

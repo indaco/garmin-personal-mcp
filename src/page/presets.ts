@@ -11,6 +11,7 @@ const PRESETS: Record<string, [widget: string, span: Span][]> = {
     ["weeklyVolume", 2],
     ["intensityMinutes", 1],
     ["loadSafety", 3],
+    ["fitnessFatigue", 3],
     ["loadVsRecovery", 3],
     ["activities", 3],
     ["coachNotes", 3],

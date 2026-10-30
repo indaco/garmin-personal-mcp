@@ -13,6 +13,7 @@ it by hand.
 | Weekly volume | `weeklyVolume` | Time, distance, sessions or load of each week, stacked by type, with a 4-week average line. | all and each type | 2 |
 | Intensity minutes | `intensityMinutes` | Moderate + 2 x vigorous minutes of the activities each week, against 150 minutes. | all and each type | 1 |
 | Load safety | `loadSafety` | Weekly load with its change against the week before (flagged above +10%), and 7-day monotony and strain (Foster). | - | 3 |
+| Fitness, fatigue and form | `fitnessFatigue` | Fitness (42-day) and fatigue (7-day) averages of the daily load, and form: fitness minus fatigue, to time a taper. | - | 3 |
 | Consistency | `calendar` | A heatmap of the training minutes of each day; a day shows its activities on hover or touch. | all and each type | 3 |
 | Load vs recovery | `loadVsRecovery` | Daily load by type (bars) with nightly HRV (line). | all and each type | 3 |
 | HRV | `hrv` | Nightly HRV of the last 14 days with its 7-day average and the balanced range. | - | 1 |
@@ -53,7 +54,7 @@ every board. _Width_ is the default width in columns.
 
 | Board | Widgets, in order |
 | ----- | ----------------- |
-| all | `kpis`, `readiness`, `calendar`, `periodComparison`, `records`, `weeklyVolume`, `intensityMinutes`, `loadSafety`, `loadVsRecovery`, `activities`, `coachNotes` |
+| all | `kpis`, `readiness`, `calendar`, `periodComparison`, `records`, `weeklyVolume`, `intensityMinutes`, `loadSafety`, `fitnessFatigue`, `loadVsRecovery`, `activities`, `coachNotes` |
 | running | `typeKpis`, `typeWeekly`, `hrZones`, `bestEfforts`, `races`, `aerobicFitness`, `intensityShare`, `runningForm`, `runWalk`, `trainingEffect`, `racePredictor`, `longRuns`, `activities` |
 | strengthTraining | `typeKpis`, `typeWeekly`, `hrZones`, `setsPerCategory`, `muscleBalance`, `exercises`, `strengthSessions` |
 | walking | `typeKpis`, `typeWeekly`, `hrZones`, `walkDetails`, `steps`, `activities` |

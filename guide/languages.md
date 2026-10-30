@@ -320,6 +320,12 @@ out. To add one:
 | `ls.ramp` | Change vs week before (%) |
 | `ls.note` | All activities. Red weeks rose more than 10%; a week in progress is not flagged. Monotony and strain (Foster) are estimates. |
 | `ls.estimated` | Some loads are estimates: the activity has no Garmin load. |
+| `w.fitnessFatigue` | Fitness, fatigue and form |
+| `ff.fitness` | Fitness · 42 days |
+| `ff.fatigue` | Fatigue · 7 days |
+| `ff.form` | Form |
+| `ff.note` | All activities. Fitness and fatigue are the daily load averaged over about 42 and 7 days. Form is the fitness minus the fatigue of the day before: below 0 you carry fatigue, above 0 you are fresh, as in a taper before a race. |
+| `ff.short` | The data starts less than 6 weeks before this window, so fitness reads low in the first weeks. |
 | `w.loadVsRecovery` | Load vs recovery |
 | `lvr.hrv` | HRV (ms) |
 | `lvr.note` | Daily load by type (bars) and nightly HRV (line). |

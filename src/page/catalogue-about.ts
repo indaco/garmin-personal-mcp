@@ -15,6 +15,8 @@ export const ABOUT: Record<string, string> = {
     "Moderate + 2 x vigorous minutes of the activities each week, against 150 minutes.",
   loadSafety:
     "Weekly load with its change against the week before (flagged above +10%), and 7-day monotony and strain (Foster).",
+  fitnessFatigue:
+    "Fitness (42-day) and fatigue (7-day) averages of the daily load, and form: fitness minus fatigue, to time a taper.",
   calendar:
     "A heatmap of the training minutes of each day; a day shows its activities on hover or touch.",
   loadVsRecovery: "Daily load by type (bars) with nightly HRV (line).",
