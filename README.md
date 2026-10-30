@@ -165,7 +165,7 @@ Ask "list my last 5 activities". The first time that a garmin-personal tool asks
 | `downloadActivityFit`      | saves the .FIT file of an activity in the data folder                          |
 | `getHrvRange`              | HRV during the night                                                           |
 | `getDailyHeartRate`        | the heart rate of a day, with the resting HR                                   |
-| `getSleep`                 | the sleep of a night, or of up to 14 nights                                    |
+| `getSleep`                 | the sleep of a night, or of up to 14 nights: hours, phases, score and need     |
 | `getWeight`                | weight and body composition for a range of dates                               |
 | `getBodyBattery`           | how Body Battery charged and drained, for up to 14 days                        |
 | `getHeartRateZones`        | your HR zones                                                                  |
@@ -381,7 +381,9 @@ The server is read-only. It sends the API key only to the Garmin token endpoint,
 or returns the key or the access token. It refuses a key that has spaces or line breaks in it, and
 it removes the key and the token from network error messages. If you saw your API key in a chat,
 revoke the key on the [API key page](https://connect.garmin.com/app/settings/personalApiToken) and
-create a new one. Your .FIT files can have your GPS track, so keep the data folder private.
+create a new one. No tool result has your Garmin user id, name or profile image, or the ids of
+your devices and daily records, also with `raw` and `garminGet`. Your .FIT files can have your GPS
+track, so keep the data folder private.
 
 [SECURITY.md](SECURITY.md) tells how the server protects your data and how to report a
 vulnerability. Do not open a public issue for a vulnerability.

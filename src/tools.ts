@@ -6,6 +6,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { type GarminApiClient, GarminApiError } from "./api-client";
 import { type Catalogue, decodeFit, hms, lapsOf, round, setsOf, unzipFit } from "./fit";
+import { addDays } from "./dates";
 import { log } from "./log";
 
 type Json = Record<string, unknown>;
@@ -83,7 +84,7 @@ export class GarminTools {
     }
     const list = Array.isArray(json) ? json : firstArray(json);
     if (!list) {
-      return JSON.stringify(json);
+      return toJson(json);
     }
     const named = (a: unknown) => {
       const name = isObject(a) ? a.activityName : undefined;
@@ -100,70 +101,75 @@ export class GarminTools {
           )
           .slice(0, asked)
       : list;
-    return JSON.stringify(
+    return toJson(
       raw === true ? (filtered ? rows : json) : rows.map((a) => summarize(isObject(a) ? a : {})),
     );
   }
 
   async getActivity(activityId: number): Promise<string> {
-    return JSON.stringify(await this.api.getJson(`/activity-service/activity/${activityId}`, {}));
+    return toJson(await this.api.getJson(`/activity-service/activity/${activityId}`, {}));
   }
 
   async getActivityWorkouts(activityId: number): Promise<string> {
     // many fields of each step are null (equipment, weight, name): leaving them out keeps the answer short
-    return JSON.stringify(
+    return toJson(
       await this.api.getJson(`/activity-service/activity/${activityId}/workouts`, {}),
-      (_, v: unknown) => (v === null ? undefined : v),
+      (_, v) => v === null,
     );
   }
 
   async downloadActivityFit(activityId: number): Promise<string> {
     const fit = await this.fetchFit(activityId);
-    return JSON.stringify({ path: resolve(fit), bytes: (await stat(fit)).size });
+    return toJson({ path: resolve(fit), bytes: (await stat(fit)).size });
   }
 
   async getActivityLaps(activityId: number): Promise<string> {
-    return JSON.stringify(lapsOf(await this.#decodeFit(activityId), activityId));
+    return toJson(lapsOf(await this.#decodeFit(activityId), activityId));
   }
 
   async getActivitySets(activityId: number): Promise<string> {
     const fit = await this.#decodeFit(activityId);
-    return JSON.stringify(setsOf(fit, activityId, await this.#exerciseCatalogue()));
+    return toJson(setsOf(fit, activityId, await this.#exerciseCatalogue()));
   }
 
   // ------------------------------------------------------------------ health
 
   async getHrvRange(fromDate: string, toDate: string): Promise<string> {
-    return JSON.stringify(
-      await this.api.getJson(`/hrv-service/hrv/daily/${fromDate}/${toDate}`, {}),
-    );
+    return toJson(await this.api.getJson(`/hrv-service/hrv/daily/${fromDate}/${toDate}`, {}));
   }
 
   async getDailyHeartRate(date: string): Promise<string> {
-    return JSON.stringify(
-      await this.api.getJson("/wellness-service/wellness/dailyHeartRate", { date }),
-    );
+    return toJson(await this.api.getJson("/wellness-service/wellness/dailyHeartRate", { date }));
   }
 
-  async getSleep(date: string): Promise<string> {
-    return JSON.stringify(await this.api.getJson("/sleep-service/sleep/dailySleep", { date }));
+  async getSleep(date: string, raw?: boolean): Promise<string> {
+    const night = await this.api.getJson("/sleep-service/sleep/dailySleep", { date });
+    return raw === true ? toJson(night, isRecordId) : toJson(nightRow(date, sleepSummary(night)));
   }
 
-  async getSleepRange(fromDate: string, toDate: string): Promise<string> {
+  async getSleepRange(fromDate: string, toDate: string, raw?: boolean): Promise<string> {
     checkRange(fromDate, toDate);
-    return JSON.stringify(
-      await this.api.getJson("/sleep-service/sleep/dailySleepSummariesByDate", {
-        startDate: fromDate,
-        endDate: toDate,
-      }),
-    );
+    const nights = await this.api.getJson("/sleep-service/sleep/dailySleepSummariesByDate", {
+      startDate: fromDate,
+      endDate: toDate,
+    });
+    if (raw === true || !Array.isArray(nights)) {
+      return toJson(nights, isRecordId);
+    }
+    // Garmin leaves out some nights: answer each night asked, so a missing one is not skipped unseen
+    const byDate = new Map(nights.map(sleepSummary).map((s) => [s.date, s]));
+    const rows: Json[] = [];
+    for (let day = fromDate; day <= toDate; day = addDays(day, 1)) {
+      rows.push(nightRow(day, byDate.get(day)));
+    }
+    return toJson(rows);
   }
 
   async getWeight(fromDate: string, toDate: string, includeAll?: boolean): Promise<string> {
     // no day cap: one small row per day, and a weight trend needs months
     // the spec says kilograms, but Garmin answers grams (72500 for 72.5 kg)
     checkRange(fromDate, toDate, Infinity);
-    return JSON.stringify(
+    return toJson(
       await this.api.getJson(`/weight-service/weight/range/${fromDate}/${toDate}`, {
         includeAll: includeAll === true ? "true" : undefined,
       }),
@@ -172,7 +178,7 @@ export class GarminTools {
 
   async getBodyBattery(fromDate: string, toDate: string): Promise<string> {
     checkRange(fromDate, toDate);
-    return JSON.stringify(
+    return toJson(
       await this.api.getJson("/wellness-service/wellness/bodyBattery/reports/daily", {
         startDate: fromDate,
         endDate: toDate,
@@ -181,22 +187,22 @@ export class GarminTools {
   }
 
   async getHeartRateZones(): Promise<string> {
-    return JSON.stringify(await this.api.getJson("/biometric-service/heartRateZones/v2", {}));
+    return toJson(await this.api.getJson("/biometric-service/heartRateZones/v2", {}));
   }
 
   async getFitnessAge(date: string): Promise<string> {
-    return JSON.stringify(await this.api.getJson(`/fitnessage-service/fitnessage/v2/${date}`, {}));
+    return toJson(await this.api.getJson(`/fitnessage-service/fitnessage/v2/${date}`, {}));
   }
 
   async getDailySummary(date: string): Promise<string> {
-    return JSON.stringify(
+    return toJson(
       await this.api.getJson("/usersummary-service/usersummary/daily", { calendarDate: date }),
     );
   }
 
   async getDailySummaryRange(fromDate: string, toDate: string): Promise<string> {
     checkRange(fromDate, toDate);
-    return JSON.stringify(
+    return toJson(
       await this.api.getJson("/usersummary-service/v2/dailysummaries", {
         startDate: fromDate,
         endDate: toDate,
@@ -214,7 +220,9 @@ export class GarminTools {
         q[name] = value;
       }
     }
-    return JSON.stringify(await this.api.getJson(path, q));
+    // only a night's `id` is a record id: elsewhere `id` can be an activity a tool takes back
+    const drop = path.startsWith("/sleep-service/") ? isRecordId : undefined;
+    return toJson(await this.api.getJson(path, q), drop);
   }
 
   // ------------------------------------------------------------------ FIT
@@ -400,6 +408,81 @@ export function summarize(a: Json): Json {
     }
   }
   return o;
+}
+
+const SLEEP_HOURS = [
+  ["sleepTimeSeconds", "sleepH"],
+  ["deepSleepSeconds", "deepH"],
+  ["lightSleepSeconds", "lightH"],
+  ["remSleepSeconds", "remH"],
+  ["awakeSleepSeconds", "awakeH"],
+] as const;
+
+/** The compact sleep row of getSleep and the dashboard; Garmin's night is about 3,000 characters. */
+export function sleepSummary(night: unknown): Json {
+  const n = isObject(night) ? night : {};
+  const o: Json = {};
+  copy(n, o, "calendarDate", "date");
+  // a night without sleep has no calendarDate, but its sleep need names the night
+  if (o.date === undefined && isObject(n.sleepNeed)) {
+    copy(n.sleepNeed, o, "calendarDate", "date");
+  }
+  putLocalTime(n, o, "sleepStartTimestampLocal", "bedtime");
+  putLocalTime(n, o, "sleepEndTimestampLocal", "wake");
+  for (const [name, as] of SLEEP_HOURS) {
+    const s = n[name];
+    if (typeof s === "number") {
+      o[as] = round(s / 3600, 2);
+    }
+  }
+  const overall = field(n.sleepScores, "overall");
+  if (isObject(overall)) {
+    copy(overall, o, "value", "sleepScore");
+    copy(overall, o, "qualifierKey", "sleepQuality");
+  }
+  const need = field(n.sleepNeed, "actual");
+  if (typeof need === "number") {
+    o.needH = round(need / 60, 2);
+  }
+  putRounded(n, o, "avgHeartRate", "avgHR", 0);
+  putRounded(n, o, "averageSpO2Value", "avgSpO2", 0);
+  putRounded(n, o, "lowestSpO2Value", "lowestSpO2", 0);
+  putRounded(n, o, "averageRespirationValue", "avgRespiration", 1);
+  putRounded(n, o, "awakeCount", "awakeCount", 0);
+  putRounded(n, o, "avgSleepStress", "avgSleepStress", 1);
+  copy(n, o, "sleepScoreFeedback", "feedback");
+  return o;
+}
+
+/** A getSleep row: the night's summary, or only its date when Garmin has no sleep for it (a sleep need alone is not a night). */
+function nightRow(date: string, s: Json | undefined): Json {
+  return s !== undefined && "sleepH" in s ? { date, ...s } : { date };
+}
+
+/** A *Local timestamp is local wall time encoded as epoch ms: read as UTC, it gives the local HH:mm. */
+function putLocalTime(from: Json, to: Json, name: string, as: string): void {
+  const t = new Date(typeof from[name] === "number" ? from[name] : Number.NaN);
+  if (!Number.isNaN(t.getTime())) {
+    to[as] = t.toISOString().slice(11, 16);
+  }
+}
+
+/** The `id` of a daily record (a night of sleep): a Garmin key that helps no answer. */
+const isRecordId = (key: string) => key === "id";
+
+/** Ids of the user, their devices and daily records, at any depth: they help no answer and identify the user. */
+const PRIVATE_KEYS =
+  /^(userProfile(Pk|Id)|userId|profileId|owner\w*|userInfoDto|displayName|fullName|deviceId|userDailySummaryId|uuid|samplePk)$/i;
+
+/** A tool result: the JSON without PRIVATE_KEYS and without the keys `drop` names. */
+function toJson(value: unknown, drop?: (key: string, v: unknown) => boolean): string {
+  const dropped = (k: string, v: unknown) => PRIVATE_KEYS.test(k) || drop?.(k, v) === true;
+  // an object of dropped keys only (activityUUID: { uuid }), at any depth, goes too; not an empty {} itself
+  const emptied = (v: unknown): boolean =>
+    isObject(v) &&
+    Object.keys(v).length > 0 &&
+    Object.entries(v).every(([k, x]) => dropped(k, x) || emptied(x));
+  return JSON.stringify(value, (k, v: unknown) => (dropped(k, v) || emptied(v) ? undefined : v));
 }
 
 /** The activity list inside Garmin's answer when it is not a bare array. */
@@ -640,16 +723,24 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
   server.registerTool(
     "getSleep",
     {
-      description:
-        "Sleep data for one night (date: the morning you woke up), or for up to 14 nights (fromDate and toDate), yyyy-MM-dd.",
-      inputSchema: dayOrRangeInput,
+      description: [
+        "Sleep for one night (date: the morning you woke up), or for up to 14 nights (fromDate and",
+        "toDate), yyyy-MM-dd, as one compact row per night: bedtime and wake (local HH:mm), hours of",
+        "sleep, deep, light, REM and awake, the sleep score and its quality, the sleep need (hours),",
+        "average heart rate, average and lowest SpO2, average respiration, awake count, average sleep",
+        "stress and Garmin's feedback. Missing values are left out, and a night without sleep data has",
+        "only its date. Set raw=true for Garmin's JSON.",
+      ].join("\n"),
+      inputSchema: dayOrRangeInput.extend({
+        raw: z.boolean().describe("Return Garmin's raw JSON instead of the summary").optional(),
+      }),
     },
     async (a) =>
       text(
         await dayOrRange(
           a,
-          (d) => tools.getSleep(d),
-          (f, t) => tools.getSleepRange(f, t),
+          (d) => tools.getSleep(d, a.raw),
+          (f, t) => tools.getSleepRange(f, t, a.raw),
         ),
       ),
   );
