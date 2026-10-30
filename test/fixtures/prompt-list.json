@@ -43,6 +43,38 @@
     ]
   },
   {
+    "name": "race-readiness",
+    "description": "Check if you are ready for a race: training block, taper, predicted time, recovery, race plan",
+    "arguments": [
+      {
+        "name": "date",
+        "description": "The race date, yyyy-MM-dd",
+        "required": false
+      },
+      {
+        "name": "distance",
+        "description": "5k, 10k, half, marathon, or a distance in km",
+        "required": false
+      },
+      {
+        "name": "goal",
+        "description": "Your goal time, e.g. 1:45:00; empty = no goal",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "run-review",
+    "description": "Review a run as a coach: planned workout against the laps, rep fade, HR drift, recovery",
+    "arguments": [
+      {
+        "name": "activity",
+        "description": "An activity id, or words of its name; empty = the latest run",
+        "required": false
+      }
+    ]
+  },
+  {
     "name": "training-dashboard",
     "description": "Build a personal training + recovery dashboard (volume, load, HRV, sleep) from Garmin data",
     "arguments": [
