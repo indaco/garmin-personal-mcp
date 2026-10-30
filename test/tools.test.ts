@@ -501,6 +501,17 @@ describe("activities", () => {
     expect(api.getJson).toHaveBeenCalledWith(path, query);
   });
 
+  it("garminGet leaves out the record id of a night, and keeps the other ids", async () => {
+    api.getJson.mockResolvedValue({ id: 1, calendarDate: "2026-10-27" });
+    expect(await tools.garminGet("/sleep-service/sleep/dailySleep")).toBe(
+      '{"calendarDate":"2026-10-27"}',
+    );
+    api.getJson.mockResolvedValue({ id: 1, name: "Easy run" });
+    expect(await tools.garminGet("/activity-service/activity/1")).toBe(
+      '{"id":1,"name":"Easy run"}',
+    );
+  });
+
   it("garminGet decodes the query string into parameters", async () => {
     api.getJson.mockResolvedValue([]);
     await tools.garminGet("/x", "?a=1&b=2=3&=skip&noValue&a=4&c=&name=a%20b+c&d%C3%A9j%C3%A0=vu");

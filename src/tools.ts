@@ -220,7 +220,9 @@ export class GarminTools {
         q[name] = value;
       }
     }
-    return toJson(await this.api.getJson(path, q));
+    // only a night's `id` is a record id: elsewhere `id` can be an activity a tool takes back
+    const drop = path.startsWith("/sleep-service/") ? isRecordId : undefined;
+    return toJson(await this.api.getJson(path, q), drop);
   }
 
   // ------------------------------------------------------------------ FIT
