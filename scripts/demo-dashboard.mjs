@@ -7,7 +7,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { parseArgs } from "node:util";
-import { fillPage } from "./fill-dashboard-fixture.mjs";
+import { asServer, fillPage } from "./fill-dashboard-fixture.mjs";
 
 const { values: opt, positionals } = parseArgs({
   allowPositionals: true,
@@ -539,13 +539,8 @@ activities.forEach((a, n) => (a.id = 30500000000 + n * 7919 + ri(0, 7000)));
 const withId = activities.map(({ id, ...a }) => ({ id, ...a }));
 const dayOf = (a) => a.start.slice(0, 10);
 const current = withId.filter((a) => dayOf(a) >= START).toReversed();
-// the details that getDashboardData attaches (src/dashboard.ts attachDetails): laps for the 3 newest
-// activities, races and runs over 15 km, sets for the 30 newest strength sessions
-let strengthSessions = 0;
-current.forEach((a, n) => {
-  if (a.exercises && strengthSessions++ >= 30) delete a.exercises;
-  if (a.laps && !(n < 3 || a.race || a.km > 15)) delete a.laps;
-});
+// only the details that getDashboardData attaches, for a page with the workout comparison
+asServer(current, true);
 const previous = withId
   .filter((a) => dayOf(a) < START)
   .toReversed()
@@ -682,7 +677,9 @@ const NOTE = `<style>.demo-note{max-width:1440px;margin:12px auto 0;padding:0 16
     <div id="app"></div>`;
 
 if (outHtml) {
-  const page = fillPage(readFileSync("dist/dashboard.html", "utf8"), data);
+  const page = fillPage(readFileSync("dist/dashboard.html", "utf8"), data, null, {
+    workouts: true,
+  });
   if (!page.includes('<div id="app"></div>')) throw new Error("dist/dashboard.html has no #app");
   if (!page.includes(LAYOUT_KEY)) throw new Error(`dist/dashboard.html has no ${LAYOUT_KEY} key`);
   mkdirSync(dirname(outHtml), { recursive: true });

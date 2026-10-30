@@ -1,6 +1,7 @@
 // Fills the built page template with dashboard data, for screenshots and manual checks: data, layout,
-// widgets and i18n. Settings and languages keep the template defaults (no settings, English only):
-// plain node cannot import src/dashboard-page.ts, whose withData is what writeDashboard uses.
+// widgets, i18n and settings. Languages keep the template default (English only), and the settings
+// only reach the settings block, not the title or the CSS: plain node cannot import
+// src/dashboard-page.ts, whose withData and styled are what writeDashboard uses.
 // `node scripts/fill-dashboard-fixture.mjs dist/dashboard.html test/fixtures/dashboard-data.json out.html`
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -19,8 +20,40 @@ export const fill = (page, block, value) =>
       `/* garmin-${block}:start */${JSON.stringify(value).replaceAll("<", "\\u003c").replaceAll("*", "\\u002a")}/* garmin-${block}:end */`,
   );
 
-/** The template with every block filled; the layout defaults to the preset. */
-export function fillPage(template, data, layout = null) {
+const isRun = (a) => typeof a.type === "string" && a.type.endsWith("running");
+// workoutOf of src/page/running.ts: the run name without the place that Garmin puts before " - "
+const workoutOf = (name) => {
+  const i = name.indexOf(" - ");
+  return (i > 0 ? name.slice(i + 3).trim() : "") || name;
+};
+const workout = (a) => (typeof a.name === "string" ? workoutOf(a.name) : undefined);
+
+/**
+ * Removes the details that getDashboardData does not attach (src/dashboard.ts attachDetails), so a demo
+ * shows what the server gives on a first build, before older .FIT files are saved. `activities` come newest first. Laps stay for the 3 newest activities,
+ * races, runs over 15 km and, with `workouts`, the 8 newest runs of each run name that repeats; sets
+ * stay for the 30 newest strength sessions.
+ */
+export function asServer(activities, workouts = false) {
+  const runNames = new Map();
+  for (const a of activities.filter(isRun))
+    runNames.set(workout(a), (runNames.get(workout(a)) ?? 0) + 1);
+  const lapped = new Map();
+  let strength = 0;
+  activities.forEach((a, i) => {
+    if (a.type?.includes("strength") && strength++ >= 30) delete a.exercises;
+    const longRun = isRun(a) && typeof a.km === "number" && a.km > 15;
+    const w = workout(a);
+    const repeated =
+      workouts && isRun(a) && w !== undefined && runNames.get(w) > 1 && (lapped.get(w) ?? 0) < 8;
+    if (repeated) lapped.set(w, (lapped.get(w) ?? 0) + 1);
+    if (!(i < 3 || a.race === true || longRun || repeated)) delete a.laps;
+  });
+  return activities;
+}
+
+/** The template with every block filled; the layout defaults to the preset, the settings to none. */
+export function fillPage(template, data, layout = null, settings = null) {
   let page = fill(template, "data", {
     updated: new Date().toISOString(),
     ...data,
@@ -28,6 +61,7 @@ export function fillPage(template, data, layout = null) {
   });
   page = fill(page, "layout", layout);
   page = fill(page, "widgets", []);
+  page = fill(page, "settings", settings);
   return fill(page, "i18n", {});
 }
 

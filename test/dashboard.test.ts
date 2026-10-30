@@ -9,6 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Profile } from "@garmin/fitsdk";
+import { asServer } from "../scripts/fill-dashboard-fixture.mjs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GarminApiError, type GarminApiClient } from "../src/api-client";
 import {
@@ -558,6 +559,35 @@ describe("getDashboardData", () => {
     expect(withLaps(out)).toEqual([40, 41, 42, 43, 44, 45, 46, 47, 49]);
     // the 8 newest are downloaded, the saved one is read from the data folder
     expect(api.getBytes).toHaveBeenCalledTimes(8);
+  });
+
+  it("gives laps to the same activities as the demo scripts, which show what the server gives", async () => {
+    garminActivities = [
+      activity(70, "2026-10-26", "cycling"),
+      activity(71, "2026-10-25", "strength_training"),
+      activity(72, "2026-10-24", "cycling"),
+      activity(73, "2026-10-23", "running", { eventType: { typeKey: "race" } }),
+      activity(74, "2026-10-22", "trail_running", { distance: 16000 }),
+      activity(75, "2026-10-21", "cycling", { distance: 40000 }),
+      ...Array.from({ length: 9 }, (_, i) =>
+        activity(80 + i, `2026-10-${String(20 - i).padStart(2, "0")}`, "running", {
+          // one workout, run in two places
+          activityName: i % 2 ? "Hillview - Tempo" : "Riverside - Tempo",
+        }),
+      ),
+    ];
+    for (const workouts of [false, true]) {
+      const out = JSON.parse(await dashboard.getDashboardData(3, workouts));
+      const demo = asServer(
+        out.activities.map((a: Record<string, unknown>) => ({ ...a, laps: [] })),
+        workouts,
+      );
+      expect([workouts, withLaps({ activities: demo })]).toEqual([workouts, withLaps(out)]);
+    }
+    // one workout in two places: its 8 newest sessions, not the 9 of both names
+    expect(withLaps(JSON.parse(await dashboard.getDashboardData(3, true)))).toEqual([
+      70, 71, 72, 73, 74, 80, 81, 82, 83, 84, 85, 86, 87,
+    ]);
   });
 
   it("reports a detail that cannot be read on the activity", async () => {

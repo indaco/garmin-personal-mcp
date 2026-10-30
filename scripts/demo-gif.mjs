@@ -6,13 +6,15 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
-import { fillPage } from "./fill-dashboard-fixture.mjs";
+import { asServer, fillPage } from "./fill-dashboard-fixture.mjs";
 
 const dir = mkdtempSync(join(tmpdir(), "dashboard-demo-"));
 const data = JSON.parse(readFileSync("test/fixtures/dashboard-data.json", "utf8"));
+// the test data has laps on every run: keep the ones that the server gives a page with the workout comparison
+asServer(data.activities, true);
 
-function pageFile(name, layout) {
-  const page = fillPage(readFileSync("dist/dashboard.html", "utf8"), data, layout);
+function pageFile(name, layout, settings = null) {
+  const page = fillPage(readFileSync("dist/dashboard.html", "utf8"), data, layout, settings);
   const file = join(dir, `${name}.html`);
   writeFileSync(file, page);
   return file;
@@ -48,13 +50,20 @@ const scrollTo = (page, id) =>
     window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16),
   );
 
-// The All board, load against recovery, the Run board and an exercise of the Strength board
-let page = await open(pageFile("preset", null));
+// The All board, load against recovery, the Run board with two workouts compared across weeks, and
+// an exercise of the Strength board
+let page = await open(pageFile("preset", null, { workouts: true }));
 await shot(page);
 await scrollTo(page, "loadVsRecovery");
 await shot(page);
 await page.click("[data-tab=running]");
 await page.evaluate(() => window.scrollTo(0, 0));
+await shot(page);
+await page.click("[data-id=workoutTrend] >> text=Track Intervals (6)");
+await page.click("[data-id=workoutTrend] >> text=Tempo Run (6)");
+await page.click("[data-id=workoutTrend] >> text=Long Run (10)");
+await page.click("[data-id=workoutTrend] >> text=Efficiency");
+await scrollTo(page, "workoutTrend");
 await shot(page);
 await page.click("[data-tab=strengthTraining]");
 await page.click("[data-exercise=barbell-back-squat]");
