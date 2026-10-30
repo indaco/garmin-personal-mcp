@@ -21,7 +21,11 @@ describe("site facts", () => {
 
   it("lists the coach prompts of the README, apart from the dashboard prompts", () => {
     const prompts = names("test/fixtures/prompt-list.json");
-    expect(f.coachPrompts.map((p) => p.name)).toEqual(["run-review", "race-readiness"]);
+    expect(f.coachPrompts.map((p) => [p.name, p.sport])).toEqual([
+      ["run-review", "running"],
+      ["race-readiness", "running"],
+      ["strength-review", "strength"],
+    ]);
     for (const p of f.coachPrompts) expect(prompts).toContain(p.name);
     expect(f.prompts.map((p) => p.name)).not.toContain("run-review");
   });

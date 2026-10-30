@@ -76,8 +76,8 @@ assistant chooses the tools and can combine their data. Some examples:
   stdio. Tested with Claude Desktop and Claude Code.
 - **A dashboard in less than a minute**: your training load next to recovery, for you or for your
   coach, with your own widgets and languages. See [Dashboard](#dashboard).
-- **Coach prompts**: a review of one run against its planned workout, and a readiness check before a
-  race. See [Coach prompts](#coach-prompts).
+- **Coach prompts**: a review of one run or one strength session against its planned workout, and a
+  readiness check before a race. See [Coach prompts](#coach-prompts).
 
 ## Quick start
 
@@ -301,10 +301,11 @@ For a design of your own, use `layout` = `freeform`: Claude writes the page, as 
 
 These prompts answer in the chat. They do not change a dashboard.
 
-| Prompt                            | What it does                                                | Claude Code example                                       |
-| --------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------- |
-| [run-review](#run-review)         | reviews one run as a coach                                  | `/garmin-personal:run-review`                             |
-| [race-readiness](#race-readiness) | tells if you are ready for a race, with a plan for its pace | `/garmin-personal:race-readiness 2026-11-15 half 1:45:00` |
+| Prompt                              | What it does                                                | Claude Code example                                       |
+| ----------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------- |
+| [run-review](#run-review)           | reviews one run as a coach                                  | `/garmin-personal:run-review`                             |
+| [race-readiness](#race-readiness)   | tells if you are ready for a race, with a plan for its pace | `/garmin-personal:race-readiness 2026-11-15 half 1:45:00` |
+| [strength-review](#strength-review) | reviews one strength session as a coach                     | `/garmin-personal:strength-review`                        |
 
 A missing value shows as "n/a": the assistant does not estimate it.
 
@@ -337,6 +338,18 @@ the last 7 nights. It ends with a target pace for each quarter of the race.
 In Claude Code, give the values in any order: a value in the form `yyyy-MM-dd` is the date, a value
 in the form `1:45:00` is the goal, and the other words are the distance. For example
 `/garmin-personal:race-readiness half marathon 2026-11-15`.
+
+### strength-review
+
+The assistant compares the planned workout with the sets you did: the planned sets and reps of each
+exercise, what you did, and hit or miss. Garmin plans no weights, so the plan shows none. For each
+exercise it gives the top set and its estimated 1RM against the previous session of the same name,
+and the rep drop from the first set to the last at the same weight. It compares your rest with the
+planned rest, and ends with the sleep and HRV of the night after the session, and a short coach note.
+
+| Argument   | Values                                                       | Default                   |
+| ---------- | ------------------------------------------------------------ | ------------------------- |
+| `activity` | an activity id, or words of the activity name (`Upper Body`) | the last strength session |
 
 ## Configuration
 
