@@ -1422,6 +1422,30 @@ describe("strength board", () => {
     expect(errors).toEqual([]);
   });
 
+  it("leaves out a session without sets and says so, and has no note when every session has sets", async () => {
+    const note = /strength session has no sets/;
+    const full = await open(browser, pageFile(), { hash: "#strengthTraining" });
+    expect(await full.page.innerText("[data-id=setsPerCategory]")).not.toMatch(note);
+    // the oldest strength session lost its sets, as one past the 30 newest
+    const oldest = data.activities.findLastIndex((a: { type: string }) =>
+      a.type.includes("strength"),
+    );
+    const activities = data.activities.map((a: Record<string, unknown>, i: number) =>
+      i === oldest ? { ...a, exercises: undefined } : a,
+    );
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }),
+      { hash: "#strengthTraining" },
+    );
+    for (const id of ["setsPerCategory", "muscleBalance"])
+      expect(await page.innerText(`[data-id=${id}]`)).toContain(
+        "1 strength session has no sets (past the 30 newest without a saved .FIT file, or not readable): its week is left out.",
+      );
+    expect(await page.innerText("[data-id=exercises]")).toContain("1 strength session has no sets");
+    expect(errors).toEqual([]);
+  });
+
   it("searches, filters by group, and a second click on the chip shows all groups", async () => {
     const { page } = await open(browser, pageFile(), { hash: "#strengthTraining" });
     await page.fill(".search", "squat");

@@ -425,6 +425,8 @@
   "ex.longest": "Längster Satz (s)",
   "ex.restAfter": "Pause {v}",
   "ex.notDone": "nicht absolviert",
+  "ex.noSets": "{n} Krafteinheit hat keine Sätze (älter als die 30 neuesten ohne gespeicherte .FIT-Datei oder nicht lesbar): sie zählt nicht.|{n} Krafteinheiten haben keine Sätze (älter als die 30 neuesten ohne gespeicherte .FIT-Datei oder nicht lesbar): sie zählen nicht.",
+  "ex.noSetsWeeks": "{n} Krafteinheit hat keine Sätze (älter als die 30 neuesten ohne gespeicherte .FIT-Datei oder nicht lesbar): ihre Woche wird ausgelassen.|{n} Krafteinheiten haben keine Sätze (älter als die 30 neuesten ohne gespeicherte .FIT-Datei oder nicht lesbar): ihre Wochen werden ausgelassen.",
   "w.strengthSessions": "Einheiten",
   "ss.count": "{n} Übung|{n} Übungen",
   "mg.chest": "Brust",

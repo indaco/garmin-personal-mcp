@@ -54,10 +54,18 @@ register({
       },
       260,
     );
+    noSets(el, ctx, "ex.noSetsWeeks");
   },
 });
 
-const sum = (v: number[]) => v.reduce((s, x) => s + x, 0);
+// a week that holds a session without sets is null: it adds nothing
+const sum = (v: (number | null)[]) => v.reduce<number>((s, x) => s + (x ?? 0), 0);
+
+/** The note on the strength sessions without sets, when there are some. */
+function noSets(el: HTMLElement, ctx: Ctx, key: Key): void {
+  const n = ctx.calc.missingSets(ctx.activities, ctx.weeks).sessions;
+  if (n > 0) append(el, note(ctx.t(key, { n })));
+}
 
 register({
   id: "muscleBalance",
@@ -66,7 +74,9 @@ register({
     if (oneSession(el, ctx)) return;
     const sets = calc.muscleSets(ctx.activities, ctx.weeks);
     const groups = calc.MUSCLE_GROUPS.filter((g) => sets[g]);
-    const avg = groups.map((g) => sum(sets[g]!) / ctx.weeks.length);
+    // the mean of the weeks with every session's sets
+    const weeks = ctx.weeks.length - calc.missingSets(ctx.activities, ctx.weeks).weeks.size;
+    const avg = groups.map((g) => (weeks > 0 ? sum(sets[g]!) / weeks : 0));
     const ratio = calc.pushPull(sets);
     append(el, kpiRow(kpi(t("mb.pushPull"), ratio === null ? fmt.na : `${fmt.num(ratio, 2)} : 1`)));
     ctx.chart(
@@ -99,6 +109,7 @@ register({
       Math.max(160, groups.length * 26),
     );
     append(el, note(t("mb.note")));
+    noSets(el, ctx, "ex.noSetsWeeks");
   },
 });
 
@@ -173,6 +184,7 @@ register({
     const open = stats.find((s) => calc.slug(s.name) === ctx.item);
     if (open) append(el, detail(ctx, open));
     append(el, note(t("rec.estimate")));
+    noSets(el, ctx, "ex.noSets");
   },
 });
 

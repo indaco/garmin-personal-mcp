@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   completed,
   exerciseStats,
+  missingSets,
   muscleGroup,
   muscleSets,
   pushPull,
@@ -102,6 +103,34 @@ describe("categories", () => {
       "Push Up": [2, 0],
       Plank: [0, 2],
     });
+  });
+});
+
+describe("sessions without sets", () => {
+  // past the 30 newest sessions, or a .FIT file that could not be read
+  const noSets = { id: 3, type: "strength_training", start: "2026-10-23 18:00:00" };
+  const weeks = ["2026-10-12", "2026-10-19", "2026-10-26"];
+  const withGap = [noSets, ...acts];
+
+  it("leaves out each week that holds a session without sets, not one cut-off date", () => {
+    expect(missingSets(withGap, weeks)).toEqual({ sessions: 1, weeks: new Set([1]) });
+    // the week of 19 Oct has sets of one session and none of the other: not a real count
+    expect(setsByCategory(withGap, weeks)).toEqual({
+      Squat: [1, null, 0],
+      "Push Up": [2, null, 0],
+      Plank: [0, null, 0],
+    });
+    expect(muscleSets(withGap, weeks).quads).toEqual([1, null, 0]);
+  });
+
+  it("counts a week without strength sessions as 0 and ignores other sports", () => {
+    const run = { id: 4, type: "running", start: "2026-10-27 07:00:00" };
+    expect(missingSets([run, ...acts], weeks)).toEqual({ sessions: 0, weeks: new Set() });
+    expect(setsByCategory([run, ...acts], weeks).Squat).toEqual([1, 2, 0]);
+  });
+
+  it("gives push against pull from the complete weeks only", () => {
+    expect(pushPull({ chest: [2, null], back: [1, null] })).toBe(2);
   });
 });
 

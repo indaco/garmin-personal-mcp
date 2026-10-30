@@ -20,6 +20,7 @@ import {
   recoveryRow,
   toFetch,
 } from "../src/dashboard";
+import { addDays } from "../src/dates";
 import { GarminTools, writeAtomically } from "../src/tools";
 import { fitFile } from "./fit-file";
 
@@ -524,6 +525,22 @@ describe("getDashboardData", () => {
       16: [true, false],
     });
     expect(out.activities[0].exercises[0].exercise).toBe("Barbell Back Squat");
+  });
+
+  it("also gives sets to a strength session past the 30 newest whose .FIT file is saved", async () => {
+    garminActivities = Array.from({ length: 32 }, (_, i) =>
+      activity(100 + i, addDays("2026-10-26", -i), "strength_training"),
+    );
+    await new GarminTools(api as unknown as GarminApiClient, dataDir).fetchFit(131);
+    api.getBytes.mockClear();
+    const out = JSON.parse(await dashboard.getDashboardData(5));
+    const withSets = out.activities.filter((a: Record<string, unknown>) => a.exercises);
+    expect(withSets.map((a: Record<string, unknown>) => a.id)).toEqual([
+      ...Array.from({ length: 30 }, (_, i) => 100 + i),
+      131,
+    ]);
+    // the 30 newest are downloaded, the saved one is read from the data folder
+    expect(api.getBytes).toHaveBeenCalledTimes(30);
   });
 
   it("adds the laps of the last 8 sessions of each repeated run name, only when asked", async () => {

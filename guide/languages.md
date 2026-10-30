@@ -479,6 +479,8 @@ out. To add one:
 | `ex.longest` | Longest set (s) |
 | `ex.restAfter` | rest {v} |
 | `ex.notDone` | not done |
+| `ex.noSets` | {n} strength session has no sets (past the 30 newest without a saved .FIT file, or not readable): it is not counted.\|{n} strength sessions have no sets (past the 30 newest without a saved .FIT file, or not readable): they are not counted. |
+| `ex.noSetsWeeks` | {n} strength session has no sets (past the 30 newest without a saved .FIT file, or not readable): its week is left out.\|{n} strength sessions have no sets (past the 30 newest without a saved .FIT file, or not readable): their weeks are left out. |
 | `w.strengthSessions` | Sessions |
 | `ss.count` | {n} exercise\|{n} exercises |
 | `mg.chest` | Chest |

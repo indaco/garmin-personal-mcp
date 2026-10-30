@@ -425,6 +425,8 @@
   "ex.longest": "Serie más larga (s)",
   "ex.restAfter": "descanso {v}",
   "ex.notDone": "no completada",
+  "ex.noSets": "{n} sesión de fuerza no tiene series (más allá de las 30 más recientes sin archivo .FIT guardado, o ilegible): no se cuenta.|{n} sesiones de fuerza no tienen series (más allá de las 30 más recientes sin archivo .FIT guardado, o ilegibles): no se cuentan.",
+  "ex.noSetsWeeks": "{n} sesión de fuerza no tiene series (más allá de las 30 más recientes sin archivo .FIT guardado, o ilegible): su semana queda fuera.|{n} sesiones de fuerza no tienen series (más allá de las 30 más recientes sin archivo .FIT guardado, o ilegibles): sus semanas quedan fuera.",
   "w.strengthSessions": "Sesiones",
   "ss.count": "{n} ejercicio|{n} ejercicios",
   "mg.chest": "Pecho",
