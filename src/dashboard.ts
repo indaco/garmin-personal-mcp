@@ -94,14 +94,16 @@ export class GarminDashboard {
     };
     const cached = Object.keys(objectAt(cache, "activities"));
     // the small parts first: a reader that stops early still sees them
-    out.sync = {
-      garminCalls: sync.calls, // one-time .FIT downloads for new sets and laps not included
+    const synced: Json = {
+      garminCalls: sync.calls, // the .FIT downloads are in fitDownloads
+      fitDownloads: 0,
       newActivities: cached.filter((id) => !before.has(id)).length,
       failedDays: sync.failedDates.length,
       failedDates: sync.failedDates,
       failedSections: sync.failedSections,
       cachedActivities: cached.length,
     };
+    out.sync = synced;
     out.hrv = between(objectAt(cache, "hrv"), start, today);
     out.recovery = between(
       objectAt(cache, "recovery"),
@@ -109,7 +111,7 @@ export class GarminDashboard {
       today,
     );
     const activities = activitiesBetween(cache, start, today).map((a) => structuredClone(a));
-    await this.#attachDetails(activities, workouts);
+    synced.fitDownloads = await this.#attachDetails(activities, workouts);
     out.activities = activities;
     out.previousActivities = activitiesBetween(cache, prevStart, addDays(start, -1)).map(compact);
     return jsonByLines(out);
@@ -241,7 +243,7 @@ export class GarminDashboard {
    * sessions of a plan, compared across weeks): the newest WORKOUT_SESSIONS, downloaded when needed, and
    * every older one whose .FIT file is saved, which costs no download.
    */
-  async #attachDetails(acts: Json[], workouts: boolean): Promise<void> {
+  async #attachDetails(acts: Json[], workouts: boolean): Promise<number> {
     const isRun = (a: Json) => typeof a.type === "string" && a.type.endsWith("running");
     // runs of one workout share it, whatever place Garmin puts in their name
     const workout = (a: Json) => (typeof a.name === "string" ? workoutOf(a.name) : undefined);
@@ -251,12 +253,18 @@ export class GarminDashboard {
     // the activities come most recent first
     const lapped = new Map<unknown, number>();
     let strength = 0;
+    let downloads = 0;
+    // the sets and the laps of an activity come from one .FIT file: count it once, when it is not saved
+    const fit = async <T>(id: number, read: (id: number) => Promise<T>): Promise<T> => {
+      if (!(await this.tools.hasFit(id))) downloads++;
+      return read(id);
+    };
     for (const [i, a] of acts.entries()) {
       const id = asLong(a.id);
       const type = typeof a.type === "string" ? a.type : "";
       try {
         if (type.includes("strength") && strength++ < 30) {
-          a.exercises = JSON.parse(await this.tools.getActivitySets(id)).exercises;
+          a.exercises = JSON.parse(await fit(id, (n) => this.tools.getActivitySets(n))).exercises;
         }
         const longRun = isRun(a) && typeof a.km === "number" && a.km > 15;
         let repeated = false;
@@ -267,12 +275,15 @@ export class GarminDashboard {
           repeated = newer < WORKOUT_SESSIONS || (await this.tools.hasFit(id));
         }
         if (i < 3 || a.race === true || longRun || repeated) {
-          a.laps = JSON.parse(await this.tools.getActivityLaps(id)).laps;
+          const laps = JSON.parse(await fit(id, (n) => this.tools.getActivityLaps(n))).laps;
+          // a file without laps (a strength session) gives none, not an empty list
+          if (Array.isArray(laps) && laps.length > 0) a.laps = laps;
         }
       } catch (e) {
         a.detailError = (e as Error).message;
       }
     }
+    return downloads;
   }
 
   // ------------------------------------------------------------------ cache file
@@ -534,7 +545,8 @@ export function registerDashboard(server: McpServer, dashboard: GarminDashboard)
         "statute_uk) that the page shows; the data itself is always metric; `locale`: the language of",
         "the Garmin profile, e.g. it or pt-BR. Keeps a local cache and",
         "fetches from Garmin only what is new since the last call, so a rebuild or an update needs few",
-        "calls. `sync` in the result says what was fetched.",
+        "calls. `sync` in the result says what was fetched: Garmin calls, .FIT files downloaded",
+        "(fitDownloads) and new activities.",
         "`digest`, first in the result: the server's totals for the whole period and for each",
         "Monday-Sunday week (sessions, km, hours, load), the training load of the last 7 and 28 days,",
         "best efforts, races and strength top sets; quote them instead of your own sums. For another",
