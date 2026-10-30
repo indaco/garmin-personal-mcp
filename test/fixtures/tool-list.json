@@ -383,11 +383,10 @@
   },
   {
     "name": "getSleep",
-    "description": "Sleep data for one night (date: the morning you woke up), or for up to 14 nights (fromDate and toDate), yyyy-MM-dd.",
+    "description": "Sleep for one night (date: the morning you woke up), or for up to 14 nights (fromDate and\ntoDate), yyyy-MM-dd, as one compact row per night: bedtime and wake (local HH:mm), hours of\nsleep, deep, light, REM and awake, the sleep score and its quality, the sleep need (hours),\naverage heart rate, average and lowest SpO2, average respiration, awake count, average sleep\nstress and Garmin's feedback. Missing values are left out, and a night without sleep data has\nonly its date. Set raw=true for Garmin's JSON.",
     "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "additionalProperties": false,
       "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "date": {
           "type": "string",
@@ -400,6 +399,10 @@
         "toDate": {
           "type": "string",
           "description": "Last date yyyy-MM-dd, with fromDate"
+        },
+        "raw": {
+          "type": "boolean",
+          "description": "Return Garmin's raw JSON instead of the summary"
         }
       }
     }

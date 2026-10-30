@@ -110,6 +110,8 @@ describe("recoveryRow", () => {
       {
         sleepTimeSeconds: 21240,
         deepSleepSeconds: 6000,
+        lightSleepSeconds: 13500,
+        awakeSleepSeconds: 600,
         remSleepSeconds: 840,
         sleepScores: { overall: { value: 44 } },
         sleepNeed: { actual: 450 },
@@ -125,7 +127,8 @@ describe("recoveryRow", () => {
       },
     );
     expect(JSON.stringify(row)).toBe(
-      '{"date":"2026-10-25","sleepH":5.9,"deep":1.67,"rem":0.23,"sleepScore":44,' +
+      '{"date":"2026-10-25","sleepH":5.9,"deep":1.67,"light":3.75,"rem":0.23,"awake":0.17,' +
+        '"sleepScore":44,' +
         '"needH":7.5,"bedMin":1431,"rhr":49,"bbHigh":53,"bbLow":12,"steps":15037,' +
         '"stepGoal":14520,"floors":93}',
     );

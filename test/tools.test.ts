@@ -222,6 +222,70 @@ const namedIds = async (limit?: number, raw?: boolean) =>
 const drills = (from: number, n: number) =>
   Array.from({ length: n }, (_, i) => ({ activityId: from + i, activityName: "Drill" }));
 
+/** One part of Garmin's sleepScores. */
+const score = (value?: number) => ({ value, qualifierKey: "GOOD", optimalStart: 1, optimalEnd: 2 });
+
+/** Garmin's answer for a night without sleep data: nulls, and the sleep need of that night. */
+const emptyNight = (date: string) => ({
+  calendarDate: null,
+  sleepTimeSeconds: null,
+  deepSleepSeconds: null,
+  sleepStartTimestampLocal: null,
+  avgHeartRate: null,
+  deviceRemCapable: true,
+  sleepNeed: { calendarDate: date, baseline: 480, actual: 490 },
+  nextSleepNeed: null,
+});
+
+/** A synthetic night in Garmin's sleep JSON: 23:10 to 07:05 local, 7.5 h of sleep. */
+const night = (date: string) => {
+  const wake = Date.parse(`${date}T07:05:00Z`);
+  const bed = wake - (7 * 60 + 55) * 60_000;
+  return {
+    id: 1761000000000,
+    userProfilePK: 1,
+    calendarDate: date,
+    sleepTimeSeconds: 27000,
+    napTimeSeconds: 0,
+    sleepStartTimestampGMT: bed - 3600_000,
+    sleepEndTimestampGMT: wake - 3600_000,
+    sleepStartTimestampLocal: bed,
+    sleepEndTimestampLocal: wake,
+    autoSleepStartTimestampGMT: null,
+    deepSleepSeconds: 5400,
+    lightSleepSeconds: 15300,
+    remSleepSeconds: 6300,
+    awakeSleepSeconds: 900,
+    averageSpO2Value: 95,
+    lowestSpO2Value: 88,
+    highestSpO2Value: 99,
+    averageRespirationValue: 14.27,
+    lowestRespirationValue: 9,
+    awakeCount: 2,
+    avgSleepStress: 12.43,
+    ageGroup: "ADULT",
+    avgHeartRate: 52.2,
+    sleepScoreFeedback: "POSITIVE_LONG_AND_DEEP",
+    sleepScoreInsight: "NONE",
+    sleepScores: {
+      overall: { value: 82, qualifierKey: "GOOD" },
+      totalDuration: score(),
+      stress: score(),
+      remPercentage: score(23),
+      lightPercentage: score(57),
+      deepPercentage: score(20),
+    },
+    sleepNeed: {
+      userProfilePk: 1,
+      calendarDate: date,
+      deviceId: 2,
+      baseline: 480,
+      actual: 480,
+      feedback: "NO_CHANGE",
+    },
+  };
+};
+
 describe("activities", () => {
   it("lists activities as summaries, limit 20 by default and 200 at most", async () => {
     api.getJson.mockResolvedValue([
@@ -409,7 +473,7 @@ describe("activities", () => {
       "/wellness-service/wellness/dailyHeartRate",
       { date: "2026-10-27" },
     ],
-    ["getSleep", ["2026-10-27"], "/sleep-service/sleep/dailySleep", { date: "2026-10-27" }],
+    ["getSleep", ["2026-10-27", true], "/sleep-service/sleep/dailySleep", { date: "2026-10-27" }],
     [
       "getWeight",
       ["2026-07-01", "2026-10-27"],
@@ -535,12 +599,75 @@ describe("activities", () => {
     },
   );
 
-  it("getSleepRange asks for the nights between two dates in one request", async () => {
-    api.getJson.mockResolvedValue([{ calendarDate: "2026-10-27" }]);
-    expect(await tools.getSleepRange("2026-10-21", "2026-10-27")).toBe(
-      '[{"calendarDate":"2026-10-27"}]',
+  it("getSleep answers one compact row for the night", async () => {
+    api.getJson.mockResolvedValue(night("2026-10-27"));
+    expect(await tools.getSleep("2026-10-27")).toBe(
+      '{"date":"2026-10-27","bedtime":"23:10","wake":"07:05","sleepH":7.5,"deepH":1.5,' +
+        '"lightH":4.25,"remH":1.75,"awakeH":0.25,"sleepScore":82,"sleepQuality":"GOOD",' +
+        '"needH":8,"avgHR":52,"avgSpO2":95,"lowestSpO2":88,"avgRespiration":14.3,' +
+        '"awakeCount":2,"avgSleepStress":12.4,"feedback":"POSITIVE_LONG_AND_DEEP"}',
     );
+  });
+
+  it("getSleep leaves out what Garmin has not measured, and keeps the asked date", async () => {
+    api.getJson.mockResolvedValue({
+      sleepTimeSeconds: null,
+      sleepStartTimestampLocal: 1e20,
+      sleepScores: { overall: { value: null } },
+      sleepNeed: null,
+      avgSleepStress: "12",
+    });
+    expect(JSON.parse(await tools.getSleep("2026-10-27"))).toEqual({ date: "2026-10-27" });
+    api.getJson.mockResolvedValue(null);
+    expect(JSON.parse(await tools.getSleep("2026-10-27"))).toEqual({ date: "2026-10-27" });
+  });
+
+  it("getSleep answers only the date for a night without sleep, even with a sleep need", async () => {
+    api.getJson.mockResolvedValue(emptyNight("2026-10-28"));
+    expect(await tools.getSleep("2026-10-28")).toBe('{"date":"2026-10-28"}');
+  });
+
+  it("getSleep with raw gives Garmin's JSON without the record and user ids", async () => {
+    api.getJson.mockResolvedValue(night("2026-10-27"));
+    const raw = JSON.parse(await tools.getSleep("2026-10-27", true));
+    const { id: _id, userProfilePK: _pk, ...rest } = night("2026-10-27");
+    expect(raw).toEqual({
+      ...rest,
+      sleepNeed: { calendarDate: "2026-10-27", baseline: 480, actual: 480, feedback: "NO_CHANGE" },
+    });
+  });
+
+  it("getSleepRange answers one row per night asked, with only the date when there is no sleep", async () => {
+    // Garmin leaves out some nights, and answers the next night with a sleep need and no date
+    api.getJson.mockResolvedValue([{}, night("2026-10-26"), emptyNight("2026-10-28")]);
+    const rows = JSON.parse(await tools.getSleepRange("2026-10-25", "2026-10-29"));
+    expect(rows).toEqual([
+      { date: "2026-10-25" },
+      expect.objectContaining({ date: "2026-10-26", sleepH: 7.5, sleepScore: 82 }),
+      { date: "2026-10-27" },
+      { date: "2026-10-28" },
+      { date: "2026-10-29" },
+    ]);
     expect(api.getJson).toHaveBeenCalledOnce();
+    expect(api.getJson).toHaveBeenCalledWith("/sleep-service/sleep/dailySleepSummariesByDate", {
+      startDate: "2026-10-25",
+      endDate: "2026-10-29",
+    });
+  });
+
+  it("getSleepRange answers 14 nights in under 8,000 characters", async () => {
+    const days = Array.from({ length: 14 }, (_, i) => `2026-10-${String(i + 1).padStart(2, "0")}`);
+    api.getJson.mockResolvedValue(days.map(night));
+    const raw = await tools.getSleepRange("2026-10-01", "2026-10-14", true);
+    const compact = await tools.getSleepRange("2026-10-01", "2026-10-14");
+    expect(JSON.parse(compact)).toHaveLength(14);
+    expect(compact.length).toBeLessThan(8000);
+    expect(compact.length).toBeLessThan(raw.length / 3);
+  });
+
+  it("getSleepRange gives Garmin's answer as it is when it is not a list of nights", async () => {
+    api.getJson.mockResolvedValue({ message: "nothing" });
+    expect(await tools.getSleepRange("2026-10-21", "2026-10-27")).toBe('{"message":"nothing"}');
     expect(api.getJson).toHaveBeenCalledWith("/sleep-service/sleep/dailySleepSummariesByDate", {
       startDate: "2026-10-21",
       endDate: "2026-10-27",
@@ -843,7 +970,12 @@ describe("MCP tools", () => {
       "/wellness-service/wellness/dailyHeartRate",
       { date: "2026-10-27" },
     ],
-    ["getSleep", { date: "2026-10-27" }, "/sleep-service/sleep/dailySleep", { date: "2026-10-27" }],
+    [
+      "getSleep",
+      { date: "2026-10-27", raw: true },
+      "/sleep-service/sleep/dailySleep",
+      { date: "2026-10-27" },
+    ],
     [
       "getWeight",
       { fromDate: "2026-10-01", toDate: "2026-10-27", includeAll: true },

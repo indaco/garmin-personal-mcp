@@ -7,7 +7,7 @@ import { addDays, localToday } from "./dates";
 import { digest } from "./digest";
 import { log } from "./log";
 import { workoutOf } from "./page/running";
-import { type GarminTools, firstArray, summarize, writeAtomically } from "./tools";
+import { type GarminTools, firstArray, sleepSummary, summarize, writeAtomically } from "./tools";
 
 type Json = Record<string, unknown>;
 /** An inclusive date range, yyyy-MM-dd. */
@@ -212,7 +212,7 @@ export class GarminDashboard {
       }
       try {
         const [sleep, summary] = await Promise.all([
-          call(sync, () => this.tools.getSleep(day)),
+          call(sync, () => this.tools.getSleep(day, true)),
           call(sync, () => this.tools.getDailySummary(day)),
         ]);
         byDate[day] = recoveryRow(day, sleep, summary);
@@ -370,21 +370,17 @@ export function recoveryRefreshFrom(lastSync: string | undefined, today: string)
 /** One compact row per day: sleep, sleep need, bedtime, resting HR, body battery, stress, steps. */
 export function recoveryRow(day: string, sleep: unknown, summary: unknown): Json {
   const r: Json = { date: day };
-  hours(sleep, r, "sleepTimeSeconds", "sleepH");
-  hours(sleep, r, "deepSleepSeconds", "deep");
-  hours(sleep, r, "lightSleepSeconds", "light");
-  hours(sleep, r, "remSleepSeconds", "rem");
-  hours(sleep, r, "awakeSleepSeconds", "awake");
-  copy(field(field(sleep, "sleepScores"), "overall"), r, "value", "sleepScore");
-  const need = field(field(sleep, "sleepNeed"), "actual");
-  if (typeof need === "number") {
-    r.needH = round2(need / 60);
-  }
-  const bed = field(sleep, "sleepStartTimestampLocal");
-  if (typeof bed === "number") {
-    // the *Local timestamp is local wall time encoded as epoch ms: read it as UTC
-    const t = new Date(Math.trunc(bed));
-    r.bedMin = t.getUTCHours() * 60 + t.getUTCMinutes();
+  // the cache keeps its own names, so the fields come from getSleep's summary renamed
+  const s = sleepSummary(sleep);
+  copy(s, r, "sleepH", "sleepH");
+  copy(s, r, "deepH", "deep");
+  copy(s, r, "lightH", "light");
+  copy(s, r, "remH", "rem");
+  copy(s, r, "awakeH", "awake");
+  copy(s, r, "sleepScore", "sleepScore");
+  copy(s, r, "needH", "needH");
+  if (typeof s.bedtime === "string") {
+    r.bedMin = Number(s.bedtime.slice(0, 2)) * 60 + Number(s.bedtime.slice(3));
   }
   copy(summary, r, "restingHeartRate", "rhr");
   copy(summary, r, "bodyBatteryHighestValue", "bbHigh");
@@ -483,17 +479,6 @@ function copy(from: unknown, to: Json, name: string, as: string): void {
   if (v !== undefined && v !== null) {
     to[as] = v;
   }
-}
-
-function hours(from: unknown, to: Json, name: string, as: string): void {
-  const v = field(from, name);
-  if (typeof v === "number") {
-    to[as] = round2(v / 3600);
-  }
-}
-
-function round2(v: number): number {
-  return Math.round(v * 100) / 100;
 }
 
 function isObject(v: unknown): v is Json {

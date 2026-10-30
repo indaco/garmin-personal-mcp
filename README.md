@@ -165,7 +165,7 @@ Ask "list my last 5 activities". The first time that a garmin-personal tool asks
 | `downloadActivityFit`      | saves the .FIT file of an activity in the data folder                          |
 | `getHrvRange`              | HRV during the night                                                           |
 | `getDailyHeartRate`        | the heart rate of a day, with the resting HR                                   |
-| `getSleep`                 | the sleep of a night, or of up to 14 nights                                    |
+| `getSleep`                 | the sleep of a night, or of up to 14 nights: hours, phases, score and need     |
 | `getWeight`                | weight and body composition for a range of dates                               |
 | `getBodyBattery`           | how Body Battery charged and drained, for up to 14 days                        |
 | `getHeartRateZones`        | your HR zones                                                                  |
