@@ -169,6 +169,15 @@ function run(i, name, km, pace, kind, race = false) {
   const speed = 1000 / avgPace;
   const strideCm = round(((speed * 60) / cadence) * 100, 1);
   const vertOsc = round(r(7.8, 9) - fitness(i) * 0.4, 1);
+  // the running form of each lap, from its pace: no random numbers, so the other data stays the same
+  for (const l of laps) {
+    const p = l.sec / l.km;
+    const stride = round(((1000 / p) * 60 * 100) / l.cadenceSpm, 1);
+    l.gctMs = Math.round(258 - (easy - p) * 0.35 - fitness(i) * 10);
+    l.vertOscCm = vertOsc;
+    l.strideCm = stride;
+    l.vertRatioPct = round((vertOsc / stride) * 100, 1);
+  }
   const a = {
     name,
     type: "running",

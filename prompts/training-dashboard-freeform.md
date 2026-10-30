@@ -261,11 +261,12 @@ charts ("one session so far"). Trends start at 2 sessions.
 10. **Workout trend**, only when I said yes to the workout comparison: the runs of the same workout
    across weeks (the run name without the place that Garmin puts before " - "), up to 3 workouts
    side by side, with a choice of metric: pace, avg HR, efficiency, cadence, ground contact,
-   vertical ratio, stride and power. For a run whose laps mark a warm-up,
-   rest or cool-down, take pace, HR, cadence and power from its work laps (intensity `active` or
-   `interval`) of 20 m and 8 s or more: a shorter one is a lap that the watch adds between steps. Show the
-   reps and the fade: the pace of the last rep against the first of the same workout step (`step`,
-   the step with the most reps), only when those reps have the same distance or time (within 15%).
+   vertical ratio, stride and power. For a run whose laps mark a warm-up, rest or cool-down, take
+   pace, HR, cadence, power and running form (`gctMs`, `vertRatioPct`, `strideCm` of each lap) from
+   its work laps (intensity `active` or `interval`) of 20 m and 8 s or more: a shorter one is a lap
+   that the watch adds between steps. Show the reps and the fade: the pace of the last rep against
+   the first of the same workout step (`step`, the step with the most reps), only when those reps
+   have the same distance or time (within 15%).
 
 **Walk** adds pace and avg HR for each week, and steps, cadence and body battery change for each
 walk. It also adds daily steps against the goal, with floors (last 14 days). **Hike** adds

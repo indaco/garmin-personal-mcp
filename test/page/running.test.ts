@@ -261,12 +261,33 @@ describe("workout metrics", () => {
     expect(m.pace).toBe(300);
   });
 
+  it("takes the running form from the work laps when the laps have it", () => {
+    const form = (gctMs: number, strideCm: number) => ({
+      ...step("active", 1, "4:00", 170),
+      gctMs,
+      vertRatioPct: 7,
+      strideCm,
+    });
+    const m = workoutMetrics({
+      ...run,
+      laps: [
+        { ...step("warmup", 1, "6:00", 130), gctMs: 290, strideCm: 90 },
+        form(240, 130),
+        form(250, 120),
+      ],
+    });
+    // the reps, not the warm-up and not the whole run (250 ms, 110 cm)
+    expect(m).toMatchObject({ gct: 245, vertRatio: 7, stride: 125 });
+  });
+
   it("takes pace, HR, cadence and power from the work laps of a structured workout", () => {
     const m = workoutMetrics({
       ...run,
       laps: [step("warmup", 1, "6:00", 130), step("active", 2, "8:00", 160)],
     });
-    expect(m).toMatchObject({ pace: 240, hr: 160, cadence: 180, power: 300, gct: 250, reps: 1 });
+    expect(m).toMatchObject({ pace: 240, hr: 160, cadence: 180, power: 300, reps: 1 });
+    // laps without running form: no form, rather than the whole run with its warm-up
+    expect(m.gct).toBeUndefined();
     expect(m.efficiency).toBeCloseTo(60_000 / 240 / 160, 6);
   });
 });

@@ -150,6 +150,11 @@ export function lapsOf(fit: Messages, activityId: number) {
     putIfSet(o, "ascentM", lap.totalAscent);
     putIfSet(o, "descentM", lap.totalDescent);
     putIfSet(o, "avgPowerW", lap.avgPower);
+    // running form, in the names and units of the activity summary (FIT gives mm)
+    if (lap.avgStanceTime != null) o.gctMs = Math.round(lap.avgStanceTime);
+    if (lap.avgVerticalRatio != null) o.vertRatioPct = round(lap.avgVerticalRatio, 1);
+    if (lap.avgVerticalOscillation != null) o.vertOscCm = round(lap.avgVerticalOscillation / 10, 1);
+    if (lap.avgStepLength != null) o.strideCm = round(lap.avgStepLength / 10, 1);
     const intensity = enumName("intensity", lap.intensity);
     if (intensity) o.intensity = intensity;
     const trigger = enumName("lapTrigger", lap.lapTrigger);

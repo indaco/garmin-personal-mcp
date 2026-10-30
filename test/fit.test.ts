@@ -279,6 +279,32 @@ describe("laps", () => {
     ]);
   });
 
+  it("gives the running form of a lap: ground contact, vertical ratio and oscillation, stride", () => {
+    const fit = decodeFit(
+      fitFile(
+        [
+          Profile.MesgNum.LAP,
+          {
+            totalTimerTime: 30,
+            avgStanceTime: 261.5,
+            avgVerticalRatio: 6.86,
+            avgVerticalOscillation: 81.7,
+            avgStepLength: 1339,
+          },
+        ],
+        [Profile.MesgNum.SESSION, { sport: "running" }],
+      ),
+      13,
+    );
+    // the names and units of the activity summary: mm become cm
+    expect(lapsOf(fit, 13).laps[0]).toMatchObject({
+      gctMs: 262,
+      vertRatioPct: 6.9,
+      vertOscCm: 8.2,
+      strideCm: 133.9,
+    });
+  });
+
   it("has no sport when the file has no session", () => {
     const fit = decodeFit(fitFile([Profile.MesgNum.LAP, { totalTimerTime: 3725 }]), 11);
     expect(lapsOf(fit, 11)).toEqual({ activityId: 11, laps: [{ lap: 1, km: 0, time: "1:02:05" }] });
