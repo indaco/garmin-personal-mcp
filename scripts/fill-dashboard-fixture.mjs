@@ -33,7 +33,7 @@ const workout = (a) => (typeof a.name === "string" ? workoutOf(a.name) : undefin
  * shows what the server gives. With `saved`, every .FIT file is saved, as on a page that has updated
  * for months; without, it is a first build. `activities` come newest first. Laps stay for the 3 newest activities,
  * races, runs over 15 km and, with `workouts`, the 8 newest runs of each run name that repeats; sets
- * stay for the 30 newest strength sessions.
+ * stay for the 30 newest strength sessions, and for all of them when every file is saved.
  */
 export function asServer(activities, workouts = false, saved = false) {
   const runNames = new Map();
@@ -42,7 +42,7 @@ export function asServer(activities, workouts = false, saved = false) {
   const lapped = new Map();
   let strength = 0;
   activities.forEach((a, i) => {
-    if (a.type?.includes("strength") && strength++ >= 30) delete a.exercises;
+    if (a.type?.includes("strength") && strength++ >= 30 && !saved) delete a.exercises;
     const longRun = isRun(a) && typeof a.km === "number" && a.km > 15;
     const w = workout(a);
     const repeated =

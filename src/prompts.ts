@@ -28,6 +28,7 @@ export function registerPrompts(server: McpServer): void {
   const setupPrompt = load("dashboard-setup.md");
   const reviewPrompt = load("run-review.md");
   const readinessPrompt = load("race-readiness.md");
+  const strengthPrompt = load("strength-review.md");
 
   const dashboardDescription =
     "Build a personal training + recovery dashboard (volume, load, HRV, sleep) from Garmin data";
@@ -196,13 +197,32 @@ export function registerPrompts(server: McpServer): void {
       }),
     },
     (args) => {
-      const activity = arg(args.activity);
-      const find = /^\d+$/.test(activity)
-        ? `The run is the activity with \`activityId\` = ${activity}.`
-        : activity
-          ? `Call \`listActivities\` with \`names\` = ${JSON.stringify([activity])} and \`limit\` = 100, and keep the runs (a type that ends in \`running\`). My words can be only the start of the name: when the runs have more than one name, list the 5 most recent with date and name and ask me which one. Then take the most recent run of that name.`
-          : "Call `listActivities` and take the most recent run (a type that ends in `running`).";
+      const find = findActivity(arg(args.activity), "run", "runs", "a type that ends in `running`");
       return result(reviewDescription, render(reviewPrompt, { today: localToday(), find }));
+    },
+  );
+
+  const strengthDescription =
+    "Review a strength session as a coach: planned sets against done, top sets, rest, recovery";
+  server.registerPrompt(
+    "strength-review",
+    {
+      description: strengthDescription,
+      argsSchema: z.object({
+        activity: z
+          .string()
+          .describe("An activity id, or words of its name; empty = the latest strength session")
+          .optional(),
+      }),
+    },
+    (args) => {
+      const find = findActivity(
+        arg(args.activity),
+        "strength session",
+        "strength sessions",
+        "a type that contains `strength`",
+      );
+      return result(strengthDescription, render(strengthPrompt, { today: localToday(), find }));
     },
   );
 
@@ -244,6 +264,19 @@ export function registerPrompts(server: McpServer): void {
       );
     },
   );
+}
+
+/**
+ * The step that finds the activity of a review: by id, by words of its name (the slash command can pass
+ * only the first word, so the name may be cut), or the latest one of its kind.
+ */
+function findActivity(activity: string, one: string, many: string, type: string): string {
+  if (/^\d+$/.test(activity))
+    return `The ${one} is the activity with \`activityId\` = ${activity}.`;
+  return activity
+    ? `Call \`listActivities\` with \`names\` = ${JSON.stringify([activity])} and \`limit\` = 100, and keep the ${many} (${type}). My words can be only the start of the name: when the ${many} have more than one name, list the 5 most recent with date and name and ask me which one. Then take the most recent ${one} of that name.`
+    : // 100 activities answer about 55,000 characters, over a client's tool output limit: page by 20
+      `Call \`listActivities\` and take the most recent ${one} (${type}). When none of them is one, call it again with \`endDate\` = the day of the oldest activity in the list, until you find one.`;
 }
 
 function renderDashboard(template: string, w: number): string {

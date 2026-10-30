@@ -26,7 +26,7 @@ const PALETTE = [
 register({
   id: "setsPerCategory",
   render(el, ctx) {
-    if (oneSession(el, ctx)) return;
+    if (oneSession(el, ctx) || noCompleteWeek(el, ctx)) return;
     const sets = ctx.calc.setsByCategory(ctx.activities, ctx.weeks);
     const names = Object.keys(sets).toSorted((a, b) => sum(sets[b]) - sum(sets[a]));
     ctx.chart(
@@ -54,19 +54,45 @@ register({
       },
       260,
     );
+    noSets(el, ctx, "ex.noSetsWeeks");
   },
 });
 
-const sum = (v: number[]) => v.reduce((s, x) => s + x, 0);
+// a week that holds a session without sets is null: it adds nothing
+const sum = (v: (number | null)[]) => v.reduce<number>((s, x) => s + (x ?? 0), 0);
+
+/** The note on the strength sessions without sets, when there are some. */
+function noSets(el: HTMLElement, ctx: Ctx, key: Key): void {
+  const text = noSetsText(ctx, key);
+  if (text) append(el, note(text));
+}
+
+function noSetsText(ctx: Ctx, key: Key): string | undefined {
+  const n = ctx.calc.missingSets(ctx.activities, ctx.weeks).sessions;
+  return n > 0 ? ctx.t(key, { n }) : undefined;
+}
+
+/**
+ * True, with the note as the empty state, when each week with strength sessions holds one without sets:
+ * the chart would show only zeros, and none of them is real.
+ */
+function noCompleteWeek(el: HTMLElement, ctx: Ctx): boolean {
+  const m = ctx.calc.missingSets(ctx.activities, ctx.weeks);
+  if (m.sessions === 0 || m.complete > 0) return false;
+  ctx.empty(el, noSetsText(ctx, "ex.noSetsWeeks"));
+  return true;
+}
 
 register({
   id: "muscleBalance",
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
-    if (oneSession(el, ctx)) return;
+    if (oneSession(el, ctx) || noCompleteWeek(el, ctx)) return;
     const sets = calc.muscleSets(ctx.activities, ctx.weeks);
     const groups = calc.MUSCLE_GROUPS.filter((g) => sets[g]);
-    const avg = groups.map((g) => sum(sets[g]!) / ctx.weeks.length);
+    // the mean of the weeks with every session's sets
+    const weeks = ctx.weeks.length - calc.missingSets(ctx.activities, ctx.weeks).weeks.size;
+    const avg = groups.map((g) => sum(sets[g]!) / weeks);
     const ratio = calc.pushPull(sets);
     append(el, kpiRow(kpi(t("mb.pushPull"), ratio === null ? fmt.na : `${fmt.num(ratio, 2)} : 1`)));
     ctx.chart(
@@ -99,6 +125,7 @@ register({
       Math.max(160, groups.length * 26),
     );
     append(el, note(t("mb.note")));
+    noSets(el, ctx, "ex.noSetsWeeks");
   },
 });
 
@@ -113,7 +140,7 @@ register({
   render(el, ctx) {
     const { t, calc } = ctx;
     const stats = calc.exerciseStats(ctx.activities);
-    if (stats.length === 0) return ctx.empty(el);
+    if (stats.length === 0) return ctx.empty(el, noSetsText(ctx, "ex.noSets"));
     const key = `${ctx.board}/${ctx.id}`;
     const st = state.get(key) ?? { sort: "group", desc: false, group: null, search: "" };
     state.set(key, st);
@@ -172,7 +199,8 @@ register({
 
     const open = stats.find((s) => calc.slug(s.name) === ctx.item);
     if (open) append(el, detail(ctx, open));
-    append(el, note(t("rec.estimate")));
+    append(el, note(t("ex.changeNote")), note(t("rec.estimate")));
+    noSets(el, ctx, "ex.noSets");
   },
 });
 
@@ -284,6 +312,16 @@ function exerciseTable(
               },
               s.name,
             ),
+            // the state of the lift now, apart from the change since its first sessions
+            (s.status === "stalled" || s.status === "down") &&
+              h(
+                "span",
+                {
+                  class: "tag",
+                  title: t(s.status === "stalled" ? "ex.stalledHint" : "ex.downHint"),
+                },
+                t(s.status === "stalled" ? "ex.stalled" : "ex.down"),
+              ),
           ),
           h("td", { class: "num" }, String(s.sessions.length)),
           h("td", { class: "num" }, fmt.day(last.date)),

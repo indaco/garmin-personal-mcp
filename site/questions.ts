@@ -27,6 +27,7 @@ export const QUESTIONS: Record<string, [question: string, tools: string][]> = {
       "What was my heaviest squat set this month, and what 1RM does it suggest?",
       "listActivities · getActivitySets",
     ],
+    ["Which of my lifts have stalled over the last 6 weeks?", "listActivities · getActivitySets"],
     ["How long did I rest between sets in my last strength session?", "getActivitySets"],
     [
       "How much weight did I lift in total in each strength session this month?",

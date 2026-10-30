@@ -238,8 +238,8 @@ export class GarminDashboard {
   // ------------------------------------------------------------------ output
 
   /**
-   * Strength sets for every strength session (30 most recent); laps for the 3 most recent activities,
-   * races and runs over 15 km. With `workouts`, also the laps of the runs of each name that repeats (the
+   * Strength sets for the 30 most recent strength sessions and every older one whose .FIT file is saved;
+   * laps for the 3 most recent activities, races and runs over 15 km. With `workouts`, also the laps of the runs of each name that repeats (the
    * sessions of a plan, compared across weeks): the newest WORKOUT_SESSIONS, downloaded when needed, and
    * every older one whose .FIT file is saved, which costs no download.
    */
@@ -263,7 +263,7 @@ export class GarminDashboard {
       const id = asLong(a.id);
       const type = typeof a.type === "string" ? a.type : "";
       try {
-        if (type.includes("strength") && strength++ < 30) {
+        if (type.includes("strength") && (strength++ < 30 || (await this.tools.hasFit(id)))) {
           a.exercises = JSON.parse(await fit(id, (n) => this.tools.getActivitySets(n))).exercises;
         }
         const longRun = isRun(a) && typeof a.km === "number" && a.km > 15;

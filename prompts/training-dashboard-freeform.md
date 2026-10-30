@@ -27,8 +27,9 @@ of `getDashboardData` with `weeks` = {{weeks}}, which has:
 
 - `zones`: my HR zones. `fitnessAge`: Garmin's fitness age.
 - `activities`: the activities from {{startDate}} to {{today}}, most recent first, as compact
-  summaries. Strength activities have `exercises`: sets, rest, and the primary and secondary
-  muscles of each exercise. The 3 most recent activities, every race, every run over 15 km and
+  summaries. The 30 most recent strength activities, and older ones whose .FIT file is saved, have
+  `exercises`: sets, rest, and the primary and secondary muscles of each exercise. A strength
+  activity without `exercises` has no sets: leave its week out of set counts and say so. The 3 most recent activities, every race, every run over 15 km and
   every run whose name repeats have `laps` (km splits, intervals, warm-up and cool-down).
 - `previousActivities`: the activities from {{prevStartDate}} to {{prevEndDate}}, with the fields
   for the period comparison.

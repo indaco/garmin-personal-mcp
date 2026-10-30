@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   completed,
   exerciseStats,
+  missingSets,
   muscleGroup,
   muscleSets,
   pushPull,
   setsByCategory,
   slug,
 } from "../../src/page/strength";
+import { addDays } from "../../src/dates";
 
 const squat = (sets: Record<string, number>[]) => ({
   exercise: "Back Squat",
@@ -53,6 +55,15 @@ const acts = [
   },
 ];
 
+/** Pull-up sessions, one each `days` days from 1 Sep, with these max reps. */
+const pullUps = (reps: number[], days = 7) =>
+  exerciseStats(
+    reps.map((n, i) => ({
+      start: `${addDays("2026-09-01", i * days)} 18:00:00`,
+      exercises: [{ exercise: "Pull Up", sets: [{ reps: n }] }],
+    })),
+  )[0];
+
 describe("sets", () => {
   it("counts a set as done when it has reps, or time without reps", () => {
     expect(completed({ reps: 8, kg: 60 })).toBe(true);
@@ -89,6 +100,19 @@ describe("muscle groups", () => {
     expect(sets.abs).toEqual([0, 2]);
   });
 
+  it("counts an exercise without catalogue muscles under other", () => {
+    const sets = muscleSets(
+      [
+        {
+          start: "2026-10-15 18:00:00",
+          exercises: [{ exercise: "Sled Push", sets: [{ reps: 8 }] }],
+        },
+      ],
+      ["2026-10-12"],
+    );
+    expect(sets).toEqual({ other: [1] });
+  });
+
   it("gives push against pull sets", () => {
     expect(pushPull({ chest: [2], shoulders: [1], triceps: [1], back: [2], biceps: [0] })).toBe(2);
     expect(pushPull({ chest: [2] })).toBeNull();
@@ -102,6 +126,52 @@ describe("categories", () => {
       "Push Up": [2, 0],
       Plank: [0, 2],
     });
+  });
+});
+
+/** A strength session without sets, as one past the 30 newest. */
+const withoutSets = (id: number, start: string) => ({ id, type: "strength_training", start });
+
+describe("sessions without sets", () => {
+  // past the 30 newest sessions, or a .FIT file that could not be read
+  const noSets = { id: 3, type: "strength_training", start: "2026-10-23 18:00:00" };
+  const weeks = ["2026-10-12", "2026-10-19", "2026-10-26"];
+  const withGap = [noSets, ...acts];
+
+  it("leaves out each week that holds a session without sets, not one cut-off date", () => {
+    // the week of 12 Oct still holds a session with all its sets
+    expect(missingSets(withGap, weeks)).toEqual({ sessions: 1, weeks: new Set([1]), complete: 1 });
+    // the week of 19 Oct has sets of one session and none of the other: not a real count
+    expect(setsByCategory(withGap, weeks)).toEqual({
+      Squat: [1, null, 0],
+      "Push Up": [2, null, 0],
+      Plank: [0, null, 0],
+    });
+    expect(muscleSets(withGap, weeks).quads).toEqual([1, null, 0]);
+  });
+
+  it("counts a week without strength sessions as 0 and ignores other sports", () => {
+    const run = { id: 4, type: "running", start: "2026-10-27 07:00:00" };
+    expect(missingSets([run, ...acts], weeks)).toEqual({
+      sessions: 0,
+      weeks: new Set(),
+      complete: 2,
+    });
+    expect(setsByCategory([run, ...acts], weeks).Squat).toEqual([1, 2, 0]);
+  });
+
+  it("counts no complete week when each week with strength holds a session without sets", () => {
+    const gaps = [
+      withoutSets(5, "2026-10-14 18:00:00"),
+      withoutSets(6, "2026-10-21 18:00:00"),
+      ...acts,
+    ];
+    // the empty week of 26 Oct is a real 0, but it is no week of sets
+    expect(missingSets(gaps, weeks)).toMatchObject({ sessions: 2, complete: 0 });
+  });
+
+  it("gives push against pull from the complete weeks only", () => {
+    expect(pushPull({ chest: [2, null], back: [1, null] })).toBe(2);
   });
 });
 
@@ -149,6 +219,48 @@ describe("exercise stats", () => {
     ])[0];
     expect(timed.kind).toBe("time");
     expect(timed.sessions[0].longest).toBe(50);
+  });
+
+  it("compares the best of the last 3 sessions with the best of the first 3 from 6 sessions", () => {
+    // one good first day and one bad last day do not decide the change
+    expect(pullUps([12, 8, 8, 10, 10, 6]).change).toBe(((10 - 12) / 12) * 100);
+    expect(pullUps([8, 9, 10, 12, 11, 10]).change).toBe(((12 - 10) / 10) * 100);
+    // under 6 sessions: the first against the last
+    expect(pullUps([8, 9, 10, 12, 11]).change).toBe(((11 - 8) / 8) * 100);
+  });
+
+  it("marks a lift progressing, stalled or down against the sessions just before the last ones", () => {
+    expect(pullUps([8, 9, 10, 11]).status).toBe("up");
+    expect(pullUps([8, 10, 9, 10, 10]).status).toBe("stalled");
+    // more than 5% under the best of the sessions before
+    expect(pullUps([8, 10, 9, 9, 9]).status).toBe("down");
+    expect(pullUps([20, 20, 19, 19, 19]).status).toBe("stalled");
+    // one lucky day long ago does not block a new best: only as many sessions before count
+    expect(pullUps([14, 8, 8, 8, 9, 9, 9, 10, 10, 10]).status).toBe("up");
+  });
+
+  it("takes the sessions of 14 days or more, so a lift done twice a week gets a status too", () => {
+    // every 3 days: the last 6 sessions span 15 days, against the 4 before them
+    expect(pullUps([8, 9, 10, 10, 10, 10, 10, 10, 10, 10], 3).status).toBe("stalled");
+    expect(pullUps([8, 9, 10, 10, 10, 10, 10, 10, 10, 11], 3).status).toBe("up");
+  });
+
+  it("gives no status to a timed exercise: its set time follows the lap button, not strength", () => {
+    const hold = exerciseStats(
+      [60, 45, 50, 30, 30].map((seconds, i) => ({
+        start: `${addDays("2026-09-01", i * 7)} 18:00:00`,
+        exercises: [{ exercise: "Plank", sets: [{ reps: 1, seconds }] }],
+      })),
+    )[0];
+    expect(hold.kind).toBe("time");
+    expect(hold.status).toBeNull();
+  });
+
+  it("gives no status without sessions before the last 14 days, or before 4 sessions", () => {
+    expect(pullUps([8, 9, 10]).status).toBeNull();
+    // 4 sessions over 18 days: all of them are the last 14 days or more
+    expect(pullUps([10, 9, 10, 10], 6).status).toBeNull();
+    expect(pullUps([10, 9, 10, 10], 7).status).toBe("stalled");
   });
 
   it("makes a URL name of the exercise", () => {

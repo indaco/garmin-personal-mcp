@@ -37,10 +37,19 @@ export function ask(): void {
     }
     stack.append(set);
   }
-  // the coach prompts are about running: they go with its questions, and the shared cell keeps the
-  // section as tall for every sport
+  // each sport's coach prompts go with its questions, and the shared cell keeps the section as tall
+  // for every sport
   const coach = document.getElementById("coach-prompts");
-  if (coach) stack.querySelector('.qs-set[data-sport="running"]')?.append(coach);
+  if (coach) {
+    for (const set of stack.querySelectorAll<HTMLElement>(".qs-set")) {
+      const box = coach.cloneNode(true) as HTMLElement;
+      box.removeAttribute("id");
+      for (const tr of box.querySelectorAll<HTMLElement>("tbody tr"))
+        if (tr.dataset.sport !== set.dataset.sport) tr.remove();
+      if (box.querySelector("tbody tr")) set.append(box);
+    }
+    coach.remove();
+  }
 
   const select = (sport: string) => {
     for (const b of picker.querySelectorAll<HTMLElement>('[role="tab"]'))

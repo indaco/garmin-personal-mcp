@@ -81,11 +81,42 @@ function weekIndex(a: Activity, weeks: string[]): number {
   return d ? weeks.findIndex((w) => d >= w && d <= addDays(w, 6)) : -1;
 }
 
-/** Completed sets of each muscle group per week: 1 for each primary group, 0.5 for each secondary one. */
+/**
+ * The strength sessions without sets (past the 30 newest whose .FIT file is not saved, or a file that
+ * could not be read), the indexes of the weeks that hold one (their set counts would be too low), and
+ * the weeks with strength sessions that all have their sets.
+ */
+export function missingSets(acts: Activity[], weeks: string[]) {
+  const strength = acts.filter((a) => String(a.type).includes("strength"));
+  const missing = strength.filter((a) => !Array.isArray(a.exercises));
+  const at = new Set(missing.map((a) => weekIndex(a, weeks)).filter((i) => i >= 0));
+  const withSets = new Set(strength.map((a) => weekIndex(a, weeks)).filter((i) => i >= 0));
+  return {
+    sessions: missing.length,
+    weeks: at,
+    complete: [...withSets].filter((i) => !at.has(i)).length,
+  };
+}
+
+/** null for each week that holds a session without sets, so a chart or a mean leaves it out. */
+function leaveOut<T extends Record<string, (number | null)[]>>(
+  out: T,
+  acts: Activity[],
+  weeks: string[],
+): T {
+  const { weeks: gaps } = missingSets(acts, weeks);
+  for (const v of Object.values(out)) for (const i of gaps) v[i] = null;
+  return out;
+}
+
+/**
+ * Completed sets of each muscle group per week: 1 for each primary group, 0.5 for each secondary one;
+ * null for a week that holds a session without sets.
+ */
 export function muscleSets(
   acts: Activity[],
   weeks: string[],
-): Partial<Record<MuscleGroup, number[]>> {
+): Partial<Record<MuscleGroup, (number | null)[]>> {
   const out: Partial<Record<MuscleGroup, number[]>> = {};
   const add = (g: MuscleGroup, i: number, v: number) => ((out[g] ??= weeks.map(() => 0))[i] += v);
   for (const a of acts) {
@@ -103,19 +134,22 @@ export function muscleSets(
       for (const g of secondary) add(g, i, done * 0.5);
     }
   }
-  return out;
+  return leaveOut(out, acts, weeks);
 }
 
 /** Push sets (chest, shoulders, triceps) over pull sets (back, biceps); null without pull sets. */
-export function pushPull(sets: Partial<Record<string, number[]>>): number | null {
+export function pushPull(sets: Partial<Record<string, (number | null)[]>>): number | null {
   const sum = (gs: string[]) =>
-    gs.reduce((s, g) => s + (sets[g] ?? []).reduce((x, v) => x + v, 0), 0);
+    gs.reduce((s, g) => s + (sets[g] ?? []).reduce<number>((x, v) => x + (v ?? 0), 0), 0);
   const pull = sum(["back", "biceps"]);
   return pull > 0 ? sum(["chest", "shoulders", "triceps"]) / pull : null;
 }
 
-/** Completed sets of each movement category per week. */
-export function setsByCategory(acts: Activity[], weeks: string[]): Record<string, number[]> {
+/** Completed sets of each movement category per week; null for a week that holds a session without sets. */
+export function setsByCategory(
+  acts: Activity[],
+  weeks: string[],
+): Record<string, (number | null)[]> {
   const out: Record<string, number[]> = {};
   for (const a of acts) {
     const i = weekIndex(a, weeks);
@@ -125,7 +159,7 @@ export function setsByCategory(acts: Activity[], weeks: string[]): Record<string
       if (done > 0) (out[e.category ?? e.exercise] ??= weeks.map(() => 0))[i] += done;
     }
   }
-  return out;
+  return leaveOut(out, acts, weeks);
 }
 
 export interface ExerciseSession {
@@ -149,8 +183,13 @@ export interface ExerciseStats {
   /** Oldest first. */
   sessions: ExerciseSession[];
   best1rm?: number;
-  /** Change in % from the first to the last session: 1RM, max reps or longest set, by kind. */
+  /**
+   * Change in % of the 1RM, max reps or longest set, by kind: the best of the last 3 sessions against the
+   * best of the first 3, or the last session against the first with under 6 sessions.
+   */
   change: number | null;
+  /** The last sessions over 14 days or more against as many sessions before them. See progress(). */
+  status: "up" | "stalled" | "down" | null;
   medianRest?: number;
   completedSets: number;
 }
@@ -190,7 +229,10 @@ export function exerciseStats(acts: Activity[]): ExerciseStats[] {
     const kind = sessions.some((s) => s.top) ? "weight" : sets.every(timed) ? "time" : "reps";
     const measure = (s: ExerciseSession) =>
       kind === "weight" ? s.e1rm : kind === "reps" ? s.maxReps : s.longest;
-    const values = sessions.map(measure).filter((v): v is number => typeof v === "number" && v > 0);
+    const measured = sessions
+      .map((s) => ({ date: s.date, v: measure(s) }))
+      .filter((x): x is { date: string; v: number } => typeof x.v === "number" && x.v > 0);
+    const values = measured.map((x) => x.v);
     const rests = sessions
       .flatMap((s) => s.sets.filter(completed).map((x) => x.restSec))
       .filter((v): v is number => typeof v === "number");
@@ -203,13 +245,34 @@ export function exerciseStats(acts: Activity[]): ExerciseStats[] {
       sessions,
       ...(e1rms.length > 0 ? { best1rm: Math.max(...e1rms) } : {}),
       change:
-        values.length > 1 && values[0] > 0
-          ? ((values.at(-1)! - values[0]) / values[0]) * 100
-          : null,
+        values.length >= 6
+          ? pct(Math.max(...values.slice(-3)), Math.max(...values.slice(0, 3)))
+          : values.length > 1
+            ? pct(values.at(-1)!, values[0])
+            : null,
+      // the time of a set follows the lap button or the plan, not strength: it can vary tenfold
+      status: kind === "time" ? null : progress(measured),
       ...(rests.length > 0 ? { medianRest: median(rests) } : {}),
       completedSets: sessions.reduce((s, x) => s + x.sets.filter(completed).length, 0),
     };
   });
+}
+
+const pct = (now: number, before: number) => ((now - before) / before) * 100;
+
+/**
+ * The last sessions, at least 3 and over 14 days or more, against as many sessions just before them:
+ * up when they set a new best, down when their best is more than 5% under, else stalled. A lift done
+ * twice a week needs more than 3 sessions for 14 days; one lucky day long ago does not count.
+ */
+function progress(m: { date: string; v: number }[]): ExerciseStats["status"] {
+  let k = 3;
+  while (k < m.length && m.at(-1)!.date < addDays(m.at(-k)!.date, 14)) k++;
+  if (m.length <= k) return null;
+  const recent = Math.max(...m.slice(-k).map((x) => x.v));
+  const before = Math.max(...m.slice(Math.max(0, m.length - 2 * k), -k).map((x) => x.v));
+  if (recent > before) return "up";
+  return recent < before * 0.95 ? "down" : "stalled";
 }
 
 export function median(values: number[]): number | undefined {

@@ -1400,8 +1400,7 @@ describe("type boards", () => {
   });
 });
 
-const rows = (page: Page) =>
-  page.$$eval(".ex-row", (r) => r.map((x) => x.firstElementChild!.textContent));
+const rows = (page: Page) => page.$$eval(".ex-row .linkish", (r) => r.map((x) => x.textContent));
 
 describe("strength board", () => {
   it("shows the Strength widgets", async () => {
@@ -1418,6 +1417,101 @@ describe("strength board", () => {
     expect(await rows(page)).toHaveLength(9);
     expect(await page.textContent("[data-id=muscleBalance]")).toMatch(
       /Push : pull sets\s*[\d.]+ : 1/,
+    );
+    expect(errors).toEqual([]);
+  });
+
+  it("leaves out a session without sets and says so, and has no note when every session has sets", async () => {
+    const note = /strength session has no sets/;
+    const full = await open(browser, pageFile(), { hash: "#strengthTraining" });
+    expect(await full.page.innerText("[data-id=setsPerCategory]")).not.toMatch(note);
+    // the oldest strength session lost its sets, as one past the 30 newest
+    const oldest = data.activities.findLastIndex((a: { type: string }) =>
+      a.type.includes("strength"),
+    );
+    const activities = data.activities.map((a: Record<string, unknown>, i: number) =>
+      i === oldest ? { ...a, exercises: undefined } : a,
+    );
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }),
+      { hash: "#strengthTraining" },
+    );
+    for (const id of ["setsPerCategory", "muscleBalance"])
+      expect(await page.innerText(`[data-id=${id}]`)).toContain(
+        "1 strength session has no sets (past the 30 newest without a saved .FIT file, or not readable): its week is left out.",
+      );
+    expect(await page.innerText("[data-id=exercises]")).toContain("1 strength session has no sets");
+    expect(errors).toEqual([]);
+  });
+
+  it("tags a lift whose last sessions are more than 5% under the ones before as down", async () => {
+    // once a week: the 3 newest bench press sessions are the last 14 days, at 80% of their weight
+    let newest = 3;
+    const activities = data.activities.map((a: Record<string, unknown>) => {
+      const ex = a.exercises as { exercise: string; sets: { kg?: number }[] }[] | undefined;
+      if (!ex?.some((e) => e.exercise === "Barbell Bench Press") || newest-- <= 0) return a;
+      return {
+        ...a,
+        exercises: ex.map((e) =>
+          e.exercise === "Barbell Bench Press"
+            ? { ...e, sets: e.sets.map((s) => ({ ...s, kg: (s.kg ?? 0) * 0.8 })) }
+            : e,
+        ),
+      };
+    });
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }),
+      { hash: "#strengthTraining" },
+    );
+    const tag = page.locator("[data-exercise=barbell-bench-press] td:first-child .tag");
+    expect(await tag.textContent()).toBe("down");
+    expect(await tag.getAttribute("title")).toBe(
+      "The best of the last sessions (14 days or more) is more than 5% under the best of as many sessions before them",
+    );
+    expect(errors).toEqual([]);
+  });
+
+  it("says why it shows nothing when no session has sets, instead of bars of 0", async () => {
+    // for example when Garmin's .FIT download fails for every session
+    const activities = data.activities.map((a: Record<string, unknown>) =>
+      Array.isArray(a.exercises) ? { ...a, exercises: undefined, detailError: "HTTP 500" } : a,
+    );
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }),
+      { hash: "#strengthTraining" },
+    );
+    for (const id of ["setsPerCategory", "muscleBalance", "exercises"]) {
+      expect(await page.$$(`[data-id=${id}] canvas`)).toHaveLength(0);
+      expect(await page.innerText(`[data-id=${id}] .empty`)).toMatch(
+        /^24 strength sessions have no sets/,
+      );
+    }
+    expect(errors).toEqual([]);
+  });
+
+  it("tags the stalled lifts next to their name and says what the change compares", async () => {
+    const { page, errors } = await open(browser, pageFile(), { hash: "#strengthTraining" });
+    // the tag is the lift's state now, apart from the change since its first sessions
+    const tagged = await page.$$eval(".ex-row td:first-child .tag", (t) =>
+      t.map((x) => [
+        x.parentElement!.querySelector(".linkish")!.textContent,
+        x.textContent,
+        (x as HTMLElement).title,
+      ]),
+    );
+    // the plank is timed: it gets no tag
+    expect(tagged).toEqual([
+      [
+        "Barbell Bench Press",
+        "stalled",
+        "No new best in the last sessions (14 days or more) against as many sessions before them",
+      ],
+    ]);
+    expect(await page.innerText("[data-id=exercises]")).toContain(
+      "Change: the best of the last 3 sessions against the best of the first 3",
     );
     expect(errors).toEqual([]);
   });

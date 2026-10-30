@@ -206,15 +206,18 @@ describe("site sections", () => {
     }
   });
 
-  it("shows the coach prompts with the running questions only", async () => {
+  it("shows the coach prompts of each sport with its questions only", async () => {
     const { page } = await site();
-    const shown = () => page.isVisible("#coach-prompts");
-    expect(await shown()).toBe(true);
-    expect(await page.textContent("#coach-prompts")).toContain("race-readiness");
+    const shown = () =>
+      page.$$eval(".qs-set.on .coach td code", (c) => c.map((x) => x.textContent));
+    expect(await shown()).toEqual(["run-review", "race-readiness"]);
+    await page.click(".picker [data-sport=strength]");
+    expect(await shown()).toEqual(["strength-review"]);
     await page.click(".picker [data-sport=cycling]");
-    expect(await shown()).toBe(false);
+    expect(await shown()).toEqual([]);
+    expect(await page.isVisible(".coach")).toBe(false);
     await page.click(".picker [data-sport=running]");
-    expect(await shown()).toBe(true);
+    expect(await shown()).toEqual(["run-review", "race-readiness"]);
   });
 
   it("selects the sport of a hero cell, with its note for the questions written for the page", async () => {

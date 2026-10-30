@@ -366,9 +366,61 @@ describe("coach prompts", () => {
     expect(byName).toContain(
       "when the runs have more than one name, list the 5 most recent with date and name and ask me which one",
     );
-    expect(await render("run-review")).toContain(
-      "Call `listActivities` and take the most recent run",
+    // 100 activities answer about 55,000 characters, over a client's tool output limit: page by 20
+    const latest = await render("run-review");
+    expect(latest).toContain(
+      "Call `listActivities` and take the most recent run (a type that ends in `running`). When none of them is one, call it again with `endDate` = the day of the oldest activity in the list, until you find one.",
     );
+    expect(latest).not.toContain("`limit` = 100");
+  });
+
+  it("reviews a strength session by id, by name, or the latest one", async () => {
+    const byId = await render("strength-review", { activity: "21000000456" });
+    expect(byId).toContain("The strength session is the activity with `activityId` = 21000000456.");
+    expect(byId).toContain('a failed call shows as "n/a"');
+    expect(byId.includes("{{")).toBe(false);
+    const byName = await render("strength-review", { activity: "Upper" });
+    expect(byName).toContain(
+      'Call `listActivities` with `names` = ["Upper"] and `limit` = 100, and keep the strength sessions (a type that contains `strength`).',
+    );
+    expect(byName).toContain(
+      "when the strength sessions have more than one name, list the 5 most recent",
+    );
+    expect(await render("strength-review")).toContain(
+      "Call `listActivities` and take the most recent strength session (a type that contains `strength`). When none of them is one,",
+    );
+  });
+
+  it("compares planned sets with done sets and never shows a planned weight", async () => {
+    // the sentences as one line: the template wraps them anywhere
+    const text = (await render("strength-review")).replace(/\s+/g, " ");
+    // Garmin names the planned exercise by its constant, the sets by words
+    expect(text).toContain('(`BARBELL_BACK_SQUAT` is "Barbell Back Squat", case ignored)');
+    expect(text).toContain("The plan has no weights: do not show a planned weight.");
+    expect(text).toContain("A set with 0 reps was not done");
+    expect(text).toContain("the previous session when it has that exercise");
+    // a step can plan a range of reps as its target, without a duration
+    expect(text).toContain("REPS plans `targetValueLow` to `targetValue` reps");
+    // a set over 12 reps has no e1RM: it is the top set only when no set has 1 to 12 reps
+    expect(text).toContain("the heaviest set of 1 to 12 reps, then the most reps;");
+    // a rep target can have no upper value: Garmin sends 0
+    expect(text).toContain("when `targetValue` is 0 or under it, at least `targetValueLow` reps");
+    // a short rest inside the block is the condition: straight sets with a long rest after them are no group
+    expect(text).toContain(
+      "a repeat block whose rest inside it is 20 s or less or OPEN, with a longer rest step right after the block",
+    );
+    expect(text).toContain("compare only the first set of each group");
+    // two exercises in one block share the rest step after the second one, inside the block
+    expect(text).toContain(
+      "Two exercises in one repeat block with one rest step after the second, inside the block, are a superset",
+    );
+    expect(text).toContain("compare each with the rests after the sets it follows");
+    expect(text).toContain("as the warm-up or cool-down, without hit or miss");
+    // a rep target with timed sets done: the sets compare, the reps cannot
+    expect(text).toContain("When the done sets have no reps (timed sets), judge the sets only");
+    expect(text).toContain("The warm-up and cool-down stay out of Sets and Rest.");
+    // the time of a timed set follows the lap button: it is no gain or loss
+    expect(text).toContain("for a timed one, the longest set in seconds, without a change");
   });
 
   it("checks race readiness with the race, the goal and the plan", async () => {
@@ -390,7 +442,7 @@ describe("coach prompts", () => {
   });
 
   it("reads the race date and goal by their shape from any slot, as the slash command passes them", async () => {
-    // "/garmin-personal:race-readiness half marathon 2026-11-15 1:45:00" fills the slots in order
+    // "/mcp__garmin-personal__race-readiness half marathon 2026-11-15 1:45:00" fills the slots in order
     const text = await render("race-readiness", {
       date: "half",
       distance: "marathon",

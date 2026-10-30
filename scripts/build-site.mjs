@@ -66,7 +66,11 @@ export function facts(root = ".") {
       .filter(Boolean)
       .map(([, name, text]) => ({ name, text }));
   const prompts = promptTable("## Dashboard");
-  const coachPrompts = promptTable("## Coach prompts");
+  // the sport tab of "What you can ask" that each coach prompt goes with
+  const coachPrompts = promptTable("## Coach prompts").map((p) => ({
+    ...p,
+    sport: p.name.startsWith("strength") ? "strength" : "running",
+  }));
   const themes = [
     ...read(`${root}/src/page/theme.ts`).matchAll(/\{ id: "(\w+)", group: "(\w+)" \}/g),
   ].map(([, id, group]) => ({ id, group }));
@@ -171,7 +175,12 @@ export function values(f) {
 }
 
 const promptRows = (list) =>
-  list.map((p) => `<tr><td><code>${p.name}</code></td><td>${cell(p.text)}</td></tr>`).join("\n");
+  list
+    .map(
+      (p) =>
+        `<tr${p.sport ? ` data-sport="${p.sport}"` : ""}><td><code>${p.name}</code></td><td>${cell(p.text)}</td></tr>`,
+    )
+    .join("\n");
 
 function fill(text, vals) {
   return text.replace(/\{\{(\w+)\}\}/g, (all, name) => {
