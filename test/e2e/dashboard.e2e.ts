@@ -1240,6 +1240,9 @@ describe("type boards", () => {
       await page.$$eval(`${tile} .chip`, (b) => b.slice(0, 4).map((x) => x.textContent)),
     ).toEqual(["Long Run (10)", "Track Intervals (6)", "Easy Run (12)", "Tempo Run (6)"]);
     expect(await pressed()).toEqual(["Long Run (10)", "Pace / speed"]);
+    // the 8 newest sessions, the others behind "Show all"
+    expect(await page.$$eval(`${tile} table.data tbody tr:not([hidden])`, (r) => r.length)).toBe(8);
+    expect(await page.textContent(`${tile} .btn.more`)).toBe("Show all 10");
     await page.click(`${tile} >> text=Track Intervals (6)`);
     expect(await kpis()).toEqual(["Long Run", "Track Intervals"]);
     await page.click(`${tile} >> text=Easy Run (12)`);

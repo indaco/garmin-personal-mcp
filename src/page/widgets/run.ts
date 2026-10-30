@@ -616,6 +616,8 @@ const WORKOUT: [WorkoutMetric, Key, unit: string, digits: number, better?: "up" 
 /** The workouts chosen in each workout trend, by board and widget, until a reload. */
 const chosenWorkouts = new Map<string, string[]>();
 const MAX_WORKOUTS = 3;
+/** The sessions in the table before "Show all". */
+const SESSION_ROWS = 8;
 
 register({
   id: "workoutTrend",
@@ -755,36 +757,38 @@ register({
     const first = sessions(chosen[0]).toReversed();
     // a structured workout has reps; the fade only when they are alike
     const intervals = first.some((s) => s.m.reps !== undefined);
+    const sessionTable = table(
+      [
+        t("col.date"),
+        t("col.distance"),
+        ...shown.map(([, l]) => t(l)),
+        ...(intervals ? [t("wt.reps"), t("wt.fade")] : []),
+      ],
+      first.map(({ a, m }) => [
+        fmt.day(day(a)),
+        fmt.dist(num(a.km), 2),
+        ...shown.map(([k, , u, d]) =>
+          k === "pace" ? fmt.pace(m.pace) : m[k] === undefined ? fmt.na : `${fmt.num(m[k], d)}${u}`,
+        ),
+        ...(intervals
+          ? [fmt.num(m.reps), m.fade === undefined ? fmt.na : `${fmt.num(m.fade, 1)}%`]
+          : []),
+      ]),
+      [
+        1,
+        ...shown.map((_, i) => i + 2),
+        ...(intervals ? [shown.length + 2, shown.length + 3] : []),
+      ],
+    );
+    // the newest sessions first; a year of a weekly workout goes behind "Show all"
+    const older = [...sessionTable.querySelectorAll("tbody tr")].slice(
+      SESSION_ROWS,
+    ) as HTMLElement[];
     append(
       el,
       h("h3", { class: "small" }, chosen[0]),
-      table(
-        [
-          t("col.date"),
-          t("col.distance"),
-          ...shown.map(([, l]) => t(l)),
-          ...(intervals ? [t("wt.reps"), t("wt.fade")] : []),
-        ],
-        first.map(({ a, m }) => [
-          fmt.day(day(a)),
-          fmt.dist(num(a.km), 2),
-          ...shown.map(([k, , u, d]) =>
-            k === "pace"
-              ? fmt.pace(m.pace)
-              : m[k] === undefined
-                ? fmt.na
-                : `${fmt.num(m[k], d)}${u}`,
-          ),
-          ...(intervals
-            ? [fmt.num(m.reps), m.fade === undefined ? fmt.na : `${fmt.num(m.fade, 1)}%`]
-            : []),
-        ]),
-        [
-          1,
-          ...shown.map((_, i) => i + 2),
-          ...(intervals ? [shown.length + 2, shown.length + 3] : []),
-        ],
-      ),
+      sessionTable,
+      showAll(ctx, older, first.length),
       note(t("wt.note")),
       ...chosen
         .filter((name) => of.get(name)!.left > 0)
