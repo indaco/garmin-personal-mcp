@@ -212,6 +212,12 @@ You can also give only the layout: `/garmin-personal:training-dashboard freeform
 The assistant gives you the path of the page and the command to open it. The page has a board for
 all your training, a Recovery board and a board for each sport. A missing value shows as "n/a".
 
+When your runs repeat a name, for example the "Tempo Run" of a training plan, the assistant asks
+whether to compare those workouts across weeks. The default is no. A yes adds the Workout trend
+widget. The server downloads the laps of the last 8 runs of each workout once and keeps them, so
+the comparison grows with each update. See
+[Page settings](guide/dashboard.md#page-settings).
+
 [The dashboard guide](guide/dashboard.md) tells about the title and the headline, the boards, the
 themes and languages, the units and the activity-name filter, and how to change the layout.
 [The widget catalogue](guide/widgets.md) lists every widget.
@@ -243,7 +249,7 @@ page is for:
   for example HR zones yes, fitness age and sleep no.
 
 Then the assistant asks for the file (any name or path), the title, the headline, the sports, the
-languages and the themes. The server writes only the data that you select into the file. Other data
+languages and the themes, and whether to compare the workouts that your runs repeat. The server writes only the data that you select into the file. Other data
 is not in the file, so you can send the file safely. A personal page and a shared page can be two
 files side by side. Each page keeps its settings on each update. The argument `weeks` is optional
 (default 12).

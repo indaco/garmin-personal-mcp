@@ -4,10 +4,11 @@ import { append, h } from "../dom";
 import type { Key } from "../i18n";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
+import type { WorkoutMetric } from "../running";
 import { oneSession } from "./types";
-import { alpha, delta, kpi, kpiRow, note, showAll, table, weekLabel } from "./ui";
+import { alpha, delta, kpi, kpiRow, note, picker, showAll, table, weekLabel } from "./ui";
 
-/** The Run board: best efforts, races, aerobic fitness, intensity, form, run/walk, training effect, predictions, long runs. */
+/** The Run board: best efforts, races, aerobic fitness, intensity, form, run/walk, training effect, predictions, long runs, workouts. */
 
 const DISTANCES = ["1k", "mile", "5k", "10k", "half", "marathon"];
 const TREND: Record<string, number> = { "5k": 5, "10k": 10 };
@@ -597,6 +598,200 @@ register({
           ]),
           [2, 3, 5, 6],
         ),
+    );
+  },
+});
+
+/** The metrics of the workout trend: label, unit as written after the number, digits, and which way is better (none: it depends). */
+const WORKOUT: [WorkoutMetric, Key, unit: string, digits: number, better?: "up" | "down"][] = [
+  ["pace", "col.pace", "", 0, "down"],
+  ["hr", "col.hr", " bpm", 0, "down"],
+  ["efficiency", "af.efficiency", "", 2, "up"],
+  ["cadence", "form.cadence", " spm", 0],
+  ["gct", "form.gct", " ms", 0, "down"],
+  ["vertRatio", "form.vertRatio", "%", 1, "down"],
+  ["stride", "form.stride", " cm", 0],
+  ["power", "form.power", " W", 0],
+];
+/** The workouts chosen in each workout trend, by board and widget, until a reload. */
+const chosenWorkouts = new Map<string, string[]>();
+const MAX_WORKOUTS = 3;
+
+register({
+  id: "workoutTrend",
+  render(el, ctx) {
+    const { t, fmt, calc } = ctx;
+    // a workout is the run name without the place that Garmin puts before it
+    const workout = (a: Activity) =>
+      typeof a.name === "string" ? calc.workoutOf(a.name) : undefined;
+    const count = new Map<string, number>();
+    for (const a of runs(ctx)) {
+      const w = workout(a);
+      if (w !== undefined) count.set(w, (count.get(w) ?? 0) + 1);
+    }
+    const names = [...count].filter(([, n]) => n > 1).map(([name]) => name);
+    if (names.length === 0) return ctx.empty(el, t("wt.none"));
+    const key = `${ctx.board}/${ctx.id}`;
+    const chosen = (chosenWorkouts.get(key) ?? []).filter((n) => names.includes(n));
+    if (chosen.length === 0) chosen.push(names[0]);
+    const toggle = (name: string) => {
+      const next = chosen.includes(name) ? chosen.filter((n) => n !== name) : [...chosen, name];
+      // at least one workout; a fourth replaces the first chosen
+      if (next.length > 0) chosenWorkouts.set(key, next.slice(-MAX_WORKOUTS));
+      ctx.refresh();
+    };
+    // oldest first; only the sessions that compare with each other
+    const of = new Map(
+      chosen.map((name) => [
+        name,
+        calc.workoutSessions(
+          runs(ctx)
+            .filter((a) => workout(a) === name)
+            .toReversed(),
+        ),
+      ]),
+    );
+    const sessions = (name: string) => of.get(name)!.sessions;
+    const all = chosen.flatMap(sessions);
+    const shown = WORKOUT.filter(([m]) => all.some((s) => s.m[m] !== undefined));
+    if (shown.length === 0) return ctx.empty(el);
+    const [picked, bar] = picker(
+      ctx,
+      "metric",
+      shown.map(([m, label]) => [m, t(label)]),
+      t("wt.metric"),
+    );
+    const [metric, label, unit, digits, better] = shown.find(([m]) => m === picked) ?? shown[0];
+    const value = (v: number | undefined) =>
+      metric === "pace" ? fmt.pace(v) : v === undefined ? fmt.na : `${fmt.num(v, digits)}${unit}`;
+    append(
+      el,
+      h(
+        "div",
+        { class: "picker", role: "group", "aria-label": t("wt.pick") },
+        ...names.map((name) =>
+          h(
+            "button",
+            {
+              class: "chip small",
+              "aria-pressed": String(chosen.includes(name)),
+              onclick: () => toggle(name),
+            },
+            `${name} (${count.get(name)})`,
+          ),
+        ),
+      ),
+      bar,
+      kpiRow(
+        ...chosen.map((name) => {
+          const list = sessions(name).filter((s) => s.m[metric] !== undefined);
+          const first = list[0]?.m[metric];
+          const last = list.at(-1)?.m[metric];
+          return kpi(
+            name,
+            value(last),
+            first !== undefined &&
+              last !== undefined &&
+              list.length > 1 &&
+              h("span", {}, delta(ctx, calc.change(last, first), better), " ", t("wt.vsFirst")),
+          );
+        }),
+      ),
+    );
+    const colors = ["running", "accent", "warn"];
+    ctx.chart(
+      el,
+      {
+        type: "line",
+        data: {
+          labels: ctx.weeks.map((w) => weekLabel(ctx, w)),
+          datasets: chosen.map((name, i) => {
+            const list = sessions(name);
+            return {
+              label: name,
+              data: ctx.weeks.map((_, w) => {
+                const v = calc.mean(
+                  list
+                    .filter((s) => weekOf(ctx, s.a) === w)
+                    .map((s) => s.m[metric])
+                    .filter((x): x is number => x !== undefined),
+                );
+                return v === null ? null : metric === "pace" ? fmt.to.pace(v) : v;
+              }),
+              borderColor: ctx.color(colors[i]),
+              spanGaps: true,
+            };
+          }),
+        },
+        options: {
+          scales: {
+            y: {
+              reverse: metric === "pace",
+              title: {
+                display: true,
+                text:
+                  metric === "pace"
+                    ? t("af.pace", { unit: fmt.unit.pace })
+                    : unit.trim() || t(label),
+              },
+              ...(metric === "pace"
+                ? { ticks: { callback: (v: string | number) => fmt.hms(Number(v)) } }
+                : {}),
+            },
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: (c) =>
+                  `${c.dataset.label}: ${metric === "pace" ? `${fmt.hms(c.parsed.y ?? 0)}${fmt.unit.pace}` : fmt.num(c.parsed.y ?? undefined, digits)}`,
+              },
+            },
+          },
+        },
+      },
+      200,
+    );
+    // every session of the first workout, with all its numbers
+    const first = sessions(chosen[0]).toReversed();
+    // a structured workout has reps; the fade only when they are alike
+    const intervals = first.some((s) => s.m.reps !== undefined);
+    append(
+      el,
+      h("h3", { class: "small" }, chosen[0]),
+      table(
+        [
+          t("col.date"),
+          t("col.distance"),
+          ...shown.map(([, l]) => t(l)),
+          ...(intervals ? [t("wt.reps"), t("wt.fade")] : []),
+        ],
+        first.map(({ a, m }) => [
+          fmt.day(day(a)),
+          fmt.dist(num(a.km), 2),
+          ...shown.map(([k, , u, d]) =>
+            k === "pace"
+              ? fmt.pace(m.pace)
+              : m[k] === undefined
+                ? fmt.na
+                : `${fmt.num(m[k], d)}${u}`,
+          ),
+          ...(intervals
+            ? [fmt.num(m.reps), m.fade === undefined ? fmt.na : `${fmt.num(m.fade, 1)}%`]
+            : []),
+        ]),
+        [
+          1,
+          ...shown.map((_, i) => i + 2),
+          ...(intervals ? [shown.length + 2, shown.length + 3] : []),
+        ],
+      ),
+      note(t("wt.note")),
+      ...chosen
+        .filter((name) => of.get(name)!.left > 0)
+        .map((name) => {
+          const w = of.get(name)!;
+          return note(t("wt.left", { name, n: w.left, from: fmt.day(day(w.sessions[0].a)) }));
+        }),
     );
   },
 });

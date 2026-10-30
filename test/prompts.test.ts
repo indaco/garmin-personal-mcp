@@ -85,7 +85,7 @@ describe("prompts", () => {
       expect(text).toContain("only when `settings` has more than `title` and `headline`");
       expect(text).toContain('"Keep these settings" (default)');
       expect(text).toContain(
-        '"Use the defaults: all sports, all data, English and\n     the language of my Garmin profile, all themes, opens in midnight"',
+        '"Use the defaults: all sports, all data, English and\n     the language of my Garmin profile, all themes, opens in midnight, no workout comparison"',
       );
       expect(text).toContain('"all sports, keep the rest"');
       expect(text).toContain(
@@ -321,6 +321,28 @@ describe("widget and language prompts", () => {
     const plain = await render("dashboard-language", { language: "German" });
     expect(plain).not.toContain("`path`");
     expect(plain).toContain("call `writeDashboard` first");
+  });
+});
+
+describe("workout comparison", () => {
+  it("asks for it in every prompt that makes a page, when runs repeat a name", async () => {
+    for (const layout of ["preset", "blank"]) {
+      const text = await render("training-dashboard", { layout });
+      expect(text).toContain("**Workout comparison**: only when `repeatedRuns` is not empty");
+      expect(text).toContain("give `settings` with `workouts` = true");
+    }
+    const freeform = await render("training-dashboard", { layout: "freeform" });
+    expect(freeform).toContain("If\n`repeatedRuns` of its `digest` is not empty");
+    expect(freeform).toContain(
+      "`window.GARMIN_SETTINGS = /* garmin-settings:start */null/* garmin-settings:end */;`",
+    );
+    expect(freeform).toContain('give `settings` = { "workouts": true }');
+    expect(freeform).toContain("10. **Workout trend**, only when I said yes");
+    const setup = await render("dashboard-setup");
+    expect(setup).toContain("ask about the **Workout comparison**, only when `repeatedRuns`");
+    expect(setup).toContain("`workouts` (true when I said yes to the workout comparison)");
+    // an update keeps the choice of the page and asks nothing
+    expect(await render("training-dashboard-update")).not.toContain("Workout comparison");
   });
 });
 

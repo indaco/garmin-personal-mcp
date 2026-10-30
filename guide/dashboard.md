@@ -275,6 +275,7 @@ assistant calls `writeDashboard` with `settings`:
 | `language`  | the language that the page opens in: `auto` or a language code             | the profile language when the page has it, else `auto` |
 | `themes`    | the themes to keep                                                         | all                                                    |
 | `theme`     | the theme that the page opens in                                           | `midnight`                                             |
+| `workouts`  | compare the same run workout across weeks (the Workout trend widget)       | off                                                    |
 
 The server leaves the excluded data and sports out of the file, and out of the digest for the coach
 notes. A widget whose data is left out does not show. With `recovery` excluded, the page has no
@@ -292,8 +293,19 @@ update a page with another file name, give its file to the prompt:
 `dashboard-language` takes the file in the same way. New settings replace all the old settings, and
 the old page is kept as `.bak`.
 
-Settings need a page from the template: a page that the assistant designed (`freeform`) cannot keep
-them.
+`workouts` is for a training plan whose sessions have the same name, for example "Tempo Run" every
+week. Garmin names a run "<place> - <workout>", and the place does not count: "Riverside - Drill
+Workout" and "Hillview - Drill Workout" are one workout. Every prompt that makes a page asks about
+it when your runs repeat a name. With `workouts`, the server also loads the laps of the last 8 runs
+of each repeated name. It downloads the .FIT file of each of those runs once, so the first build
+takes longer, and keeps it in the data folder. An older run whose file is already there keeps its
+laps, so the history grows with each update while an update downloads at most 8 files for each
+workout. The Workout trend widget compares those sessions: pace, HR, efficiency and running form,
+and for intervals the work laps, the reps and the fade. Without `workouts`, the page has no Workout
+trend widget.
+
+Settings need a page from the template, or a page that the assistant designed (`freeform`) with a
+`garmin-settings` block. The freeform prompt adds that block when you turn on `workouts`.
 
 ## Keyboard and screen readers
 

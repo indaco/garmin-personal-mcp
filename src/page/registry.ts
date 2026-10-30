@@ -6,7 +6,8 @@ import type * as strength from "./strength";
 import type * as sports from "./sports";
 import type { Activity } from "./calc";
 import type { Fmt, T, Units } from "./i18n";
-import { CATALOGUE } from "./catalogue";
+import { CATALOGUE, inPage } from "./catalogue";
+import type { Settings } from "./settings";
 import type { Span } from "./layout";
 
 /** The getDashboardData result embedded in the page, plus the coach notes. */
@@ -113,9 +114,9 @@ export function registerCustom(def: WidgetDef): void {
 /** The built-in widgets whose data the page leaves out: no board shows them, Add widget does not list them. */
 export const withheld = new Set<string>();
 
-export function withhold(exclude: readonly string[]): void {
+export function withhold(settings: Settings): void {
   for (const c of CATALOGUE) {
-    if (c.needs && exclude.includes(c.needs)) {
+    if (!inPage(c, settings)) {
       widgets.delete(c.id);
       withheld.add(c.id);
     }

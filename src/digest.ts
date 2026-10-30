@@ -1,6 +1,7 @@
 import { addDays } from "./dates";
 import { round } from "./fit";
 import { type Activity, dayOf, mondayOf, sessionSeconds, seconds } from "./page/calc";
+import { workoutOf } from "./page/running";
 
 type Json = Record<string, unknown>;
 
@@ -33,6 +34,8 @@ export interface Digest {
   load: { last7Days: number; weeklyAvgLast28Days: number; acuteToChronic: number | null };
   bestEfforts: Record<string, { time: string; date: string; name: unknown }>;
   races: Json[];
+  /** The run names with more than one session: the workouts that the workout trend compares. */
+  repeatedRuns: Record<string, number>;
   strengthExercises: Record<string, { sessions: number; first?: TopSet; last?: TopSet }>;
   hrvLast14: unknown[];
   recovery: unknown;
@@ -139,12 +142,25 @@ export function digest(data: Json): Digest {
         date: dayOf(a as Activity),
         ...pick(a, ["name", "km", "duration", "pace", "avgHR"]),
       })),
+    repeatedRuns: repeatedRuns(acts),
     strengthExercises,
     hrvLast14: list(data.hrv).slice(-14),
     recovery: data.recovery,
     fitnessAge: pick(age, ["fitnessAge", "chronologicalAge", "achievableFitnessAge"]),
     sync: data.sync,
   };
+}
+
+/** The number of runs of each workout (the run name without its place) that has more than one, most first. */
+function repeatedRuns(acts: Json[]): Record<string, number> {
+  const count = new Map<string, number>();
+  for (const a of acts) {
+    if (typeOf(a).endsWith("running") && typeof a.name === "string") {
+      const w = workoutOf(a.name);
+      count.set(w, (count.get(w) ?? 0) + 1);
+    }
+  }
+  return Object.fromEntries([...count].filter(([, n]) => n > 1).toSorted((x, y) => y[1] - x[1]));
 }
 
 /** The heaviest completed set, as "70 kg x 6"; undefined for sets without weight. */

@@ -40,6 +40,7 @@ const PRESETS: Record<string, [widget: string, span: Span][]> = {
     ["trainingEffect", 2],
     ["racePredictor", 1],
     ["longRuns", 2],
+    ["workoutTrend", 3],
     ["activities", 3],
   ],
   strengthTraining: [

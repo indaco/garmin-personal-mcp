@@ -269,6 +269,16 @@ describe("laps", () => {
     expect(lapsOf(fit, 10).laps).toEqual([{ lap: 1, km: 20, time: "40:00", kmh: 30, cadence: 85 }]);
   });
 
+  it("gives the workout step of a lap, so the reps of one drill stay together", () => {
+    const fit = decodeFit(
+      fitFile([Profile.MesgNum.LAP, { totalTimerTime: 30, intensity: "active", wktStepIndex: 2 }]),
+      12,
+    );
+    expect(lapsOf(fit, 12).laps).toEqual([
+      { lap: 1, km: 0, time: "0:30", intensity: "active", step: 2 },
+    ]);
+  });
+
   it("has no sport when the file has no session", () => {
     const fit = decodeFit(fitFile([Profile.MesgNum.LAP, { totalTimerTime: 3725 }]), 11);
     expect(lapsOf(fit, 11)).toEqual({ activityId: 11, laps: [{ lap: 1, km: 0, time: "1:02:05" }] });

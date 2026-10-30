@@ -910,10 +910,12 @@ describe("MCP tools", () => {
       dashboard.getDashboardData.mockResolvedValue('{"end":"2026-10-26"}');
     });
 
-    it("getDashboardData passes weeks", async () => {
+    it("getDashboardData passes weeks and workouts", async () => {
       const client = await connectHandlers(writer, dashboard);
       const result = await client.callTool({ name: "getDashboardData", arguments: { weeks: 8 } });
-      expect(dashboard.getDashboardData).toHaveBeenCalledWith(8);
+      expect(dashboard.getDashboardData).toHaveBeenCalledWith(8, undefined);
+      await client.callTool({ name: "getDashboardData", arguments: { workouts: true } });
+      expect(dashboard.getDashboardData).toHaveBeenLastCalledWith(undefined, true);
       expect(JSON.parse(textOf(result))).toMatchObject({ end: "2026-10-26" });
     });
 

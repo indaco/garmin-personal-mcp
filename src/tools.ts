@@ -229,10 +229,19 @@ export class GarminTools {
     return run;
   }
 
+  /** Whether the .FIT file of the activity is saved in `<data-dir>/fit`: reading it needs no download. */
+  async hasFit(activityId: number): Promise<boolean> {
+    const saved = await stat(this.#fitPath(activityId)).catch(() => undefined);
+    return saved?.isFile() === true && saved.size > 0;
+  }
+
+  #fitPath(activityId: number): string {
+    return join(this.dataDir, "fit", `${activityId}.fit`);
+  }
+
   async #fetchFit(activityId: number): Promise<string> {
-    const target = join(this.dataDir, "fit", `${activityId}.fit`);
-    const cached = await stat(target).catch(() => undefined);
-    if (cached?.isFile() && cached.size > 0) {
+    const target = this.#fitPath(activityId);
+    if (await this.hasFit(activityId)) {
       return target;
     }
     const data = await this.api.getBytes(`/download-service/files/activity/${activityId}`, {});
@@ -583,7 +592,9 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
         "Laps of an activity as recorded by the watch (manual laps, auto-lap every km, or workout",
         "steps), read from the original .FIT file. One row per lap: distance (km), timer time,",
         "pace (min/km, foot sports) or speed (km/h), average/max HR, cadence (spm for running),",
-        "ascent/descent, average power, intensity (active/rest/warmup/cooldown) and lap trigger.",
+        "ascent/descent, average power, intensity (active, interval, rest, recovery, warmup, cooldown; the",
+        "auto laps of a free run can be interval), lap trigger, and the step of the planned workout",
+        "(step: the reps of one drill share it).",
         "Use it for intervals and per-km splits; getActivity does not have them.",
       ].join("\n"),
       inputSchema: z.object({ activityId }),

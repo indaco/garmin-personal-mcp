@@ -6,6 +6,7 @@ import { type GarminApiClient, GarminApiError } from "./api-client";
 import { addDays, localToday } from "./dates";
 import { digest } from "./digest";
 import { log } from "./log";
+import { workoutOf } from "./page/running";
 import { type GarminTools, firstArray, summarize, writeAtomically } from "./tools";
 
 type Json = Record<string, unknown>;
@@ -15,6 +16,8 @@ type Range = [string, string];
 const DEFAULT_WEEKS = 12;
 const MAX_WEEKS = 52;
 const RECOVERY_DAYS = 14;
+/** The newest sessions of each repeated run name whose laps are downloaded, for the workout trend. */
+export const WORKOUT_SESSIONS = 8;
 
 /** The weeks that getDashboardData covers for an asked number: 12 by default, 1 to 52. */
 export const weeksCovered = (weeks: number | undefined): number =>
@@ -45,13 +48,14 @@ export class GarminDashboard {
     private readonly dataDir: string,
   ) {}
 
-  getDashboardData(weeks?: number): Promise<string> {
-    const run = this.#queue.then(() => this.#build(weeks));
+  /** `workouts` adds the laps of the last sessions of each repeated run name, for the workout trend. */
+  getDashboardData(weeks?: number, workouts = false): Promise<string> {
+    const run = this.#queue.then(() => this.#build(weeks, workouts));
     this.#queue = run.catch(() => {});
     return run;
   }
 
-  async #build(weeks: number | undefined): Promise<string> {
+  async #build(weeks: number | undefined, workouts: boolean): Promise<string> {
     const w = weeksCovered(weeks);
     const today = localToday();
     const start = addDays(today, -7 * w);
@@ -105,7 +109,7 @@ export class GarminDashboard {
       today,
     );
     const activities = activitiesBetween(cache, start, today).map((a) => structuredClone(a));
-    await this.#attachDetails(activities);
+    await this.#attachDetails(activities, workouts);
     out.activities = activities;
     out.previousActivities = activitiesBetween(cache, prevStart, addDays(start, -1)).map(compact);
     return jsonByLines(out);
@@ -231,8 +235,21 @@ export class GarminDashboard {
 
   // ------------------------------------------------------------------ output
 
-  /** Strength sets for every strength session (30 most recent), laps for the 3 most recent activities, races and runs over 15 km. */
-  async #attachDetails(acts: Json[]): Promise<void> {
+  /**
+   * Strength sets for every strength session (30 most recent); laps for the 3 most recent activities,
+   * races and runs over 15 km. With `workouts`, also the laps of the runs of each name that repeats (the
+   * sessions of a plan, compared across weeks): the newest WORKOUT_SESSIONS, downloaded when needed, and
+   * every older one whose .FIT file is saved, which costs no download.
+   */
+  async #attachDetails(acts: Json[], workouts: boolean): Promise<void> {
+    const isRun = (a: Json) => typeof a.type === "string" && a.type.endsWith("running");
+    // runs of one workout share it, whatever place Garmin puts in their name
+    const workout = (a: Json) => (typeof a.name === "string" ? workoutOf(a.name) : undefined);
+    const runNames = new Map<unknown, number>();
+    for (const a of acts.filter(isRun))
+      runNames.set(workout(a), (runNames.get(workout(a)) ?? 0) + 1);
+    // the activities come most recent first
+    const lapped = new Map<unknown, number>();
     let strength = 0;
     for (const [i, a] of acts.entries()) {
       const id = asLong(a.id);
@@ -241,8 +258,15 @@ export class GarminDashboard {
         if (type.includes("strength") && strength++ < 30) {
           a.exercises = JSON.parse(await this.tools.getActivitySets(id)).exercises;
         }
-        const longRun = type.endsWith("running") && typeof a.km === "number" && a.km > 15;
-        if (i < 3 || a.race === true || longRun) {
+        const longRun = isRun(a) && typeof a.km === "number" && a.km > 15;
+        let repeated = false;
+        const w = workout(a);
+        if (workouts && isRun(a) && w !== undefined && runNames.get(w)! > 1) {
+          const newer = lapped.get(w) ?? 0;
+          lapped.set(w, newer + 1);
+          repeated = newer < WORKOUT_SESSIONS || (await this.tools.hasFit(id));
+        }
+        if (i < 3 || a.race === true || longRun || repeated) {
           a.laps = JSON.parse(await this.tools.getActivityLaps(id)).laps;
         }
       } catch (e) {
@@ -518,10 +542,16 @@ export function registerDashboard(server: McpServer, dashboard: GarminDashboard)
       ].join("\n"),
       inputSchema: z.object({
         weeks: z.number().int().describe("Weeks to cover, default 12, max 52").optional(),
+        workouts: z
+          .boolean()
+          .describe(
+            `Also the laps of the runs of each run name that repeats, to compare a workout across weeks: the last ${WORKOUT_SESSIONS} (downloaded once) and older ones whose .FIT file is saved; default false`,
+          )
+          .optional(),
       }),
     },
     async (a) => {
-      const data = JSON.parse(await dashboard.getDashboardData(a.weeks)) as Json;
+      const data = JSON.parse(await dashboard.getDashboardData(a.weeks, a.workouts)) as Json;
       // only in the tool result: the page data and the widgets' ctx.data stay without it
       return {
         content: [{ type: "text" as const, text: jsonByLines({ digest: digest(data), ...data }) }],

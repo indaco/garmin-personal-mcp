@@ -154,6 +154,8 @@ export function lapsOf(fit: Messages, activityId: number) {
     if (intensity) o.intensity = intensity;
     const trigger = enumName("lapTrigger", lap.lapTrigger);
     if (trigger) o.trigger = trigger;
+    // the step of the planned workout: the reps of one drill share it
+    putIfSet(o, "step", lap.wktStepIndex);
     return o;
   });
   return { activityId, ...(sport ? { sport } : {}), laps };

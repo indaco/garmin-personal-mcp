@@ -378,6 +378,55 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
     );
   });
 
+  it("loads the workout laps for a page that turns them on, also on its updates", async () => {
+    const workouts: (boolean | undefined)[] = [];
+    writer = new DashboardWriter(
+      async (_, w) => {
+        workouts.push(w);
+        return JSON.stringify(full);
+      },
+      dir,
+      async () => templateText,
+    );
+    await writer.write({ weeks: 12 });
+    // a snapshot without the workout laps does not serve a page that wants them
+    await writer.write({ weeks: 12, settings: { workouts: true } });
+    vi.useFakeTimers({ now: Date.now() + 20 * 60_000, toFake: ["Date"] });
+    try {
+      await writer.write({});
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(workouts).toEqual([false, true, true]);
+    expect(page()).toContain('"workouts":true');
+  });
+
+  it("keeps the settings of a page that Claude wrote with a settings block, for its updates", async () => {
+    const workouts: (boolean | undefined)[] = [];
+    writer = new DashboardWriter(
+      async (_, w) => {
+        workouts.push(w);
+        return JSON.stringify(full);
+      },
+      dir,
+      async () => templateText,
+    );
+    const own = `<html><script>window.GARMIN_SETTINGS = /* garmin-settings:start */null/* garmin-settings:end */;
+const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
+    await writer.write({ page: own, settings: { workouts: true, exclude: ["names"] } });
+    vi.useFakeTimers({ now: Date.now() + 20 * 60_000, toFake: ["Date"] });
+    try {
+      await writer.write({ notes: ["n"] });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(workouts).toEqual([true, true]);
+    expect(page()).toContain('{"workouts":true,"exclude":["names"]}');
+    // new settings without any setting: the block is empty again
+    await writer.write({ page: own, settings: {} });
+    expect(page()).toContain("/* garmin-settings:start */null/* garmin-settings:end */");
+  });
+
   it("leaves out of the page and of the digest the data and the sports that the settings exclude", async () => {
     const r = await writer.write({
       settings: { sports: ["running"], exclude: ["recovery", "fitnessAge", "names", "notes"] },
@@ -531,6 +580,9 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
     await expect(writer.write({ settings: { title: " " } })).rejects.toThrow(/title/);
     await expect(writer.write({ settings: { sports: [] } })).rejects.toThrow(/sports/);
     await expect(writer.write({ settings: { languages: [] } })).rejects.toThrow(/languages/);
+    await expect(
+      writer.write({ settings: { workouts: "yes" as unknown as boolean } }),
+    ).rejects.toThrow(/workouts: true or false/);
     expect(existsSync(file)).toBe(false);
     const own = "<html><script>/* garmin-data:start */null/* garmin-data:end */</script></html>";
     await expect(writer.write({ page: own, settings: { exclude: ["names"] } })).rejects.toThrow(

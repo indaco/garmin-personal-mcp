@@ -36,6 +36,7 @@ it by hand.
 | Training effect | `trainingEffect` | Aerobic and anaerobic training effect of each run, and the training effect labels of each week. | running | 2 |
 | Race predictor | `racePredictor` | Predicted 5 km, 10 km, half marathon and marathon times (Riegel), from the best effort of 5 km or more. | running | 1 |
 | Long runs and pace split | `longRuns` | The share of the longest run in each week's km (flagged above 35%), weekly ascent, and the pace split and HR drift of races and long runs. | running | 2 |
+| Workout trend | `workoutTrend` | The same workout (runs with the same name, without the place that Garmin puts before it) across weeks: pace, HR, efficiency and running form, up to 3 workouts side by side; intervals by their work laps. Only on a page with the workout comparison (setting workouts). | running | 3 |
 | Sets per movement | `setsPerCategory` | Completed sets of each movement category each week. | strengthTraining | 2 |
 | Muscle-group balance | `muscleBalance` | Average weekly sets of each muscle group against 10-20, and the push:pull ratio. | strengthTraining | 1 |
 | Exercises | `exercises` | Each exercise by muscle group, with sort, search and group filter; a row opens its trend and its sessions. | strengthTraining | 3 |
@@ -55,7 +56,7 @@ every board. _Width_ is the default width in columns.
 | Board | Widgets, in order |
 | ----- | ----------------- |
 | all | `kpis`, `readiness`, `calendar`, `periodComparison`, `records`, `weeklyVolume`, `intensityMinutes`, `loadSafety`, `fitnessFatigue`, `loadVsRecovery`, `activities`, `coachNotes` |
-| running | `typeKpis`, `typeWeekly`, `hrZones`, `bestEfforts`, `races`, `aerobicFitness`, `intensityShare`, `runningForm`, `runWalk`, `trainingEffect`, `racePredictor`, `longRuns`, `activities` |
+| running | `typeKpis`, `typeWeekly`, `hrZones`, `bestEfforts`, `races`, `aerobicFitness`, `intensityShare`, `runningForm`, `runWalk`, `trainingEffect`, `racePredictor`, `longRuns`, `workoutTrend`, `activities` |
 | strengthTraining | `typeKpis`, `typeWeekly`, `hrZones`, `setsPerCategory`, `muscleBalance`, `exercises`, `strengthSessions` |
 | walking | `typeKpis`, `typeWeekly`, `hrZones`, `walkDetails`, `steps`, `activities` |
 | hiking | `typeKpis`, `typeWeekly`, `hrZones`, `hikeVertical`, `activities` |

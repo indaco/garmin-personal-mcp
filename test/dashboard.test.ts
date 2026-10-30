@@ -172,6 +172,9 @@ const activity = (
   movingDuration: 1500,
   ...extra,
 });
+/** The ids of the activities that have laps. */
+const withLaps = (out: { activities: Record<string, unknown>[] }) =>
+  out.activities.filter((a) => a.laps).map((a) => a.id);
 const callsTo = (prefix: string) =>
   api.getJson.mock.calls.filter(([path]) => String(path).startsWith(prefix));
 
@@ -518,6 +521,43 @@ describe("getDashboardData", () => {
       16: [true, false],
     });
     expect(out.activities[0].exercises[0].exercise).toBe("Barbell Back Squat");
+  });
+
+  it("adds the laps of the last 8 sessions of each repeated run name, only when asked", async () => {
+    garminActivities = [
+      activity(30, "2026-10-26", "cycling"),
+      activity(31, "2026-10-25", "cycling"),
+      activity(32, "2026-10-24", "cycling"),
+      ...Array.from({ length: 10 }, (_, i) =>
+        activity(40 + i, `2026-10-${String(23 - i).padStart(2, "0")}`, "running", {
+          activityName: "Tempo",
+        }),
+      ),
+      activity(60, "2026-10-12", "running", { activityName: "Easy" }),
+      activity(61, "2026-10-11", "cycling", { activityName: "Easy" }),
+    ];
+    // off by default: the 3 most recent only
+    expect(withLaps(JSON.parse(await dashboard.getDashboardData(3)))).toEqual([30, 31, 32]);
+    // the 8 most recent Tempo runs; one Easy run and a ride do not make a repeat
+    expect(withLaps(JSON.parse(await dashboard.getDashboardData(3, true)))).toEqual([
+      30, 31, 32, 40, 41, 42, 43, 44, 45, 46, 47,
+    ]);
+  });
+
+  it("also gives laps to an older session of a workout whose .FIT file is saved, without a download", async () => {
+    garminActivities = Array.from({ length: 10 }, (_, i) =>
+      activity(40 + i, `2026-10-${String(23 - i).padStart(2, "0")}`, "running", {
+        activityName: "Tempo",
+      }),
+    );
+    // the oldest session was downloaded before, for example when it was one of the newest
+    const client = api as unknown as GarminApiClient;
+    await new GarminTools(client, dataDir).fetchFit(49);
+    api.getBytes.mockClear();
+    const out = JSON.parse(await dashboard.getDashboardData(3, true));
+    expect(withLaps(out)).toEqual([40, 41, 42, 43, 44, 45, 46, 47, 49]);
+    // the 8 newest are downloaded, the saved one is read from the data folder
+    expect(api.getBytes).toHaveBeenCalledTimes(8);
   });
 
   it("reports a detail that cannot be read on the activity", async () => {

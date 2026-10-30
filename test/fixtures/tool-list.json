@@ -209,7 +209,7 @@
   },
   {
     "name": "getActivityLaps",
-    "description": "Laps of an activity as recorded by the watch (manual laps, auto-lap every km, or workout\nsteps), read from the original .FIT file. One row per lap: distance (km), timer time,\npace (min/km, foot sports) or speed (km/h), average/max HR, cadence (spm for running),\nascent/descent, average power, intensity (active/rest/warmup/cooldown) and lap trigger.\nUse it for intervals and per-km splits; getActivity does not have them.",
+    "description": "Laps of an activity as recorded by the watch (manual laps, auto-lap every km, or workout\nsteps), read from the original .FIT file. One row per lap: distance (km), timer time,\npace (min/km, foot sports) or speed (km/h), average/max HR, cadence (spm for running),\nascent/descent, average power, intensity (active, interval, rest, recovery, warmup, cooldown; the\nauto laps of a free run can be interval), lap trigger, and the step of the planned workout\n(step: the reps of one drill share it).\nUse it for intervals and per-km splits; getActivity does not have them.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
@@ -325,6 +325,10 @@
         "weeks": {
           "type": "integer",
           "description": "Weeks to cover, default 12, max 52"
+        },
+        "workouts": {
+          "type": "boolean",
+          "description": "Also the laps of the runs of each run name that repeats, to compare a workout across weeks: the last 8 (downloaded once) and older ones whose .FIT file is saved; default false"
         }
       },
       "required": []
@@ -564,6 +568,10 @@
             "theme": {
               "type": "string",
               "description": "Default theme"
+            },
+            "workouts": {
+              "type": "boolean",
+              "description": "Compare the same run workout across weeks (Workout trend widget): the server loads the laps of the last 8 sessions of each repeated run name, and of older ones whose .FIT file is saved; off when not set"
             }
           },
           "description": "The page settings; replaces the page's own"
