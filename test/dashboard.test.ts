@@ -588,6 +588,16 @@ describe("getDashboardData", () => {
     expect(withLaps(JSON.parse(await dashboard.getDashboardData(3, true)))).toEqual([
       70, 71, 72, 73, 74, 80, 81, 82, 83, 84, 85, 86, 87,
     ]);
+    // a page updated for months has every .FIT file saved: also the oldest session has its laps
+    await new GarminTools(api as unknown as GarminApiClient, dataDir).fetchFit(88);
+    const saved = JSON.parse(await dashboard.getDashboardData(3, true));
+    const demo = asServer(
+      saved.activities.map((a: Record<string, unknown>) => ({ ...a, laps: [] })),
+      true,
+      true,
+    );
+    expect(withLaps({ activities: demo })).toEqual(withLaps(saved));
+    expect(withLaps(saved)).toContain(88);
   });
 
   it("reports a detail that cannot be read on the activity", async () => {

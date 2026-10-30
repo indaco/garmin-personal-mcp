@@ -30,11 +30,12 @@ const workout = (a) => (typeof a.name === "string" ? workoutOf(a.name) : undefin
 
 /**
  * Removes the details that getDashboardData does not attach (src/dashboard.ts attachDetails), so a demo
- * shows what the server gives on a first build, before older .FIT files are saved. `activities` come newest first. Laps stay for the 3 newest activities,
+ * shows what the server gives. With `saved`, every .FIT file is saved, as on a page that has updated
+ * for months; without, it is a first build. `activities` come newest first. Laps stay for the 3 newest activities,
  * races, runs over 15 km and, with `workouts`, the 8 newest runs of each run name that repeats; sets
  * stay for the 30 newest strength sessions.
  */
-export function asServer(activities, workouts = false) {
+export function asServer(activities, workouts = false, saved = false) {
   const runNames = new Map();
   for (const a of activities.filter(isRun))
     runNames.set(workout(a), (runNames.get(workout(a)) ?? 0) + 1);
@@ -45,7 +46,11 @@ export function asServer(activities, workouts = false) {
     const longRun = isRun(a) && typeof a.km === "number" && a.km > 15;
     const w = workout(a);
     const repeated =
-      workouts && isRun(a) && w !== undefined && runNames.get(w) > 1 && (lapped.get(w) ?? 0) < 8;
+      workouts &&
+      isRun(a) &&
+      w !== undefined &&
+      runNames.get(w) > 1 &&
+      ((lapped.get(w) ?? 0) < 8 || saved);
     if (repeated) lapped.set(w, (lapped.get(w) ?? 0) + 1);
     if (!(i < 3 || a.race === true || longRun || repeated)) delete a.laps;
   });

@@ -2,6 +2,7 @@
 export function asServer<T extends Record<string, unknown>>(
   activities: T[],
   workouts?: boolean,
+  saved?: boolean,
 ): T[];
 export function fillPage(
   template: string,
