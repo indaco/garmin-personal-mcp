@@ -83,7 +83,7 @@ export class GarminTools {
     }
     const list = Array.isArray(json) ? json : firstArray(json);
     if (!list) {
-      return JSON.stringify(json);
+      return toJson(json);
     }
     const named = (a: unknown) => {
       const name = isObject(a) ? a.activityName : undefined;
@@ -100,58 +100,54 @@ export class GarminTools {
           )
           .slice(0, asked)
       : list;
-    return JSON.stringify(
+    return toJson(
       raw === true ? (filtered ? rows : json) : rows.map((a) => summarize(isObject(a) ? a : {})),
     );
   }
 
   async getActivity(activityId: number): Promise<string> {
-    return JSON.stringify(await this.api.getJson(`/activity-service/activity/${activityId}`, {}));
+    return toJson(await this.api.getJson(`/activity-service/activity/${activityId}`, {}));
   }
 
   async getActivityWorkouts(activityId: number): Promise<string> {
     // many fields of each step are null (equipment, weight, name): leaving them out keeps the answer short
-    return JSON.stringify(
+    return toJson(
       await this.api.getJson(`/activity-service/activity/${activityId}/workouts`, {}),
-      (_, v: unknown) => (v === null ? undefined : v),
+      (_, v) => v === null,
     );
   }
 
   async downloadActivityFit(activityId: number): Promise<string> {
     const fit = await this.fetchFit(activityId);
-    return JSON.stringify({ path: resolve(fit), bytes: (await stat(fit)).size });
+    return toJson({ path: resolve(fit), bytes: (await stat(fit)).size });
   }
 
   async getActivityLaps(activityId: number): Promise<string> {
-    return JSON.stringify(lapsOf(await this.#decodeFit(activityId), activityId));
+    return toJson(lapsOf(await this.#decodeFit(activityId), activityId));
   }
 
   async getActivitySets(activityId: number): Promise<string> {
     const fit = await this.#decodeFit(activityId);
-    return JSON.stringify(setsOf(fit, activityId, await this.#exerciseCatalogue()));
+    return toJson(setsOf(fit, activityId, await this.#exerciseCatalogue()));
   }
 
   // ------------------------------------------------------------------ health
 
   async getHrvRange(fromDate: string, toDate: string): Promise<string> {
-    return JSON.stringify(
-      await this.api.getJson(`/hrv-service/hrv/daily/${fromDate}/${toDate}`, {}),
-    );
+    return toJson(await this.api.getJson(`/hrv-service/hrv/daily/${fromDate}/${toDate}`, {}));
   }
 
   async getDailyHeartRate(date: string): Promise<string> {
-    return JSON.stringify(
-      await this.api.getJson("/wellness-service/wellness/dailyHeartRate", { date }),
-    );
+    return toJson(await this.api.getJson("/wellness-service/wellness/dailyHeartRate", { date }));
   }
 
   async getSleep(date: string): Promise<string> {
-    return JSON.stringify(await this.api.getJson("/sleep-service/sleep/dailySleep", { date }));
+    return toJson(await this.api.getJson("/sleep-service/sleep/dailySleep", { date }));
   }
 
   async getSleepRange(fromDate: string, toDate: string): Promise<string> {
     checkRange(fromDate, toDate);
-    return JSON.stringify(
+    return toJson(
       await this.api.getJson("/sleep-service/sleep/dailySleepSummariesByDate", {
         startDate: fromDate,
         endDate: toDate,
@@ -163,7 +159,7 @@ export class GarminTools {
     // no day cap: one small row per day, and a weight trend needs months
     // the spec says kilograms, but Garmin answers grams (72500 for 72.5 kg)
     checkRange(fromDate, toDate, Infinity);
-    return JSON.stringify(
+    return toJson(
       await this.api.getJson(`/weight-service/weight/range/${fromDate}/${toDate}`, {
         includeAll: includeAll === true ? "true" : undefined,
       }),
@@ -172,7 +168,7 @@ export class GarminTools {
 
   async getBodyBattery(fromDate: string, toDate: string): Promise<string> {
     checkRange(fromDate, toDate);
-    return JSON.stringify(
+    return toJson(
       await this.api.getJson("/wellness-service/wellness/bodyBattery/reports/daily", {
         startDate: fromDate,
         endDate: toDate,
@@ -181,22 +177,22 @@ export class GarminTools {
   }
 
   async getHeartRateZones(): Promise<string> {
-    return JSON.stringify(await this.api.getJson("/biometric-service/heartRateZones/v2", {}));
+    return toJson(await this.api.getJson("/biometric-service/heartRateZones/v2", {}));
   }
 
   async getFitnessAge(date: string): Promise<string> {
-    return JSON.stringify(await this.api.getJson(`/fitnessage-service/fitnessage/v2/${date}`, {}));
+    return toJson(await this.api.getJson(`/fitnessage-service/fitnessage/v2/${date}`, {}));
   }
 
   async getDailySummary(date: string): Promise<string> {
-    return JSON.stringify(
+    return toJson(
       await this.api.getJson("/usersummary-service/usersummary/daily", { calendarDate: date }),
     );
   }
 
   async getDailySummaryRange(fromDate: string, toDate: string): Promise<string> {
     checkRange(fromDate, toDate);
-    return JSON.stringify(
+    return toJson(
       await this.api.getJson("/usersummary-service/v2/dailysummaries", {
         startDate: fromDate,
         endDate: toDate,
@@ -214,7 +210,7 @@ export class GarminTools {
         q[name] = value;
       }
     }
-    return JSON.stringify(await this.api.getJson(path, q));
+    return toJson(await this.api.getJson(path, q));
   }
 
   // ------------------------------------------------------------------ FIT
@@ -400,6 +396,21 @@ export function summarize(a: Json): Json {
     }
   }
   return o;
+}
+
+/** Ids of the user, their devices and daily records, at any depth: they help no answer and identify the user. */
+const PRIVATE_KEYS =
+  /^(userProfile(Pk|Id)|userId|profileId|owner\w*|userInfoDto|displayName|fullName|deviceId|userDailySummaryId|uuid|samplePk)$/i;
+
+/** A tool result: the JSON without PRIVATE_KEYS and without the keys `drop` names. */
+function toJson(value: unknown, drop?: (key: string, v: unknown) => boolean): string {
+  const dropped = (k: string, v: unknown) => PRIVATE_KEYS.test(k) || drop?.(k, v) === true;
+  // an object of dropped keys only (activityUUID: { uuid }), at any depth, goes too; not an empty {} itself
+  const emptied = (v: unknown): boolean =>
+    isObject(v) &&
+    Object.keys(v).length > 0 &&
+    Object.entries(v).every(([k, x]) => dropped(k, x) || emptied(x));
+  return JSON.stringify(value, (k, v: unknown) => (dropped(k, v) || emptied(v) ? undefined : v));
 }
 
 /** The activity list inside Garmin's answer when it is not a bare array. */

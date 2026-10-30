@@ -7,6 +7,8 @@
   Garmin token endpoint.
 - **Access token**: the server keeps the token in memory only. It never writes the key or the
   token to the log, and no tool returns them.
+- **Ids**: tool results leave out your Garmin user id, name and profile image, and the ids of
+  your devices and daily records. This applies also to `raw` answers and to `garminGet`.
 - **Read-only**: the server sends only GET requests to the Personal API. It sends one POST request
   to get the token.
 - **Exercise catalogue**: the server gets the catalogue from `connect.garmin.com` without your

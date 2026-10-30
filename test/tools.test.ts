@@ -475,6 +475,66 @@ describe("activities", () => {
     expect(api.getJson).toHaveBeenCalledWith("/activity-service/activity/42/workouts", {});
   });
 
+  it.each([
+    ["getActivity", [42]],
+    ["getActivityWorkouts", [42]],
+    ["getHrvRange", ["2026-10-21", "2026-10-27"]],
+    ["getDailyHeartRate", ["2026-10-27"]],
+    ["getSleep", ["2026-10-27", true]],
+    ["getSleepRange", ["2026-10-21", "2026-10-27", true]],
+    ["getWeight", ["2026-10-21", "2026-10-27"]],
+    ["getBodyBattery", ["2026-10-21", "2026-10-27"]],
+    ["getHeartRateZones", []],
+    ["getFitnessAge", ["2026-10-27"]],
+    ["getDailySummary", ["2026-10-27"]],
+    ["getDailySummaryRange", ["2026-10-21", "2026-10-27"]],
+    ["listActivities", [undefined, undefined, undefined, 1, true]],
+    ["garminGet", ["/x"]],
+  ] as const)(
+    "%s leaves out the ids of the user, the device and the record",
+    async (tool, args) => {
+      const record = {
+        activityId: 7,
+        typeId: 1,
+        calendarDate: "2026-10-27",
+        userProfilePK: 1,
+        userProfilePk: 2,
+        userProfileId: 3,
+        userId: 4,
+        profileId: 5,
+        ownerId: 6,
+        ownerDisplayName: "a",
+        ownerFullName: "b",
+        ownerProfileImageUrlSmall: "c",
+        displayName: "d",
+        fullName: "e",
+        deviceId: 8,
+        userDailySummaryId: 9,
+        uuid: "f",
+        samplePk: 10,
+        activityUUID: { uuid: "g" },
+        wrapperDTO: { inner: { uuid: "h" } },
+        emptyDTO: {},
+        metadataDTO: { fileFormat: { formatId: 1 }, userInfoDto: { userProfilePk: 1 } },
+        sleepNeed: { userProfilePk: 1, deviceId: 2, actual: 450 },
+        data: [{ userProfilePk: 1, totalSteps: 100 }],
+      };
+      api.getJson.mockResolvedValue([record]);
+      const call = tools[tool] as (...a: unknown[]) => Promise<string>;
+      expect(JSON.parse(await call.apply(tools, [...args]))).toEqual([
+        {
+          activityId: 7,
+          typeId: 1,
+          calendarDate: "2026-10-27",
+          emptyDTO: {},
+          metadataDTO: { fileFormat: { formatId: 1 } },
+          sleepNeed: { actual: 450 },
+          data: [{ totalSteps: 100 }],
+        },
+      ]);
+    },
+  );
+
   it("getSleepRange asks for the nights between two dates in one request", async () => {
     api.getJson.mockResolvedValue([{ calendarDate: "2026-10-27" }]);
     expect(await tools.getSleepRange("2026-10-21", "2026-10-27")).toBe(

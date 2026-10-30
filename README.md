@@ -381,7 +381,9 @@ The server is read-only. It sends the API key only to the Garmin token endpoint,
 or returns the key or the access token. It refuses a key that has spaces or line breaks in it, and
 it removes the key and the token from network error messages. If you saw your API key in a chat,
 revoke the key on the [API key page](https://connect.garmin.com/app/settings/personalApiToken) and
-create a new one. Your .FIT files can have your GPS track, so keep the data folder private.
+create a new one. No tool result has your Garmin user id, name or profile image, or the ids of
+your devices and daily records, also with `raw` and `garminGet`. Your .FIT files can have your GPS
+track, so keep the data folder private.
 
 [SECURITY.md](SECURITY.md) tells how the server protects your data and how to report a
 vulnerability. Do not open a public issue for a vulnerability.
