@@ -1198,6 +1198,12 @@ describe("type boards", () => {
     expect(await page.textContent("[data-id=racePredictor]")).toContain("Estimate (Riegel)");
     // a small multiple for each running form metric in the data
     expect(await page.$$eval("[data-id=runningForm] .multiple", (m) => m.length)).toBe(7);
+    // the 5 km and 10 km of each run over time
+    expect(
+      await page.$$eval("[data-id=bestEfforts] .sr-only thead th", (h) =>
+        h.map((x) => x.textContent),
+      ),
+    ).toEqual(["5 km", "10 km"]);
     // the laps of the fixture have HR, so every long run has a drift
     const drift = await page.$$eval("[data-id=longRuns] table.data tbody tr", (r) =>
       r.map((x) => x.children[5].textContent),

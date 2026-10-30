@@ -395,6 +395,7 @@ out. To add one:
 | `w.bestEfforts` | Best efforts |
 | `be.distance` | Distance |
 | `be.activity` | Activity |
+| `be.trendNote` | The chart shows the pace of the fastest 5 km and 10 km of each week, from any run: a week without a hard run shows a slower pace. |
 | `w.races` | Races |
 | `races.none` | No races in the selected weeks. |
 | `te.aerobic` | Aerobic TE |

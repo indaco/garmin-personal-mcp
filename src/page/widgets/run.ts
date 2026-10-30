@@ -10,6 +10,7 @@ import { alpha, kpi, kpiRow, note, showAll, table, weekLabel } from "./ui";
 /** The Run board: best efforts, races, aerobic fitness, intensity, form, run/walk, training effect, predictions, long runs. */
 
 const DISTANCES = ["1k", "mile", "5k", "10k", "half", "marathon"];
+const TREND: Record<string, number> = { "5k": 5, "10k": 10 };
 const FORM: [field: string, key: Key, unit: string, digits: number][] = [
   ["cadenceSpm", "form.cadence", "spm", 0],
   ["gctMs", "form.gct", "ms", 0],
@@ -50,6 +51,60 @@ register({
     ]);
     if (rows.length === 0) return ctx.empty(el);
     append(el, table([t("be.distance"), t("col.time"), t("be.activity")], rows, [1]));
+    // the fastest effort of each week as pace, like the top set of an exercise: one axis for both
+    const effort = (a: Activity, d: string) =>
+      ctx.calc.seconds((a.best as Record<string, unknown> | undefined)?.[d]);
+    const weekly = Object.entries(TREND).map(([d, km]) => ({
+      d,
+      km,
+      weeks: ctx.weeks.map((_, i) =>
+        runs(ctx)
+          .filter((a) => weekOf(ctx, a) === i && effort(a, d) > 0)
+          .reduce<Activity | undefined>(
+            (b, a) => (b && effort(b, d) <= effort(a, d) ? b : a),
+            undefined,
+          ),
+      ),
+    }));
+    const shown = weekly.filter((x) => x.weeks.filter(Boolean).length >= 2);
+    if (shown.length === 0) return;
+    ctx.chart(
+      el,
+      {
+        type: "line",
+        data: {
+          labels: ctx.weeks.map((w) => weekLabel(ctx, w)),
+          datasets: shown.map((x, i) => ({
+            label: t(`d.${x.d}` as Key),
+            data: x.weeks.map((a) => (a ? fmt.to.pace(effort(a, x.d) / x.km) : null)),
+            borderColor: ctx.color(i === 0 ? "running" : "accent"),
+            spanGaps: true,
+          })),
+        },
+        options: {
+          scales: {
+            y: {
+              reverse: true,
+              ticks: { callback: (v) => fmt.hms(Number(v)) },
+              title: { display: true, text: t("af.pace", { unit: fmt.unit.pace }) },
+            },
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: (c) => {
+                  const x = shown[c.datasetIndex];
+                  const a = x.weeks[c.dataIndex]!;
+                  return `${c.dataset.label}: ${fmt.hms(effort(a, x.d))} · ${fmt.day(day(a))} ${a.name ?? ""}`;
+                },
+              },
+            },
+          },
+        },
+      },
+      180,
+    );
+    append(el, note(t("be.trendNote")));
   },
 });
 

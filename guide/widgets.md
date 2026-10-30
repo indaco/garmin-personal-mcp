@@ -26,7 +26,7 @@ it by hand.
 | Summary | `typeKpis` | Sessions, time, distance with pace or speed, HR, Garmin load and its share, and the last 7 days against the 4-week average. | all and each type | 3 |
 | Each week | `typeWeekly` | Time, distance or sessions of each week. | all and each type | 2 |
 | Time in HR zones | `hrZones` | Minutes in HR zones 1-5 each week. | all and each type | 1 |
-| Best efforts | `bestEfforts` | The fastest 1 km, mile, 5 km, 10 km, half marathon and marathon in the window. | running | 1 |
+| Best efforts | `bestEfforts` | The fastest 1 km, mile, 5 km, 10 km, half marathon and marathon in the window, and the pace of the fastest 5 km and 10 km of each week. | running | 1 |
 | Races | `races` | Each race with its time, pace, HR, power and aerobic training effect. | running | 2 |
 | Aerobic fitness | `aerobicFitness` | Pace against HR of each run (older runs paler), and weekly pace and efficiency (metres per heartbeat). | running | 2 |
 | Easy and hard running | `intensityShare` | The share of running time in Z1-2 (easy) and Z4-5 (hard) each week. | running | 1 |

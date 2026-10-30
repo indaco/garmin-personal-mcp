@@ -31,7 +31,8 @@ export const ABOUT: Record<string, string> = {
     "Sessions, time, distance with pace or speed, HR, Garmin load and its share, and the last 7 days against the 4-week average.",
   typeWeekly: "Time, distance or sessions of each week.",
   hrZones: "Minutes in HR zones 1-5 each week.",
-  bestEfforts: "The fastest 1 km, mile, 5 km, 10 km, half marathon and marathon in the window.",
+  bestEfforts:
+    "The fastest 1 km, mile, 5 km, 10 km, half marathon and marathon in the window, and the pace of the fastest 5 km and 10 km of each week.",
   races: "Each race with its time, pace, HR, power and aerobic training effect.",
   aerobicFitness:
     "Pace against HR of each run (older runs paler), and weekly pace and efficiency (metres per heartbeat).",

@@ -341,6 +341,7 @@
   "w.bestEfforts": "Mejores marcas",
   "be.distance": "Distancia",
   "be.activity": "Actividad",
+  "be.trendNote": "El gráfico muestra el ritmo de los 5 km y 10 km más rápidos de cada semana, de cualquier carrera: una semana sin una carrera intensa muestra un ritmo más lento.",
   "w.races": "Competiciones",
   "races.none": "No hay competiciones en las semanas elegidas.",
   "te.aerobic": "TE aeróbico",

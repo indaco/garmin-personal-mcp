@@ -341,6 +341,7 @@
   "w.bestEfforts": "Bestleistungen",
   "be.distance": "Distanz",
   "be.activity": "Aktivität",
+  "be.trendNote": "Das Diagramm zeigt die Pace der schnellsten 5 km und 10 km jeder Woche, aus jedem Lauf: Eine Woche ohne harten Lauf zeigt eine langsamere Pace.",
   "w.races": "Wettkämpfe",
   "races.none": "Keine Wettkämpfe in den gewählten Wochen.",
   "te.aerobic": "Aerober TE",
