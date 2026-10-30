@@ -449,7 +449,7 @@ out. To add one:
 | `wt.vsFirst` | vs first session |
 | `wt.reps` | Reps |
 | `wt.fade` | Fade |
-| `wt.note` | Pick up to 3 workouts: runs with the same name. The place that Garmin puts before " - " does not count: "Riverside - Drill Workout" and "Hillview - Drill Workout" are one workout. The Weeks bar at the top sets the weeks to compare. For a structured workout (laps that mark a warm-up, rest or cool-down), pace, HR, cadence and power come from the work laps; else from the whole run. Fade is the pace of the last rep against the first of the same workout step, when the reps have the same distance or time. Ground contact, vertical ratio and stride are of the whole run. |
+| `wt.note` | Pick up to 3 workouts: runs with the same name. The place that Garmin puts before " - " does not count: "Riverside - Drill Workout" and "Hillview - Drill Workout" are one workout. The Weeks bar at the top sets the weeks to compare. For a structured workout (laps that mark a warm-up, rest or cool-down), pace, HR, cadence, power and running form come from the work laps; else from the whole run. Fade is the pace of the last rep against the first of the same workout step, when the reps have the same distance or time. |
 | `wt.left` | {name}: {n} session has no work laps and is left out, so reps compare with reps. The sessions with work laps start on {from}. Each update downloads the laps of the last 8 runs of each workout and keeps them.\|{name}: {n} sessions have no work laps and are left out, so reps compare with reps. The sessions with work laps start on {from}. Each update downloads the laps of the last 8 runs of each workout and keeps them. |
 | `w.setsPerCategory` | Sets per movement |
 | `ex.sets` | Completed sets |

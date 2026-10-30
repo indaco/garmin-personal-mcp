@@ -150,6 +150,9 @@ export function workOf(laps: Lap[]) {
     hr: avg("avgHR"),
     cadence: avg("cadenceSpm"),
     power: avg("avgPowerW"),
+    gct: avg("gctMs"),
+    vertRatio: avg("vertRatioPct"),
+    stride: avg("strideCm"),
     fade:
       reps.length > 1 && (alike(reps.map((x) => x.km)) || alike(reps.map((x) => x.sec)))
         ? ((last - first) / first) * 100
@@ -182,9 +185,9 @@ export function workoutMetrics(a: Activity) {
     hr,
     efficiency: pace && hr ? 60_000 / pace / hr : undefined,
     cadence: work ? work.cadence : num(a.cadenceSpm),
-    gct: num(a.gctMs),
-    vertRatio: num(a.vertRatioPct),
-    stride: num(a.strideCm),
+    gct: work ? work.gct : num(a.gctMs),
+    vertRatio: work ? work.vertRatio : num(a.vertRatioPct),
+    stride: work ? work.stride : num(a.strideCm),
     power: work ? work.power : num(a.avgPowerW),
     reps: work?.reps,
     fade: work?.fade,

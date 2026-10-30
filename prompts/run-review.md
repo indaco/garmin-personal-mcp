@@ -17,7 +17,8 @@ Then answer in chat, in this order, short:
   step: the target (pace, HR or cadence, low to high), what the matching lap did, and hit or miss.
   Match the steps to the laps in order, leaving out laps under 20 m or under 8 s: the watch adds
   them between steps. Without a planned workout, say so in one line.
-- **Reps**: for intervals, the pace and HR of each active lap of 20 m and 8 s or more (a shorter one
+- **Reps**: for intervals, the pace, HR and running form (ground contact `gctMs`, vertical ratio
+  `vertRatioPct`, when the laps have them) of each active lap of 20 m and 8 s or more (a shorter one
   is a lap that the watch adds between steps), and the fade: the last rep against the first of the
   same workout step (`step`), in %, for each step with more than one rep, only when those reps have
   the same distance or time. Skip this part for a steady run.

@@ -209,7 +209,7 @@
   },
   {
     "name": "getActivityLaps",
-    "description": "Laps of an activity as recorded by the watch (manual laps, auto-lap every km, or workout\nsteps), read from the original .FIT file. One row per lap: distance (km), timer time,\npace (min/km, foot sports) or speed (km/h), average/max HR, cadence (spm for running),\nascent/descent, average power, intensity (active, interval, rest, recovery, warmup, cooldown; the\nauto laps of a free run can be interval), lap trigger, and the step of the planned workout\n(step: the reps of one drill share it).\nUse it for intervals and per-km splits; getActivity does not have them.",
+    "description": "Laps of an activity as recorded by the watch (manual laps, auto-lap every km, or workout\nsteps), read from the original .FIT file. One row per lap: distance (km), timer time,\npace (min/km, foot sports) or speed (km/h), average/max HR, cadence (spm for running),\nascent/descent, average power, running form (gctMs, vertRatioPct, vertOscCm, strideCm),\nintensity (active, interval, rest, recovery, warmup, cooldown; the auto laps of a free run can\nbe interval), lap trigger, and the step of the planned workout (step: the reps of one drill\nshare it).\nUse it for intervals and per-km splits; getActivity does not have them.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
