@@ -3,16 +3,18 @@ server. Today is {{today}}.
 
 1. {{find}}
 2. Call `getActivitySets` and `getActivityWorkouts` with its `activityId`.
-3. Call `listActivities` with `names` = [the session's name] and `limit` = 100 (`getActivity` gives
-   the name when you have only the id). Its row of this session is the summary. The previous session
-   is the most recent strength session of the same name before this one: call `getActivitySets` with
-   its `activityId`. Without one, show the comparison as "n/a".
+3. When step 1 called `listActivities` with `names`, use its rows; otherwise call `listActivities`
+   with `names` = [the session's name] and `limit` = 100 (`getActivity` gives the name when you have
+   only the id). Its row of this session is the summary. The previous session is the most recent
+   strength session of the same name before this one: call `getActivitySets` with its `activityId`.
+   Without one, show the comparison as "n/a".
 4. Call `getSleep` with `date` = the day after the session (the night after it), and `getHrvRange`
    with `fromDate` and `toDate` = that day. When that night has not come yet, skip both calls and show
    the recovery as "n/a".
 
-A set with 0 reps was not done: leave it out of every count. The estimated 1RM (e1RM) of a set is
-kg × (1 + reps / 30), for sets of 1 to 12 reps with weight only; say that it is an estimate.
+A set with 0 reps was not done: leave it and its `restSec` out of every count and median. The
+estimated 1RM (e1RM) of a set is kg × (1 + reps / 30), for sets of 1 to 12 reps with weight only;
+say that it is an estimate.
 
 Then answer in chat, in this order, short:
 
@@ -35,7 +37,10 @@ Then answer in chat, in this order, short:
   one line.
 - **Sets**: for each exercise, the top set (the heaviest set of 1 to 12 reps, then the most reps;
   the heaviest set when none has 1 to 12 reps) and its e1RM, and the same for the previous session
-  when it has that exercise, with the change in %. For an exercise without weight, the most reps in
+  when it has that exercise, with the change in %. When the top set has more than 12 reps, its e1RM
+  is "n/a" and the change in % is of its weight. When the previous session has the exercise in
+  another form (timed sets against sets with reps, or sets without weight against sets with
+  weight), show its comparison as "n/a". For an exercise without weight, the most reps in
   a set; for a timed one, the longest set in seconds, without a change: its time follows the lap
   button or the plan, not strength. The rep drop: the reps of the last set against the first set at
   the same weight, when the exercise has 2 or more of them. A rest-pause or cluster group is a
