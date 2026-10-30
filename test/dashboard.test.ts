@@ -272,6 +272,14 @@ describe("jsonByLines", () => {
   });
 });
 
+/** How many of 32 strength sessions with sets keep them in a demo, on a first build or with every file saved. */
+const keptSets = (saved: boolean) =>
+  asServer(
+    Array.from({ length: 32 }, (_, i) => ({ id: i, type: "strength_training", exercises: [] })),
+    false,
+    saved,
+  ).filter((a: Record<string, unknown>) => a.exercises).length;
+
 describe("getDashboardData", () => {
   it("fetches everything on the first call and keeps it in the cache", async () => {
     garminActivities = [
@@ -541,6 +549,10 @@ describe("getDashboardData", () => {
     ]);
     // the 30 newest are downloaded, the saved one is read from the data folder
     expect(api.getBytes).toHaveBeenCalledTimes(30);
+  });
+
+  it("keeps in the demos the sets that the server gives: the 30 newest, all once every file is saved", () => {
+    expect([keptSets(false), keptSets(true)]).toEqual([30, 32]);
   });
 
   it("adds the laps of the last 8 sessions of each repeated run name, only when asked", async () => {

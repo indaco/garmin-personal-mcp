@@ -100,6 +100,19 @@ describe("muscle groups", () => {
     expect(sets.abs).toEqual([0, 2]);
   });
 
+  it("counts an exercise without catalogue muscles under other", () => {
+    const sets = muscleSets(
+      [
+        {
+          start: "2026-10-15 18:00:00",
+          exercises: [{ exercise: "Sled Push", sets: [{ reps: 8 }] }],
+        },
+      ],
+      ["2026-10-12"],
+    );
+    expect(sets).toEqual({ other: [1] });
+  });
+
   it("gives push against pull sets", () => {
     expect(pushPull({ chest: [2], shoulders: [1], triceps: [1], back: [2], biceps: [0] })).toBe(2);
     expect(pushPull({ chest: [2] })).toBeNull();

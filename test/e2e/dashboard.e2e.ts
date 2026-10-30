@@ -1445,6 +1445,34 @@ describe("strength board", () => {
     expect(errors).toEqual([]);
   });
 
+  it("tags a lift whose last sessions are more than 5% under the ones before as down", async () => {
+    // once a week: the 3 newest bench press sessions are the last 14 days, at 80% of their weight
+    let newest = 3;
+    const activities = data.activities.map((a: Record<string, unknown>) => {
+      const ex = a.exercises as { exercise: string; sets: { kg?: number }[] }[] | undefined;
+      if (!ex?.some((e) => e.exercise === "Barbell Bench Press") || newest-- <= 0) return a;
+      return {
+        ...a,
+        exercises: ex.map((e) =>
+          e.exercise === "Barbell Bench Press"
+            ? { ...e, sets: e.sets.map((s) => ({ ...s, kg: (s.kg ?? 0) * 0.8 })) }
+            : e,
+        ),
+      };
+    });
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }),
+      { hash: "#strengthTraining" },
+    );
+    const tag = page.locator("[data-exercise=barbell-bench-press] td:first-child .tag");
+    expect(await tag.textContent()).toBe("down");
+    expect(await tag.getAttribute("title")).toBe(
+      "The best of the last sessions (14 days or more) is more than 5% under the best of as many sessions before them",
+    );
+    expect(errors).toEqual([]);
+  });
+
   it("says why it shows nothing when no session has sets, instead of bars of 0", async () => {
     // for example when Garmin's .FIT download fails for every session
     const activities = data.activities.map((a: Record<string, unknown>) =>
