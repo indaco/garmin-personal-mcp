@@ -183,15 +183,17 @@ Personal API does not have.
 ## Dashboard
 
 The server makes a training dashboard with these prompts. In Claude Desktop, the prompts are in
-the **+** menu of the message box, under _garmin-personal_. In Claude Code, they are slash commands.
+the **+** menu of the message box, under _garmin-personal_. In Claude Code, they are slash commands:
+use the full name, `/mcp__garmin-personal__<prompt>`. The short form `/garmin-personal:<prompt>` can
+reach the assistant as the command name only, without the prompt.
 
-| Prompt                                                  | What it does                                                                              | Claude Code example                                 |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| [training-dashboard](#training-dashboard)               | makes the page                                                                            | `/garmin-personal:training-dashboard 8`             |
-| [training-dashboard-update](#training-dashboard-update) | adds the new data, your layout stays                                                      | `/garmin-personal:training-dashboard-update`        |
-| [dashboard-setup](#dashboard-setup)                     | makes a page for you or for your coach, with only the sports and the data that you select | `/garmin-personal:dashboard-setup`                  |
-| [dashboard-widget](#dashboard-widget)                   | makes a new widget from your idea                                                         | `/garmin-personal:dashboard-widget my longest ride` |
-| [dashboard-language](#dashboard-language)               | adds a language to the page                                                               | `/garmin-personal:dashboard-language German`        |
+| Prompt                                                  | What it does                                                                              | Claude Code example                                       |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| [training-dashboard](#training-dashboard)               | makes the page                                                                            | `/mcp__garmin-personal__training-dashboard 8`             |
+| [training-dashboard-update](#training-dashboard-update) | adds the new data, your layout stays                                                      | `/mcp__garmin-personal__training-dashboard-update`        |
+| [dashboard-setup](#dashboard-setup)                     | makes a page for you or for your coach, with only the sports and the data that you select | `/mcp__garmin-personal__dashboard-setup`                  |
+| [dashboard-widget](#dashboard-widget)                   | makes a new widget from your idea                                                         | `/mcp__garmin-personal__dashboard-widget my longest ride` |
+| [dashboard-language](#dashboard-language)               | adds a language to the page                                                               | `/mcp__garmin-personal__dashboard-language German`        |
 
 The prompts remove all spaces around an argument, also the no-break space from a phone keyboard.
 
@@ -211,7 +213,7 @@ The page is one HTML file, `garmin-dashboard.html` in the data folder. It works 
   different.
 
 In Claude Code, the arguments are in order and separated by spaces: first `weeks`, then `layout`.
-You can also give only the layout: `/garmin-personal:training-dashboard freeform`.
+You can also give only the layout: `/mcp__garmin-personal__training-dashboard freeform`.
 
 The assistant gives you the path of the page and the command to open it. The page has a board for
 all your training, a Recovery board and a board for each sport. A missing value shows as "n/a".
@@ -236,7 +238,7 @@ your languages stay. Reload the page to see the new data.
 | `weeks`  | the weeks to cover                                                      | the weeks of the page   |
 | `path`   | the dashboard file, for example `garmin-dashboard-coach.html` (`.html`) | `garmin-dashboard.html` |
 
-In Claude Code: `/garmin-personal:training-dashboard-update coach.html` updates `coach.html`. A
+In Claude Code: `/mcp__garmin-personal__training-dashboard-update coach.html` updates `coach.html`. A
 value that ends in `.html` is the file, also in the first place.
 
 To update the page automatically, tell your assistant when, in your own words, for example "update
@@ -267,7 +269,7 @@ assistant writes a small widget, and `editDashboard` stores it in the page and i
 library (`widgets.json` in the data folder). The widget stays after each update, and each new page
 gets it too. The argument `idea` is required. The argument `path` is optional: it is the file of the
 page, for example `coach.html`. In Claude Code:
-`/garmin-personal:dashboard-widget my longest ride each month coach.html`. Reload the page to see
+`/mcp__garmin-personal__dashboard-widget my longest ride each month coach.html`. Reload the page to see
 the widget.
 [Custom widgets](guide/custom-widgets.md) tells more.
 
@@ -276,7 +278,7 @@ the widget.
 This prompt adds a language to the dashboard. The assistant translates the texts of the page, and
 `editDashboard` stores them in the page. The argument `language` is optional: the default is the
 language of the conversation. The argument `path` is optional: it is the file of the page, for
-example `coach.html`. In Claude Code: `/garmin-personal:dashboard-language German coach.html`. A
+example `coach.html`. In Claude Code: `/mcp__garmin-personal__dashboard-language German coach.html`. A
 text without a translation shows in English. To remove an added language, ask your assistant to
 remove it: `editDashboard` with `removeLanguages`.
 [Languages](guide/languages.md) tells more.
@@ -301,11 +303,11 @@ For a design of your own, use `layout` = `freeform`: Claude writes the page, as 
 
 These prompts answer in the chat. They do not change a dashboard.
 
-| Prompt                              | What it does                                                | Claude Code example                                       |
-| ----------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------- |
-| [run-review](#run-review)           | reviews one run as a coach                                  | `/garmin-personal:run-review`                             |
-| [race-readiness](#race-readiness)   | tells if you are ready for a race, with a plan for its pace | `/garmin-personal:race-readiness 2026-11-15 half 1:45:00` |
-| [strength-review](#strength-review) | reviews one strength session as a coach                     | `/garmin-personal:strength-review`                        |
+| Prompt                              | What it does                                                | Claude Code example                                             |
+| ----------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------- |
+| [run-review](#run-review)           | reviews one run as a coach                                  | `/mcp__garmin-personal__run-review`                             |
+| [race-readiness](#race-readiness)   | tells if you are ready for a race, with a plan for its pace | `/mcp__garmin-personal__race-readiness 2026-11-15 half 1:45:00` |
+| [strength-review](#strength-review) | reviews one strength session as a coach                     | `/mcp__garmin-personal__strength-review`                        |
 
 A missing value shows as "n/a": the assistant does not estimate it.
 
@@ -337,7 +339,7 @@ the last 7 nights. It ends with a target pace for each quarter of the race.
 
 In Claude Code, give the values in any order: a value in the form `yyyy-MM-dd` is the date, a value
 in the form `1:45:00` is the goal, and the other words are the distance. For example
-`/garmin-personal:race-readiness half marathon 2026-11-15`.
+`/mcp__garmin-personal__race-readiness half marathon 2026-11-15`.
 
 ### strength-review
 

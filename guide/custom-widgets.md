@@ -20,7 +20,7 @@ Each step is a request to your assistant, and what you then see.
 6. **Keep it.** Copy `widgets.json` from the data folder to back up your widgets, or to use them
    on another computer.
 
-In Claude Code, step 1 is `/garmin-personal:dashboard-widget my longest ride of each month`.
+In Claude Code, step 1 is `/mcp__garmin-personal__dashboard-widget my longest ride of each month`.
 
 ## How the assistant makes a widget
 

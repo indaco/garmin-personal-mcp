@@ -442,7 +442,7 @@ describe("coach prompts", () => {
   });
 
   it("reads the race date and goal by their shape from any slot, as the slash command passes them", async () => {
-    // "/garmin-personal:race-readiness half marathon 2026-11-15 1:45:00" fills the slots in order
+    // "/mcp__garmin-personal__race-readiness half marathon 2026-11-15 1:45:00" fills the slots in order
     const text = await render("race-readiness", {
       date: "half",
       distance: "marathon",
