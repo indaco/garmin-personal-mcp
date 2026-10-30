@@ -244,3 +244,29 @@ describe("site sections", () => {
     );
   });
 });
+
+describe("site demo", () => {
+  it("shows a page updated for a year: the workout trend has every session, with its form", async () => {
+    const { page, errors } = await site();
+    await page.goto(`${base}demo/index.html#running`, { waitUntil: "load" });
+    const tile = "[data-id=workoutTrend]";
+    await page.waitForSelector(tile);
+    // every repeated run has its laps: no session is left out
+    expect(await page.textContent(tile)).not.toContain("left out");
+    await page.click(`${tile} >> text=/^Track Intervals/`);
+    await page.click(`${tile} >> text=/^Tempo Run/`);
+    expect(await page.textContent(`${tile} h3`)).toBe("Track Intervals");
+    // the 8 newest sessions, the others behind "Show all"
+    expect(await page.$$eval(`${tile} table.data tbody tr:not([hidden])`, (r) => r.length)).toBe(8);
+    expect(await page.textContent(`${tile} .btn.more`)).toMatch(/^Show all \d+$/);
+    // the running form of the reps, from the laps
+    const head = await page.$$eval(`${tile} table.data th`, (h) => h.map((x) => x.textContent));
+    const gct = await page.$$eval(
+      `${tile} table.data tbody tr`,
+      (r, c) => r.map((x) => x.children[c].textContent),
+      head.indexOf("Ground contact"),
+    );
+    for (const v of gct) expect(v).toMatch(/^\d+ ms$/);
+    expect(errors).toEqual([]);
+  });
+});
