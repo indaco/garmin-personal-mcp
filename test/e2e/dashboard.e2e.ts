@@ -1445,6 +1445,25 @@ describe("strength board", () => {
     expect(errors).toEqual([]);
   });
 
+  it("says why it shows nothing when no session has sets, instead of bars of 0", async () => {
+    // for example when Garmin's .FIT download fails for every session
+    const activities = data.activities.map((a: Record<string, unknown>) =>
+      Array.isArray(a.exercises) ? { ...a, exercises: undefined, detailError: "HTTP 500" } : a,
+    );
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }),
+      { hash: "#strengthTraining" },
+    );
+    for (const id of ["setsPerCategory", "muscleBalance", "exercises"]) {
+      expect(await page.$$(`[data-id=${id}] canvas`)).toHaveLength(0);
+      expect(await page.innerText(`[data-id=${id}] .empty`)).toMatch(
+        /^24 strength sessions have no sets/,
+      );
+    }
+    expect(errors).toEqual([]);
+  });
+
   it("tags the stalled lifts next to their name and says what the change compares", async () => {
     const { page, errors } = await open(browser, pageFile(), { hash: "#strengthTraining" });
     // the tag is the lift's state now, apart from the change since its first sessions

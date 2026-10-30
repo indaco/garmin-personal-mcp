@@ -26,7 +26,7 @@ const PALETTE = [
 register({
   id: "setsPerCategory",
   render(el, ctx) {
-    if (oneSession(el, ctx)) return;
+    if (oneSession(el, ctx) || noCompleteWeek(el, ctx)) return;
     const sets = ctx.calc.setsByCategory(ctx.activities, ctx.weeks);
     const names = Object.keys(sets).toSorted((a, b) => sum(sets[b]) - sum(sets[a]));
     ctx.chart(
@@ -63,20 +63,36 @@ const sum = (v: (number | null)[]) => v.reduce<number>((s, x) => s + (x ?? 0), 0
 
 /** The note on the strength sessions without sets, when there are some. */
 function noSets(el: HTMLElement, ctx: Ctx, key: Key): void {
+  const text = noSetsText(ctx, key);
+  if (text) append(el, note(text));
+}
+
+function noSetsText(ctx: Ctx, key: Key): string | undefined {
   const n = ctx.calc.missingSets(ctx.activities, ctx.weeks).sessions;
-  if (n > 0) append(el, note(ctx.t(key, { n })));
+  return n > 0 ? ctx.t(key, { n }) : undefined;
+}
+
+/**
+ * True, with the note as the empty state, when each week with strength sessions holds one without sets:
+ * the chart would show only zeros, and none of them is real.
+ */
+function noCompleteWeek(el: HTMLElement, ctx: Ctx): boolean {
+  const m = ctx.calc.missingSets(ctx.activities, ctx.weeks);
+  if (m.sessions === 0 || m.complete > 0) return false;
+  ctx.empty(el, noSetsText(ctx, "ex.noSetsWeeks"));
+  return true;
 }
 
 register({
   id: "muscleBalance",
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
-    if (oneSession(el, ctx)) return;
+    if (oneSession(el, ctx) || noCompleteWeek(el, ctx)) return;
     const sets = calc.muscleSets(ctx.activities, ctx.weeks);
     const groups = calc.MUSCLE_GROUPS.filter((g) => sets[g]);
     // the mean of the weeks with every session's sets
     const weeks = ctx.weeks.length - calc.missingSets(ctx.activities, ctx.weeks).weeks.size;
-    const avg = groups.map((g) => (weeks > 0 ? sum(sets[g]!) / weeks : 0));
+    const avg = groups.map((g) => sum(sets[g]!) / weeks);
     const ratio = calc.pushPull(sets);
     append(el, kpiRow(kpi(t("mb.pushPull"), ratio === null ? fmt.na : `${fmt.num(ratio, 2)} : 1`)));
     ctx.chart(
@@ -124,7 +140,7 @@ register({
   render(el, ctx) {
     const { t, calc } = ctx;
     const stats = calc.exerciseStats(ctx.activities);
-    if (stats.length === 0) return ctx.empty(el);
+    if (stats.length === 0) return ctx.empty(el, noSetsText(ctx, "ex.noSets"));
     const key = `${ctx.board}/${ctx.id}`;
     const st = state.get(key) ?? { sort: "group", desc: false, group: null, search: "" };
     state.set(key, st);

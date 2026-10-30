@@ -83,14 +83,19 @@ function weekIndex(a: Activity, weeks: string[]): number {
 
 /**
  * The strength sessions without sets (past the 30 newest whose .FIT file is not saved, or a file that
- * could not be read) and the indexes of the weeks that hold one: their set counts would be too low.
+ * could not be read), the indexes of the weeks that hold one (their set counts would be too low), and
+ * the weeks with strength sessions that all have their sets.
  */
 export function missingSets(acts: Activity[], weeks: string[]) {
-  const missing = acts.filter(
-    (a) => String(a.type).includes("strength") && !Array.isArray(a.exercises),
-  );
+  const strength = acts.filter((a) => String(a.type).includes("strength"));
+  const missing = strength.filter((a) => !Array.isArray(a.exercises));
   const at = new Set(missing.map((a) => weekIndex(a, weeks)).filter((i) => i >= 0));
-  return { sessions: missing.length, weeks: at };
+  const withSets = new Set(strength.map((a) => weekIndex(a, weeks)).filter((i) => i >= 0));
+  return {
+    sessions: missing.length,
+    weeks: at,
+    complete: [...withSets].filter((i) => !at.has(i)).length,
+  };
 }
 
 /** null for each week that holds a session without sets, so a chart or a mean leaves it out. */

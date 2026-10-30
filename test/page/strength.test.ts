@@ -116,6 +116,9 @@ describe("categories", () => {
   });
 });
 
+/** A strength session without sets, as one past the 30 newest. */
+const withoutSets = (id: number, start: string) => ({ id, type: "strength_training", start });
+
 describe("sessions without sets", () => {
   // past the 30 newest sessions, or a .FIT file that could not be read
   const noSets = { id: 3, type: "strength_training", start: "2026-10-23 18:00:00" };
@@ -123,7 +126,8 @@ describe("sessions without sets", () => {
   const withGap = [noSets, ...acts];
 
   it("leaves out each week that holds a session without sets, not one cut-off date", () => {
-    expect(missingSets(withGap, weeks)).toEqual({ sessions: 1, weeks: new Set([1]) });
+    // the week of 12 Oct still holds a session with all its sets
+    expect(missingSets(withGap, weeks)).toEqual({ sessions: 1, weeks: new Set([1]), complete: 1 });
     // the week of 19 Oct has sets of one session and none of the other: not a real count
     expect(setsByCategory(withGap, weeks)).toEqual({
       Squat: [1, null, 0],
@@ -135,8 +139,22 @@ describe("sessions without sets", () => {
 
   it("counts a week without strength sessions as 0 and ignores other sports", () => {
     const run = { id: 4, type: "running", start: "2026-10-27 07:00:00" };
-    expect(missingSets([run, ...acts], weeks)).toEqual({ sessions: 0, weeks: new Set() });
+    expect(missingSets([run, ...acts], weeks)).toEqual({
+      sessions: 0,
+      weeks: new Set(),
+      complete: 2,
+    });
     expect(setsByCategory([run, ...acts], weeks).Squat).toEqual([1, 2, 0]);
+  });
+
+  it("counts no complete week when each week with strength holds a session without sets", () => {
+    const gaps = [
+      withoutSets(5, "2026-10-14 18:00:00"),
+      withoutSets(6, "2026-10-21 18:00:00"),
+      ...acts,
+    ];
+    // the empty week of 26 Oct is a real 0, but it is no week of sets
+    expect(missingSets(gaps, weeks)).toMatchObject({ sessions: 2, complete: 0 });
   });
 
   it("gives push against pull from the complete weeks only", () => {
