@@ -4,6 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { type GarminApiClient, GarminApiError } from "./api-client";
 import { addDays, localToday } from "./dates";
+import { digest } from "./digest";
 import { log } from "./log";
 import { type GarminTools, firstArray, summarize, writeAtomically } from "./tools";
 
@@ -510,13 +511,21 @@ export function registerDashboard(server: McpServer, dashboard: GarminDashboard)
         "the Garmin profile, e.g. it or pt-BR. Keeps a local cache and",
         "fetches from Garmin only what is new since the last call, so a rebuild or an update needs few",
         "calls. `sync` in the result says what was fetched.",
+        "`digest`, first in the result: the server's totals for the whole period and for each",
+        "Monday-Sunday week (sessions, km, hours, load), the training load of the last 7 and 28 days,",
+        "best efforts, races and strength top sets; quote them instead of your own sums. For another",
+        "date range, use the activities: each one is on its own line.",
       ].join("\n"),
       inputSchema: z.object({
         weeks: z.number().int().describe("Weeks to cover, default 12, max 52").optional(),
       }),
     },
-    async (a) => ({
-      content: [{ type: "text" as const, text: await dashboard.getDashboardData(a.weeks) }],
-    }),
+    async (a) => {
+      const data = JSON.parse(await dashboard.getDashboardData(a.weeks)) as Json;
+      // only in the tool result: the page data and the widgets' ctx.data stay without it
+      return {
+        content: [{ type: "text" as const, text: jsonByLines({ digest: digest(data), ...data }) }],
+      };
+    },
   );
 }

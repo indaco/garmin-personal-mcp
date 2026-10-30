@@ -886,14 +886,32 @@ describe("MCP tools", () => {
       writer.write.mockResolvedValue({ wrote: 1 });
       writer.preview.mockResolvedValue({ previewed: 1 });
       writer.edit.mockResolvedValue({ edited: 1 });
-      dashboard.getDashboardData.mockResolvedValue('{"d":1}');
+      dashboard.getDashboardData.mockResolvedValue('{"end":"2026-10-26"}');
     });
 
     it("getDashboardData passes weeks", async () => {
       const client = await connectHandlers(writer, dashboard);
       const result = await client.callTool({ name: "getDashboardData", arguments: { weeks: 8 } });
       expect(dashboard.getDashboardData).toHaveBeenCalledWith(8);
-      expect(textOf(result)).toBe('{"d":1}');
+      expect(JSON.parse(textOf(result))).toMatchObject({ end: "2026-10-26" });
+    });
+
+    it("getDashboardData gives the server's digest first, then the data as it is", async () => {
+      const data = {
+        end: "2026-10-26",
+        activities: [
+          { type: "running", km: 5, trainingLoad: 50, start: "2026-10-20 07:00:00" },
+          { type: "running", km: 7.5, trainingLoad: 70, start: "2026-10-22 07:00:00" },
+        ],
+      };
+      dashboard.getDashboardData.mockResolvedValue(JSON.stringify(data));
+      const client = await connectHandlers(writer, dashboard);
+      const text = textOf(await client.callTool({ name: "getDashboardData", arguments: {} }));
+      const { digest, ...rest } = JSON.parse(text);
+
+      expect(text.startsWith('{\n"digest":')).toBe(true);
+      expect(digest.totals.running).toMatchObject({ sessions: 2, km: 12.5, load: 120 });
+      expect(rest).toEqual(data);
     });
 
     it("writeDashboard writes with its arguments", async () => {

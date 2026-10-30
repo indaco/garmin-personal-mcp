@@ -165,7 +165,7 @@ Ask "list my last 5 activities". The first time that a garmin-personal tool asks
 | `getHeartRateZones`        | your HR zones                                                                  |
 | `getFitnessAge`            | fitness age against actual age                                                 |
 | `getDailySummary`          | steps, stress and Body Battery, for a day or a range                           |
-| `getDashboardData`         | all the data of the dashboard in one call, with a local cache                  |
+| `getDashboardData`         | all the dashboard data in one call, with the server's totals and a local cache |
 | `writeDashboard`           | writes the dashboard page                                                      |
 | `editDashboard`            | changes the layout, the custom widgets and the languages of the page           |
 | `scheduleDashboardRefresh` | updates a dashboard page automatically, at the times you say in your own words |

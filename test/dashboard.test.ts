@@ -326,6 +326,8 @@ describe("getDashboardData", () => {
     garminActivities = [activity(1, "2026-10-20"), activity(2, "2026-10-19")];
     const text = await dashboard.getDashboardData(2);
     const lines = text.split("\n");
+    // the digest is only in the tool result: this text is also the page data
+    expect(JSON.parse(text)).not.toHaveProperty("digest");
 
     expect(Object.keys(JSON.parse(text)).slice(-5)).toEqual([
       "sync",
