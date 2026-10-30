@@ -19,6 +19,13 @@ describe("site facts", () => {
     expect(f.tools.every((t) => t.text.length > 0)).toBe(true);
   });
 
+  it("lists the coach prompts of the README, apart from the dashboard prompts", () => {
+    const prompts = names("test/fixtures/prompt-list.json");
+    expect(f.coachPrompts.map((p) => p.name)).toEqual(["run-review", "race-readiness"]);
+    for (const p of f.coachPrompts) expect(prompts).toContain(p.name);
+    expect(f.prompts.map((p) => p.name)).not.toContain("run-review");
+  });
+
   it("lists dashboard prompts that the server has", () => {
     const prompts = names("test/fixtures/prompt-list.json");
     expect(f.prompts.length).toBeGreaterThan(0);
