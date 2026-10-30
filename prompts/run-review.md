@@ -28,6 +28,7 @@ Then answer in chat, in this order, short:
   intervals.
 - **Recovery**: the sleep score and hours of the night after the run, and its HRV (`lastNightAvg`)
   against Garmin's 7-day average of that night (`weeklyAvg`).
+  A `getSleep` row with only the `date` means that night has no sleep data: show its sleep as "n/a".
 - **Coach note**: 2 or 3 sentences: what went well and what to change next time. Base each sentence
   on a number above.
 

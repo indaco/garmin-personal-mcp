@@ -354,6 +354,16 @@ describe("workout comparison", () => {
 });
 
 describe("coach prompts", () => {
+  it.each(["run-review", "strength-review"])(
+    "%s shows a night without sleep data as n/a",
+    async (name) => {
+      const text = (await render(name)).replace(/\s+/g, " ");
+      expect(text).toContain(
+        'A `getSleep` row with only the `date` means that night has no sleep data: show its sleep as "n/a".',
+      );
+    },
+  );
+
   it("reviews a run by id, by name, or the latest run", async () => {
     const byId = await render("run-review", { activity: " 21000000123 " });
     expect(byId).toContain("`activityId` = 21000000123.");
