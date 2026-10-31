@@ -21,6 +21,9 @@ Commands:
   -v, --version                       show the version
   -h, --help                          show this help`;
 
+/** The waits before `refresh --auto` tries a page again after a network error: 3.5 minutes in all. */
+export const RETRY_MS = [30_000, 60_000, 120_000];
+
 export interface CliResult {
   code: number;
   stdout?: string;
@@ -35,8 +38,9 @@ export interface CliResult {
 export async function cli(
   command: string,
   args: string[],
-  auto: Pick<AutoRefresh, "pages" | "status" | "set" | "off" | "saveRun">,
+  auto: Pick<AutoRefresh, "pages" | "status" | "set" | "off" | "saveRun" | "missed">,
   writer: () => Pick<DashboardWriter, "write">,
+  sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms)),
 ): Promise<CliResult> {
   if (command === "--version" || command === "-v") return { code: 0, stdout: version };
   if (command === "--help" || command === "-h") return { code: 0, stdout: HELP };
@@ -44,8 +48,26 @@ export async function cli(
     if (command === "refresh") {
       const scheduled = args[0] === "--auto";
       const at = new Date().toISOString();
+      // the job starts at the run times and at login: nothing to do when no run time was missed
+      if (scheduled && !(await auto.missed())) return { code: 0, stdout: `${at} no run due` };
       const pages = scheduled ? await auto.pages() : [args[0] ?? ""];
-      const { lines, failed } = await refreshPages(writer(), pages);
+      const w = writer();
+      const result = await refreshPages(w, pages);
+      const { lines } = result;
+      let { failed } = result;
+      // at login or after a wake the network can come a little after the job: wait for it
+      for (const ms of scheduled ? RETRY_MS : []) {
+        const offline = failed.filter((f) => f.error.startsWith("Network error"));
+        if (offline.length === 0) break;
+        lines.push(`network not ready: trying ${offline.length} page(s) again in ${ms / 1000} s`);
+        await sleep(ms);
+        const again = await refreshPages(
+          w,
+          offline.map((f) => f.path),
+        );
+        lines.push(...again.lines);
+        failed = [...failed.filter((f) => !offline.includes(f)), ...again.failed];
+      }
       if (scheduled) await auto.saveRun({ at, failed });
       return { code: failed.length > 0 ? 1 : 0, stdout: lines.join("\n") };
     }

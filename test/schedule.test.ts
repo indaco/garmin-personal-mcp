@@ -10,6 +10,7 @@ import {
   cronLine,
   cronOf,
   type Job,
+  lastRunTime,
   nextRuns,
   parseCron,
   plist,
@@ -113,6 +114,8 @@ describe("cron", () => {
       "<dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>5</integer></dict>",
     );
     expect(daily).toContain("<string>/opt/node/bin/npx</string>");
+    // the job also starts at login, so a time missed while the Mac was off runs then
+    expect(daily).toContain("<key>RunAtLoad</key><true/>");
     expect(plist(job, parseCron("0 7 * * 1-5")).match(/<key>Weekday<\/key>/g)).toHaveLength(5);
     expect(plist(job, parseCron("0 8 1 1,7 *"))).toContain(
       "<dict><key>Month</key><integer>7</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>",
@@ -161,6 +164,40 @@ describe("cron", () => {
     );
   });
 });
+
+const at = (s: string) => new Date(s);
+
+it("lastRunTime gives the last run time at or before now", () => {
+  const c = parseCron("0 7,19 * * 1");
+  // Monday 2 November 2026
+  expect(lastRunTime(c, at("2026-11-02T07:00:00"))).toEqual(at("2026-11-02T07:00:00"));
+  expect(lastRunTime(c, at("2026-11-02T18:59:00"))).toEqual(at("2026-11-02T07:00:00"));
+  expect(lastRunTime(c, at("2026-11-08T12:00:00"))).toEqual(at("2026-11-02T19:00:00"));
+  // a day of the month, a new year, and day or weekday as cron reads both
+  expect(lastRunTime(parseCron("0 7 1 * *"), at("2026-11-15T12:00:00"))).toEqual(
+    at("2026-11-01T07:00:00"),
+  );
+  expect(lastRunTime(parseCron("30 6 1 1 *"), at("2026-11-02T07:00:00"))).toEqual(
+    at("2026-01-01T06:30:00"),
+  );
+  expect(lastRunTime(parseCron("0 7 1 1 *"), at("2026-01-01T06:59:00"))).toEqual(
+    at("2025-01-01T07:00:00"),
+  );
+  // parseCron refuses a date that never comes, so a hand-made one shows the 8-year limit
+  expect(
+    lastRunTime(
+      { text: "0 7 30 2 *", times: [420], days: [30], months: [2] },
+      at("2026-11-02T07:00:00"),
+    ),
+  ).toBeUndefined();
+  // Tuesday 3 November: the Monday before comes after the 1st of the month
+  expect(lastRunTime(parseCron("0 8 1 * 1"), at("2026-11-03T12:00:00"))).toEqual(
+    at("2026-11-02T08:00:00"),
+  );
+});
+
+/** The ISO time n days ago. */
+const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
 
 /** A page with a data block, as the writer makes it. */
 const dashboard = (data: object) =>
@@ -338,11 +375,13 @@ describe("AutoRefresh", () => {
     expect(calls).toEqual([]);
   });
 
-  it("reports an error of the scheduler", async () => {
-    await expect(
-      new AutoRefresh(config, "darwin", join(dir, "home"), failing, "/n").set({}),
-    ).rejects.toThrow(/launchctl failed \(5\): Bootstrap failed/);
+  it("reports an error of the scheduler, and keeps the schedule it had", async () => {
+    const broken = new AutoRefresh(config, "darwin", join(dir, "home"), failing, "/n");
+    await expect(broken.set({})).rejects.toThrow(/launchctl failed \(5\): Bootstrap failed/);
     expect(existsSync(join(config.dataDir, "auto-refresh.json"))).toBe(false);
+    await auto("darwin").set({ cron: "0 6 * * *" });
+    await expect(broken.set({ cron: "0 9 * * *" })).rejects.toThrow(/launchctl failed/);
+    expect((await auto("darwin").status()).cron).toBe("0 6 * * *");
   });
 
   it("writes the next run into each scheduled page as due, and removes it when stopped", async () => {
@@ -379,6 +418,64 @@ describe("AutoRefresh", () => {
     expect((await a.status()).last).toEqual(last);
     await a.set({ cron: "0 6 * * *" });
     expect((await a.status()).last).toEqual(last);
+  });
+
+  it("runs once for a missed run time, and not for a time before the schedule", async () => {
+    const a = auto("darwin");
+    expect(await a.missed()).toBe(false);
+    await a.set({ cron: "0 7 * * *" });
+    // set now: no run time has passed since
+    expect(await a.missed()).toBe(false);
+    const later = new Date(Date.now() + 2 * 86_400_000);
+    expect(await a.missed(later)).toBe(true);
+    await a.saveRun({ at: later.toISOString(), failed: [{ path: "a.html", error: "HTTP 401" }] });
+    // a failed run counts too: the next try is the next run time, not a loop on a broken key
+    expect(await a.missed(later)).toBe(false);
+    expect((await a.status()).last).toEqual({
+      at: later.toISOString(),
+      failed: [{ path: "a.html", error: "HTTP 401" }],
+    });
+    // the same cron again keeps the last run and the start
+    await a.set({ path: "coach.html" });
+    expect(await a.missed(later)).toBe(false);
+    expect((await a.status()).last?.at).toBe(later.toISOString());
+  });
+
+  it("runs a missed time of a schedule saved before the start time existed", async () => {
+    const page = join(config.dataDir, "garmin-dashboard.html");
+    const file = join(config.dataDir, "auto-refresh.json");
+    writeFileSync(file, JSON.stringify({ cron: "0 7 * * *", pages: [page] }));
+    expect(await auto("linux").missed()).toBe(true);
+  });
+
+  it("does not catch up a time of a new cron set after the last run", async () => {
+    const page = join(config.dataDir, "garmin-dashboard.html");
+    writeFileSync(
+      join(config.dataDir, "auto-refresh.json"),
+      JSON.stringify({
+        cron: "0 7 * * *",
+        pages: [page],
+        since: daysAgo(5),
+        last: { at: daysAgo(2), failed: [] },
+      }),
+    );
+    const a = auto("darwin");
+    expect(await a.missed()).toBe(true);
+    // launchd starts the job as it loads the new cron: it must find nothing to do
+    await a.set({ cron: "0 6 * * *" });
+    expect(await a.missed()).toBe(false);
+  });
+
+  it("counts a run at the run time itself as done, and a run just before it as not", async () => {
+    const a = auto("linux");
+    await a.set({ cron: "0 7 * * *" });
+    const seven = new Date(Date.now() + 3 * 86_400_000);
+    seven.setHours(7, 0, 0, 0);
+    expect(await a.missed(seven)).toBe(true);
+    await a.saveRun({ at: seven.toISOString(), failed: [] });
+    expect(await a.missed(seven)).toBe(false);
+    await a.saveRun({ at: new Date(seven.getTime() - 1).toISOString(), failed: [] });
+    expect(await a.missed(seven)).toBe(true);
   });
 
   it("saves no run when no page has a schedule", async () => {

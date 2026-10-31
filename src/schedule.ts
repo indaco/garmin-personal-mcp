@@ -74,6 +74,8 @@ export interface LastRun {
 interface State {
   cron: string;
   pages: string[];
+  /** When the schedule was set: a run time before it is not missed. */
+  since?: string;
   last?: LastRun;
 }
 
@@ -193,6 +195,19 @@ function* runDates(c: Cron, from: Date): Generator<Date> {
   }
 }
 
+/** The last run time at or before `now`; undefined when there is none in 8 years. */
+export function lastRunTime(c: Cron, now: Date): Date | undefined {
+  for (let i = 0; i < 366 * 8; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    if (!runsOn(c, d)) continue;
+    for (const t of c.times.toReversed()) {
+      const at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(t / 60), t % 60);
+      if (at <= now) return at;
+    }
+  }
+  return undefined;
+}
+
 /** The next `count` runs after `from`, as local "YYYY-MM-DD HH:MM"; empty when the date never comes. */
 export function nextRuns(c: Cron, from: Date, count: number): string[] {
   const runs: string[] = [];
@@ -268,6 +283,7 @@ ${strings([job.program, ...job.args])}
   <dict>
 ${env}
   </dict>
+  <key>RunAtLoad</key><true/>
   <key>StartCalendarInterval</key>
   <array>
 ${when.join("\n")}
@@ -416,6 +432,22 @@ export class AutoRefresh {
     return dueOf(state.cron);
   }
 
+  /**
+   * Whether `refresh --auto` must run: a run time passed since the last run (or since the schedule
+   * was set). The job also starts at login, so a time that the computer missed runs then, once.
+   */
+  async missed(now = new Date()): Promise<boolean> {
+    const state = await this.#state();
+    if (!state) return false;
+    const time = lastRunTime(parseCron(state.cron), now);
+    // the later of the last run and the start: a new cron does not catch up its times before it
+    const after = Math.max(
+      Date.parse(state.last?.at ?? "") || 0,
+      Date.parse(state.since ?? "") || 0,
+    );
+    return time !== undefined && after < time.getTime();
+  }
+
   /** Keeps the result of a `refresh --auto` run for the status; nothing when no page is scheduled. */
   async saveRun(last: LastRun): Promise<void> {
     const state = await this.#state();
@@ -438,8 +470,17 @@ export class AutoRefresh {
     const old = await this.#state();
     const cron = parseCron(o.cron ?? old?.cron ?? DEFAULT_CRON);
     const pages = [...new Set([...(old?.pages ?? []), page])];
-    await this.#install(cron);
-    await this.#save({ ...old, cron: cron.text, pages });
+    // a new cron starts now, so the job does not catch up a time of the old one
+    const since = old?.cron === cron.text && old.since ? old.since : new Date().toISOString();
+    // saved first: launchd starts the job as it loads it, and the job must see `since`
+    await this.#save({ ...old, cron: cron.text, pages, since });
+    try {
+      await this.#install(cron);
+    } catch (e) {
+      if (old) await this.#save(old);
+      else await rm(this.#stateFile, { force: true });
+      throw e;
+    }
     // a new cron moves the next run: each page must expect the new one, or it warns too early
     const due = dueOf(cron.text);
     for (const p of pages) await patchDue(p, due);
