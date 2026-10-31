@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -149,6 +149,29 @@ describe("writeDashboard", () => {
       data.weeks = 12;
     }
     expect(asked).toEqual([8]);
+  });
+
+  it("takes the default weeks when the data block of the page cannot be read", async () => {
+    await writer.write({ weeks: 8 });
+    writeFileSync(
+      file,
+      page().replace(/garmin-data:start \*\/[\s\S]*?\/\*/, "garmin-data:start */{oops/*"),
+    );
+    asked.length = 0;
+    vi.useFakeTimers({ now: Date.now() + 20 * 60_000, toFake: ["Date"] });
+    try {
+      await writer.write({});
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(asked).toEqual([undefined]);
+  });
+
+  it("refuses more than 5 coach notes and writes nothing", async () => {
+    await expect(writer.write({ notes: ["1", "2", "3", "4", "5", "6"] })).rejects.toThrow(
+      "At most 5 notes",
+    );
+    expect(existsSync(file)).toBe(false);
   });
 
   it("reuses the data of the last call for 15 minutes, so the notes match their digest", async () => {
@@ -643,7 +666,17 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
     await expect(
       writer.write({ settings: { workouts: "yes" as unknown as boolean } }),
     ).rejects.toThrow(/workouts: true or false/);
+    await expect(
+      writer.write({ settings: { colour: "red" } as unknown as Record<string, never> }),
+    ).rejects.toThrow(/unknown settings colour/);
+    await expect(writer.write({ settings: { language: "english" } })).rejects.toThrow(
+      /language: auto or a code such as en, it or pt-BR/,
+    );
     expect(existsSync(file)).toBe(false);
+    // a language with a region is a code too
+    await writer.write({ settings: { language: "pt-BR" } });
+    expect(readBlock(page(), "settings")).toEqual({ language: "pt-BR" });
+    rmSync(file);
     const own = "<html><script>/* garmin-data:start */null/* garmin-data:end */</script></html>";
     await expect(writer.write({ page: own, settings: { exclude: ["names"] } })).rejects.toThrow(
       /template/,
