@@ -138,6 +138,32 @@ const ratios = (page: Page) =>
       .map((k) => k.querySelector(".kpi-value")?.textContent),
   );
 
+/** The dataset labels of the bar charts in the tiles of `widget`. */
+const barLabels = (page: Page, widget: string) =>
+  page.evaluate(
+    (w) =>
+      Object.values(window.Chart!.instances)
+        .filter(
+          (c) =>
+            c.canvas.closest(`[data-widget=${w}]`) &&
+            (c.config as { type?: string }).type === "bar",
+        )
+        .flatMap((c) => c.data.datasets.map((d) => String(d.label))),
+    widget,
+  );
+
+/** The values and the gap setting of the dataset `label` of the chart in the tile of `widget`. */
+const chartDataset = (page: Page, widget: string, label: string) =>
+  page.evaluate(
+    ([w, l]) => {
+      const d = Object.values(window.Chart!.instances)
+        .find((c) => c.canvas.closest(`[data-widget=${w}]`))!
+        .data.datasets.find((x) => x.label === l)!;
+      return { data: d.data, spanGaps: (d as { spanGaps?: unknown }).spanGaps };
+    },
+    [widget, label],
+  );
+
 describe("the page", () => {
   it("keeps the template small", () => {
     // minified, with only the Chart.js parts the page uses: Chart.js is most of it, and the page
@@ -1287,6 +1313,78 @@ describe("type boards", () => {
     );
     expect(drift.length).toBeGreaterThan(0);
     for (const d of drift) expect(d).toMatch(/^-?\d+\.\d%$/);
+    // every run of the fixture has Garmin's zone time
+    expect(await page.textContent("[data-id=intensityShare]")).not.toContain("Approximate");
+  });
+
+  it("shows n/a for a race without time or pace, gaps for weeks without ascent, and the approximate-zones note", async () => {
+    const gaps = {
+      ...data,
+      activities: data.activities.map((a: Record<string, unknown>) => ({
+        ...a,
+        // only the runs of the last week give an ascent, and it is a real 0 m
+        ascentM: String(a.start) >= "2026-10-19" ? 0 : undefined,
+        // one run of that week has no zone time from Garmin, the others have it
+        ...(String(a.start).startsWith("2026-10-22") ? { hrZonesSec: undefined } : {}),
+        ...(a.name === "Riverside Half Marathon" ? { duration: undefined } : {}),
+        ...(a.name === "City 10K" ? { pace: undefined } : {}),
+      })),
+      v: DASHBOARD_VERSION,
+      notes: [],
+    };
+    const { page, errors } = await open(browser, pageFile({ data: gaps }), { hash: "#running" });
+    const races = await page.$$eval("[data-id=races] tbody tr", (r) =>
+      r.map((x) => [
+        x.children[1].textContent,
+        x.children[3].textContent,
+        x.children[4].textContent,
+      ]),
+    );
+    expect(races).toEqual([
+      ["Riverside Half Marathon", "n/a", "4:48/km"],
+      ["City 10K", "49:00", "n/a"],
+    ]);
+    const ascent = await chartDataset(page, "longRuns", "Weekly ascent");
+    // 13 weeks: no ascent in the first 11, 0 m in the 12th, no run in the 13th
+    expect(ascent).toEqual({
+      data: [...Array.from({ length: 11 }, () => null), 0, null],
+      spanGaps: true,
+    });
+    expect(await page.textContent("[data-id=intensityShare]")).toContain("Approximate");
+    expect(errors).toEqual([]);
+  });
+
+  it("names the training effects with the catalogue texts", async () => {
+    // a label that the catalogues do not know keeps Garmin's words
+    const unknown = {
+      ...data,
+      activities: data.activities.map((a: Record<string, unknown>) =>
+        String(a.start).startsWith("2026-10-24") ? { ...a, teLabel: "lactate_threshold" } : a,
+      ),
+      v: DASHBOARD_VERSION,
+      notes: [],
+    };
+    const en = await open(browser, pageFile({ data: unknown }), { hash: "#running" });
+    expect((await barLabels(en.page, "trainingEffect")).toSorted()).toEqual([
+      "Aerobic base",
+      "Anaerobic capacity",
+      "Tempo",
+      "VO2 max",
+      "lactate threshold",
+    ]);
+    const italian = await open(
+      browser,
+      pageFile({ data: unknown, settings: { languages: ["en", "it"] } }),
+      { hash: "#running", locale: "it-IT" },
+    );
+    expect((await barLabels(italian.page, "trainingEffect")).toSorted()).toEqual([
+      "Base aerobica",
+      "Capacità anaerobica",
+      "Tempo",
+      "VO2 max",
+      "lactate threshold",
+    ]);
+    expect([...en.errors, ...italian.errors]).toEqual([]);
   });
 
   it("compares the same workout across weeks, up to 3 workouts, intervals by their work laps", async () => {
@@ -1464,6 +1562,10 @@ describe("type boards", () => {
   });
 });
 
+/** The sets with `field` set to 0. */
+const zero = (sets: Record<string, unknown>[], field: string) =>
+  sets.map((s) => ({ ...s, [field]: 0 }));
+
 const rows = (page: Page) => page.$$eval(".ex-row .linkish", (r) => r.map((x) => x.textContent));
 
 describe("strength board", () => {
@@ -1482,6 +1584,49 @@ describe("strength board", () => {
     expect(await page.textContent("[data-id=muscleBalance]")).toMatch(
       /Push : pull sets\s*[\d.]+ : 1/,
     );
+    expect(errors).toEqual([]);
+  });
+
+  it("shows n/a in the exercises table for a value the sets do not give, and leaves out a skipped exercise", async () => {
+    const activities = data.activities.map((a: Record<string, unknown>) => {
+      const ex = a.exercises as { exercise: string; sets: Record<string, unknown>[] }[] | undefined;
+      if (!ex) return a;
+      // the newest session skipped the lat pulldown: every set has 0 reps
+      if (String(a.start).startsWith("2026-10-23"))
+        return {
+          ...a,
+          exercises: ex.map((e) =>
+            e.exercise === "Lat Pulldown" ? { ...e, sets: zero(e.sets, "reps") } : e,
+          ),
+        };
+      // the newest squats without weight, and pull-ups done once
+      if (String(a.start).startsWith("2026-10-19"))
+        return {
+          ...a,
+          exercises: [
+            ...ex.map((e) =>
+              e.exercise === "Barbell Back Squat" ? { ...e, sets: zero(e.sets, "kg") } : e,
+            ),
+            { exercise: "Pull Up", primaryMuscles: ["Lats"], sets: [{ reps: 8 }] },
+          ],
+        };
+      return a;
+    });
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }),
+      { hash: "#strengthTraining" },
+    );
+    // sessions, last, top set, best est. 1RM, change
+    const cells = (slug: string) =>
+      page.$$eval(`[data-exercise=${slug}] td`, (c) => c.slice(1, 6).map((x) => x.textContent));
+    const pulldown = await cells("lat-pulldown");
+    const deadlift = await cells("romanian-deadlift");
+    // the deadlift was done in the same sessions, up to the newest
+    expect([pulldown[0], pulldown[1]]).toEqual([String(Number(deadlift[0]) - 1), "Oct 16"]);
+    expect((await cells("barbell-back-squat"))[2]).toBe("n/a");
+    expect((await cells("plank"))[3]).toBe("n/a");
+    expect(await cells("pull-up")).toEqual(["1", "Oct 19", "8 reps", "n/a", "n/a"]);
     expect(errors).toEqual([]);
   });
 
@@ -1945,12 +2090,21 @@ describe("custom widgets and languages", () => {
         widgets: [
           custom("broken", "throw new Error('no data here');"),
           custom("bad", "this is not code ("),
+          custom("text", "throw 'plain text';"),
+          custom("thing", "throw { code: 1 };"),
         ],
-        layout: on("broken", "bad", "coachNotes"),
+        layout: on("broken", "bad", "text", "thing", "coachNotes"),
       }),
     );
-    expect(await page.textContent("[data-id=broken] .error")).toContain("no data here");
+    expect(await page.textContent("[data-id=broken] .error")).toBe(
+      "This widget failed: no data here",
+    );
     expect(await page.textContent("[data-id=bad] .error")).toContain("This widget failed");
+    // a thrown value that is not an Error still fills the placeholder
+    expect(await page.textContent("[data-id=text] .error")).toBe("This widget failed: plain text");
+    expect(await page.textContent("[data-id=thing] .error")).toBe(
+      "This widget failed: [object Object]",
+    );
     expect(await page.textContent("[data-id=coachNotes] .notes")).toContain("Load");
     expect(errors).toEqual([]);
   });

@@ -116,9 +116,11 @@ update is every day at 07:00. All the pages that update automatically use the sa
   Linux, and Task Scheduler on Windows. The job reads the API key from the key file
   (`GARMIN_API_KEY_FILE`), never from your MCP client configuration. Save the key in that file
   first.
-- The job runs the server as you installed it. A server that `npx` starts schedules the latest
-  release through `npx`; a server installed with `npm install -g` schedules that copy. After you
-  change the Node.js version, set the schedule again.
+- The job runs the server as you installed it. A server that `npx` or `pnpm dlx` starts schedules
+  the latest release through `npx`. The server also looks for the folders of `bunx` and `yarn dlx`
+  (not tested). A server installed with `npm install -g` schedules that copy. After you change the
+  Node.js version, set the schedule again. Ask your assistant "when does my dashboard update?": the
+  reply says when the job cannot start.
 - Each update writes one line to `~/.cache/garmin-personal-mcp/refresh.log`.
 
 ## Show the dashboard in the chat

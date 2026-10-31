@@ -612,6 +612,25 @@ describe("activities", () => {
     },
   );
 
+  it("answers {} when Garmin's answer has only ids, and leaves out an item of ids only", async () => {
+    api.getJson.mockResolvedValue({ userProfilePK: 1, sub: { uuid: "x" } });
+    expect(await tools.getHrvRange("2026-10-01", "2026-10-27")).toBe("{}");
+    api.getJson.mockResolvedValue([{ uuid: "a" }, { calendarDate: "2026-10-27", uuid: "b" }]);
+    expect(await tools.getHrvRange("2026-10-01", "2026-10-27")).toBe(
+      '[{"calendarDate":"2026-10-27"}]',
+    );
+    api.getJson.mockResolvedValue({ days: [{ sub: { uuid: "a" } }, {}, [], 0], none: [] });
+    expect(await tools.getHrvRange("2026-10-01", "2026-10-27")).toBe(
+      '{"days":[{},[],0],"none":[]}',
+    );
+    api.getJson.mockResolvedValue([{ deviceId: 1 }]);
+    expect(await tools.getHrvRange("2026-10-01", "2026-10-27")).toBe("[]");
+    for (const given of [{}, [], 0, "n/a", null]) {
+      api.getJson.mockResolvedValue(given);
+      expect(await tools.getHrvRange("2026-10-01", "2026-10-27")).toBe(JSON.stringify(given));
+    }
+  });
+
   it("getSleep answers one compact row for the night", async () => {
     api.getJson.mockResolvedValue(night("2026-10-27"));
     expect(await tools.getSleep("2026-10-27")).toBe(
@@ -753,10 +772,27 @@ describe("activities", () => {
     ["from after to", "2026-10-27", "2026-10-01"],
     ["a bad from date", "27-10-2026", "2026-10-27"],
     ["a bad to date", "2026-10-01", "2026-10-27T00:00"],
+    ["an impossible date", "2026-02-31", "2026-03-01"],
+    ["a path piece", "../x", "2026-10-27"],
   ])("range calls refuse %s without a request", async (_name, from, to) => {
     const message = "fromDate and toDate must be real dates yyyy-MM-dd with fromDate <= toDate";
     await expect(tools.getSleepRange(from, to)).rejects.toThrow(message);
     await expect(tools.getDailySummaryRange(from, to)).rejects.toThrow(message);
+    await expect(tools.getHrvRange(from, to)).rejects.toThrow(message);
+    expect(api.getJson).not.toHaveBeenCalled();
+  });
+
+  it("getHrvRange takes a range of a year and a single day", async () => {
+    api.getJson.mockResolvedValue([]);
+    await tools.getHrvRange("2025-10-28", "2026-10-27");
+    await tools.getHrvRange("2026-10-27", "2026-10-27");
+    expect(api.getJson).toHaveBeenCalledTimes(2);
+  });
+
+  it("getFitnessAge refuses a date that is not real, without a request", async () => {
+    for (const date of ["2026-02-31", "../x", "2026-10-27/../x", "27-10-2026", ""]) {
+      await expect(tools.getFitnessAge(date)).rejects.toThrow(/real date/);
+    }
     expect(api.getJson).not.toHaveBeenCalled();
   });
 });

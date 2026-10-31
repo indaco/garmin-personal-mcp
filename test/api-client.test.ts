@@ -182,6 +182,15 @@ describe("token", () => {
     );
   });
 
+  it("leaves the API key out of a refused token answer", async () => {
+    mockFetch({ status: 401, body: `bad key ${KEY} and ${KEY}`, contentType: "text/plain" });
+    const error = await client()
+      .getJson("/x")
+      .then(String, (e: Error) => e.message);
+    expect(error).toContain("body: bad key *** and ***)");
+    expect(error).not.toContain(KEY);
+  });
+
   it("reports an empty token response", async () => {
     mockFetch({ body: "  ", contentType: "text/plain" });
     await expect(client().getJson("/x")).rejects.toThrow(
@@ -298,6 +307,58 @@ describe("retries", () => {
     mockFetch(tokenJson({ access_token: "tok" }), { status: 500, body: "e".repeat(600) });
     await expect(client().getJson("/x")).rejects.toThrow(
       `GET /x -> HTTP 500: ${"e".repeat(500)}...`,
+    );
+  });
+  it("leaves the token out of the body of an error answer", async () => {
+    mockFetch(tokenJson({ access_token: "tok-123" }), {
+      status: 500,
+      body: "echo: Bearer tok-123",
+    });
+    await expect(client().getJson("/x")).rejects.toThrow(
+      /^GET \/x -> HTTP 500: echo: Bearer \*\*\*$/,
+    );
+  });
+
+  it("leaves the token out of an error answer after a renewal", async () => {
+    mockFetch(
+      tokenJson({ access_token: "tok-old" }),
+      { status: 401 },
+      tokenJson({ access_token: "tok-new" }),
+      { status: 500, body: "echo: Bearer tok-new" },
+    );
+    await expect(client().getBytes("/x")).rejects.toThrow("GET /x -> HTTP 500: echo: Bearer ***");
+  });
+
+  it("leaves the body of an error answer without the token as is", async () => {
+    mockFetch(tokenJson({ access_token: "tok-123" }), { status: 500, body: "tok-12 ok-123 ***" });
+    await expect(client().getJson("/x")).rejects.toThrow("GET /x -> HTTP 500: tok-12 ok-123 ***");
+  });
+
+  it("replaces a token with regex characters as plain text", async () => {
+    const token = "t.k$&+*?(^)[1]|\\d";
+    mockFetch(tokenJson({ access_token: token }), { status: 500, body: `a ${token} b tXk` });
+    await expect(client().getJson("/x")).rejects.toThrow("GET /x -> HTTP 500: a *** b tXk");
+  });
+
+  it("replaces the token before it cuts the preview", async () => {
+    mockFetch(tokenJson({ access_token: "tok-123" }), {
+      status: 500,
+      body: `${"e".repeat(497)}tok-123x`,
+    });
+    const error = await client()
+      .getJson("/x")
+      .then(String, (e: Error) => e.message);
+    expect(error.endsWith(`: ${"e".repeat(497)}***...`)).toBe(true);
+    expect(error).not.toContain("tok");
+  });
+
+  it("leaves the token out of a 2xx body that is not JSON", async () => {
+    mockFetch(tokenJson({ access_token: "tok-123" }), {
+      body: "<html>tok-123</html>",
+      contentType: "text/html",
+    });
+    await expect(client().getJson("/x")).rejects.toThrow(
+      /^Response is not JSON: <html>\*\*\*<\/html>$/,
     );
   });
 });

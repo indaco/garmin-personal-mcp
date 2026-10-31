@@ -99,7 +99,11 @@ export function summary(s: Status): string {
     `Automatic refresh "${s.cron}" with ${s.scheduler}, next: ${s.next!.join(", ")}`,
     "Pages:",
     ...s.pages!.map((p) => `  ${p}`),
-    ...(s.installed ? [] : [`The job is missing from ${s.scheduler}: run the schedule again.`]),
+    ...(s.installed
+      ? []
+      : [
+          `The job is missing from ${s.scheduler} or cannot start (its Node.js or server file is gone): run the schedule again.`,
+        ]),
     ...(s.last ? [lastLine(s.last)] : []),
     `Log: ${s.log}`,
   ].join("\n");

@@ -822,7 +822,11 @@ function tile(data: Data, inst: Instance, def: WidgetDef | undefined): HTMLEleme
       def.render(body, ctxFor(data, inst));
     } catch (e) {
       body.replaceChildren(
-        h("p", { class: "error" }, t("widget.failed", { message: (e as Error).message })),
+        h(
+          "p",
+          { class: "error" },
+          t("widget.failed", { message: e instanceof Error ? e.message : String(e) }),
+        ),
       );
       console.warn(`widget ${inst.widget}:`, e);
     }

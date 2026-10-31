@@ -202,6 +202,8 @@ export function exerciseStats(acts: Activity[]): ExerciseStats[] {
     if (!date) continue;
     for (const e of exercisesOf(a)) {
       const done = e.sets.filter(completed);
+      // an exercise of the plan that was skipped (only sets of 0 reps) is no session of it
+      if (done.length === 0) continue;
       const weighted = done.filter((s) => (s.kg ?? 0) > 0 && (s.reps ?? 0) > 0);
       const top = weighted.toSorted((x, y) => y.kg! - x.kg! || y.reps! - x.reps!)[0];
       const e1rms = weighted

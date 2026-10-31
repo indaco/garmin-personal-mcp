@@ -8,7 +8,7 @@ import { THEMES } from "./page/theme";
 
 /**
  * MCP prompts: ready-made instructions the client shows in its prompt menu (e.g. Claude Desktop "+").
- * The texts live in prompts/*.md and use {{placeholder}} markers, filled by plain string replacement.
+ * The texts live in prompts/*.md and use {{placeholder}} markers, filled in one pass: a value goes in as it is.
  */
 
 const DEFAULT_WEEKS = 12;
@@ -300,12 +300,11 @@ function result(description: string, text: string) {
   };
 }
 
+/** Fills each {{key}} of `values` once; a value goes in as it is, and other markers stay for a later call. */
 function render(template: string, values: Record<string, string>): string {
-  let text = template;
-  for (const [key, value] of Object.entries(values)) {
-    text = text.replaceAll(`{{${key}}}`, value);
-  }
-  return text;
+  return template.replace(/\{\{(\w+)\}\}/g, (marker, key: string) =>
+    Object.hasOwn(values, key) ? values[key] : marker,
+  );
 }
 
 /** A language code by its English name, e.g. Italian for it. */

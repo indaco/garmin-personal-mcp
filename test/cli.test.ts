@@ -212,7 +212,7 @@ describe("cli", () => {
       ].join("\n"),
     );
     expect(summary({ ...on, installed: false })).toContain(
-      "The job is missing from launchd: run the schedule again.",
+      "The job is missing from launchd or cannot start (its Node.js or server file is gone): run the schedule again.",
     );
   });
 

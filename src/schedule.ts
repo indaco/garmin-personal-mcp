@@ -61,7 +61,10 @@ export interface Status {
   next?: string[];
   pages?: string[];
   scheduler?: string;
-  /** False when the job is no longer in the system scheduler. */
+  /**
+   * False when the job is no longer in the system scheduler, or its node or server file is gone (set
+   * the schedule again).
+   */
   installed?: boolean;
   log?: string;
   /** The last run of `refresh --auto`, and the pages it could not update. */
@@ -79,6 +82,8 @@ interface State {
   /** When the schedule was set: a run time before it is not missed. */
   since?: string;
   last?: LastRun;
+  /** What the job starts: status checks that it still exists. */
+  job?: { program: string; entry?: string };
 }
 
 export type Run = (
@@ -144,13 +149,24 @@ export function parseCron(text: string): Cron {
   if (times.length > 1 && Math.min(...gaps) < MIN_GAP_MINUTES) {
     throw new Error("Cron: the runs must be at least 1 hour apart");
   }
-  // as in cron, a field that starts with * is every day; with day of month and weekday, either one runs
+  // a field that covers every value (*, */1, 1-31) is every; field() gives sorted values, 7 as 0
+  const someDays = days.length < 31;
+  const someWeekdays = weekdays.length < 7;
+  // cron: when a day field starts with *, both day fields must match, which launchd and Task
+  // Scheduler cannot say; otherwise either one runs, so one that covers every day makes every day
+  const star = parts[2].startsWith("*") || parts[4].startsWith("*");
+  if (star && someDays && someWeekdays) {
+    throw new Error(
+      "Cron: with a day of month and a weekday, write both as numbers or lists, without *",
+    );
+  }
+  const restricts = star || (someDays && someWeekdays);
   const cron: Cron = {
     text: parts.join(" "),
     times,
-    ...(parts[2].startsWith("*") ? {} : { days }),
-    ...(parts[3].startsWith("*") ? {} : { months }),
-    ...(parts[4].startsWith("*") ? {} : { weekdays }),
+    ...(someDays && restricts ? { days } : {}),
+    ...(months.length < 12 ? { months } : {}),
+    ...(someWeekdays && restricts ? { weekdays } : {}),
   };
   if (nextRuns(cron, new Date(), 1).length === 0) throw new Error("Cron: this date never comes");
   return cron;
@@ -421,7 +437,7 @@ export class AutoRefresh {
       next: nextRuns(parseCron(state.cron), new Date(), 3),
       pages: state.pages,
       scheduler: this.#scheduler,
-      installed: await this.#installed(),
+      installed: (await this.#installed()) && this.#canStart(state),
       log: this.#log,
       ...(state.last ? { last: state.last } : {}),
     };
@@ -483,12 +499,21 @@ export class AutoRefresh {
     // a new cron starts now, so the job does not catch up a time of the old one
     const since = old?.cron === cron.text && old.since ? old.since : new Date().toISOString();
     // saved first: launchd starts the job as it loads it, and the job must see `since`
-    await this.#save({ ...old, cron: cron.text, pages, since });
+    const job = { program: this.#job().program, ...(this.#npx ? {} : { entry: this.entry }) };
+    await this.#save({ ...old, cron: cron.text, pages, since, job });
     try {
       await this.#install(cron);
     } catch (e) {
-      if (old) await this.#save(old);
-      else await rm(this.#stateFile, { force: true });
+      // launchd booted the old job out before the failed load: put it back, or remove the new one
+      if (old) {
+        await this.#save(old);
+        await this.#install(parseCron(old.cron)).catch((e2) =>
+          log("WARN", `schedule: the old job could not be restored: ${(e2 as Error).message}`),
+        );
+      } else {
+        await this.#uninstall().catch(() => undefined);
+        await rm(this.#stateFile, { force: true });
+      }
       throw e;
     }
     // a new cron moves the next run: each page must expect the new one, or it warns too early
@@ -521,10 +546,22 @@ export class AutoRefresh {
     return { scheduled: false };
   }
 
+  /** The node and the server file of the job still exist; a schedule saved before has no record. */
+  #canStart(state: State): boolean {
+    return !state.job || Object.values(state.job).every((f) => existsSync(f));
+  }
+
+  /**
+   * A package manager can prune its cache (npx, pnpm dlx, bunx, yarn dlx), so a server started from
+   * one schedules npx with the latest release.
+   */
+  get #npx(): boolean {
+    return this.entry === "" || /[/\\](?:_npx|dlx|dlx-\d+|bunx-\d+-[^/\\]+)[/\\]/.test(this.entry);
+  }
+
   #job(): Job {
     const win = this.platform === "win32";
-    // npm can prune the npx cache, so a server started by npx schedules npx with the latest release
-    const npx = this.entry === "" || /[/\\]_npx[/\\]/.test(this.entry);
+    const npx = this.#npx;
     return {
       program: join(this.nodeDir, npx ? (win ? "npx.cmd" : "npx") : win ? "node.exe" : "node"),
       args: [...(npx ? ["-y", `${name}@latest`] : [this.entry]), "refresh", "--auto"],
@@ -571,7 +608,11 @@ export class AutoRefresh {
   }
 
   async #installed(): Promise<boolean> {
-    if (this.platform === "darwin") return existsSync(this.#plist);
+    if (this.platform === "darwin") {
+      // a plist is not enough: a failed bootstrap leaves one that launchd did not load
+      const job = `${this.#domain()}/${LABEL}`;
+      return existsSync(this.#plist) && (await this.exec("launchctl", ["print", job])).code === 0;
+    }
     if (this.platform === "linux") return (await this.#crontab()).includes(MARK);
     return (await this.exec("schtasks", ["/Query", "/TN", TASK])).code === 0;
   }
