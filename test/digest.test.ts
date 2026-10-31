@@ -224,6 +224,37 @@ describe("digest", () => {
     expect(d.sync).toEqual(data.sync);
   });
 
+  it("leaves out an exercise without a name", () => {
+    const out = digest({
+      ...data,
+      activities: [
+        {
+          ...run("2026-10-20", "strength_training"),
+          exercises: [{ sets: [{ reps: 5, kg: 50 }] }, squat([{ reps: 5, kg: 60 }])],
+        },
+      ],
+    });
+    expect(Object.keys(out.strengthExercises)).toEqual(["Back Squat"]);
+  });
+
+  it("lists the run names that repeat most first", () => {
+    const tempo = (day: string) => ({ ...run(day), name: "Tempo" });
+    const out = digest({
+      ...data,
+      activities: [
+        run("2026-10-12"),
+        run("2026-10-05"),
+        tempo("2026-10-04"),
+        tempo("2026-10-03"),
+        tempo("2026-10-02"),
+      ],
+    });
+    expect(Object.entries(out.repeatedRuns)).toEqual([
+      ["Tempo", 3],
+      ["Easy Run", 2],
+    ]);
+  });
+
   it("counts the run names that repeat: the workouts that the dashboard can compare across weeks", () => {
     expect(d.repeatedRuns).toEqual({});
     const more = digest({

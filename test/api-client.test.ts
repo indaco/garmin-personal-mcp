@@ -207,6 +207,17 @@ describe("token", () => {
     );
     expect(String(error)).not.toContain("tok-secret");
   });
+
+  it("refuses a token that cannot go into a header, without quoting it", async () => {
+    mockFetch(tokenJson({ access_token: "tok-secret\r\nX-Evil: 1" }));
+    const error = await client()
+      .getJson("/x")
+      .catch((e: Error) => e);
+    expect((error as Error).message).toBe(
+      "Token response is not a token (Content-Type: application/json)",
+    );
+    expect(String(error)).not.toContain("tok-secret");
+  });
 });
 
 describe("API key", () => {
@@ -354,6 +365,17 @@ describe("requests", () => {
     mockFetch({ status: 503 });
     await expect(client().getExerciseCatalogue()).rejects.toThrow(
       "GET exercise catalogue -> HTTP 503",
+    );
+  });
+
+  it("wraps a network error while fetching the exercise catalogue", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
+    const error = await client()
+      .getExerciseCatalogue()
+      .catch((e: Error) => e);
+    expect(error).toBeInstanceOf(GarminApiError);
+    expect((error as Error).message).toBe(
+      "Network error reading the exercise catalogue: fetch failed",
     );
   });
 

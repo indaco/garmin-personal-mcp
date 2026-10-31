@@ -125,6 +125,11 @@ describe("editDashboard", () => {
     await expect(writer.edit({ widgets: [{ ...widget, id: "kpis" }] })).rejects.toThrow(/built-in/);
     await expect(writer.edit({ widgets: [{ ...widget, id: "Bad Id" }] })).rejects.toThrow(/id/);
     await expect(writer.edit({ widgets: [{ ...widget, code: "" }] })).rejects.toThrow(/code/);
+    for (const title of ["", " ", "x".repeat(61)]) {
+      await expect(writer.edit({ widgets: [{ ...widget, title }] })).rejects.toThrow(
+        "A widget title needs 1 to 60 characters",
+      );
+    }
     await expect(writer.edit({ widgets: [{ ...widget, types: ["chess"] }] })).rejects.toThrow(
       /chess/,
     );
@@ -215,6 +220,11 @@ describe("editDashboard", () => {
       /\{n\}/,
     );
     await expect(writer.edit({ languages: { German: { title: "x" } } })).rejects.toThrow(/German/);
+    for (const title of [" ", "x".repeat(501)]) {
+      await expect(writer.edit({ languages: { de: { title } } })).rejects.toThrow(
+        "title: 1 to 500 characters",
+      );
+    }
   });
 
   it("works only on a dashboard from the template", async () => {

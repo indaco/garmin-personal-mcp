@@ -1,6 +1,15 @@
 import { Profile } from "@garmin/fitsdk";
 import { describe, expect, it, vi } from "vitest";
-import { addLanguages, formatter, pickLang, translator, widgetText } from "../../src/page/i18n";
+import {
+  addLanguages,
+  CATALOGUES,
+  formatter,
+  LANGUAGE_NAMES,
+  languageName,
+  pickLang,
+  translator,
+  widgetText,
+} from "../../src/page/i18n";
 import { BUILT_IN } from "../../src/page/i18n/built-in";
 import { en } from "../../src/page/i18n/en";
 import { typeName } from "../../src/page/widgets/ui";
@@ -22,6 +31,25 @@ describe("catalogues", () => {
     expect(translator("it")("title")).toBe("Il mio allenamento");
     expect(translator("it")("na")).toBe("n/d");
     addLanguages(BUILT_IN);
+  });
+
+  it("ignores a block that is not an object, bad codes, and texts that are not strings or keys of en", () => {
+    const before = Object.keys(CATALOGUES);
+    addLanguages(null);
+    addLanguages("de");
+    addLanguages({ German: { title: "x" }, fr: null, es: "x" });
+    expect(Object.keys(CATALOGUES)).toEqual(before);
+    addLanguages({ xx: { na: "-", title: 5, nope: "y" } });
+    expect(translator("xx")("na")).toBe("-");
+    expect(translator("xx")("title")).toBe(en.title);
+    expect(CATALOGUES.xx).not.toHaveProperty("nope");
+    delete CATALOGUES.xx;
+    delete LANGUAGE_NAMES.xx;
+  });
+
+  it("names a language by its own name, or by its code when the browser cannot", () => {
+    expect(languageName("de")).toBe("Deutsch");
+    expect(languageName("!!")).toBe("!!");
   });
 
   it.each(Object.entries(ALL))("%s has exactly the keys of en, none empty", (_, catalogue) => {
@@ -117,6 +145,8 @@ describe("formatter", () => {
     expect(formatter("en").hms(undefined)).toBe("n/a");
     expect(formatter("en").num(undefined)).toBe("n/a");
     expect(formatter("en").num(Number.NaN)).toBe("n/a");
+    expect(formatter("en").longDay(undefined)).toBe("n/a");
+    expect(formatter("en").hours(undefined)).toBe("n/a");
   });
 
   it("writes durations and paces", () => {

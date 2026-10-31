@@ -1,5 +1,6 @@
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -39,6 +40,10 @@ describe("toFetch and covered", () => {
     // last sync on 20 Oct: refetch 19-20 Oct (they could still change) and everything after
     expect(ranges(toFetch(FROM, "2026-10-20", FROM, TO))).toEqual(["2026-10-19..2026-10-26"]);
     expect(ranges(toFetch(FROM, TO, FROM, TO))).toEqual(["2026-10-25..2026-10-26"]);
+  });
+
+  it("starts the refresh at the window when the cache ends on its first day", () => {
+    expect(ranges(toFetch("2026-07-01", FROM, FROM, TO))).toEqual(["2026-08-03..2026-10-26"]);
   });
 
   it("also fetches the missing start of a longer window", () => {
@@ -100,6 +105,16 @@ describe("cache file", () => {
     await writeAtomically(f, new Uint8Array([4]));
     expect(statSync(f).size).toBe(1);
     expect(readdirSync(join(f, ".."))).toEqual(["a.fit"]);
+  });
+
+  it("removes its temp file and passes on the error when the move fails", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "garmin-dash-"));
+    // a folder with a file in it cannot be replaced by a file
+    const target = join(dir, "a.fit");
+    mkdirSync(target);
+    writeFileSync(join(target, "x"), "");
+    await expect(writeAtomically(target, "data")).rejects.toThrow();
+    expect(readdirSync(dir)).toEqual(["a.fit"]);
   });
 });
 
@@ -446,6 +461,24 @@ describe("getDashboardData", () => {
     await dashboard.getDashboardData(1);
     expect(callsTo("/sleep-service").map(([, q]) => q.date)).toContain("2026-10-19");
     expect(readCache().recoveryTo).toBe("2026-10-26");
+  });
+
+  it("passes on an error that is not a Garmin error, in the recovery days and the optional parts", async () => {
+    for (const prefix of ["/sleep-service", "/biometric-service/heartRateZones"]) {
+      api.getJson.mockImplementation(async (path, q) => {
+        if (path.startsWith(prefix)) throw new TypeError(`bug in ${prefix}`);
+        return fakeGarmin(path, q);
+      });
+      await expect(dashboard.getDashboardData(1)).rejects.toThrow(`bug in ${prefix}`);
+    }
+  });
+
+  it("reads an activity id that Garmin sends as a string of digits", async () => {
+    garminActivities = [{ ...activity(1, "2026-10-20", "strength_training"), activityId: "77" }];
+    await dashboard.getDashboardData(1);
+    expect(api.getBytes.mock.calls.map(([path]) => path)).toContain(
+      "/download-service/files/activity/77",
+    );
   });
 
   it("builds the dashboard without zones and fitness age when they fail", async () => {

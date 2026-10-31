@@ -143,6 +143,9 @@ describe("statistics", () => {
       act("2026-10-12", { km: 7 }),
     ];
     expect(weekly(acts, ["2026-10-05", "2026-10-12"], (a) => a.km as number)).toEqual([8, 7]);
+    // an activity without a start and one after the last week count nowhere
+    const more = [...acts, { id: 9, type: "running", km: 9 }, act("2026-10-19", { km: 4 })];
+    expect(weekly(more, ["2026-10-05", "2026-10-12"], (a) => a.km as number)).toEqual([8, 7]);
   });
 });
 
