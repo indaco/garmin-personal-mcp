@@ -120,7 +120,7 @@ describe("site footer", () => {
     const links = await page.$$eval("header a[href^='http'], footer a[href^='http']", (as) =>
       as.map((a) => [a.getAttribute("target"), a.getAttribute("rel"), a.textContent?.trim()]),
     );
-    expect(links.length).toBe(5);
+    expect(links.length).toBe(7);
     for (const [target, rel, text] of links) {
       expect([text, target, rel]).toEqual([text, "_blank", "noopener"]);
       expect(text).toMatch(/\(opens in a new tab\)$/);
@@ -172,7 +172,7 @@ describe("site header", () => {
     const { page } = await site({ viewport: { width: 390, height: 844 } });
     await page.click("#menu");
     expect(await page.getAttribute("#menu", "aria-expanded")).toBe("true");
-    expect(await page.$$eval("#site-nav a", (links) => links.length)).toBe(6);
+    expect(await page.$$eval("#site-nav a", (links) => links.length)).toBe(7);
     await page.keyboard.press("Escape");
     expect(await page.isVisible("#site-nav")).toBe(false);
     expect(await focused(page)).toBe("menu");

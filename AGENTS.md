@@ -9,7 +9,7 @@ that an agent breaks most often.
 A stdio MCP server in TypeScript (Node.js 22 or later) for the read-only Garmin Connect Personal
 API. The client starts `dist/index.js` and speaks JSON-RPC over stdin and stdout. The server gives
 tools, prompts (`prompts/*.md`) and a dashboard page (`src/page/`, built into
-`dist/dashboard.html`).
+`dist/dashboard.html`). `showDashboard` also shows that page inside the chat, as an MCP App.
 
 ## Commands
 
@@ -48,10 +48,15 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
   `THIRD-PARTY-NOTICES.md` (the build writes it).
 - **The README documents each tool, prompt argument and environment variable.** Update it in the
   same change.
+- **The guide has an index.** A new, renamed or removed page in `guide/` changes its line in
+  `guide/README.md`.
 - **Client-neutral text.** The server runs in every stdio MCP client. Text that a user or a model
   reads (README, guides, page texts, prompts, tool descriptions) says "your assistant" or "the
   assistant". Name a client only for its own steps (install, configuration, slash commands) and for
   measurements made with it.
+- **Name the clients of a feature that only some clients show**, such as the dashboard in the chat.
+  Write "tested" only for a client that you tried. Mark the others "not tested". Do not write "some
+  assistants".
 - **Dependencies are the latest versions.** Runtime libraries are dev dependencies, because tsdown
   bundles them into `dist/index.js`.
 - **No personal data.** Tests use synthetic data and `fitFile()` from `test/fit-file.ts`, never a

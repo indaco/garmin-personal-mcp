@@ -6,11 +6,11 @@ heart rate. The server writes the file, and the assistant writes the coach notes
 - [Make the dashboard](#make-the-dashboard)
 - [Update the dashboard](#update-the-dashboard)
 - [Update the dashboard on a schedule](#update-the-dashboard-on-a-schedule)
+- [Show the dashboard in the chat](#show-the-dashboard-in-the-chat)
 - [Boards and widgets](#boards-and-widgets)
 - [Change the layout](#change-the-layout)
 - [Themes and languages](#themes-and-languages)
 - [Page settings](#page-settings)
-- [In the chat](#in-the-chat)
 - [How the page keeps your changes](#how-the-page-keeps-your-changes)
 
 ## Make the dashboard
@@ -120,6 +120,50 @@ update is every day at 07:00. All the pages that update automatically use the sa
   release through `npx`; a server installed with `npm install -g` schedules that copy. After you
   change the Node.js version, set the schedule again.
 - Each update writes one line to `~/.cache/garmin-personal-mcp/refresh.log`.
+
+## Show the dashboard in the chat
+
+In Claude Desktop, the dashboard can open inside the chat. The page has the same boards, charts and
+themes as the page file, with new data. You do not open a file or a browser.
+
+There is no prompt for this. Ask in your own words, and say "in the chat":
+
+| You ask                                                | The chat shows                                 |
+| ------------------------------------------------------ | ---------------------------------------------- |
+| "Show my training dashboard in the chat."              | your saved page, with the weeks of the page    |
+| "Show my dashboard in the chat for the last 26 weeks." | the same page, with 26 weeks                   |
+| "Show garmin-dashboard-coach.html in the chat."        | that page, for example the page for your coach |
+
+The assistant calls the `showDashboard` tool. When it writes a file instead, ask again with "in the
+chat". The tool has two optional arguments:
+
+| Argument | Values                                                | Default                        |
+| -------- | ----------------------------------------------------- | ------------------------------ |
+| `weeks`  | 1 to 52                                               | the weeks of the page, else 12 |
+| `path`   | the page file. A relative path is in the data folder. | `garmin-dashboard.html`        |
+
+- The page has the layout, the custom widgets, the languages and the settings of your saved page.
+  Without a saved page, it has the preset widgets.
+- The server writes no file, and the page has no coach notes.
+- When the client can show the page full screen, a button next to **Settings** does it. The same
+  button goes back to the chat.
+- The data goes only to the page. The assistant gets the digest of the data, as with
+  `writeDashboard`.
+- A layout that you change in the chat is not saved in the file.
+- A client can block the code of custom widgets. Then a custom widget shows an error, and the other
+  widgets show as usual. Claude Desktop runs custom widgets. The page file always runs them.
+
+| Client                                                | What you get                                                             |
+| ----------------------------------------------------- | ------------------------------------------------------------------------ |
+| Claude Desktop                                        | the page in the chat (tested)                                            |
+| Claude Code, the Codex CLI and other terminal clients | a short text reply. Run `training-dashboard` to write the page as a file |
+| Codex in the ChatGPT desktop app                      | not tested yet                                                           |
+| The ChatGPT chat, Claude on the web                   | not available: they connect only to servers on the internet              |
+
+The page in the chat is an MCP App: a page that an MCP server gives to the client, and that the
+client shows in the chat. Other clients that show MCP Apps can also work, but they are not tested.
+The ChatGPT chat and Claude on the web show MCP Apps too, but they cannot start a server on your
+computer.
 
 ### From a terminal
 
@@ -321,25 +365,6 @@ Settings need a page from the template, or a page that the assistant designed (`
 - Each chart has its data as a table that screen readers read instead of the picture.
 - In edit mode the grip and the right edge of a widget work from the keyboard too: see
   [Change the layout](#change-the-layout).
-
-## In the chat
-
-Some assistants show MCP Apps: pages from an MCP server, inside the chat. In those assistants, ask
-your assistant to show the dashboard. The assistant calls `showDashboard`, and the chat shows the
-page with new data.
-
-- The page has the layout, the custom widgets, the languages and the settings of your saved page.
-  Without a saved page, it has the preset widgets.
-- The server writes no file, and the page has no coach notes.
-- When the assistant can show the page full screen, a button next to **Settings** does it. The same
-  button goes back to the chat.
-- The data goes only to the page. The assistant gets the digest of the data, as with
-  `writeDashboard`.
-- A layout that you change in the chat is not saved in the file.
-- The assistant can block the code of custom widgets. Then a custom widget shows an error, and the
-  other widgets show as usual. The page file always runs custom widgets.
-- Other assistants show only the text reply. There, the training-dashboard prompt writes the page as
-  a file.
 
 ## How the page keeps your changes
 

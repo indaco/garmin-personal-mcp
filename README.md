@@ -3,7 +3,7 @@
   garmin-personal-mcp
 </h1>
 
-<p align="center"><b>Your Garmin training in Claude, Codex or any MCP client, through the official Personal API. Read-only, nothing to install.</b></p>
+<p align="center"><b>Ask Claude, Codex or another AI assistant about your Garmin training, and get a training dashboard, also inside the chat. Official Personal API, read-only, nothing to install.</b></p>
 
 <p align="center">
   🌐 <a href="https://garmin-personal-mcp.indaco.dev/"><b>Website</b></a> &nbsp;&middot;&nbsp; 👉
@@ -26,13 +26,14 @@
   <b><a href="#what-you-can-ask">What you can ask</a></b> &middot;
   <b><a href="#tools">Tools</a></b> &middot;
   <b><a href="#dashboard">Dashboard</a></b> &middot;
-  <b><a href="guide/how-it-works.md">How it works</a></b> &middot;
-  <b><a href="guide/troubleshooting.md">Troubleshooting</a></b>
+  <b><a href="#dashboard-in-the-chat">Dashboard in the chat</a></b> &middot;
+  <b><a href="guide/README.md">Guide</a></b>
 </p>
 
 <p align="center">
-  An MCP server that lets your assistant read your Garmin data: activities, laps, strength sets,
-  sleep, HRV and more. Ask questions in the chat, or let the server build a training dashboard.
+  An MCP server: a small program that your AI app starts on your computer, so that the assistant
+  can read your Garmin data. Activities, laps, strength sets, sleep, HRV and more. Ask questions in
+  your own words, or get a training dashboard: as a page file, or inside the chat in Claude Desktop.
 </p>
 
 <p align="center">
@@ -76,6 +77,8 @@ assistant chooses the tools and can combine their data. Some examples:
   stdio. Tested with Claude Desktop and Claude Code.
 - **A dashboard in less than a minute**: your training load next to recovery, for you or for your
   coach, with your own widgets and languages. See [Dashboard](#dashboard).
+- **The dashboard in the chat**: in Claude Desktop, ask "show my training dashboard" and the page
+  opens in the reply, with new data. See [Dashboard in the chat](#dashboard-in-the-chat).
 - **Coach prompts**: a review of one run or one strength session against its planned workout, and a
   readiness check before a race. See [Coach prompts](#coach-prompts).
 
@@ -174,7 +177,7 @@ Ask "list my last 5 activities". The first time that a garmin-personal tool asks
 | `getDashboardData`         | all the dashboard data in one call, with the server's totals and a local cache |
 | `writeDashboard`           | writes the dashboard page                                                      |
 | `editDashboard`            | changes the layout, the custom widgets and the languages of the page           |
-| `showDashboard`            | shows the dashboard in the chat, in assistants that support MCP Apps           |
+| `showDashboard`            | shows the dashboard inside the chat, in Claude Desktop                         |
 | `scheduleDashboardRefresh` | updates a dashboard page automatically, at the times you say in your own words |
 | `garminGet`                | all other GET endpoints of the Personal API                                    |
 
@@ -300,11 +303,29 @@ For a design of your own, use `layout` = `freeform`: Claude writes the page, as 
 
 [Presets or freeform](guide/presets.md) gives the measurements and the limits of the presets.
 
-### In the chat
+## Dashboard in the chat
 
-Some assistants show MCP Apps: small pages from the server, inside the chat. In those assistants,
-ask "show my dashboard": `showDashboard` shows your page with new data, and writes no file. Other
-assistants show only a short text. [In the chat](guide/dashboard.md#in-the-chat) gives the limits.
+In Claude Desktop, the dashboard can open inside the chat, with its boards, charts and themes. You
+do not open a file or a browser. There is no prompt to run: ask in your own words, for example:
+
+- "Show my training dashboard in the chat."
+- "Show my dashboard in the chat for the last 26 weeks."
+- "Show garmin-dashboard-coach.html in the chat."
+
+The assistant calls `showDashboard`. The tool reads new data from Garmin and shows your saved page,
+with its layout, custom widgets, languages and settings. It writes no file, and the page has no
+coach notes.
+
+| Client                                                | What you get                                                             |
+| ----------------------------------------------------- | ------------------------------------------------------------------------ |
+| Claude Desktop                                        | the page in the chat (tested)                                            |
+| Claude Code, the Codex CLI and other terminal clients | a short text reply. Run `training-dashboard` to write the page as a file |
+| Codex in the ChatGPT desktop app                      | not tested yet                                                           |
+| The ChatGPT chat, Claude on the web                   | not available: they connect only to servers on the internet              |
+
+The page in the chat is an MCP App. Other clients that show MCP Apps can also work, but they are not
+tested. [Show the dashboard in the chat](guide/dashboard.md#show-the-dashboard-in-the-chat) gives
+the limits.
 
 ## Coach prompts
 
