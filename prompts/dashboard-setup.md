@@ -56,6 +56,8 @@ rule applies also to data that another tool showed earlier in this chat.
 
 Use only numbers of the digest. **Never invent, interpolate or estimate missing values.** If a value
 is missing, write "n/a". If a call fails, say which one and why in one line.
+If `estimatedLoads` is more than 0, say that a part of the load is an estimate from heart rate. Do
+not compare a week with `partial: true` with whole weeks.
 
 Do not write or change the page yourself. Settings need a page from the template: a page designed with
 layout freeform cannot keep them.

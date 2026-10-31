@@ -543,7 +543,9 @@ export function registerDashboard(server: McpServer, dashboard: GarminDashboard)
         "`digest`, first in the result: the server's totals for the whole period and for each",
         "Monday-Sunday week (sessions, km, hours, load), the training load of the last 7 and 28 days,",
         "best efforts, races and strength top sets; quote them instead of your own sums. For another",
-        "date range, use the activities: each one is on its own line.",
+        "date range, use the activities: each one is on its own line. A load is null (n/a) when the",
+        "sessions have none; estimatedLoads counts the loads that are estimates from heart rate. A week",
+        "with partial: true starts before the period.",
       ].join("\n"),
       inputSchema: z.object({
         weeks: z.number().int().describe("Weeks to cover, default 12, max 52").optional(),

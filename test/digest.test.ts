@@ -13,6 +13,16 @@ const run = (day: string, type = "running") => ({
   duration: "30:00",
 });
 
+/** A run on a day with a training load. */
+const loaded = (day: string, trainingLoad: number) => ({ ...run(day), trainingLoad });
+
+/** A previous-period row as the server keeps it: a run with km only. */
+const row = (day: string, km: number) => ({ type: "running", start: `${day} 07:00:00`, km });
+
+/** An activity without its training load. */
+const noLoad = (a: Record<string, unknown>) =>
+  Object.fromEntries(Object.entries(a).filter(([k]) => k !== "trainingLoad"));
+
 /** A small getDashboardData result, most recent activity first, as the server returns it. */
 const data = {
   generated: "2026-10-26",
@@ -124,12 +134,15 @@ describe("digest", () => {
       weeks: 12,
       prevStart: "2026-05-04",
       prevEnd: "2026-08-02",
+      // as many days as start..end (85), right before start
+      previousPeriod: { from: "2026-05-10", to: "2026-08-02" },
     });
   });
 
   it("sums each type key, with elapsed time only for strength and racket sports", () => {
     expect(d.totals).toEqual({
-      walking: { sessions: 1, km: 3, hours: 0.6, load: 0 },
+      // a walk without a training load: n/a, not 0
+      walking: { sessions: 1, km: 3, hours: 0.6, load: null },
       running: { sessions: 2, km: 15.5, hours: 1.3, load: 150 },
       strength_training: { sessions: 2, hours: 1.8, load: 70 },
       cycling: { sessions: 1, km: 40, hours: 1.5, load: 60 },
@@ -169,12 +182,141 @@ describe("digest", () => {
       hours: 2.3,
       load: 190,
     });
-    expect(d.weekly["2026-10-26"]).toEqual({ sessions: 1, km: 3, runKm: 0, hours: 0.6, load: 0 });
+    expect(d.weekly["2026-10-26"]).toEqual({
+      sessions: 1,
+      km: 3,
+      runKm: 0,
+      hours: 0.6,
+      load: null,
+    });
   });
 
   it("gives the 7-day load against the weekly average of 28 days", () => {
     // the ride on 27 Sep is outside the 28 days that end on 26 Oct
-    expect(d.load).toEqual({ last7Days: 190, weeklyAvgLast28Days: 47.5, acuteToChronic: 4 });
+    expect(d.load).toEqual({
+      last7Days: 190,
+      weeklyAvgLast28Days: 47.5,
+      acuteToChronic: 4,
+      estimatedLoads: 0,
+    });
+  });
+
+  it("has no 28-day load or ratio when the data does not cover the 28 days", () => {
+    // a 1-week page: its data starts 21 days before the end, not 27
+    const week = {
+      ...data,
+      weeks: 1,
+      start: "2026-10-19",
+      prevStart: "2026-10-05",
+      activities: [loaded("2026-10-25", 100)],
+      previousActivities: [],
+    };
+    expect(digest(week).load).toEqual({
+      last7Days: 100,
+      weeklyAvgLast28Days: null,
+      acuteToChronic: null,
+      estimatedLoads: 0,
+    });
+    // from the first of the 28 days on, the data covers them
+    expect(digest({ ...week, prevStart: "2026-09-29" }).load.acuteToChronic).toBe(4);
+    expect(digest({ ...week, prevStart: "2026-09-30" }).load.acuteToChronic).toBeNull();
+  });
+
+  it("counts the previous activities in the 28-day load", () => {
+    const out = digest({
+      ...data,
+      start: "2026-10-05",
+      prevStart: "2026-09-01",
+      activities: [loaded("2026-10-25", 100)],
+      previousActivities: [
+        { id: 0, type: "running", start: "2026-10-01 07:00:00", trainingLoad: 100 },
+      ],
+    });
+    // acute 100; chronic (100 + 100) / 4 = 50
+    expect(out.load).toEqual({
+      last7Days: 100,
+      weeklyAvgLast28Days: 50,
+      acuteToChronic: 2,
+      estimatedLoads: 0,
+    });
+  });
+
+  it("gives no load, not 0, when no session has one", () => {
+    const none = digest({
+      ...data,
+      activities: data.activities.map(noLoad),
+      previousActivities: data.previousActivities.map(noLoad),
+    });
+    expect(none.load).toEqual({
+      last7Days: null,
+      weeklyAvgLast28Days: null,
+      acuteToChronic: null,
+      estimatedLoads: 0,
+    });
+    expect(none.totals.running.load).toBeNull();
+    expect(none.previousPeriodTotals.running.load).toBeNull();
+    expect(none.weekly["2026-10-19"].load).toBeNull();
+  });
+
+  it("gives 0 for 7 days without sessions, and sums only the known loads of a mix", () => {
+    const out = digest({
+      ...data,
+      activities: [run("2026-10-10"), loaded("2026-10-08", 80)],
+      previousActivities: [],
+    });
+    // no session in the last 7 days is rest, a true 0
+    expect(out.load).toMatchObject({ last7Days: 0, weeklyAvgLast28Days: 20, acuteToChronic: 0 });
+    expect(out.totals.running).toEqual({ sessions: 2, km: 10, hours: 1, load: 80 });
+  });
+
+  it("uses the page's estimate from heart rate for a session without load, and counts it", () => {
+    const out = digest({
+      ...data,
+      zones: [{ sport: "DEFAULT", maxHeartRateUsed: 200 }],
+      activities: [
+        { type: "running", start: "2026-10-25 07:00:00", duration: "30:00", avgHR: 150 },
+      ],
+      previousActivities: [],
+    });
+    // 30 min x 150 / 200
+    expect(out.load).toEqual({
+      last7Days: 22.5,
+      weeklyAvgLast28Days: 5.6,
+      acuteToChronic: 4,
+      estimatedLoads: 1,
+    });
+    expect(out.totals.running).toEqual({ sessions: 1, hours: 0.5, load: 22.5, estimatedLoads: 1 });
+    expect(out.weekly["2026-10-19"]).toMatchObject({ load: 22.5, estimatedLoads: 1 });
+    expect(d.totals.running).not.toHaveProperty("estimatedLoads");
+  });
+
+  it("marks the first week as partial when the period starts after its Monday", () => {
+    const out = digest({
+      ...data,
+      start: "2026-08-05",
+      activities: [run("2026-08-06"), run("2026-10-20")],
+    });
+    expect(out.weekly["2026-08-03"].partial).toBe(true);
+    expect(out.weekly["2026-10-19"]).not.toHaveProperty("partial");
+    // a period that starts on a Monday has only whole weeks
+    expect(Object.values(d.weekly).filter((w) => "partial" in w)).toEqual([]);
+  });
+
+  it("compares with a previous period of the same length", () => {
+    const out = digest({
+      ...data,
+      // 5 May is in the data (from prevStart, 4 May) but before the 85 days that end on 2 Aug
+      previousActivities: [row("2026-05-05", 99), row("2026-05-10", 1), row("2026-08-02", 2)],
+    });
+    expect(out.previousPeriodTotals.running).toMatchObject({ sessions: 2, km: 3 });
+    // without the start of the period, every previous activity counts
+    const loose = digest({
+      ...data,
+      start: undefined,
+      previousActivities: [row("2026-05-05", 99), row("2026-05-10", 1)],
+    });
+    expect(loose.previousPeriodTotals.running).toMatchObject({ sessions: 2, km: 100 });
+    expect(loose.period).not.toHaveProperty("previousPeriod");
   });
 
   it("has no load ratio without load in the 28 days", () => {
