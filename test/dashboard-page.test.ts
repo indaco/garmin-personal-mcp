@@ -448,7 +448,7 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
       { id: 3, sport: "cycling", type: "road_biking", start: "2026-07-24 07:00:00" },
     ],
     hrv: [{ date: "2026-10-25", hrv: 50 }],
-    recovery: [{ date: "2026-10-25", sleepScore: 80 }],
+    recovery: [{ date: "2026-10-25", sleepH: 7.5, sleepScore: 80 }],
   };
   type Full = typeof full & { notes: string[] };
 
@@ -528,6 +528,11 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
     expect(page()).not.toContain("Anna");
     expect(r.digest.hrvLast14).toEqual([]);
     expect(Object.keys(r.digest.totals)).toEqual(["running"]);
+    // the digest is all the assistant gets for the notes: no sleep in it, also on a later update
+    const update = await writer.write({ notes: ["n"] });
+    for (const out of [JSON.stringify(r.digest), JSON.stringify(update.digest), page()]) {
+      expect(out).not.toMatch(/sleep/i);
+    }
   });
 
   it("keeps a title and headline from the notes call through updates, refreshes and upgrades", async () => {

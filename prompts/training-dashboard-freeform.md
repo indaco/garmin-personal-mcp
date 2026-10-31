@@ -224,6 +224,8 @@ active.
 12. **Coach notes**: at most 5 bullet points, each tied to a specific number in the dashboard
    (e.g. "HRV 12% below baseline for 3 nights while load ratio is 1.4"). Training suggestions
    only, no medical advice. Use only numbers of the digest. The page shows `DATA.notes` as HTML.
+   Do not mention in the notes the data or the sports that the `settings` of the reply exclude.
+   This rule applies also to data that another tool showed earlier in this chat.
 
 ### Type tabs
 

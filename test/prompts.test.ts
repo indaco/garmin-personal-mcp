@@ -450,6 +450,21 @@ describe("coach prompts", () => {
     expect(text).toContain("for a timed one, the longest set in seconds, without a change");
   });
 
+  it("keeps the data that the page settings leave out of the coach notes", async () => {
+    const texts = await Promise.all([
+      render("training-dashboard"),
+      render("training-dashboard", { layout: "freeform" }),
+      render("training-dashboard-update"),
+      render("dashboard-setup"),
+    ]);
+    for (const text of texts) {
+      // the digest has no excluded data, but an earlier tool result in the chat can
+      expect(text.replace(/\s+/g, " ")).toContain(
+        "Do not mention in the notes the data or the sports that the `settings` of the reply exclude. This rule applies also to data that another tool showed earlier in this chat.",
+      );
+    }
+  });
+
   it("checks race readiness with the race, the goal and the plan", async () => {
     const text = await render("race-readiness", {
       date: "2026-11-15",

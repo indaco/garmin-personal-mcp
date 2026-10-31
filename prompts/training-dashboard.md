@@ -56,6 +56,9 @@ changes, translate the English texts of those widgets (`customWidgets[].texts.en
 languages, keeping each `{placeholder}`, and call `editDashboard` with `widgetTexts` =
 { "<widget id>": { "<code>": { "<key>": "<text>", ... } } }.
 
+Do not mention in the notes the data or the sports that the `settings` of the reply exclude. This
+rule applies also to data that another tool showed earlier in this chat.
+
 Use only numbers of the digest. **Never invent, interpolate or estimate missing values.** If a value
 is missing, write "n/a". If `sync.failedDays` is more than 0, name the dates in `sync.failedDates`.
 If `sync.failedSections` is not empty, name those sections (HR zones, fitness age, HRV) and say that
