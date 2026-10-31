@@ -1,10 +1,20 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { McpServer } from "@modelcontextprotocol/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Config } from "../src/config";
+import { log } from "../src/log";
 import {
   AutoRefresh,
   cronLine,
@@ -24,6 +34,8 @@ import {
   withCronLine,
 } from "../src/schedule";
 
+vi.mock("../src/log", () => ({ log: vi.fn() }));
+
 const job: Job = {
   program: "/opt/node/bin/npx",
   args: ["-y", "pkg@latest", "refresh", "--auto"],
@@ -33,11 +45,17 @@ const job: Job = {
 
 const NPX_ENTRY = "/home/u/.npm/_npx/1a2b/node_modules/pkg/dist/index.js";
 
+/** What cron prints for `crontab -l` when the user has no crontab. */
+const NO_CRONTAB = { code: 1, stdout: "", stderr: "no crontab for u\n" };
+
 /** A crontab that fails with its message on stdout only. */
 const noStderr: Run = async (cmd, args) =>
   cmd === "crontab" && args[0] === "-"
     ? { code: 2, stdout: "crontab: no permission\n", stderr: "" }
-    : { code: 1, stdout: "", stderr: "" };
+    : NO_CRONTAB;
+
+/** A crontab -l that fails for another reason, with its message on stdout only. */
+const onStdout: Run = async () => ({ code: 2, stdout: "crontab: spool busy\n", stderr: "" });
 
 const failing: Run = async () => ({ code: 5, stdout: "", stderr: "Bootstrap failed: 5" });
 
@@ -215,7 +233,7 @@ describe("AutoRefresh", () => {
   const exec: Run = async (cmd, args, input) => {
     calls.push({ cmd, args, input });
     if (cmd === "crontab" && args[0] === "-l")
-      return { code: crontab ? 0 : 1, stdout: crontab, stderr: "" };
+      return crontab ? { code: 0, stdout: crontab, stderr: "" } : NO_CRONTAB;
     if (cmd === "crontab") crontab = input ?? "";
     return { code: 0, stdout: "", stderr: "" };
   };
@@ -293,6 +311,82 @@ describe("AutoRefresh", () => {
     expect((await a.status()).installed).toBe(true);
     await a.off();
     expect(crontab).toBe("15 3 * * * backup.sh\n");
+  });
+
+  it("stops and keeps the user's crontab when crontab -l fails for another reason", async () => {
+    const seen: string[][] = [];
+    const unreadable: Run = async (cmd, args) => {
+      seen.push(args);
+      return { code: 1, stdout: "", stderr: "crontab: cannot read spool\n" };
+    };
+    const a = new AutoRefresh(config, "linux", join(dir, "home"), unreadable, "/n", NPX_ENTRY);
+    await expect(a.set({})).rejects.toThrow("crontab -l failed (1): crontab: cannot read spool");
+    expect(seen.filter((args) => args[0] === "-")).toEqual([]);
+    expect(existsSync(join(config.dataDir, "auto-refresh.json"))).toBe(false);
+    // a status, and turning off, must not install an empty crontab either
+    await expect(a.status()).resolves.toEqual({ scheduled: false });
+    expect(seen.filter((args) => args[0] === "-")).toEqual([]);
+    // a crontab that prints its error on stdout only
+    await expect(
+      new AutoRefresh(config, "linux", join(dir, "home"), onStdout, "/n", NPX_ENTRY).set({}),
+    ).rejects.toThrow("crontab -l failed (2): crontab: spool busy");
+  });
+
+  it("reads the BusyBox message for a missing crontab as an empty crontab", async () => {
+    const lines: string[] = [];
+    const busybox: Run = async (cmd, args, input) => {
+      if (args[0] === "-l") {
+        return {
+          code: 1,
+          stdout: "",
+          stderr: "crontab: can't open 'u': No such file or directory\n",
+        };
+      }
+      lines.push(input ?? "");
+      return { code: 0, stdout: "", stderr: "" };
+    };
+    await new AutoRefresh(config, "linux", join(dir, "home"), busybox, "/n", NPX_ENTRY).set({});
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(/^0 7 \* \* \* .*# garmin-personal-mcp refresh\n$/);
+  });
+
+  it("names a damaged auto-refresh.json, keeps page writes working, and off removes it", async () => {
+    const stateFile = join(config.dataDir, "auto-refresh.json");
+    const main = join(config.dataDir, "garmin-dashboard.html");
+    const damaged = /auto-refresh\.json is damaged: stop the automatic refresh \(off\)/;
+    for (const text of ["{ broken", '{"cron":"0 7 * * *"}', '{"pages":[]}', "null"]) {
+      writeFileSync(stateFile, text);
+      crontab = "15 3 * * * backup.sh\n0 7 * * * x # garmin-personal-mcp refresh\n";
+      const a = auto("linux");
+      await expect(a.status(), text).rejects.toThrow(damaged);
+      await expect(a.set({}), text).rejects.toThrow(damaged);
+      await expect(a.missed(), text).rejects.toThrow(damaged);
+      await expect(a.pages(), text).rejects.toThrow(damaged);
+      await expect(a.saveRun({ at: new Date().toISOString(), failed: [] }), text).rejects.toThrow(
+        damaged,
+      );
+      vi.mocked(log).mockClear();
+      // every page write asks for its due time: the damaged file must not stop it
+      await expect(a.due(main), text).resolves.toBeUndefined();
+      expect(vi.mocked(log)).toHaveBeenCalledWith("WARN", expect.stringMatching(damaged));
+      expect(await a.off(), text).toEqual({ scheduled: false });
+      expect(existsSync(stateFile), text).toBe(false);
+      expect(crontab, text).toBe("15 3 * * * backup.sh\n");
+    }
+  });
+
+  it("writes auto-refresh.json through a temp file and leaves none behind", async () => {
+    const stateFile = join(config.dataDir, "auto-refresh.json");
+    await auto("linux").set({ cron: "0 6 * * *" });
+    const before = statSync(stateFile).ino;
+    await auto("linux").set({ cron: "0 9 * * *" });
+    // a rename puts a new file in place: a reader never sees half of one
+    expect(statSync(stateFile).ino).not.toBe(before);
+    expect(readdirSync(config.dataDir).filter((f) => f.endsWith(".tmp"))).toEqual([]);
+    expect(JSON.parse(readFileSync(stateFile, "utf8"))).toMatchObject({
+      cron: "0 9 * * *",
+      pages: [join(config.dataDir, "garmin-dashboard.html")],
+    });
   });
 
   it("runs an installed copy with its node, and a copy in the npx cache with npx", async () => {
