@@ -96,7 +96,7 @@ describe("site page", () => {
     for (const t of f.tools) expect(page).toContain(`<code>${t.name}</code>`);
     for (const p of f.prompts) expect(page).toContain(`<code>${p.name}</code>`);
     // the footer: the version of package.json, linked to its release notes
-    const release = `<a\\s+href="${f.repository}/releases/tag/v${f.pkg.version}"[^>]*>\\s*v${f.pkg.version}<span class="sr-only"> release notes</span></a`;
+    const release = `<a\\s+href="${f.repository}/releases/tag/v${f.pkg.version}"[^>]*>\\s*v${f.pkg.version}<span class="sr-only"> release notes \\(opens in a new tab\\)</span></a`;
     expect(page).toMatch(new RegExp(release.replace(/\./g, "\\.")));
   });
 

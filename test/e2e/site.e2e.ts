@@ -115,10 +115,25 @@ describe("site accessibility", () => {
 });
 
 describe("site footer", () => {
+  it("opens the external links of the header and the footer in a new tab, and says so", async () => {
+    const { page } = await site();
+    const links = await page.$$eval("header a[href^='http'], footer a[href^='http']", (as) =>
+      as.map((a) => [a.getAttribute("target"), a.getAttribute("rel"), a.textContent?.trim()]),
+    );
+    expect(links.length).toBe(5);
+    for (const [target, rel, text] of links) {
+      expect([text, target, rel]).toEqual([text, "_blank", "noopener"]);
+      expect(text).toMatch(/\(opens in a new tab\)$/);
+    }
+  });
+
   it("names the version link for screen readers by what it opens", async () => {
     const { page } = await site();
     const version = JSON.parse(readFileSync("package.json", "utf8")).version;
-    const link = page.getByRole("link", { name: `v${version} release notes`, exact: true });
+    const link = page.getByRole("link", {
+      name: `v${version} release notes (opens in a new tab)`,
+      exact: true,
+    });
     expect(await link.count()).toBe(1);
     // on screen only the version shows: the rest is clipped to a 1 px box
     const box = await link.locator(".sr-only").boundingBox();
