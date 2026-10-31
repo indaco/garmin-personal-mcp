@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   completed,
   exerciseStats,
+  median,
   missingSets,
   muscleGroup,
   muscleSets,
@@ -172,6 +173,32 @@ describe("sessions without sets", () => {
 
   it("gives push against pull from the complete weeks only", () => {
     expect(pushPull({ chest: [2, null], back: [1, null] })).toBe(2);
+  });
+});
+
+describe("sessions that count nowhere", () => {
+  const weeks = ["2026-10-12", "2026-10-19"];
+  const early = { ...acts[1], id: 3, start: "2026-09-01 18:00:00" };
+  // a muscle group that no other session trains: a counted session would add its row
+  const neck = { exercise: "Neck Curl", category: "Neck", primaryMuscles: ["Neck"] };
+  const undone = { ...acts[1], id: 4, exercises: [{ ...neck, sets: [{ reps: 0, kg: 10 }] }] };
+  const undated = { ...acts[1], id: 5, start: undefined };
+
+  it("counts only the completed sets of the sessions inside the weeks", () => {
+    expect(muscleSets([early, undone, ...acts], weeks)).toEqual(muscleSets(acts, weeks));
+    expect(setsByCategory([early, undone, ...acts], weeks)).toEqual(setsByCategory(acts, weeks));
+  });
+
+  it("leaves a session without a date out of the exercise stats", () => {
+    expect(exerciseStats([undated, ...acts])).toEqual(exerciseStats(acts));
+  });
+});
+
+describe("median", () => {
+  it("is the middle value, the mean of the two middle values, or nothing", () => {
+    expect(median([3, 1, 2])).toBe(2);
+    expect(median([4, 1, 3, 2])).toBe(2.5);
+    expect(median([])).toBeUndefined();
   });
 });
 
