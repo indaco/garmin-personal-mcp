@@ -267,6 +267,20 @@ describe("widget and language prompts", () => {
     expect(text.includes("{{")).toBe(false);
   });
 
+  it("keeps the dollar patterns of an argument as typed", async () => {
+    const idea = "cost over $$100, $& and $' and $` and $1";
+    const text = await render("dashboard-widget", { idea });
+    expect(text).toContain(`dashboard: ${idea}. Use`);
+  });
+
+  it("keeps a marker in an argument as typed and fills the markers of the template", async () => {
+    const idea = "rides {{pathWith}} on {{today}}, {{idea}} and {{today";
+    const text = await render("dashboard-widget", { idea, path: "coach.html" });
+    expect(text).toContain(`dashboard: ${idea}. Use`);
+    expect(text).toContain('call `writeDashboard` with `path` = "coach.html" first');
+    expect(text).toContain('call `editDashboard` again with `path` = "coach.html", at most');
+  });
+
   it("adds the widget to the page file given as path", async () => {
     const text = await render("dashboard-widget", { idea: "my longest ride", path: "coach.html" });
     expect(text).toContain("dashboard: my longest ride. Use");
@@ -500,5 +514,13 @@ describe("coach prompts", () => {
     expect(await render("race-readiness", { date: "2026-11-15" })).toContain(
       "Race: distance not given on 2026-11-15.",
     );
+  });
+
+  it("keeps a race distance with a dollar pattern or a marker as typed", async () => {
+    const text = await render("race-readiness", {
+      date: "2026-12-06",
+      distance: "$'10k {{today}}",
+    });
+    expect(text).toContain("Race: $'10k {{today}} on 2026-12-06.");
   });
 });
