@@ -8,6 +8,8 @@ import * as z from "zod/v4";
 import { name } from "../package.json";
 import type { Config } from "./config";
 import { type DashboardWriter, pageTarget, patchDue } from "./dashboard-page";
+import { log } from "./log";
+import { MODEL_ONLY, writeAtomically } from "./tools";
 
 /**
  * The automatic refresh of dashboard pages: one job in the scheduler of the operating system (launchd,
@@ -427,14 +429,22 @@ export class AutoRefresh {
 
   /** The next run for a scheduled page, as an ISO time; undefined when the page has no schedule. */
   async due(path: string): Promise<string | undefined> {
-    const state = await this.#state();
+    let state: State | undefined;
+    try {
+      state = await this.#state();
+    } catch (e) {
+      // every page write asks: a damaged state file must not stop it
+      log("WARN", (e as Error).message);
+      return undefined;
+    }
     if (!state?.pages.includes(path)) return undefined;
     return dueOf(state.cron);
   }
 
   /**
    * Whether `refresh --auto` must run: a run time passed since the last run (or since the schedule
-   * was set). The job also starts at login, so a time that the computer missed runs then, once.
+   * was set). launchd and Task Scheduler also start the job at login or wake, so a time that the
+   * computer missed runs then, once. cron skips it.
    */
   async missed(now = new Date()): Promise<boolean> {
     const state = await this.#state();
@@ -489,7 +499,15 @@ export class AutoRefresh {
 
   /** Removes the page; without a page, or when no page is left, removes the job. */
   async off(path?: string): Promise<Status> {
-    const old = await this.#state();
+    let old: State | undefined;
+    try {
+      old = await this.#state();
+    } catch {
+      // a damaged file: the page list is lost; each page clears its due time on its next write
+      await this.#uninstall();
+      await rm(this.#stateFile, { force: true });
+      return { scheduled: false };
+    }
     if (!old) return { scheduled: false };
     const pages = path ? old.pages.filter((p) => p !== pageTarget(this.config.dataDir, path)) : [];
     // a page without a schedule expects no run
@@ -563,10 +581,13 @@ export class AutoRefresh {
     return `gui/${process.getuid!()}`;
   }
 
-  /** The user's crontab; "" when there is none (crontab -l then exits with 1). */
+  /** The user's crontab; "" when there is none. Any other failure stops: a write would erase it. */
   async #crontab(): Promise<string> {
     const r = await this.exec("crontab", ["-l"]);
-    return r.code === 0 ? r.stdout : "";
+    if (r.code === 0) return r.stdout;
+    // cronie, vixie and macOS: "no crontab for <user>"; BusyBox: "can't open ... No such file"
+    if (/no crontab for|No such file or directory/i.test(r.stderr)) return "";
+    throw new Error(`crontab -l failed (${r.code}): ${(r.stderr || r.stdout).trim()}`);
   }
 
   async #must(cmd: string, args: string[], input?: string): Promise<void> {
@@ -577,12 +598,25 @@ export class AutoRefresh {
   }
 
   async #save(state: State): Promise<void> {
-    await writeFile(this.#stateFile, `${JSON.stringify(state, null, 2)}\n`);
+    // the job runs in another process: it must never read a half-written file
+    await writeAtomically(this.#stateFile, `${JSON.stringify(state, null, 2)}\n`);
   }
 
   async #state(): Promise<State | undefined> {
     const text = await readFile(this.#stateFile, "utf8").catch(() => undefined);
-    return text === undefined ? undefined : (JSON.parse(text) as State);
+    if (text === undefined) return undefined;
+    let state: Partial<State> | null = null;
+    try {
+      state = JSON.parse(text) as Partial<State> | null;
+    } catch {
+      // stays null: damaged
+    }
+    if (typeof state?.cron !== "string" || !Array.isArray(state.pages)) {
+      throw new Error(
+        `${this.#stateFile} is damaged: stop the automatic refresh (off), then set it again`,
+      );
+    }
+    return state as State;
   }
 }
 
@@ -621,6 +655,7 @@ export function registerSchedule(server: McpServer, auto: AutoRefresh): void {
   server.registerTool(
     "scheduleDashboardRefresh",
     {
+      _meta: MODEL_ONLY,
       description: [
         "Turns on, changes or stops the automatic refresh of a dashboard page. Use it only when the user",
         "asks for it or says yes to the question of a dashboard prompt. A job in the scheduler of the",

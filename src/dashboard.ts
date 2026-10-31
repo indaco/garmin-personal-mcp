@@ -7,7 +7,14 @@ import { addDays, localToday } from "./dates";
 import { digest } from "./digest";
 import { log } from "./log";
 import { workoutOf } from "./page/running";
-import { type GarminTools, firstArray, sleepSummary, summarize, writeAtomically } from "./tools";
+import {
+  type GarminTools,
+  MODEL_ONLY,
+  firstArray,
+  sleepSummary,
+  summarize,
+  writeAtomically,
+} from "./tools";
 
 type Json = Record<string, unknown>;
 /** An inclusive date range, yyyy-MM-dd. */
@@ -522,6 +529,7 @@ export function registerDashboard(server: McpServer, dashboard: GarminDashboard)
   server.registerTool(
     "getDashboardData",
     {
+      _meta: MODEL_ONLY,
       description: [
         "All the data of the training dashboard in one call: HR zones, fitness age, the activities of the",
         "last `weeks` weeks (compact summaries, with strength sets and laps where they apply), the activities",
@@ -535,7 +543,9 @@ export function registerDashboard(server: McpServer, dashboard: GarminDashboard)
         "`digest`, first in the result: the server's totals for the whole period and for each",
         "Monday-Sunday week (sessions, km, hours, load), the training load of the last 7 and 28 days,",
         "best efforts, races and strength top sets; quote them instead of your own sums. For another",
-        "date range, use the activities: each one is on its own line.",
+        "date range, use the activities: each one is on its own line. A load is null (n/a) when the",
+        "sessions have none; estimatedLoads counts the loads that are estimates from heart rate. A week",
+        "with partial: true starts before the period.",
       ].join("\n"),
       inputSchema: z.object({
         weeks: z.number().int().describe("Weeks to cover, default 12, max 52").optional(),

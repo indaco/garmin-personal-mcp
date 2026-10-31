@@ -14,15 +14,16 @@ Then answer in chat, in this order:
 
 - **Countdown**: the days left to the race.
 - **Training block**: a table of the run km (`weekly.<monday>.runKm`) and the load of each week. The
-  first week can be partial: say so. Also the longest run and its date. For the runs over 15 km,
+  first week can be partial (`partial: true`): say so. Also the longest run and its date. For the runs over 15 km,
   give the pace of the first and the second half and the HR drift (the drop in distance per
   heartbeat from the first to the second half, in %). From the laps, do not use the warm-up,
   cool-down, rest and recovery laps. Take the distance of a lap as its time / pace, because Garmin
   rounds the lap km to 10 m. Split at half the distance (a lap across the middle counts for its
   share on each side).
 - **Load and taper**: the load of the last 7 days against the weekly average of the last 28
-  (`load.acuteToChronic`). In the last 2 weeks before a race the load should drop: say if it does, or
-  how to use the days left.
+  (`load.acuteToChronic`). If it is null, write "n/a": the data has fewer than 28 days, or no
+  load. In the last 2 weeks before a race the load should drop: say if it does, or how to use the
+  days left.
 - **Prediction**: the predicted race time from each best effort of 5 km or more, with Riegel
   (time × (race distance / effort distance)^1.06; 5k = 5 km, 10k = 10 km, half = 21.0975 km,
   marathon = 42.195 km). The estimate is the fastest of them; show the others too. {{goalLine}}

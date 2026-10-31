@@ -148,6 +148,10 @@ pnpm test:page           # the dashboard page in headless Chromium, after the bu
 pnpm exec playwright-core install --only-shell chromium
 ```
 
+`pnpm test:coverage` fails when the unit coverage goes below the floor in `vitest.config.ts`: 100%
+of statements, functions and lines, and 96% of branches. Test new code in the same change. When the
+coverage goes up, raise the floor in that change too.
+
 `pnpm fmt` corrects the format. `pnpm guide` writes the generated parts of `guide/`.
 
 The README and the website show the same demo, `assets/dashboard.gif`. `pnpm demo` records it from

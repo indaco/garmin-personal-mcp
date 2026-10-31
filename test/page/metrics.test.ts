@@ -104,6 +104,21 @@ describe("load", () => {
     expect(loadRatio([], "2026-10-26").ratio).toBeNull();
   });
 
+  it("has no chronic load or ratio when the data starts inside the 28 days", () => {
+    const acts = [act("2026-10-26", { trainingLoad: 100 })];
+    // the 28 days that end on 26 Oct start on 29 Sep
+    expect(loadRatio(acts, "2026-10-26", undefined, "2026-09-30")).toEqual({
+      acute: 100,
+      chronic: null,
+      ratio: null,
+    });
+    expect(loadRatio(acts, "2026-10-26", undefined, "2026-09-29")).toEqual({
+      acute: 100,
+      chronic: 25,
+      ratio: 4,
+    });
+  });
+
   it("gives the change of each week against the week before", () => {
     expect(ramp([100, 110, 0, 50])).toEqual([null, 10, -100, null]);
   });

@@ -52,11 +52,18 @@ export function dailyLoads(acts: Activity[], from: string, to: string, maxHR?: n
   return out;
 }
 
-/** The load of the 7 days that end on `day`, against the weekly average of the 28 days that end on it. */
-export function loadRatio(acts: Activity[], day: string, maxHR?: number) {
+/**
+ * The load of the 7 days that end on `day`, against the weekly average of the 28 days that end on it.
+ * With `dataStart` (the first day of the data): no chronic load and no ratio when the data starts
+ * after the first of the 28 days, because the days before it would count as rest.
+ */
+export function loadRatio(acts: Activity[], day: string, maxHR?: number, dataStart?: string) {
   const sum = (n: number) =>
     dailyLoads(acts, addDays(day, -(n - 1)), day, maxHR).reduce((s, v) => s + v, 0);
   const acute = sum(7);
+  if (dataStart !== undefined && addDays(day, -27) < dataStart) {
+    return { acute, chronic: null, ratio: null };
+  }
   const chronic = sum(28) / 4;
   return { acute, chronic, ratio: chronic > 0 ? acute / chronic : null };
 }

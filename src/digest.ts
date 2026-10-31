@@ -1,15 +1,18 @@
 import { addDays } from "./dates";
 import { round } from "./fit";
 import { type Activity, dayOf, mondayOf, sessionSeconds, seconds } from "./page/calc";
+import { loadOf, loadRatio, zonesOf } from "./page/metrics";
 import { workoutOf } from "./page/running";
 
 type Json = Record<string, unknown>;
 
+/** A load is null (n/a) when the sessions have none; estimatedLoads counts estimates from HR. */
 interface Totals {
   sessions: number;
   km?: number;
   hours?: number;
-  load: number;
+  load: number | null;
+  estimatedLoads?: number;
 }
 
 interface Week {
@@ -17,7 +20,21 @@ interface Week {
   km: number;
   runKm: number;
   hours: number;
+  load: number | null;
+  estimatedLoads?: number;
+  /** The period starts after this Monday: the week is not whole. */
+  partial?: true;
+}
+
+/** The running sums of a type or a week; `known` and `estimated` count the sessions with a load. */
+interface Sum {
+  sessions: number;
+  km: number;
+  runKm: number;
+  hours: number;
   load: number;
+  known: number;
+  estimated: number;
 }
 
 interface TopSet {
@@ -31,7 +48,12 @@ export interface Digest {
   totals: Record<string, Totals>;
   previousPeriodTotals: Record<string, Totals>;
   weekly: Record<string, Week>;
-  load: { last7Days: number; weeklyAvgLast28Days: number; acuteToChronic: number | null };
+  load: {
+    last7Days: number | null;
+    weeklyAvgLast28Days: number | null;
+    acuteToChronic: number | null;
+    estimatedLoads: number;
+  };
   bestEfforts: Record<string, { time: string; date: string; name: unknown }>;
   races: Json[];
   /** The run names with more than one session: the workouts that the workout trend compares. */
@@ -44,55 +66,54 @@ export interface Digest {
 }
 
 /**
- * Sums and copies of a getDashboardData result, and no page logic: the page calculates the rest in the
- * browser. Every number in it comes straight from the data, so a coach note can quote it.
+ * Sums and copies of a getDashboardData result, with the page's load functions, so a coach note can
+ * quote what the page shows. A number that the data cannot back is null (n/a); a load from the HR
+ * estimate is counted in `estimatedLoads`.
  */
 export function digest(data: Json): Digest {
   const acts = list(data.activities).filter((a) => dayOf(a as Activity) !== undefined);
+  const previous = list(data.previousActivities).filter((a) => dayOf(a as Activity) !== undefined);
+  const start = typeof data.start === "string" ? data.start : "";
   const end = typeof data.end === "string" ? data.end : "";
+  // the page's load: Garmin's, else its labelled estimate from HR
+  const maxHR = zonesOf(data.zones).maxHR;
+  const loadIn = (a: Json) => loadOf(a as Activity, maxHR);
 
-  const totals: Record<string, Totals> = {};
-  const weekly: Record<string, Week> = {};
+  const totals: Record<string, Sum> = {};
+  const weekly: Record<string, Sum> = {};
   for (const a of acts) {
     const type = typeOf(a);
-    const t = (totals[type] ??= { sessions: 0, km: 0, hours: 0, load: 0 });
-    const w = (weekly[mondayOf(dayOf(a as Activity)!)] ??= {
-      sessions: 0,
-      km: 0,
-      runKm: 0,
-      hours: 0,
-      load: 0,
-    });
     const km = num(a.km);
-    const hours = sessionSeconds(a as Activity) / 3600;
-    const load = num(a.trainingLoad);
-    t.sessions++;
-    t.km! += km;
-    t.hours! += hours;
-    t.load += load;
-    w.sessions++;
-    w.km += km;
-    w.hours += hours;
-    w.load += load;
-    if (type.endsWith("running")) {
-      w.runKm += km;
+    for (const s of [
+      (totals[type] ??= sum()),
+      (weekly[mondayOf(dayOf(a as Activity)!)] ??= sum()),
+    ]) {
+      add(s, km, sessionSeconds(a as Activity) / 3600, loadIn(a));
+      if (type.endsWith("running")) s.runKm += km;
     }
   }
 
-  const previousPeriodTotals: Record<string, Totals> = {};
-  for (const a of list(data.previousActivities)) {
-    const t = (previousPeriodTotals[typeOf(a)] ??= { sessions: 0, km: 0, load: 0 });
-    t.sessions++;
-    t.km! += num(a.km);
-    t.load += num(a.trainingLoad);
+  // as many days as the period, right before it: the previous rows start a week earlier
+  const days = start && end ? (Date.parse(end) - Date.parse(start)) / 86_400_000 + 1 : 0;
+  const previousPeriod =
+    days > 0 ? { from: addDays(start, -days), to: addDays(start, -1) } : undefined;
+  const previousPeriodTotals: Record<string, Sum> = {};
+  for (const a of previous) {
+    const day = dayOf(a as Activity)!;
+    if (previousPeriod && (day < previousPeriod.from || day > previousPeriod.to)) continue;
+    add((previousPeriodTotals[typeOf(a)] ??= sum()), num(a.km), 0, loadIn(a));
   }
 
-  const loadFrom = (from: string) =>
-    acts
-      .filter((a) => dayOf(a as Activity)! >= from && dayOf(a as Activity)! <= end)
-      .reduce((s, a) => s + num(a.trainingLoad), 0);
-  const acute = loadFrom(addDays(end, -6));
-  const chronic = loadFrom(addDays(end, -27)) / 4;
+  // the weeks before the period count for the 28 days, as on the page
+  const every = [...acts, ...previous] as Activity[];
+  const dataStart = typeof data.prevStart === "string" ? data.prevStart : undefined;
+  const ratio = loadRatio(every, end, maxHR, dataStart);
+  const loadsFrom = (from: string) =>
+    every.filter((a) => dayOf(a)! >= from && dayOf(a)! <= end).map((a) => loadOf(a, maxHR));
+  const week = loadsFrom(addDays(end, -6));
+  const month = loadsFrom(addDays(end, -27));
+  // sessions without any load: n/a, not 0; no session at all is rest, a true 0
+  const unknown = (loads: typeof week) => loads.length > 0 && loads.every((l) => l === undefined);
 
   const bestEfforts: Digest["bestEfforts"] = {};
   for (const a of acts) {
@@ -122,18 +143,27 @@ export function digest(data: Json): Digest {
 
   const age = isObject(data.fitnessAge) ? data.fitnessAge : {};
   return {
-    period: pick(data, ["start", "end", "weeks", "prevStart", "prevEnd"]),
-    totals: mapValues(totals, roundTotals),
-    previousPeriodTotals: mapValues(previousPeriodTotals, roundTotals),
+    period: {
+      ...pick(data, ["start", "end", "weeks", "prevStart", "prevEnd"]),
+      ...(previousPeriod ? { previousPeriod } : {}),
+    },
+    totals: mapValues(totals, (t) => roundTotals(t, true)),
+    previousPeriodTotals: mapValues(previousPeriodTotals, (t) => roundTotals(t, false)),
     weekly: Object.fromEntries(
       Object.entries(weekly)
         .toSorted(([a], [b]) => (a < b ? -1 : 1))
-        .map(([k, w]) => [k, roundWeek(w)]),
+        // the period starts after this Monday: the week is not whole
+        .map(([k, w]) => [
+          k,
+          { ...roundWeek(w), ...(k < start ? { partial: true as const } : {}) },
+        ]),
     ),
     load: {
-      last7Days: round(acute, 1),
-      weeklyAvgLast28Days: round(chronic, 1),
-      acuteToChronic: chronic > 0 ? round(acute / chronic, 2) : null,
+      last7Days: unknown(week) ? null : round(ratio.acute, 1),
+      weeklyAvgLast28Days:
+        ratio.chronic === null || unknown(month) ? null : round(ratio.chronic, 1),
+      acuteToChronic: ratio.ratio === null ? null : round(ratio.ratio, 2),
+      estimatedLoads: month.filter((l) => l?.estimate).length,
     },
     bestEfforts,
     races: acts
@@ -171,23 +201,46 @@ function topSet(sets: Json[]): string | undefined {
   return top ? `${num(top.kg)} kg x ${num(top.reps)}` : undefined;
 }
 
-function roundWeek(w: Week): Week {
+function sum(): Sum {
+  return { sessions: 0, km: 0, runKm: 0, hours: 0, load: 0, known: 0, estimated: 0 };
+}
+
+function add(s: Sum, km: number, hours: number, load: ReturnType<typeof loadOf>): void {
+  s.sessions++;
+  s.km += km;
+  s.hours += hours;
+  if (load) {
+    s.load += load.value;
+    s.known++;
+    if (load.estimate) s.estimated++;
+  }
+}
+
+/** The load of sessions that all lack one is n/a; the count of estimates only when there are some. */
+function loadPart(s: Sum): Pick<Totals, "load" | "estimatedLoads"> {
+  return {
+    load: s.known > 0 ? round(s.load, 1) : null,
+    ...(s.estimated > 0 ? { estimatedLoads: s.estimated } : {}),
+  };
+}
+
+function roundWeek(w: Sum): Week {
   return {
     sessions: w.sessions,
     km: round(w.km, 1),
     runKm: round(w.runKm, 1),
     hours: round(w.hours, 1),
-    load: round(w.load, 1),
+    ...loadPart(w),
   };
 }
 
 /** Rounded to 0.1; no km for types without distance (strength, racket sports). */
-function roundTotals(t: Totals): Totals {
+function roundTotals(t: Sum, hours: boolean): Totals {
   return {
     sessions: t.sessions,
     ...(t.km ? { km: round(t.km, 1) } : {}),
-    ...(t.hours === undefined ? {} : { hours: round(t.hours, 1) }),
-    load: round(t.load, 1),
+    ...(hours ? { hours: round(t.hours, 1) } : {}),
+    ...loadPart(t),
   };
 }
 

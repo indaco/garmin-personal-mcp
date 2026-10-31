@@ -33,7 +33,7 @@ register({
     const week = totals(ctx, between(every, addDays(end, -6), end));
     // the 4 weeks before the last 7 days, from all embedded data
     const base = totals(ctx, between(every, addDays(end, -34), addDays(end, -7)));
-    const ratio = calc.loadRatio(everyActivity(ctx), end, maxHR(ctx)).ratio;
+    const ratio = calc.loadRatio(everyActivity(ctx), end, maxHR(ctx), ctx.data.prevStart).ratio;
     const hrv = last(ctx.data.hrv.filter((r) => String(r.date) <= end));
     const hrvNow = num(hrv?.hrv);
     const hrvBase = num(hrv?.weeklyAvg);
@@ -108,7 +108,7 @@ register({
       .map((r) => num(r.rhr))
       .filter((v): v is number => v !== undefined);
     const rhrAvg = calc.mean(before) ?? undefined;
-    const ratio = calc.loadRatio(everyActivity(ctx), data.end, maxHR(ctx)).ratio;
+    const ratio = calc.loadRatio(everyActivity(ctx), data.end, maxHR(ctx), data.prevStart).ratio;
     const inputs = {
       hrvStatus: typeof hrv?.status === "string" ? hrv.status : undefined,
       sleepScore: num(today?.sleepScore),

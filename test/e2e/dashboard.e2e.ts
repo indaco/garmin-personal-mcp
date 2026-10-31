@@ -130,6 +130,14 @@ async function shownUnits(units?: string): Promise<string> {
   return text.replaceAll(/\b(1|5|10|15) km\b/g, "");
 }
 
+/** The values of the load ratio tiles: the overview's and the readiness widget's. */
+const ratios = (page: Page) =>
+  page.$$eval("[data-id=kpis] .kpi, [data-id=readiness] .kpi", (kpis) =>
+    kpis
+      .filter((k) => (k.querySelector(".kpi-label")?.textContent ?? "").startsWith("Load ratio"))
+      .map((k) => k.querySelector(".kpi-value")?.textContent),
+  );
+
 describe("the page", () => {
   it("keeps the template small", () => {
     // minified, with only the Chart.js parts the page uses: Chart.js is most of it, and the page
@@ -1052,6 +1060,19 @@ describe("overview widgets", () => {
     const { page } = await open(browser, pageFile());
     expect(await page.textContent(".verdict")).toMatch(/^(Go easy|Ready to push|Normal)$/);
     expect(await page.$$eval("[data-id=readiness] .kpi", (k) => k.length)).toBe(4);
+  });
+
+  it("shows the load ratio as n/a when the data does not cover its 28 days", async () => {
+    const full = await open(browser, pageFile());
+    const values = await ratios(full.page);
+    expect(values).toHaveLength(2);
+    expect(values.every((v) => /^\d+\.\d\d$/.test(v ?? ""))).toBe(true);
+    // the data starts 21 days before the end: a part of the 28 days would count as rest
+    const short = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, prevStart: "2026-10-05" } }),
+    );
+    expect(await ratios(short.page)).toEqual(["n/a", "n/a"]);
   });
 
   it("shows a calendar day with its activities on hover", async () => {

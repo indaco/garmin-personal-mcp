@@ -984,6 +984,15 @@ describe("MCP tools", () => {
     expect(listed.map(shape).toSorted((a, b) => a.name.localeCompare(b.name))).toEqual(expected);
   });
 
+  it("lets only the model call each tool, never the page in the chat", async () => {
+    const { tools: listed } = await (await connect()).listTools();
+    expect(listed).toHaveLength(toolList.length);
+    for (const t of listed) {
+      // MCP Apps: without visibility a tool is ["model", "app"], so code in the page could call it
+      expect(t, t.name).toMatchObject({ _meta: { ui: { visibility: ["model"] } } });
+    }
+  });
+
   it("returns the tool result as JSON text, and errors as tool errors", async () => {
     const client = await connect();
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
@@ -1225,7 +1234,7 @@ describe("MCP tools", () => {
       const { tools: listed } = await client.listTools();
       const uri = "ui://garmin-personal/dashboard.html";
       expect(listed.find((t) => t.name === "showDashboard")).toMatchObject({
-        _meta: { ui: { resourceUri: uri } },
+        _meta: { ui: { resourceUri: uri, visibility: ["model"] } },
       });
       expect((await client.readResource({ uri })).contents).toEqual([
         { uri, mimeType: "text/html;profile=mcp-app", text: "<html>page</html>" },
