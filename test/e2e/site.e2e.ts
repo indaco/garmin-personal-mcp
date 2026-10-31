@@ -72,6 +72,9 @@ async function problems(page: Page): Promise<string[]> {
 }
 
 const focused = (page: Page) => page.evaluate(() => document.activeElement?.id ?? "");
+/** The distance from the top of the window to the element, in whole pixels. */
+const topOf = (page: Page, id: string) =>
+  page.evaluate((i) => Math.round(document.getElementById(i)!.getBoundingClientRect().top), id);
 const theme = (page: Page) => page.evaluate(() => document.documentElement.dataset.theme ?? null);
 const background = (page: Page) =>
   page.evaluate(() => getComputedStyle(document.body).backgroundColor);
@@ -112,10 +115,25 @@ describe("site accessibility", () => {
 });
 
 describe("site footer", () => {
+  it("opens the external links of the header and the footer in a new tab, and says so", async () => {
+    const { page } = await site();
+    const links = await page.$$eval("header a[href^='http'], footer a[href^='http']", (as) =>
+      as.map((a) => [a.getAttribute("target"), a.getAttribute("rel"), a.textContent?.trim()]),
+    );
+    expect(links.length).toBe(5);
+    for (const [target, rel, text] of links) {
+      expect([text, target, rel]).toEqual([text, "_blank", "noopener"]);
+      expect(text).toMatch(/\(opens in a new tab\)$/);
+    }
+  });
+
   it("names the version link for screen readers by what it opens", async () => {
     const { page } = await site();
     const version = JSON.parse(readFileSync("package.json", "utf8")).version;
-    const link = page.getByRole("link", { name: `v${version} release notes`, exact: true });
+    const link = page.getByRole("link", {
+      name: `v${version} release notes (opens in a new tab)`,
+      exact: true,
+    });
     expect(await link.count()).toBe(1);
     // on screen only the version shows: the rest is clipped to a 1 px box
     const box = await link.locator(".sr-only").boundingBox();
@@ -130,6 +148,23 @@ describe("site header", () => {
     expect(await page.isVisible("#menu")).toBe(false);
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.isVisible("#site-nav")).toBe(false);
+    expect(await page.isVisible("#menu")).toBe(true);
+  });
+
+  it("keeps the header at the top while the page scrolls, and a section link stops below it", async () => {
+    const { page } = await site();
+    await page.click('#site-nav a[href="#start"]');
+    // the scroll is smooth and takes longer than the default 1 s poll: wait until it ends at the bottom
+    // of the header
+    await expect.poll(() => topOf(page, "start"), { timeout: 5000 }).toBe(64);
+    expect((await page.locator(".site-bar").boundingBox())!.y).toBe(0);
+    expect(await page.isVisible('#site-nav a[href="#ask"]')).toBe(true);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.click("#menu");
+    await page.click('#site-nav a[href="#dashboard"]');
+    await expect.poll(() => topOf(page, "dashboard"), { timeout: 5000 }).toBe(64);
+    expect((await page.locator(".site-bar").boundingBox())!.y).toBe(0);
     expect(await page.isVisible("#menu")).toBe(true);
   });
 
