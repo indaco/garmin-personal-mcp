@@ -2,6 +2,7 @@ import { addDays } from "../../dates";
 import { type Activity, groupOf } from "../calc";
 import { append, h } from "../dom";
 import type { Key } from "../i18n";
+import { en } from "../i18n/en";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
 import type { WorkoutMetric } from "../running";
@@ -132,8 +133,8 @@ register({
           fmt.day(day(a)),
           a.name ?? "",
           fmt.dist(num(a.km), 2),
-          fmt.hms(ctx.calc.seconds(a.duration)),
-          ctx.calc.seconds(a.pace) > 0 ? fmt.pace(ctx.calc.seconds(a.pace)) : "",
+          fmt.hms(ctx.calc.seconds(a.duration) || undefined),
+          paceText(ctx, a.pace),
           fmt.num(num(a.avgHR)),
           num(a.avgPowerW) === undefined ? fmt.na : `${fmt.num(num(a.avgPowerW))} W`,
           fmt.num(num(a.aerobicTE), 1),
@@ -307,10 +308,12 @@ register({
     if (oneSession(el, ctx)) return;
     const floors = calc.zonesOf(ctx.data.zones).floors;
     const weeks = ctx.weeks.map(() => [0, 0, 0]);
+    let approximate = false;
     for (const a of runs(ctx)) {
       const z = calc.zoneSeconds(a, floors);
       const i = weekOf(ctx, a);
       if (!z || i < 0) continue;
+      approximate ||= z.approximate;
       weeks[i][0] += z.sec[0] + z.sec[1];
       weeks[i][1] += z.sec[3] + z.sec[4];
       weeks[i][2] += z.sec.reduce((s, v) => s + v, 0);
@@ -340,6 +343,7 @@ register({
         },
       },
     });
+    append(el, approximate && note(t("zones.approximate")));
   },
 });
 
@@ -475,7 +479,9 @@ register({
         data: {
           labels: ctx.weeks.map((w) => weekLabel(ctx, w)),
           datasets: labels.map((label, n) => ({
-            label: label.replaceAll("_", " "),
+            // Garmin's label key; one that the catalogue does not know keeps Garmin's words
+            label:
+              `teLabel.${label}` in en ? t(`teLabel.${label}` as Key) : label.replaceAll("_", " "),
             data: ctx.weeks.map(
               (_, i) => runs(ctx).filter((a) => weekOf(ctx, a) === i && a.teLabel === label).length,
             ),
@@ -524,7 +530,11 @@ register({
       const longest = Math.max(0, ...w.map((a) => num(a.km) ?? 0));
       return km > 0 ? (longest / km) * 100 : null;
     });
-    const ascent = weekly.map((w) => fmt.to.elev(w.reduce((s, a) => s + (num(a.ascentM) ?? 0), 0)));
+    // a week without ascent data is a gap, not flat running
+    const ascent = weekly.map((w) => {
+      const m = w.map((a) => num(a.ascentM)).filter((v): v is number => v !== undefined);
+      return m.length > 0 ? fmt.to.elev(m.reduce((s, v) => s + v, 0)) : null;
+    });
     ctx.chart(
       el,
       {
@@ -547,6 +557,7 @@ register({
               data: ascent,
               borderColor: ctx.color("hiking"),
               yAxisID: "y1",
+              spanGaps: true,
             },
           ],
         },

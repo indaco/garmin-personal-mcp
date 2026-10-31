@@ -326,12 +326,12 @@ function exerciseTable(
           h("td", { class: "num" }, String(s.sessions.length)),
           h("td", { class: "num" }, fmt.day(last.date)),
           h("td", { class: "num" }, topText(ctx, s, last)),
-          h("td", { class: "num" }, s.best1rm === undefined ? "" : fmt.mass(s.best1rm)),
+          h("td", { class: "num" }, s.best1rm === undefined ? fmt.na : fmt.mass(s.best1rm)),
           h(
             "td",
             { class: "num" },
             s.change === null
-              ? ""
+              ? fmt.na
               : h(
                   "span",
                   { class: calc.changeClass(s.change, true) },
@@ -347,7 +347,7 @@ function exerciseTable(
 }
 
 function topText(ctx: Ctx, s: ExerciseStats, x: ExerciseStats["sessions"][number]): string {
-  if (s.kind === "weight") return x.top ? `${ctx.fmt.mass(x.top.kg)} × ${x.top.reps}` : "";
+  if (s.kind === "weight") return x.top ? `${ctx.fmt.mass(x.top.kg)} × ${x.top.reps}` : ctx.fmt.na;
   if (s.kind === "reps") return ctx.t("ex.reps", { n: x.maxReps });
   return `${x.longest} s`;
 }

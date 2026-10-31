@@ -205,6 +205,32 @@ describe("median", () => {
 describe("exercise stats", () => {
   const stats = exerciseStats(acts);
 
+  it("leaves out an exercise of a session where no set was done", () => {
+    const skipped = exerciseStats([
+      {
+        start: "2026-10-22 18:00:00",
+        exercises: [
+          { exercise: "Pull Up", sets: [{ reps: 0 }, { reps: 0 }] },
+          { exercise: "Dip", sets: [{ reps: 0, kg: 20 }] },
+        ],
+      },
+      {
+        start: "2026-10-15 18:00:00",
+        exercises: [{ exercise: "Pull Up", sets: [{ reps: 8 }] }],
+      },
+      {
+        start: "2026-10-08 18:00:00",
+        exercises: [{ exercise: "Pull Up", sets: [{ reps: 0 }, { reps: 5 }] }],
+      },
+    ]);
+    // Dip was never done: no entry; Pull Up has only the sessions with one set done or more
+    expect(skipped.map((s) => s.name)).toEqual(["Pull Up"]);
+    expect(skipped[0].sessions.map((s) => [s.date, s.maxReps])).toEqual([
+      ["2026-10-08", 5],
+      ["2026-10-15", 8],
+    ]);
+  });
+
   it("gives the top set, volume and estimated 1RM of each session, oldest first", () => {
     const s = stats.find((x) => x.name === "Back Squat")!;
     expect(s.kind).toBe("weight");
