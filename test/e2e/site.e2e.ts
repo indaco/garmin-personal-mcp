@@ -267,8 +267,12 @@ describe("site demo", () => {
     await page.waitForSelector(tile);
     // every repeated run has its laps: no session is left out
     expect(await page.textContent(tile)).not.toContain("left out");
+    // the widget starts with the newest repeated run: keep Track Intervals only
     await page.click(`${tile} >> text=/^Track Intervals/`);
-    await page.click(`${tile} >> text=/^Tempo Run/`);
+    const others = page.locator(`${tile} [aria-label='Workouts to compare'] [aria-pressed=true]`, {
+      hasNotText: /^Track Intervals/,
+    });
+    while ((await others.count()) > 0) await others.first().click();
     expect(await page.textContent(`${tile} h3`)).toBe("Track Intervals");
     // the 8 newest sessions, the others behind "Show all"
     expect(await page.$$eval(`${tile} table.data tbody tr:not([hidden])`, (r) => r.length)).toBe(8);

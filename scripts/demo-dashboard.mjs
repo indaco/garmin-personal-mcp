@@ -1,6 +1,7 @@
 // Writes made-up dashboard data in the getDashboardData format, for a public demo page: a year of a
 // runner's training (a marathon block, races, strength, padel, rides, swims, hikes), HRV and recovery.
-// Seeded: the same seed and end date give the same data. With a page path it also fills the page
+// Seeded: the same seed and end date give the same data. The end date is fixed (DEMO_END), so the
+// website demo and the README GIF show the same data. With a page path it also fills the page
 // template (`pnpm build` first) and puts a sample-data note at the top. Without paths it writes the
 // demo of the website: dist-site/demo/demo-data.json and dist-site/demo/index.html.
 // `node scripts/demo-dashboard.mjs [--weeks 52] [--end yyyy-MM-dd] [--seed 7] [data.json [page.html]]`
@@ -18,9 +19,9 @@ const [outJson, outHtml] =
     ? positionals
     : ["dist-site/demo/demo-data.json", "dist-site/demo/index.html"];
 const WEEKS = Math.min(Math.max(Number(opt.weeks ?? 52), 1), 52);
-const now = new Date();
-const END =
-  opt.end ?? new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+// a Sunday, so the last week is whole; a new date also needs a new GIF: `pnpm demo` records it
+const DEMO_END = "2026-10-25";
+const END = opt.end ?? DEMO_END;
 if (!/^\d{4}-\d{2}-\d{2}$/.test(END)) throw new Error(`--end must be yyyy-MM-dd: ${END}`);
 
 // mulberry32
