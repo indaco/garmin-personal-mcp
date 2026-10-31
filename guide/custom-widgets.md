@@ -17,8 +17,8 @@ Each step is a request to your assistant, and what you then see.
    settings menu, **Edit layout** and **Add widget**: your widget is in the list.
 5. **Remove it.** Ask "Remove the longest-ride widget from this page": it stays in **Add widget**.
    Ask "Forget the longest-ride widget": it also goes from your library.
-6. **Keep it.** Copy `widgets.json` from the data folder to back up your widgets, or to use them
-   on another computer.
+6. **Keep it.** Copy `widgets.json` from the data folder to keep a copy of your widgets, or to use
+   them on another computer.
 
 In Claude Code, step 1 is `/mcp__garmin-personal__dashboard-widget my longest ride of each month`.
 

@@ -31,11 +31,11 @@ Run the `training-dashboard` prompt. It has two optional arguments:
 With `preset` and `blank`, the assistant first asks for the title and the headline (the line under
 the title). Keep them or type your own. Later updates keep them, also the automatic update. When the
 page has other settings, for example only one sport or no sleep data, the assistant tells you these
-settings. When the page leaves out data, for example on a page for your coach, the assistant names
-that data and tells you that the defaults put it back into the page. Keep the settings (the
-default), or use the defaults: all sports, all data, English and the language of your Garmin
-profile, and all themes, opening in midnight. You can also type your own choice, for example "all
-sports, keep the rest".
+settings. When the page excludes data, for example on a page for your coach, the assistant names
+that data. It also tells you that the defaults add that data to the page again. Keep the settings
+(the default), or use the defaults. The defaults are all sports, all data, all themes, and English
+and the language of your Garmin profile. With the defaults, the page opens in midnight. You can also
+type your own choice, for example "all sports, keep the rest".
 
 To set the sports and the data of the page too, for example for a page that you share with your
 coach, run `dashboard-setup`. See [Page settings](#page-settings).
@@ -84,9 +84,9 @@ asks one time if the page must update automatically:
 | Your own words        | any schedule that you type |
 
 When a schedule is already set, the assistant offers it first, after "No". When the page already
-updates automatically, the assistant does not ask: it tells you the schedule and the next update,
-and you can ask it to change or stop the schedule. The `training-dashboard-update`
-prompt does not ask: it only reminds you that you can ask.
+updates automatically, the assistant does not ask. It tells you the schedule and the next update.
+You can ask it to change or stop the schedule. The `training-dashboard-update` prompt does not ask:
+it only reminds you that you can ask.
 
 You can also ask at any time. Say when in your own words, in any language, for example:
 
@@ -108,7 +108,7 @@ update is every day at 07:00. All the pages that update automatically use the sa
 - The computer must be on at that time. A Mac that was asleep updates the page when it wakes up. A
   Mac that was off updates the page when you log in. A Windows computer that was asleep or off
   updates the page when it starts again. Linux skips that time. A missed time runs one time only.
-- When the network is not ready, for example just after you log in, the update tries again after 30
+- When the network is not ready, for example right after you log in, the update tries again after 30
   seconds, 1 minute and 2 minutes.
 - When an update is more than 1 hour late, the page shows a note. Ask your assistant "when does my
   dashboard update?": the reply gives the last update and the pages that it could not update.
@@ -160,9 +160,9 @@ chat". The tool has two optional arguments:
 | Codex in the ChatGPT desktop app                      | not tested yet                                                           |
 | The ChatGPT chat, Claude on the web                   | not available: they connect only to servers on the internet              |
 
-The page in the chat is an MCP App: a page that an MCP server gives to the client, and that the
-client shows in the chat. Other clients that show MCP Apps can also work, but they are not tested.
-The ChatGPT chat and Claude on the web show MCP Apps too, but they cannot start a server on your
+The page in the chat is an MCP App. An MCP server gives this page to the client, and the client
+shows it in the chat. Other clients that show MCP Apps can also work, but they are not tested. The
+ChatGPT chat and Claude on the web show MCP Apps too, but they cannot start a server on your
 computer.
 
 ### From a terminal
@@ -285,9 +285,9 @@ The **Language** menu has English, the language of your Garmin profile when it i
 languages that you add. The built-in languages are English, Italian, German, French, Spanish and
 Portuguese. The [page settings](#page-settings) can keep other built-in languages in the file. The
 page opens in the language of your Garmin profile until you choose one in the menu. _Auto_ follows
-the language of the browser. When the page has no texts in the language of your Garmin profile (for
-example Russian), it shows English and the settings menu says so, with the name of the language.
-When it makes the page, the assistant tells you, offers to add that language, and asks if you want
+the language of the browser. The page can have no texts in the language of your Garmin profile, for
+example Russian. Then it shows English, and the settings menu gives the name of that language. When
+the assistant makes the page, it tells you this. It offers to add that language and asks if you want
 one more. [Languages](languages.md) tells how to add a language.
 
 ## Units
@@ -329,12 +329,12 @@ assistant calls `writeDashboard` with `settings`:
 The server leaves the excluded data and sports out of the file, and out of the digest for the coach
 notes. The server cannot remove data from the chat. If another tool showed the data earlier in the
 same chat, the assistant has it. Then only the prompt tells the assistant not to use that data in
-the notes. Make a page for someone else in a new chat. A widget whose data is left out does not
-show. With `recovery` excluded, the page has no Recovery board. `names` removes the names of the
-activities; the sport stays. The file holds only the chosen languages and the CSS of the chosen
-themes. A page without English (`["it"]`) opens in Italian for every reader; English stays in the
-file only for a text that has no translation. With one language or one theme, the page has no menu
-to choose it.
+the notes. Make a page for someone else in a new chat. A widget does not show when the settings
+exclude its data. With `recovery` excluded, the page has no Recovery board. `names` removes the
+names of the activities; the sport stays. The file holds only the chosen languages and the CSS of
+the chosen themes. A page without English (`["it"]`) opens in Italian for every reader; English
+stays in the file only for a text that has no translation. With one language or one theme, the page
+has no menu to choose it.
 
 Each page keeps its own settings, so a personal page and a page for your coach can be two files, for
 example `garmin-dashboard.html` and `garmin-dashboard-coach.html`. In the `dashboard-setup`
@@ -343,7 +343,7 @@ relative path is in the data folder. An update without `settings` keeps the sett
 update a page with another file name, give its file to the prompt:
 `/mcp__garmin-personal__training-dashboard-update garmin-dashboard-coach.html`. The prompt
 `dashboard-language` takes the file in the same way. New settings replace all the old settings, and
-the old page is kept as `.bak`.
+the server keeps the old page as `.bak`.
 
 `workouts` is for a training plan whose sessions have the same name, for example "Tempo Run" every
 week. Garmin names a run "<place> - <workout>", and the place does not count: "Riverside - Drill
@@ -351,13 +351,13 @@ Workout" and "Hillview - Drill Workout" are one workout. Every prompt that makes
 it when your runs repeat a name. With `workouts`, the server also loads the laps of the last 8 runs
 of each repeated name. It downloads the .FIT file of each of those runs once, so the first build
 takes longer, and keeps it in the data folder. An older run whose file is already there keeps its
-laps, so the history grows with each update while an update downloads at most 8 files for each
-workout. The Workout trend widget compares those sessions: pace, HR, efficiency and running form,
-and for intervals the work laps, the reps and the fade. Without `workouts`, the page has no Workout
-trend widget.
+laps. The history grows with each update, but an update downloads at most 8 files for each workout.
+The Workout trend widget compares those sessions: pace, HR, efficiency and running form, and for
+intervals the work laps, the reps and the fade. Without `workouts`, the page has no Workout trend
+widget.
 
 Settings need a page from the template, or a page that the assistant designed (`freeform`) with a
-`garmin-settings` block. The freeform prompt adds that block when you turn on `workouts`.
+`garmin-settings` block. The freeform prompt adds that block when you set `workouts`.
 
 ## Keyboard and screen readers
 
@@ -371,15 +371,15 @@ Settings need a page from the template, or a page that the assistant designed (`
 
 ## How the page keeps your changes
 
-The page keeps its state in blocks of the file: the data, the layout, the custom widgets, the
-languages that you add and the [page settings](#page-settings). An update replaces only the data
-block and the block of the built-in languages, and adds the widgets of your widget library
-(`widgets.json` in the data folder).
+The page keeps its state in blocks of the file. The blocks hold the data, the layout, the custom
+widgets, the languages that you add and the [page settings](#page-settings). An update replaces only
+the data block and the block of the built-in languages. It also adds the widgets of your widget
+library (`widgets.json` in the data folder).
 
 The browser saves the layout when you select **Done**, but only in that browser. To keep the layout
 in the page, select **Copy layout** and give the text to your assistant. The assistant saves it with
 `editDashboard`. When the assistant saves a layout, the page shows the new layout and asks which one
-to use: **Keep mine** goes back to the layout of the browser, **Use the new one** deletes it from
-the browser.
+to use. **Keep mine** goes back to the layout of the browser. **Use the new one** deletes the layout
+from the browser.
 
 The choice of theme and language stays in the browser.
