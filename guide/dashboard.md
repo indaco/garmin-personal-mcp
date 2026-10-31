@@ -108,6 +108,8 @@ update is every day at 07:00. All the pages that update automatically use the sa
 - The computer must be on at that time. A Mac that was asleep updates the page when it wakes up. A
   Windows computer that was asleep or off updates the page when it starts again. Linux, and a Mac
   that was off, skip that time.
+- When an update is more than 1 hour late, the page shows a note. Ask your assistant "when does my
+  dashboard update?": the reply gives the last update and the pages that it could not update.
 - The server adds one job to the scheduler of your computer: launchd on macOS, your crontab on
   Linux, and Task Scheduler on Windows. The job reads the API key from the key file
   (`GARMIN_API_KEY_FILE`), never from your MCP client configuration. Save the key in that file

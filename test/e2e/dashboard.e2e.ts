@@ -41,6 +41,8 @@ const hash = (page: Page) => page.evaluate(() => location.hash);
 /** A copy of the object without the given fields. */
 const without = (o: object, fields: string[]) =>
   Object.fromEntries(Object.entries(o).filter(([k]) => !fields.includes(k)));
+/** The ISO time n hours from now. */
+const hours = (n: number) => new Date(Date.now() + n * 3_600_000).toISOString();
 /** Opens edit mode from the settings menu. */
 async function startEdit(page: Page): Promise<void> {
   await page.click(".account summary");
@@ -644,6 +646,47 @@ describe("edit mode", () => {
     await page.waitForSelector(".page");
     expect(await tiles(page)).toEqual([]);
     expect(await page.$(".banner")).toBeNull();
+  });
+
+  it("warns when the automatic refresh is over an hour late, and only then", async () => {
+    const missed = (due?: string) =>
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, updated: hours(-26), due } });
+    const banner = "[role=region][aria-label='Refresh missed']";
+
+    const late = await open(browser, missed(hours(-2)));
+    expect(await late.page.innerText(banner)).toMatch(
+      /^The automatic refresh has not updated this page since .*2\d{3}.*ask your assistant/,
+    );
+    expect(late.errors).toEqual([]);
+    // a run that starts after a wake gets an hour; no due means no schedule; a bad due is no due
+    for (const due of [hours(-0.5), hours(20), undefined, "soon"]) {
+      const { page, errors } = await open(browser, missed(due));
+      expect(await page.$(banner)).toBeNull();
+      expect(errors).toEqual([]);
+    }
+
+    // edit mode hides the note, Done brings it back
+    await startEdit(late.page);
+    expect(await late.page.$(banner)).toBeNull();
+    await late.page.click("text=Done");
+    expect(await late.page.$(banner)).not.toBeNull();
+  });
+
+  it("dates the late note with the day of an older page, and in the page language", async () => {
+    const older = pageFile({
+      data: { ...without(data, ["updated"]), v: DASHBOARD_VERSION, due: hours(-2) },
+      settings: { languages: ["en", "it"] },
+    });
+    const en = await open(browser, older, { locale: "en-US" });
+    // the fixture was generated on 2026-10-26 and has no time of day
+    expect(await en.page.innerText("[role=region][aria-label='Refresh missed']")).toContain(
+      "since Oct 26, 2026. The computer",
+    );
+    const italian = await open(browser, older, { locale: "it-IT" });
+    expect(
+      await italian.page.innerText("[role=region][aria-label='Aggiornamento saltato']"),
+    ).toMatch(/^L'aggiornamento automatico non ha aggiornato questa pagina dal .*26.*2026/);
+    expect([...en.errors, ...italian.errors]).toEqual([]);
   });
 
   it("saves the edits only on Done", async () => {

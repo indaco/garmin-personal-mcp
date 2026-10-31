@@ -730,9 +730,24 @@ function boardView(data: Data): HTMLElement {
   return h(
     "main",
     { id: "board", role: "tabpanel", "aria-labelledby": `tab-${view.tab}`, tabindex: "-1" },
+    !editing && missedBanner(data),
     mine && !editing && staleBanner(mine),
     caption,
     grid,
+  );
+}
+
+/** How late the automatic refresh may be: launchd and Task Scheduler start a missed run after a wake. */
+const LATE_MS = 60 * 60 * 1000;
+
+/** The automatic refresh was due over an hour ago and has not written the page since. */
+function missedBanner(data: Data): HTMLElement | false {
+  const due = Date.parse(data.due ?? "");
+  if (!(due + LATE_MS < Date.now())) return false;
+  return h(
+    "div",
+    { class: "banner", role: "region", "aria-label": t("due.label") },
+    h("p", {}, t("due.text", { date: writtenAt(data) ?? "" })),
   );
 }
 

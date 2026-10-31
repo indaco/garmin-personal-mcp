@@ -162,6 +162,14 @@ describe("cron", () => {
   });
 });
 
+/** A page with a data block, as the writer makes it. */
+const dashboard = (data: object) =>
+  `<script>window.GARMIN = /* garmin-data:start */${JSON.stringify(data)}/* garmin-data:end */;</script>`;
+const dataOf = (file: string) =>
+  JSON.parse(
+    /garmin-data:start \*\/(.*?)\/\* garmin-data:end/.exec(readFileSync(file, "utf8"))![1],
+  );
+
 describe("AutoRefresh", () => {
   let dir: string;
   let config: Config;
@@ -336,6 +344,47 @@ describe("AutoRefresh", () => {
     ).rejects.toThrow(/launchctl failed \(5\): Bootstrap failed/);
     expect(existsSync(join(config.dataDir, "auto-refresh.json"))).toBe(false);
   });
+
+  it("writes the next run into each scheduled page as due, and removes it when stopped", async () => {
+    const main = join(config.dataDir, "garmin-dashboard.html");
+    const coach = join(config.dataDir, "coach.html");
+    writeFileSync(main, dashboard({ weeks: 4 }));
+    writeFileSync(coach, dashboard({ weeks: 8 }));
+    const a = auto("linux");
+    await a.set({ cron: "0 7 * * *" });
+    await a.set({ path: "coach.html", cron: "0 18 * * *" });
+    const due = await a.due(main);
+    expect(new Date(due!).getHours()).toBe(18);
+    expect(dataOf(main)).toEqual({ weeks: 4, due });
+    expect(dataOf(coach)).toEqual({ weeks: 8, due });
+    expect(await a.due(join(config.dataDir, "other.html"))).toBeUndefined();
+
+    await a.off("coach.html");
+    expect(dataOf(coach)).toEqual({ weeks: 8 });
+    expect(dataOf(main)).toEqual({ weeks: 4, due });
+    await a.off();
+    expect(dataOf(main)).toEqual({ weeks: 4 });
+    expect(await a.due(main)).toBeUndefined();
+  });
+
+  it("keeps the last run for the status, and a new schedule keeps it too", async () => {
+    const a = auto("linux");
+    await a.set({});
+    expect(await a.status()).not.toHaveProperty("last");
+    const last = {
+      at: "2026-11-02T06:00:01.000Z",
+      failed: [{ path: "a.html", error: "HTTP 401" }],
+    };
+    await a.saveRun(last);
+    expect((await a.status()).last).toEqual(last);
+    await a.set({ cron: "0 6 * * *" });
+    expect((await a.status()).last).toEqual(last);
+  });
+
+  it("saves no run when no page has a schedule", async () => {
+    await auto("linux").saveRun({ at: new Date().toISOString(), failed: [] });
+    expect(existsSync(join(config.dataDir, "auto-refresh.json"))).toBe(false);
+  });
 });
 
 it("refreshPages goes on after a page fails", async () => {
@@ -349,7 +398,7 @@ it("refreshPages goes on after a page fails", async () => {
   };
   const r = await refreshPages(writer, ["a.html", "b.html"]);
   expect(written).toEqual(["a.html", "b.html"]);
-  expect(r.failed).toBe(true);
+  expect(r.failed).toEqual([{ path: "a.html", error: "gone" }]);
   expect(r.lines[0]).toMatch(/failed a\.html: gone$/);
   expect(r.lines[1]).toMatch(/updated b\.html$/);
 });

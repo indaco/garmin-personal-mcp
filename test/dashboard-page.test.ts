@@ -1,10 +1,11 @@
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DashboardWriter,
   languagesOf,
+  patchDue,
   readBlock,
   templateVersion,
   withData,
@@ -65,6 +66,9 @@ beforeEach(() => {
 });
 
 const page = () => readFileSync(file, "utf8");
+/** A page with only a data block, holding this JSON text. */
+const dataPage = (json: string) =>
+  `<script>/* garmin-data:start */${json}/* garmin-data:end */</script>`;
 /** The page without its data block: what an update must keep. */
 const code = (s: string) =>
   s.replace(/\/\* garmin-data:start \*\/[\s\S]*?\/\* garmin-data:end \*\//, "");
@@ -198,6 +202,62 @@ describe("writeDashboard", () => {
     expect(s.split("/* garmin-data:end */")).toHaveLength(2);
     expect(s.split("/* garmin-layout:start */")).toHaveLength(2);
     expect((readBlock(s, "data") as typeof data).activities[0].name).toBe(name);
+  });
+
+  it("writes the next automatic refresh of a scheduled page as due, and none for other pages", async () => {
+    await writer.write({});
+    expect(readBlock(page(), "data")).not.toHaveProperty("due");
+    const due = "2026-11-02T06:00:00.000Z";
+    const paths: string[] = [];
+    writer = new DashboardWriter(
+      async () => JSON.stringify(data),
+      dir,
+      async () => templateText,
+      {
+        due: async (path) => {
+          paths.push(path);
+          return due;
+        },
+      },
+    );
+    await writer.write({});
+    expect(readBlock(page(), "data")).toMatchObject({ due });
+    expect(paths).toEqual([file]);
+  });
+
+  it("patchDue sets, keeps or removes due, and leaves other files as they are", async () => {
+    const due = "2026-11-02T06:00:00.000Z";
+    const at = (name: string, text: string) => {
+      const f = join(dir, name);
+      writeFileSync(f, text);
+      return f;
+    };
+    const ok = at("ok.html", dataPage('{"weeks":4}'));
+    await patchDue(ok, due);
+    expect(readBlock(readFileSync(ok, "utf8"), "data")).toEqual({ weeks: 4, due });
+    // the same due writes nothing
+    const before = statSync(ok).mtimeMs;
+    await patchDue(ok, due);
+    expect(statSync(ok).mtimeMs).toBe(before);
+    await patchDue(ok, undefined);
+    expect(readBlock(readFileSync(ok, "utf8"), "data")).toEqual({ weeks: 4 });
+    // no due to remove: nothing changes
+    await patchDue(ok, undefined);
+    expect(readBlock(readFileSync(ok, "utf8"), "data")).toEqual({ weeks: 4 });
+
+    // a missing file, a page with no data yet, a broken block and a foreign file stay as they are
+    await patchDue(join(dir, "missing.html"), due);
+    expect(existsSync(join(dir, "missing.html"))).toBe(false);
+    for (const [name, text] of [
+      ["empty.html", dataPage("null")],
+      ["number.html", dataPage("4")],
+      ["broken.html", dataPage("{weeks")],
+      ["foreign.html", "<p>my page</p>"],
+    ]) {
+      const f = at(name, text);
+      await patchDue(f, due);
+      expect([name, readFileSync(f, "utf8")]).toEqual([name, text]);
+    }
   });
 
   it("writes the slashes of the data as they are, so paces cost no extra bytes", async () => {

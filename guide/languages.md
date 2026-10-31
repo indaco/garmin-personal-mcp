@@ -537,4 +537,6 @@ out. To add one:
 | `sport.badminton` | Badminton |
 | `sport.tableTennis` | Table tennis |
 | `sport.platformTennis` | Platform tennis |
+| `due.label` | Refresh missed |
+| `due.text` | The automatic refresh has not updated this page since {date}. The computer was perhaps off, or the refresh failed: ask your assistant to check the automatic refresh. |
 <!-- keys:end -->

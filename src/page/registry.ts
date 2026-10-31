@@ -34,6 +34,8 @@ export interface Data {
   server?: string;
   /** When the server wrote the page, as an ISO time; older pages have only `generated`. */
   updated?: string;
+  /** The next automatic refresh, as an ISO time; only on a page with a schedule. */
+  due?: string;
 }
 
 /** What a widget gets to draw itself. Built-in and custom widgets get the same. */

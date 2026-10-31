@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { version } from "../package.json";
 import { cli, HELP, summary } from "../src/cli";
-import type { Status } from "../src/schedule";
+import type { LastRun, Status } from "../src/schedule";
 
 const on: Status = {
   scheduled: true,
@@ -19,6 +19,7 @@ function fakes() {
     status: vi.fn(async () => on),
     set: vi.fn(async () => on),
     off: vi.fn(async (): Promise<Status> => ({ scheduled: false })),
+    saveRun: vi.fn<(last: LastRun) => Promise<void>>(async () => {}),
   };
   const written: (string | undefined)[] = [];
   const writer = () => ({
@@ -53,9 +54,22 @@ describe("cli", () => {
     expect(await cli("refresh", [], f.auto, f.writer)).toMatchObject({ code: 0 });
     expect(f.written).toEqual(["a.html", ""]);
 
+    expect(f.auto.saveRun).not.toHaveBeenCalled();
+
     const all = await cli("refresh", ["--auto"], f.auto, f.writer);
     expect(all.code).toBe(1);
     expect(all.stdout).toMatch(/updated a\.html\n.*failed b\.html: gone$/);
+    expect(f.auto.saveRun).toHaveBeenCalledWith({
+      at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/),
+      failed: [{ path: "b.html", error: "gone" }],
+    });
+  });
+
+  it("saves a run of --auto with no failed page, and exits with 0", async () => {
+    const f = fakes();
+    f.auto.pages.mockResolvedValue(["a.html"]);
+    expect(await cli("refresh", ["--auto"], f.auto, f.writer)).toMatchObject({ code: 0 });
+    expect(f.auto.saveRun).toHaveBeenCalledWith({ at: expect.any(String), failed: [] });
   });
 
   it("reads, sets and stops the schedule, with a page as the last word", async () => {
@@ -94,6 +108,17 @@ describe("cli", () => {
     );
     expect(summary({ ...on, installed: false })).toContain(
       "The job is missing from launchd: run the schedule again.",
+    );
+  });
+
+  it("prints the last run and the pages it could not update", () => {
+    const ok = { at: "2026-11-02T06:00:00.000Z", failed: [] };
+    expect(summary({ ...on, last: ok })).toContain(
+      "Last run: 2026-11-02T06:00:00.000Z, every page updated\nLog:",
+    );
+    const bad = { ...ok, failed: [{ path: "/d/a.html", error: "HTTP 401" }] };
+    expect(summary({ ...on, last: bad })).toContain(
+      "Last run: 2026-11-02T06:00:00.000Z, failed:\n  /d/a.html: HTTP 401\nLog:",
     );
   });
 });

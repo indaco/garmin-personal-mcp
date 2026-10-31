@@ -56,7 +56,7 @@ The data folder has:
 | `exercises.json`                            | the exercise catalogue of Garmin, for the muscles of each exercise     |
 | `dashboard-cache.json`                      | the dashboard data of the last calls                                   |
 | `widgets.json`                              | your custom widgets: every dashboard page gets them                    |
-| `auto-refresh.json`                         | the automatic update: its cron expression and its pages                |
+| `auto-refresh.json`                         | the automatic update: its cron expression, its pages and the last run  |
 | `auto-refresh.cmd`, `auto-refresh-task.xml` | Windows only: the script and the task of the automatic update          |
 
 The server writes its log to `~/.cache/garmin-personal-mcp/garmin-personal-mcp.log`. When the log

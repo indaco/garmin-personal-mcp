@@ -1,6 +1,6 @@
 import { version } from "../package.json";
 import type { DashboardWriter } from "./dashboard-page";
-import { type AutoRefresh, cronOf, refreshPages, type Status } from "./schedule";
+import { type AutoRefresh, cronOf, type LastRun, refreshPages, type Status } from "./schedule";
 
 /** The commands for a terminal or a scheduler; any other start is the MCP server. */
 export const COMMANDS = ["refresh", "schedule", "--version", "-v", "--help", "-h"];
@@ -35,16 +35,19 @@ export interface CliResult {
 export async function cli(
   command: string,
   args: string[],
-  auto: Pick<AutoRefresh, "pages" | "status" | "set" | "off">,
+  auto: Pick<AutoRefresh, "pages" | "status" | "set" | "off" | "saveRun">,
   writer: () => Pick<DashboardWriter, "write">,
 ): Promise<CliResult> {
   if (command === "--version" || command === "-v") return { code: 0, stdout: version };
   if (command === "--help" || command === "-h") return { code: 0, stdout: HELP };
   try {
     if (command === "refresh") {
-      const pages = args[0] === "--auto" ? await auto.pages() : [args[0] ?? ""];
+      const scheduled = args[0] === "--auto";
+      const at = new Date().toISOString();
+      const pages = scheduled ? await auto.pages() : [args[0] ?? ""];
       const { lines, failed } = await refreshPages(writer(), pages);
-      return { code: failed ? 1 : 0, stdout: lines.join("\n") };
+      if (scheduled) await auto.saveRun({ at, failed });
+      return { code: failed.length > 0 ? 1 : 0, stdout: lines.join("\n") };
     }
     const rest = [...args];
     const path = rest.at(-1)?.toLowerCase().endsWith(".html") ? rest.pop() : undefined;
@@ -60,6 +63,14 @@ export async function cli(
   }
 }
 
+function lastLine(last: LastRun): string {
+  if (last.failed.length === 0) return `Last run: ${last.at}, every page updated`;
+  return [
+    `Last run: ${last.at}, failed:`,
+    ...last.failed.map((f) => `  ${f.path}: ${f.error}`),
+  ].join("\n");
+}
+
 export function summary(s: Status): string {
   if (!s.scheduled) return "Automatic refresh is off.";
   return [
@@ -67,6 +78,7 @@ export function summary(s: Status): string {
     "Pages:",
     ...s.pages!.map((p) => `  ${p}`),
     ...(s.installed ? [] : [`The job is missing from ${s.scheduler}: run the schedule again.`]),
+    ...(s.last ? [lastLine(s.last)] : []),
     `Log: ${s.log}`,
   ].join("\n");
 }
