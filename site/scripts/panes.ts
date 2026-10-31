@@ -1,9 +1,11 @@
 import { arrowKeys, selectTab } from "./tabs";
 
-/** The client tabs of "start in three steps": one pane at a time. */
-export function clients(): void {
-  const list = document.querySelector<HTMLElement>(".clients");
-  if (!list) return;
+/** Tab lists with a pane per tab (the clients of "start", the dashboard views): one pane at a time. */
+export function panes(): void {
+  for (const list of document.querySelectorAll<HTMLElement>(".panes")) tabPanes(list);
+}
+
+function tabPanes(list: HTMLElement): void {
   const tabs = [...list.querySelectorAll<HTMLElement>('[role="tab"]')];
   for (const t of tabs) {
     t.tabIndex = t.getAttribute("aria-selected") === "true" ? 0 : -1;

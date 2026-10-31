@@ -60,6 +60,8 @@ out. To add one:
 | `period` | {from} to {to} |
 | `inProgress` | * week in progress |
 | `menu.settings` | Settings |
+| `chat.fullscreen` | Full screen |
+| `chat.exitFullscreen` | Exit full screen |
 | `menu.theme` | Theme |
 | `footer.updated` | Data from Garmin Connect, updated {date} |
 | `footer.failed` | Days not read from Garmin: {n} (their values show n/a) |

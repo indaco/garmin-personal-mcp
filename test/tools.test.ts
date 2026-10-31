@@ -1167,5 +1167,40 @@ describe("MCP tools", () => {
       expect(writer.edit).toHaveBeenCalledWith(args);
       expect(textOf(result)).toBe('{"edited":1}');
     });
+
+    it("showDashboard gives the model the digest and the page the blocks", async () => {
+      const blocks = { data: { weeks: 4 }, layout: null, widgets: [], languages: {}, i18n: {} };
+      const view = vi.fn().mockResolvedValue({
+        path: "/d/a.html",
+        digest: { totals: {} },
+        blocks: { ...blocks, settings: { title: "T" } },
+      });
+      const client = await connectHandlers({ ...writer, view }, dashboard);
+      const result = await client.callTool({
+        name: "showDashboard",
+        arguments: { weeks: 4, path: "a.html" },
+      });
+      expect(view).toHaveBeenCalledWith({ weeks: 4, path: "a.html" });
+      // the large data stays out of the text that the model reads
+      expect(JSON.parse(textOf(result))).toEqual({
+        path: "/d/a.html",
+        digest: { totals: {} },
+        settings: { title: "T" },
+      });
+      expect(result.structuredContent).toEqual({ ...blocks, settings: { title: "T" } });
+    });
+
+    it("links showDashboard to the page resource, served as an MCP App", async () => {
+      const template = vi.fn().mockResolvedValue("<html>page</html>");
+      const client = await connectHandlers({ ...writer, template }, dashboard);
+      const { tools: listed } = await client.listTools();
+      const uri = "ui://garmin-personal/dashboard.html";
+      expect(listed.find((t) => t.name === "showDashboard")).toMatchObject({
+        _meta: { ui: { resourceUri: uri } },
+      });
+      expect((await client.readResource({ uri })).contents).toEqual([
+        { uri, mimeType: "text/html;profile=mcp-app", text: "<html>page</html>" },
+      ]);
+    });
   });
 });

@@ -26,6 +26,14 @@
   }
 }
 @media (max-width: 720px) {
+  /* on a phone the shape of the GIF crops the page in the chat: the chat takes its own height */
+  .chat {
+    aspect-ratio: auto;
+    & img {
+      flex: none;
+      height: auto;
+    }
+  }
   .wrap {
     padding-left: max(16px, env(safe-area-inset-left, 0px));
     padding-right: max(16px, env(safe-area-inset-right, 0px));

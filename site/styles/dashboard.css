@@ -3,7 +3,7 @@
   grid-column: 1 / 7;
 }
 /* the dark frame of the GIF ends in a 56px bar with the demo action joined to its right end, like the
-   install bar and its copy button */
+   install bar and its copy button; tabs at its top switch between the page file and the chat */
 .shot {
   grid-column: 1 / 9;
   margin: 0;
@@ -18,7 +18,7 @@
   & .shot-image:hover img {
     opacity: 0.9;
   }
-  & figcaption {
+  & .shot-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -44,6 +44,75 @@
       background: var(--mint);
       color: var(--field-ink);
     }
+  }
+}
+.views {
+  display: flex;
+  margin: -14px -14px 14px;
+  & button {
+    padding: 12px 20px;
+    border: 0;
+    background: none;
+    color: var(--sky);
+    font: 600 14px var(--body);
+    cursor: pointer;
+    &:hover {
+      color: var(--mint);
+    }
+  }
+  & button[aria-selected="true"] {
+    background: var(--sky);
+    color: var(--field-ink);
+    &:hover {
+      background: var(--mint);
+      color: var(--field-ink);
+    }
+  }
+}
+/* the chat pane keeps the shape of the GIF, so the section does not jump when the view changes */
+.chat {
+  aspect-ratio: 8 / 5;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  overflow: hidden;
+  background: rgb(255 255 255 / 0.03);
+  color: var(--code-fg);
+  & p {
+    margin: 0;
+  }
+  & .me {
+    align-self: flex-end;
+    max-width: 70%;
+    padding: 8px 12px;
+    background: rgb(255 255 255 / 0.1);
+    font-size: 15px;
+  }
+  & .call {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--slate);
+    font: 500 12px var(--code);
+    & svg {
+      color: var(--mint);
+    }
+    & code {
+      font: inherit;
+    }
+  }
+  & img {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    object-fit: cover;
+    object-position: top;
+    border: 1px solid rgb(255 255 255 / 0.12);
+  }
+  & .reply {
+    color: var(--slate);
+    font-size: 14px;
   }
 }
 .facts {

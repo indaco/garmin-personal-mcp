@@ -9,29 +9,83 @@
           every client.
         </p>
       </div>
-      <figure class="shot">
-        <a class="shot-image" href="demo/index.html"
-          ><img
-            src="dashboard.gif"
-            width="800"
-            height="500"
-            alt="Open the demo dashboard: the All board, load against recovery, the Run board, strength trends, edit mode (drag a widget to a new place, hide a widget, add widgets from the catalogue to an empty board), and the light and high-contrast themes"
-        /></a>
-        <figcaption>
-          <span>The training dashboard, with demo data.</span>
-          <a class="demo-go" href="demo/index.html"
-            >open the demo
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-              <path
-                d="M1 8H14M9 3l5 5-5 5"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              /></svg
-          ></a>
-        </figcaption>
+      <figure class="shot" aria-label="The training dashboard, with demo data">
+        <div class="views panes" role="tablist" aria-label="How you see the dashboard">
+          <button type="button" role="tab" aria-selected="true" aria-controls="v-file" id="t-file">
+            page file
+          </button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="v-chat" id="t-chat">
+            in the chat
+          </button>
+        </div>
+        <div class="view" role="tabpanel" id="v-file" aria-labelledby="t-file">
+          <a class="shot-image" href="demo/index.html"
+            ><img
+              src="dashboard.gif"
+              width="800"
+              height="500"
+              alt="Open the demo dashboard: the All board, load against recovery, the Run board, strength trends, edit mode (drag a widget to a new place, hide a widget, add widgets from the catalogue to an empty board), and the light and high-contrast themes"
+          /></a>
+          <div class="shot-bar">
+            <span>The training dashboard, with demo data.</span>
+            <a class="demo-go" href="demo/index.html"
+              >open the demo
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                <path
+                  d="M1 8H14M9 3l5 5-5 5"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                /></svg
+            ></a>
+          </div>
+        </div>
+        <div class="view" role="tabpanel" id="v-chat" aria-labelledby="t-chat" hidden>
+          <div class="chat">
+            <p class="me">show my training dashboard</p>
+            <p class="call">
+              <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" />
+              </svg>
+              garmin-personal · <code>showDashboard</code>
+            </p>
+            <img
+              src="dashboard-chat.webp"
+              width="760"
+              height="480"
+              loading="lazy"
+              alt="The same dashboard inside a chat, with demo data: the title, the week window, the board tabs and the overview, and a full-screen button next to Settings"
+            />
+            <p class="reply">
+              Here is your dashboard with new data. The digest gives the totals of each sport and
+              week, the load and the recovery.
+            </p>
+          </div>
+          <div class="shot-bar">
+            <span>The same page in the chat, in assistants that show MCP Apps.</span>
+            <a
+              class="demo-go"
+              href="https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#in-the-chat"
+              >how it works
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                <path
+                  d="M1 8H14M9 3l5 5-5 5"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                /></svg
+            ></a>
+          </div>
+        </div>
       </figure>
       <dl class="facts">
+        <div>
+          <dt>also in the chat</dt>
+          <dd>
+            In assistants that show MCP Apps, <code>showDashboard</code> shows the page in the chat.
+            No file, and the data stays out of the model's context.
+          </dd>
+        </div>
         <div>
           <dt>one HTML file</dt>
           <dd>Works offline. Chart.js is inside, and the page's own code sends no requests.</dd>

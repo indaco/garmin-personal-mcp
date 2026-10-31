@@ -123,8 +123,8 @@ Where each part of the server and the page is.
 | `scripts/third-party-notices.mjs`    | writes `THIRD-PARTY-NOTICES.md` after each build                                     |
 | `scripts/fill-dashboard-fixture.mjs` | fills `dist/dashboard.html` with a data file, for screenshots and checks             |
 | `scripts/demo-dashboard.mjs`         | writes the demo of the website in `dist-site/demo/`: sample data and the filled page |
-| `scripts/demo-gif.mjs`               | records `assets/dashboard.gif` from the data of the website demo                     |
-| `scripts/demo-stamp.mjs`             | the hash of the GIF inputs, in `assets/dashboard.gif.sha256`                         |
+| `scripts/demo-gif.mjs`               | records `assets/dashboard.gif` and `assets/dashboard-chat.webp` from the demo data   |
+| `scripts/demo-stamp.mjs`             | the hash of the inputs of the demo images, in `assets/dashboard.gif.sha256`          |
 | `site/`                              | the project website: template, partials, styles, script and public files             |
 | `scripts/build-site.mjs`             | writes `dist-site/`: the website, with its facts from the code and README            |
 
@@ -151,11 +151,12 @@ pnpm exec playwright-core install --only-shell chromium
 `pnpm fmt` corrects the format. `pnpm guide` writes the generated parts of `guide/`.
 
 The README and the website show the same demo, `assets/dashboard.gif`. `pnpm demo` records it from
-the data of the website demo, and writes the hash of its inputs to `assets/dashboard.gif.sha256`.
+the data of the website demo, with `assets/dashboard-chat.webp`, the page in a chat on the website.
+It writes the hash of their inputs to `assets/dashboard.gif.sha256`.
 The inputs are the page sources, the English texts and the demo scripts. After a change to them, the
-site test and `pnpm build:site` fail until you record the GIF again. `pnpm build:all` records it
-only when the inputs changed. Recording needs the build and ImageMagick. Commit the GIF and its hash
-file. The demo data ends on a fixed date, `DEMO_END` in `scripts/demo-dashboard.mjs`.
+site test and `pnpm build:site` fail until you record the images again. `pnpm build:all` records
+them only when the inputs changed. Recording needs the build and ImageMagick. Commit the images and
+the hash file. The demo data ends on a fixed date, `DEMO_END` in `scripts/demo-dashboard.mjs`.
 
 After a dependency change, commit the new `THIRD-PARTY-NOTICES.md` that the build writes. CI fails when the
 file does not match the bundle.

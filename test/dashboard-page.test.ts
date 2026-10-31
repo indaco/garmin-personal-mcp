@@ -636,4 +636,54 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
     await writer.write({ layout: "preset", settings: {} });
     expect((await writer.preview({})).settings).toEqual({});
   });
+
+  it("views a new page with the preset layout and writes nothing", async () => {
+    const r = await writer.view({});
+    expect(existsSync(file)).toBe(false);
+    expect(r.blocks.layout).toEqual({ rev: "preset", base: "preset", boards: {} });
+    expect(r.blocks.settings).toEqual({});
+    expect((r.blocks.data as Full).activities.map((a) => a.id)).toEqual([1, 2]);
+    expect(r.digest).toEqual(digest(full));
+  });
+
+  it("views the saved page: its blocks and settings, with the same data filter", async () => {
+    await writer.write({ settings: { sports: ["running"], exclude: ["names", "zones"] } });
+    await writer.edit({ languages: { de: { title: "Training" } } });
+    const saved = page();
+    const { blocks, digest: d, path } = await writer.view({});
+    expect(page()).toBe(saved);
+    expect(path).toBe(file);
+    expect(blocks.settings).toEqual({ sports: ["running"], exclude: ["names", "zones"] });
+    for (const b of ["layout", "widgets", "languages", "i18n"] as const) {
+      expect(blocks[b]).toEqual(readBlock(saved, b));
+    }
+    const { updated: _, ...rest } = blocks.data as Full & { updated: string };
+    const { updated: __, ...written } = readBlock(saved, "data") as Full & { updated: string };
+    expect(rest).toEqual(written);
+    expect(JSON.stringify(blocks.data)).not.toContain("Run with Anna");
+    expect(blocks.data).not.toHaveProperty("zones");
+    expect(Object.keys(d.totals)).toEqual(["running"]);
+  });
+
+  it("views a page that Claude wrote with the preset layout, and its settings still filter", async () => {
+    const own =
+      "<html><script>/* garmin-settings:start */null/* garmin-settings:end */ /* garmin-data:start */null/* garmin-data:end */</script></html>";
+    await writer.write({ page: own, settings: { exclude: ["names"] } });
+    const { blocks } = await writer.view({});
+    expect(blocks.layout).toEqual({ rev: "preset", base: "preset", boards: {} });
+    expect(blocks.settings).toEqual({ exclude: ["names"] });
+    expect(JSON.stringify(blocks.data)).not.toContain("Run with Anna");
+  });
+
+  it("refuses to view a page whose settings block cannot be read, and names the way out", async () => {
+    await writer.write({ settings: { exclude: ["names"] } });
+    writeFileSync(
+      file,
+      page().replace(/garmin-settings:start \*\/.*?\/\*/, "garmin-settings:start */{oops/*"),
+    );
+    // without readable settings the view could show data that the page leaves out
+    await expect(writer.view({})).rejects.toThrow(
+      /settings block of the page is not valid JSON in .*garmin-dashboard\.html: give new settings, or delete the file/,
+    );
+  });
 });

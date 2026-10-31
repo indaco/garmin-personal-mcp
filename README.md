@@ -174,6 +174,7 @@ Ask "list my last 5 activities". The first time that a garmin-personal tool asks
 | `getDashboardData`         | all the dashboard data in one call, with the server's totals and a local cache |
 | `writeDashboard`           | writes the dashboard page                                                      |
 | `editDashboard`            | changes the layout, the custom widgets and the languages of the page           |
+| `showDashboard`            | shows the dashboard in the chat, in assistants that support MCP Apps           |
 | `scheduleDashboardRefresh` | updates a dashboard page automatically, at the times you say in your own words |
 | `garminGet`                | all other GET endpoints of the Personal API                                    |
 
@@ -298,6 +299,12 @@ coach notes. My measurements for a first build, with Claude Code and Opus
 For a design of your own, use `layout` = `freeform`: Claude writes the page, as in those guides.
 
 [Presets or freeform](guide/presets.md) gives the measurements and the limits of the presets.
+
+### In the chat
+
+Some assistants show MCP Apps: small pages from the server, inside the chat. In those assistants,
+ask "show my dashboard": `showDashboard` shows your page with new data, and writes no file. Other
+assistants show only a short text. [In the chat](guide/dashboard.md#in-the-chat) gives the limits.
 
 ## Coach prompts
 

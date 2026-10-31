@@ -1182,33 +1182,36 @@
     fill: var(--accent);
     stroke: none;
   }
-  /* Account menu */
+  /* Account menu, and the full-screen button of the chat in the same round shape */
   .account {
     position: relative;
-    & summary {
-      display: grid;
-      place-items: center;
-      width: 32px;
-      height: 32px;
-      border: 1px solid var(--line);
-      border-radius: var(--corner, 50%);
-      background: var(--panel2);
-      color: var(--muted);
-      list-style: none;
-      cursor: pointer;
-    }
     & summary::-webkit-details-marker {
       display: none;
     }
-    & summary:hover,
-    &[open] summary {
-      color: var(--text);
-      border-color: var(--accent);
-    }
-    & summary .icon {
+  }
+  .account summary,
+  .screen-mode {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--corner, 50%);
+    background: var(--panel2);
+    color: var(--muted);
+    list-style: none;
+    cursor: pointer;
+    & .icon {
       width: 18px;
       height: 18px;
     }
+  }
+  .account summary:hover,
+  .account[open] summary,
+  .screen-mode:hover {
+    color: var(--text);
+    border-color: var(--accent);
   }
   .account-panel {
     position: absolute;

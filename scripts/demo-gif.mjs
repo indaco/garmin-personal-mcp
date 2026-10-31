@@ -1,6 +1,7 @@
 // Records assets/dashboard.gif, the demo of the README and the website: the page template filled with
-// the data of the website demo (scripts/demo-dashboard.mjs), in headless Chromium, and writes the hash
-// of its inputs (scripts/demo-stamp.mjs). Needs `pnpm build` first, the Playwright Chromium and
+// the data of the website demo (scripts/demo-dashboard.mjs), in headless Chromium. Also records
+// assets/dashboard-chat.webp, the same page as a chat that shows MCP Apps shows it, and writes the hash
+// of their inputs (scripts/demo-stamp.mjs). Needs `pnpm build` first, the Playwright Chromium and
 // ImageMagick (`magick`). `--if-stale` records only when the inputs changed since the last recording.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -9,6 +10,8 @@ import { join } from "node:path";
 import { chromium } from "playwright-core";
 import { demoStamp, gifIsCurrent, STAMP_FILE } from "./demo-stamp.mjs";
 import { fillPage } from "./fill-dashboard-fixture.mjs";
+
+const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 
 if (process.argv.includes("--if-stale") && gifIsCurrent()) {
   console.log("assets/dashboard.gif is current");
@@ -124,7 +127,52 @@ for (const theme of ["light", "hcDark"]) {
   await page.keyboard.press("Escape");
   await shot(page);
 }
+// The page in a chat: a host frame that offers full screen and sends the blocks of showDashboard, as
+// src/page/mcp-app.ts expects; the page has no own URL and no storage there, as in a real host
+const chat = await (
+  await browser.newContext({ viewport: { width: 760, height: 480 }, deviceScaleFactor: 2 })
+).newPage();
+await chat.setContent(
+  '<!doctype html><body style="margin:0"><iframe sandbox="allow-scripts" style="display:block;border:0;width:760px;height:480px"></iframe></body>',
+);
+const blocks = {
+  data: { updated: new Date().toISOString(), ...data, server: version, notes: [] },
+  layout: null,
+  widgets: [],
+  languages: {},
+  i18n: {},
+  settings: { workouts: true },
+};
+await chat.evaluate(
+  ([html, b]) => {
+    const frame = document.querySelector("iframe");
+    const post = (m) => frame.contentWindow.postMessage({ jsonrpc: "2.0", ...m }, "*");
+    addEventListener("message", ({ data: m }) => {
+      if (m?.method === "ui/initialize") {
+        const hostContext = {
+          displayMode: "inline",
+          availableDisplayModes: ["inline", "fullscreen"],
+        };
+        const result = { protocolVersion: m.params.protocolVersion, hostContext };
+        post({ id: m.id, result: { ...result, hostInfo: { name: "demo", version: "1" } } });
+      }
+      if (m?.method === "ui/notifications/initialized") {
+        post({
+          method: "ui/notifications/tool-result",
+          params: { content: [], structuredContent: b },
+        });
+      }
+    });
+    frame.srcdoc = html;
+  },
+  [readFileSync("dist/dashboard.html", "utf8"), blocks],
+);
+await chat.frames()[1].waitForSelector(".screen-mode");
+await chat.waitForTimeout(800); // the chart animations
+const still = join(dir, "chat.png");
+await chat.screenshot({ path: still });
 await browser.close();
+execFileSync("magick", [still, "-quality", "82", "assets/dashboard-chat.webp"]);
 
 execFileSync("magick", [
   "-delay",
@@ -141,4 +189,6 @@ execFileSync("magick", [
   "assets/dashboard.gif",
 ]);
 writeFileSync(STAMP_FILE, `${demoStamp()}\n`);
-console.log(`assets/dashboard.gif written (${frames.length} frames), and ${STAMP_FILE}`);
+console.log(
+  `assets/dashboard.gif (${frames.length} frames), assets/dashboard-chat.webp and ${STAMP_FILE} written`,
+);

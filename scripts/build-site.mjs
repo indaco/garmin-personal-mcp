@@ -230,10 +230,11 @@ function main() {
   copyFileSync("assets/logo-192.png", `${OUT}/icon-192.png`);
   if (!gifIsCurrent()) {
     throw new Error(
-      "assets/dashboard.gif is stale: its page or demo scripts changed. Run pnpm demo",
+      "The demo images are stale: the page or the demo scripts changed. Run pnpm demo",
     );
   }
   copyFileSync("assets/dashboard.gif", `${OUT}/dashboard.gif`);
+  copyFileSync("assets/dashboard-chat.webp", `${OUT}/dashboard-chat.webp`);
   if (!existsSync("dist/dashboard.html"))
     throw new Error("the demo needs the dashboard template: run pnpm build first");
   // the demo script writes into dist-site/demo/ by default; the page needs only its HTML
