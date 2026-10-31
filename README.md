@@ -300,6 +300,12 @@ For a design of your own, use `layout` = `freeform`: Claude writes the page, as 
 
 [Presets or freeform](guide/presets.md) gives the measurements and the limits of the presets.
 
+### In the chat
+
+Some assistants show MCP Apps: small pages from the server, inside the chat. In those assistants,
+ask "show my dashboard": `showDashboard` shows your page with new data, and writes no file. Other
+assistants show only a short text. [In the chat](guide/dashboard.md#in-the-chat) gives the limits.
+
 ## Coach prompts
 
 These prompts answer in the chat. They do not change a dashboard.

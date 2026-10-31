@@ -10,6 +10,7 @@ heart rate. The server writes the file, and the assistant writes the coach notes
 - [Change the layout](#change-the-layout)
 - [Themes and languages](#themes-and-languages)
 - [Page settings](#page-settings)
+- [In the chat](#in-the-chat)
 - [How the page keeps your changes](#how-the-page-keeps-your-changes)
 
 ## Make the dashboard
@@ -316,6 +317,23 @@ Settings need a page from the template, or a page that the assistant designed (`
 - Each chart has its data as a table that screen readers read instead of the picture.
 - In edit mode the grip and the right edge of a widget work from the keyboard too: see
   [Change the layout](#change-the-layout).
+
+## In the chat
+
+Some assistants show MCP Apps: pages from an MCP server, inside the chat. In those assistants, ask
+your assistant to show the dashboard. The assistant calls `showDashboard`, and the chat shows the
+page with new data.
+
+- The page has the layout, the custom widgets, the languages and the settings of your saved page.
+  Without a saved page, it has the preset widgets.
+- The server writes no file, and the page has no coach notes.
+- The data goes only to the page. The assistant gets the digest of the data, as with
+  `writeDashboard`.
+- A layout that you change in the chat is not saved in the file.
+- The assistant can block the code of custom widgets. Then a custom widget shows an error, and the
+  other widgets show as usual. The page file always runs custom widgets.
+- Other assistants show only the text reply. There, the training-dashboard prompt writes the page as
+  a file.
 
 ## How the page keeps your changes
 
