@@ -1,17 +1,24 @@
-// Records assets/dashboard.gif, the README demo: the page template filled with the synthetic data of
-// the page tests, in headless Chromium. Needs `pnpm build` first, the Playwright Chromium and
-// ImageMagick (`magick`).
+// Records assets/dashboard.gif, the demo of the README and the website: the page template filled with
+// the data of the website demo (scripts/demo-dashboard.mjs), in headless Chromium, and writes the hash
+// of its inputs (scripts/demo-stamp.mjs). Needs `pnpm build` first, the Playwright Chromium and
+// ImageMagick (`magick`). `--if-stale` records only when the inputs changed since the last recording.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
-import { asServer, fillPage } from "./fill-dashboard-fixture.mjs";
+import { demoStamp, gifIsCurrent, STAMP_FILE } from "./demo-stamp.mjs";
+import { fillPage } from "./fill-dashboard-fixture.mjs";
+
+if (process.argv.includes("--if-stale") && gifIsCurrent()) {
+  console.log("assets/dashboard.gif is current");
+  process.exit(0);
+}
 
 const dir = mkdtempSync(join(tmpdir(), "dashboard-demo-"));
-const data = JSON.parse(readFileSync("test/fixtures/dashboard-data.json", "utf8"));
-// the test data has laps on every run: keep the ones that the server gives a page with the workout comparison
-asServer(data.activities, true);
+const json = join(dir, "demo-data.json");
+execFileSync("node", ["scripts/demo-dashboard.mjs", json], { stdio: "ignore" });
+const data = JSON.parse(readFileSync(json, "utf8"));
 
 function pageFile(name, layout, settings = null) {
   const page = fillPage(readFileSync("dist/dashboard.html", "utf8"), data, layout, settings);
@@ -59,9 +66,12 @@ await shot(page);
 await page.click("[data-tab=running]");
 await page.evaluate(() => window.scrollTo(0, 0));
 await shot(page);
-await page.click("[data-id=workoutTrend] >> text=Track Intervals (6)");
-await page.click("[data-id=workoutTrend] >> text=Tempo Run (6)");
-await page.click("[data-id=workoutTrend] >> text=Long Run (10)");
+// the widget starts with the newest repeated run: choose exactly these three
+const chips = "[data-id=workoutTrend] [aria-label='Workouts to compare'] button";
+for (const name of ["Track Intervals", "Tempo Run", "Long Run"]) {
+  const chip = page.locator(chips, { hasText: new RegExp(`^${name} \\(`) });
+  if ((await chip.getAttribute("aria-pressed")) !== "true") await chip.click();
+}
 await page.click("[data-id=workoutTrend] >> text=Efficiency");
 await scrollTo(page, "workoutTrend");
 await shot(page);
@@ -130,4 +140,5 @@ execFileSync("magick", [
   "optimize",
   "assets/dashboard.gif",
 ]);
-console.log(`assets/dashboard.gif written (${frames.length} frames)`);
+writeFileSync(STAMP_FILE, `${demoStamp()}\n`);
+console.log(`assets/dashboard.gif written (${frames.length} frames), and ${STAMP_FILE}`);

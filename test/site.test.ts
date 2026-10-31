@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { facts, render, themeGroups } from "../scripts/build-site.mjs";
+import { gifIsCurrent, STAMP_FILE } from "../scripts/demo-stamp.mjs";
 import { THEMES } from "../src/page/theme";
 import { AUTHORED, QUESTIONS } from "../site/questions";
 
@@ -13,6 +14,13 @@ const g = (group: string, n: number) => Array.from({ length: n }, () => ({ group
 
 describe("site facts", () => {
   const f = facts();
+
+  it("has a demo GIF recorded from the current page and demo data", () => {
+    // the README and the website show assets/dashboard.gif: after a change to its inputs, run pnpm demo
+    expect(gifIsCurrent(), `assets/dashboard.gif is stale: run pnpm demo (${STAMP_FILE})`).toBe(
+      true,
+    );
+  });
 
   it("lists the tools that the server registers, from the README table", () => {
     expect(f.tools.map((t) => t.name).toSorted()).toEqual(names("test/fixtures/tool-list.json"));
