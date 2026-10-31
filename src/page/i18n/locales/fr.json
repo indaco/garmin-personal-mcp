@@ -482,5 +482,7 @@
   "sport.squash": "Squash",
   "sport.badminton": "Badminton",
   "sport.tableTennis": "Tennis de table",
-  "sport.platformTennis": "Platform tennis"
+  "sport.platformTennis": "Platform tennis",
+  "due.label": "Actualisation manquée",
+  "due.text": "L'actualisation automatique n'a pas mis à jour cette page depuis {date}. L'ordinateur était peut-être éteint, ou l'actualisation a échoué : demande à ton assistant de vérifier l'actualisation automatique."
 }

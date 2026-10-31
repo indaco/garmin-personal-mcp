@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { version } from "../package.json";
-import { cli, HELP, summary } from "../src/cli";
-import type { Status } from "../src/schedule";
+import { cli, HELP, RETRY_MS, summary } from "../src/cli";
+import type { LastRun, Status } from "../src/schedule";
 
 const on: Status = {
   scheduled: true,
@@ -19,6 +19,8 @@ function fakes() {
     status: vi.fn(async () => on),
     set: vi.fn(async () => on),
     off: vi.fn(async (): Promise<Status> => ({ scheduled: false })),
+    missed: vi.fn(async () => true),
+    saveRun: vi.fn<(last: LastRun) => Promise<void>>(async () => {}),
   };
   const written: (string | undefined)[] = [];
   const writer = () => ({
@@ -30,6 +32,28 @@ function fakes() {
   });
   return { auto, writer, written };
 }
+
+/** A writer whose pages fail with the next error of their list; a page with no error left works. */
+function flaky(errors: Record<string, string[]>) {
+  const written: string[] = [];
+  const writer = () => ({
+    write: async (o: { path?: string }) => {
+      written.push(o.path!);
+      const error = errors[o.path!]?.shift();
+      if (error) throw new Error(error);
+      return {} as never;
+    },
+  });
+  return { writer, written };
+}
+
+/** A sleep that only records how long it would wait. */
+function sleeper() {
+  const waits: number[] = [];
+  return { waits, sleep: async (ms: number) => void waits.push(ms) };
+}
+
+const OFFLINE = "Network error obtaining token: fetch failed";
 
 describe("cli", () => {
   it("prints the version with --version or -v", async () => {
@@ -53,9 +77,104 @@ describe("cli", () => {
     expect(await cli("refresh", [], f.auto, f.writer)).toMatchObject({ code: 0 });
     expect(f.written).toEqual(["a.html", ""]);
 
+    expect(f.auto.saveRun).not.toHaveBeenCalled();
+
     const all = await cli("refresh", ["--auto"], f.auto, f.writer);
     expect(all.code).toBe(1);
     expect(all.stdout).toMatch(/updated a\.html\n.*failed b\.html: gone$/);
+    expect(f.auto.saveRun).toHaveBeenCalledWith({
+      at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/),
+      failed: [{ path: "b.html", error: "gone" }],
+    });
+  });
+
+  it("saves a run of --auto with no failed page, and exits with 0", async () => {
+    const f = fakes();
+    f.auto.pages.mockResolvedValue(["a.html"]);
+    expect(await cli("refresh", ["--auto"], f.auto, f.writer)).toMatchObject({ code: 0 });
+    expect(f.auto.saveRun).toHaveBeenCalledWith({ at: expect.any(String), failed: [] });
+  });
+
+  it("does nothing with --auto when no run time was missed", async () => {
+    const f = fakes();
+    f.auto.missed.mockResolvedValue(false);
+    const r = await cli("refresh", ["--auto"], f.auto, f.writer);
+    expect(r).toEqual({ code: 0, stdout: expect.stringMatching(/ no run due$/) });
+    expect(f.written).toEqual([]);
+    expect(f.auto.saveRun).not.toHaveBeenCalled();
+  });
+
+  it("waits for the network after a network error, then saves the run that worked", async () => {
+    const f = fakes();
+    f.auto.pages.mockResolvedValue(["a.html"]);
+    const w = flaky({ "a.html": [OFFLINE, OFFLINE] });
+    const s = sleeper();
+    const r = await cli("refresh", ["--auto"], f.auto, w.writer, s.sleep);
+    expect(s.waits).toEqual([30_000, 60_000]);
+    expect(w.written).toEqual(["a.html", "a.html", "a.html"]);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain("network not ready: trying 1 page(s) again in 30 s");
+    expect(r.stdout).toMatch(/updated a\.html$/);
+    expect(f.auto.saveRun).toHaveBeenCalledWith({ at: expect.any(String), failed: [] });
+  });
+
+  it("stops after the last wait and saves the network error", async () => {
+    const f = fakes();
+    f.auto.pages.mockResolvedValue(["a.html"]);
+    const w = flaky({ "a.html": Array.from({ length: 9 }, () => OFFLINE) });
+    const s = sleeper();
+    const r = await cli("refresh", ["--auto"], f.auto, w.writer, s.sleep);
+    expect(s.waits).toEqual(RETRY_MS);
+    expect(w.written).toHaveLength(RETRY_MS.length + 1);
+    expect(r.code).toBe(1);
+    expect(f.auto.saveRun).toHaveBeenCalledWith({
+      at: expect.any(String),
+      failed: [{ path: "a.html", error: OFFLINE }],
+    });
+  });
+
+  it("tries again only the pages with a network error", async () => {
+    const f = fakes();
+    f.auto.pages.mockResolvedValue(["a.html", "b.html"]);
+    const w = flaky({ "a.html": ["GET /token -> HTTP 401"], "b.html": [OFFLINE] });
+    const s = sleeper();
+    const r = await cli("refresh", ["--auto"], f.auto, w.writer, s.sleep);
+    expect(s.waits).toEqual([30_000]);
+    expect(w.written).toEqual(["a.html", "b.html", "b.html"]);
+    expect(r.code).toBe(1);
+    expect(f.auto.saveRun).toHaveBeenCalledWith({
+      at: expect.any(String),
+      failed: [{ path: "a.html", error: "GET /token -> HTTP 401" }],
+    });
+  });
+
+  it("waits with a real timer when no sleep is given", async () => {
+    vi.useFakeTimers();
+    try {
+      const f = fakes();
+      f.auto.pages.mockResolvedValue(["a.html"]);
+      const w = flaky({ "a.html": [OFFLINE] });
+      const run = cli("refresh", ["--auto"], f.auto, w.writer);
+      await vi.advanceTimersByTimeAsync(29_999);
+      expect(w.written).toEqual(["a.html"]);
+      await vi.advanceTimersByTimeAsync(1);
+      expect((await run).code).toBe(0);
+      expect(w.written).toEqual(["a.html", "a.html"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never waits for an error that is not the network, or for a refresh by hand", async () => {
+    const f = fakes();
+    f.auto.pages.mockResolvedValue(["a.html"]);
+    const s = sleeper();
+    const denied = flaky({ "a.html": ["GET /token -> HTTP 401"] });
+    expect((await cli("refresh", ["--auto"], f.auto, denied.writer, s.sleep)).code).toBe(1);
+    const byHand = flaky({ "a.html": [OFFLINE] });
+    expect((await cli("refresh", ["a.html"], f.auto, byHand.writer, s.sleep)).code).toBe(1);
+    expect(byHand.written).toEqual(["a.html"]);
+    expect(s.waits).toEqual([]);
   });
 
   it("reads, sets and stops the schedule, with a page as the last word", async () => {
@@ -94,6 +213,17 @@ describe("cli", () => {
     );
     expect(summary({ ...on, installed: false })).toContain(
       "The job is missing from launchd: run the schedule again.",
+    );
+  });
+
+  it("prints the last run and the pages it could not update", () => {
+    const ok = { at: "2026-11-02T06:00:00.000Z", failed: [] };
+    expect(summary({ ...on, last: ok })).toContain(
+      "Last run: 2026-11-02T06:00:00.000Z, every page updated\nLog:",
+    );
+    const bad = { ...ok, failed: [{ path: "/d/a.html", error: "HTTP 401" }] };
+    expect(summary({ ...on, last: bad })).toContain(
+      "Last run: 2026-11-02T06:00:00.000Z, failed:\n  /d/a.html: HTTP 401\nLog:",
     );
   });
 });

@@ -482,5 +482,7 @@
   "sport.squash": "Squash",
   "sport.badminton": "Bádminton",
   "sport.tableTennis": "Tenis de mesa",
-  "sport.platformTennis": "Platform tennis"
+  "sport.platformTennis": "Platform tennis",
+  "due.label": "Actualización perdida",
+  "due.text": "La actualización automática no ha actualizado esta página desde {date}. Quizá el ordenador estaba apagado o la actualización falló: pide a tu asistente que revise la actualización automática."
 }

@@ -7,7 +7,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { name } from "../package.json";
 import type { Config } from "./config";
-import { type DashboardWriter, pageTarget } from "./dashboard-page";
+import { type DashboardWriter, pageTarget, patchDue } from "./dashboard-page";
 
 /**
  * The automatic refresh of dashboard pages: one job in the scheduler of the operating system (launchd,
@@ -62,11 +62,21 @@ export interface Status {
   /** False when the job is no longer in the system scheduler. */
   installed?: boolean;
   log?: string;
+  /** The last run of `refresh --auto`, and the pages it could not update. */
+  last?: LastRun;
+}
+
+export interface LastRun {
+  at: string;
+  failed: { path: string; error: string }[];
 }
 
 interface State {
   cron: string;
   pages: string[];
+  /** When the schedule was set: a run time before it is not missed. */
+  since?: string;
+  last?: LastRun;
 }
 
 export type Run = (
@@ -172,23 +182,48 @@ function runsOn(c: Cron, d: Date): boolean {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** The next `count` runs after `from`, as local "YYYY-MM-DD HH:MM"; empty when the date never comes. */
-export function nextRuns(c: Cron, from: Date, count: number): string[] {
-  const runs: string[] = [];
+/** The run times after `from`, in order; none when the date never comes. */
+function* runDates(c: Cron, from: Date): Generator<Date> {
   // 8 years: a 29 February runs at least once in that time
-  for (let i = 0; i < 366 * 8 && runs.length < count; i++) {
+  for (let i = 0; i < 366 * 8; i++) {
     const d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + i);
     if (!runsOn(c, d)) continue;
     for (const t of c.times) {
       const at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(t / 60), t % 60);
-      if (at > from && runs.length < count) {
-        runs.push(
-          `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`,
-        );
-      }
+      if (at > from) yield at;
     }
   }
+}
+
+/** The last run time at or before `now`; undefined when there is none in 8 years. */
+export function lastRunTime(c: Cron, now: Date): Date | undefined {
+  for (let i = 0; i < 366 * 8; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    if (!runsOn(c, d)) continue;
+    for (const t of c.times.toReversed()) {
+      const at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(t / 60), t % 60);
+      if (at <= now) return at;
+    }
+  }
+  return undefined;
+}
+
+/** The next `count` runs after `from`, as local "YYYY-MM-DD HH:MM"; empty when the date never comes. */
+export function nextRuns(c: Cron, from: Date, count: number): string[] {
+  const runs: string[] = [];
+  for (const at of runDates(c, from)) {
+    if (runs.length === count) break;
+    runs.push(
+      `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`,
+    );
+  }
   return runs;
+}
+
+/** The next run of the cron as an ISO time, for the page's `due`; undefined when it never runs. */
+function dueOf(cron: string): string | undefined {
+  const [at] = runDates(parseCron(cron), new Date());
+  return at?.toISOString();
 }
 
 /** What the job runs, with the environment it needs. */
@@ -248,6 +283,7 @@ ${strings([job.program, ...job.args])}
   <dict>
 ${env}
   </dict>
+  <key>RunAtLoad</key><true/>
   <key>StartCalendarInterval</key>
   <array>
 ${when.join("\n")}
@@ -385,7 +421,37 @@ export class AutoRefresh {
       scheduler: this.#scheduler,
       installed: await this.#installed(),
       log: this.#log,
+      ...(state.last ? { last: state.last } : {}),
     };
+  }
+
+  /** The next run for a scheduled page, as an ISO time; undefined when the page has no schedule. */
+  async due(path: string): Promise<string | undefined> {
+    const state = await this.#state();
+    if (!state?.pages.includes(path)) return undefined;
+    return dueOf(state.cron);
+  }
+
+  /**
+   * Whether `refresh --auto` must run: a run time passed since the last run (or since the schedule
+   * was set). The job also starts at login, so a time that the computer missed runs then, once.
+   */
+  async missed(now = new Date()): Promise<boolean> {
+    const state = await this.#state();
+    if (!state) return false;
+    const time = lastRunTime(parseCron(state.cron), now);
+    // the later of the last run and the start: a new cron does not catch up its times before it
+    const after = Math.max(
+      Date.parse(state.last?.at ?? "") || 0,
+      Date.parse(state.since ?? "") || 0,
+    );
+    return time !== undefined && after < time.getTime();
+  }
+
+  /** Keeps the result of a `refresh --auto` run for the status; nothing when no page is scheduled. */
+  async saveRun(last: LastRun): Promise<void> {
+    const state = await this.#state();
+    if (state) await this.#save({ ...state, last });
   }
 
   /** Adds the page (default: the main dashboard) and sets the cron, or keeps the current one. */
@@ -404,8 +470,20 @@ export class AutoRefresh {
     const old = await this.#state();
     const cron = parseCron(o.cron ?? old?.cron ?? DEFAULT_CRON);
     const pages = [...new Set([...(old?.pages ?? []), page])];
-    await this.#install(cron);
-    await writeFile(this.#stateFile, `${JSON.stringify({ cron: cron.text, pages }, null, 2)}\n`);
+    // a new cron starts now, so the job does not catch up a time of the old one
+    const since = old?.cron === cron.text && old.since ? old.since : new Date().toISOString();
+    // saved first: launchd starts the job as it loads it, and the job must see `since`
+    await this.#save({ ...old, cron: cron.text, pages, since });
+    try {
+      await this.#install(cron);
+    } catch (e) {
+      if (old) await this.#save(old);
+      else await rm(this.#stateFile, { force: true });
+      throw e;
+    }
+    // a new cron moves the next run: each page must expect the new one, or it warns too early
+    const due = dueOf(cron.text);
+    for (const p of pages) await patchDue(p, due);
     return this.status();
   }
 
@@ -414,8 +492,10 @@ export class AutoRefresh {
     const old = await this.#state();
     if (!old) return { scheduled: false };
     const pages = path ? old.pages.filter((p) => p !== pageTarget(this.config.dataDir, path)) : [];
+    // a page without a schedule expects no run
+    for (const p of old.pages) if (!pages.includes(p)) await patchDue(p, undefined);
     if (pages.length > 0) {
-      await writeFile(this.#stateFile, `${JSON.stringify({ ...old, pages }, null, 2)}\n`);
+      await this.#save({ ...old, pages });
       return this.status();
     }
     await this.#uninstall();
@@ -496,6 +576,10 @@ export class AutoRefresh {
     }
   }
 
+  async #save(state: State): Promise<void> {
+    await writeFile(this.#stateFile, `${JSON.stringify(state, null, 2)}\n`);
+  }
+
   async #state(): Promise<State | undefined> {
     const text = await readFile(this.#stateFile, "utf8").catch(() => undefined);
     return text === undefined ? undefined : (JSON.parse(text) as State);
@@ -515,17 +599,18 @@ export function realEntry(path: string | undefined): string {
 export async function refreshPages(
   writer: Pick<DashboardWriter, "write">,
   pages: string[],
-): Promise<{ lines: string[]; failed: boolean }> {
+): Promise<{ lines: string[]; failed: LastRun["failed"] }> {
   const lines: string[] = [];
-  let failed = false;
+  const failed: LastRun["failed"] = [];
   for (const path of pages) {
     const at = new Date().toISOString();
     try {
       await writer.write({ path, onlyExisting: true });
       lines.push(`${at} updated ${path}`);
     } catch (e) {
-      failed = true;
-      lines.push(`${at} failed ${path}: ${(e as Error).message}`);
+      const error = (e as Error).message;
+      failed.push({ path, error });
+      lines.push(`${at} failed ${path}: ${error}`);
     }
   }
   return { lines, failed };
@@ -542,6 +627,8 @@ export function registerSchedule(server: McpServer, auto: AutoRefresh): void {
         "computer (launchd, cron or Task Scheduler) replaces the data of the page at the given times, also",
         "with no assistant open. The refresh removes the coach notes, because old notes do not agree",
         "with new data. The computer must be on at that time. The page must exist (writeDashboard first).",
+        "`last` is the last automatic run: its time and the pages that it could not update, with the",
+        "error. A page shows a note when its update is more than 1 hour late: `last` tells why.",
         "`cron`: convert what the user says, in any language, into a 5-field cron expression in local",
         'time: minute hour day-of-month month weekday, numbers only (0 = Sunday), e.g. "0 7 * * 1-5" for',
         "weekdays at 7. Two runs must be at least 1 hour apart. The cron is for all scheduled pages;",

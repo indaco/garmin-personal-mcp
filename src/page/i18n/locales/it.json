@@ -482,5 +482,7 @@
   "sport.squash": "Squash",
   "sport.badminton": "Badminton",
   "sport.tableTennis": "Tennis tavolo",
-  "sport.platformTennis": "Platform tennis"
+  "sport.platformTennis": "Platform tennis",
+  "due.label": "Aggiornamento saltato",
+  "due.text": "L'aggiornamento automatico non ha aggiornato questa pagina dal {date}. Forse il computer era spento, o l'aggiornamento non è riuscito: chiedi al tuo assistente di controllare l'aggiornamento automatico."
 }

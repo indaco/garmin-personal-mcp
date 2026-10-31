@@ -17,22 +17,24 @@ export function createParts(config: Config) {
   const api = new GarminApiClient(config);
   const tools = new GarminTools(api, config.dataDir);
   const dashboard = new GarminDashboard(tools, api, config.dataDir);
+  const auto = new AutoRefresh(config);
   const writer = new DashboardWriter(
     (weeks, workouts) => dashboard.getDashboardData(weeks, workouts),
     config.dataDir,
     template,
+    auto,
   );
-  return { tools, dashboard, writer };
+  return { tools, dashboard, writer, auto };
 }
 
 /** The garmin-personal MCP server with its tools and prompts. */
 export function createServer(config: Config): McpServer {
   const server = new McpServer({ name: "garmin-personal", version });
-  const { tools, dashboard, writer } = createParts(config);
+  const { tools, dashboard, writer, auto } = createParts(config);
   registerTools(server, tools);
   registerDashboard(server, dashboard);
   registerDashboardWriter(server, writer);
-  registerSchedule(server, new AutoRefresh(config));
+  registerSchedule(server, auto);
   registerPrompts(server);
   return server;
 }

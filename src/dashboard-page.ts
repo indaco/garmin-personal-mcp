@@ -276,8 +276,17 @@ export function styled(page: string, s: Settings): string {
   return next;
 }
 
-/** The page with the built-in languages and the data that the settings keep, and the escaped notes. */
-export function withData(page: string, data: Json, s: Settings, notes: readonly string[]): string {
+/**
+ * The page with the built-in languages and the data that the settings keep, and the escaped notes.
+ * `due`: the next automatic refresh, so the page can tell when it missed one.
+ */
+export function withData(
+  page: string,
+  data: Json,
+  s: Settings,
+  notes: readonly string[],
+  due?: string,
+): string {
   const next = writeBlock(page, "languages", languagesOf(s, data.locale));
   const kept = s.exclude?.includes("notes") ? [] : notes;
   return writeBlock(next, "data", {
@@ -285,8 +294,28 @@ export function withData(page: string, data: Json, s: Settings, notes: readonly 
     v: DASHBOARD_VERSION,
     server: version,
     updated: new Date().toISOString(),
+    ...(due ? { due } : {}),
     notes: kept.map(escapeHtml),
   });
+}
+
+/**
+ * Sets (or with undefined removes) `due` in the data of a saved page, with no Garmin call: for a
+ * schedule that changes or stops. A missing or foreign file is left as it is.
+ */
+export async function patchDue(path: string, due: string | undefined): Promise<void> {
+  let page: string | undefined;
+  let data: unknown;
+  try {
+    page = await readExisting(path);
+    data = page === undefined ? undefined : readBlock(page, "data");
+  } catch {
+    return;
+  }
+  if (page === undefined || data === null || typeof data !== "object") return;
+  const { due: was, ...rest } = data as Json;
+  if (was === due) return;
+  await writeAtomically(path, writeBlock(page, "data", due ? { ...rest, due } : rest));
 }
 
 /** Settings that the page can use; throws with what is wrong. */
@@ -357,6 +386,10 @@ export class DashboardWriter {
     private readonly getData: (weeks?: number, workouts?: boolean) => Promise<string>,
     private readonly dataDir: string,
     readonly template: () => Promise<string>,
+    /** The next automatic refresh of a page; undefined when it has no schedule. */
+    private readonly schedule: { due(path: string): Promise<string | undefined> } = {
+      due: async () => undefined,
+    },
   ) {}
 
   write(options: WriteOptions): Promise<WriteResult> {
@@ -510,7 +543,7 @@ export class DashboardWriter {
     }
     if (page === undefined) next = await this.#withLibrary(next, old);
     const raw = JSON.parse(await this.#data(weeks ?? weeksOf(old), own.workouts === true)) as Json;
-    next = withData(next, raw, own, notes);
+    next = withData(next, raw, own, notes, await this.schedule.due(target));
 
     let backup: string | undefined;
     if (old !== undefined && kind !== "updated") {
