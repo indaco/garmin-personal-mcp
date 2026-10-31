@@ -144,13 +144,24 @@ export function parseCron(text: string): Cron {
   if (times.length > 1 && Math.min(...gaps) < MIN_GAP_MINUTES) {
     throw new Error("Cron: the runs must be at least 1 hour apart");
   }
-  // as in cron, a field that starts with * is every day; with day of month and weekday, either one runs
+  // a field that covers every value (*, */1, 1-31) is every; field() gives sorted values, 7 as 0
+  const someDays = days.length < 31;
+  const someWeekdays = weekdays.length < 7;
+  // cron: when a day field starts with *, both day fields must match, which launchd and Task
+  // Scheduler cannot say; otherwise either one runs, so one that covers every day makes every day
+  const star = parts[2].startsWith("*") || parts[4].startsWith("*");
+  if (star && someDays && someWeekdays) {
+    throw new Error(
+      "Cron: with a day of month and a weekday, write both as numbers or lists, without *",
+    );
+  }
+  const restricts = star || (someDays && someWeekdays);
   const cron: Cron = {
     text: parts.join(" "),
     times,
-    ...(parts[2].startsWith("*") ? {} : { days }),
-    ...(parts[3].startsWith("*") ? {} : { months }),
-    ...(parts[4].startsWith("*") ? {} : { weekdays }),
+    ...(someDays && restricts ? { days } : {}),
+    ...(months.length < 12 ? { months } : {}),
+    ...(someWeekdays && restricts ? { weekdays } : {}),
   };
   if (nextRuns(cron, new Date(), 1).length === 0) throw new Error("Cron: this date never comes");
   return cron;

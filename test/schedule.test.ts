@@ -181,6 +181,104 @@ describe("cron", () => {
       "<DaysOfWeek><Saturday /></DaysOfWeek><Months><December /></Months></ScheduleByMonthDayOfWeek>",
     );
   });
+
+  it("keeps the values of a step in the day, month and weekday fields", () => {
+    const everyOther = parseCron("0 7 */2 * *");
+    expect(everyOther.days).toEqual(Array.from({ length: 16 }, (_, i) => 1 + 2 * i));
+    expect(everyOther.months).toBeUndefined();
+    expect(everyOther.weekdays).toBeUndefined();
+    expect(parseCron("0 7 1 */3 *").months).toEqual([1, 4, 7, 10]);
+    expect(parseCron("0 7 * * */2").weekdays).toEqual([0, 2, 4, 6]);
+    // a step that does not divide the range stops at the last value it reaches
+    expect(parseCron("0 7 */7 * *").days).toEqual([1, 8, 15, 22, 29]);
+    expect(parseCron("0 7 1 */5 *").months).toEqual([1, 6, 11]);
+    expect(parseCron("0 7 * * */4").weekdays).toEqual([0, 4]);
+    // the weekday range is 0-7, so */7 is Sunday twice: Sunday only
+    expect(parseCron("0 7 * * */7").weekdays).toEqual([0]);
+    expect(parseCron("0 7 * * *")).toEqual({ text: "0 7 * * *", times: [420] });
+  });
+
+  it("reads a field that covers every value as every", () => {
+    for (const every of ["0 7 */1 * *", "0 7 * */1 *", "0 7 * * */1", "0 7 1-31 1-12 0-7"]) {
+      expect(parseCron(every), every).toEqual({ text: every, times: [420] });
+    }
+    // 0-6 and 1-7 are every weekday too, and a range that misses one value is not every
+    expect(parseCron("0 7 * * 0-6").weekdays).toBeUndefined();
+    expect(parseCron("0 7 * * 1-7").weekdays).toBeUndefined();
+    expect(parseCron("0 7 2-31 * *").days).toHaveLength(30);
+    expect(parseCron("0 7 * 1-11 *").months).toHaveLength(11);
+    expect(parseCron("0 7 * * 1-6").weekdays).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it("gives the next runs of a step on the right days only", () => {
+    const from = new Date(2026, 9, 29, 12, 0); // Thursday
+    // 31 October and 1 November are both odd days
+    expect(nextRuns(parseCron("0 7 */2 * *"), from, 3)).toEqual([
+      "2026-10-31 07:00",
+      "2026-11-01 07:00",
+      "2026-11-03 07:00",
+    ]);
+    expect(nextRuns(parseCron("0 7 1 */3 *"), from, 1)).toEqual(["2027-01-01 07:00"]);
+    // months 1, 6 and 11
+    expect(nextRuns(parseCron("0 7 1 */5 *"), from, 3)).toEqual([
+      "2026-11-01 07:00",
+      "2027-01-01 07:00",
+      "2027-06-01 07:00",
+    ]);
+    // Saturday, Sunday, Tuesday
+    expect(nextRuns(parseCron("0 7 * * */2"), from, 3)).toEqual([
+      "2026-10-31 07:00",
+      "2026-11-01 07:00",
+      "2026-11-03 07:00",
+    ]);
+  });
+
+  it("writes a step into the launchd and Task Scheduler triggers", () => {
+    expect(plist(job, parseCron("0 7 */2 * *")).match(/<key>Day<\/key>/g)).toHaveLength(16);
+    expect(plist(job, parseCron("0 7 * * */2")).match(/<key>Weekday<\/key>/g)).toHaveLength(4);
+    expect(plist(job, parseCron("0 7 1 */3 *")).match(/<key>Month<\/key>/g)).toHaveLength(4);
+    expect(taskXml("a.cmd", parseCron("0 7 1 */3 *"))).toContain(
+      "<Months><January /><April /><July /><October /></Months>",
+    );
+    expect(taskXml("a.cmd", parseCron("0 7 * * */2"))).toContain(
+      "<DaysOfWeek><Sunday /><Tuesday /><Thursday /><Saturday /></DaysOfWeek>",
+    );
+    expect(taskXml("a.cmd", parseCron("0 7 */2 * *"))).toContain(
+      "<DaysOfMonth><Day>1</Day><Day>3</Day>",
+    );
+    // cron gets the expression as it is
+    expect(cronLine(job, parseCron("0 7 */2 * *")).startsWith("0 7 */2 * * ")).toBe(true);
+  });
+
+  it("refuses a step in day of month or weekday when both fields are set", () => {
+    for (const both of ["0 7 */2 * 1", "0 7 1 * */2", "0 7 */2 * */3"]) {
+      expect(() => parseCron(both), both).toThrow(/day of month and a weekday/);
+    }
+    // without a *, either field runs, as in cron
+    expect(parseCron("0 8 1 * 1")).toMatchObject({ days: [1], weekdays: [1] });
+    expect(parseCron("0 7 1-31/2 * 1")).toMatchObject({ weekdays: [1] });
+  });
+
+  it("reads day of month and weekday as cron does when one of them covers every day", () => {
+    const from = new Date(2026, 9, 29, 12, 0); // Thursday
+    // with a *, both must match: every day and Monday is Monday
+    expect(nextRuns(parseCron("0 7 */1 * 1"), from, 2)).toEqual([
+      "2026-11-02 07:00",
+      "2026-11-09 07:00",
+    ]);
+    expect(nextRuns(parseCron("0 7 */2 * 0-6"), from, 2)).toEqual([
+      "2026-10-31 07:00",
+      "2026-11-01 07:00",
+    ]);
+    // without a *, either one runs: every day or Monday is every day
+    for (const every of ["0 7 1-31 * 1", "0 7 1 * 0-6"]) {
+      expect(parseCron(every), every).toEqual({ text: every, times: [420] });
+      expect(nextRuns(parseCron(every), from, 2), every).toEqual([
+        "2026-10-30 07:00",
+        "2026-10-31 07:00",
+      ]);
+    }
+  });
 });
 
 const at = (s: string) => new Date(s);
