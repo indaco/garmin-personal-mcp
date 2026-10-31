@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The changelog is generated and managed by [sley](https://github.com/indaco/sley).
 
+## v0.6.0 - 2026-10-31
+
+### 🚀 Enhancements
+
+- warn on a late automatic refresh and run a missed one ([800eb6c](https://github.com/indaco/garmin-personal-mcp/commit/800eb6c)) ([#137](https://github.com/indaco/garmin-personal-mcp/pull/137))
+- show the dashboard in the chat as an MCP App ([c57fd2e](https://github.com/indaco/garmin-personal-mcp/commit/c57fd2e)) ([#135](https://github.com/indaco/garmin-personal-mcp/pull/135))
+- sticky site header, five strength questions, external links in a new tab ([549802c](https://github.com/indaco/garmin-personal-mcp/commit/549802c)) ([#134](https://github.com/indaco/garmin-personal-mcp/pull/134))
+
+### 🩹 Fixes
+
+- cron steps, prompt arguments as typed, n/a gaps on the page, clean tool errors ([0994cae](https://github.com/indaco/garmin-personal-mcp/commit/0994cae)) ([#144](https://github.com/indaco/garmin-personal-mcp/pull/144))
+- keep the crontab, let only the model call tools, and correct the digest load ([51b4d3f](https://github.com/indaco/garmin-personal-mcp/commit/51b4d3f)) ([#143](https://github.com/indaco/garmin-personal-mcp/pull/143))
+- keep excluded data out of the coach notes when the chat already has it ([e72a8ee](https://github.com/indaco/garmin-personal-mcp/commit/e72a8ee)) ([#140](https://github.com/indaco/garmin-personal-mcp/pull/140))
+- keep the README demo GIF and the website demo in sync ([9477072](https://github.com/indaco/garmin-personal-mcp/commit/9477072)) ([#133](https://github.com/indaco/garmin-personal-mcp/pull/133))
+
+### 📖 Documentation
+
+- rewrite guide and prompt sentences in Simplified Technical English ([e0da21d](https://github.com/indaco/garmin-personal-mcp/commit/e0da21d)) ([#141](https://github.com/indaco/garmin-personal-mcp/pull/141))
+- name the clients that show the dashboard in the chat, and add a guide index ([429e429](https://github.com/indaco/garmin-personal-mcp/commit/429e429)) ([#139](https://github.com/indaco/garmin-personal-mcp/pull/139))
+
+### ✅ Tests
+
+- restore and raise the unit coverage ([0b1082f](https://github.com/indaco/garmin-personal-mcp/commit/0b1082f)) ([#138](https://github.com/indaco/garmin-personal-mcp/pull/138))
+
+### 🏡 Chores
+
+- add glama.json ([7483936](https://github.com/indaco/garmin-personal-mcp/commit/7483936)) ([#146](https://github.com/indaco/garmin-personal-mcp/pull/146))
+
+### ❤️ Contributors
+
+- [@indaco](https://github.com/indaco)
+
 ## v0.5.0 - 2026-10-30
 
 ### 🚀 Enhancements
