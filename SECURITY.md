@@ -17,6 +17,9 @@
   and its custom widgets send in the background with fetch or XMLHttpRequest, and images, scripts
   and styles from the web. It does not cover WebRTC connections, and it cannot stop code that opens
   another web address. Add only custom widgets that you asked for.
+- **Dashboard in the chat**: each tool tells the client that only the assistant can call it (MCP
+  Apps visibility `model`). A client that obeys this rule does not let the page in the chat, or a
+  custom widget in it, call a tool.
 - **Local data**: the data folder has your .FIT files. A .FIT file can have your GPS track, so
   keep the data folder private. `.gitignore` excludes `api-key`, `*.fit` and `*.zip` files.
 - **Paths**: `garminGet` accepts only a relative API path. It refuses a full URL and `..`, so

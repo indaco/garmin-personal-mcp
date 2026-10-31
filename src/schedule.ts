@@ -9,7 +9,7 @@ import { name } from "../package.json";
 import type { Config } from "./config";
 import { type DashboardWriter, pageTarget, patchDue } from "./dashboard-page";
 import { log } from "./log";
-import { writeAtomically } from "./tools";
+import { MODEL_ONLY, writeAtomically } from "./tools";
 
 /**
  * The automatic refresh of dashboard pages: one job in the scheduler of the operating system (launchd,
@@ -655,6 +655,7 @@ export function registerSchedule(server: McpServer, auto: AutoRefresh): void {
   server.registerTool(
     "scheduleDashboardRefresh",
     {
+      _meta: MODEL_ONLY,
       description: [
         "Turns on, changes or stops the automatic refresh of a dashboard page. Use it only when the user",
         "asks for it or says yes to the question of a dashboard prompt. A job in the scheduler of the",

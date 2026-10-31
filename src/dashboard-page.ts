@@ -19,7 +19,7 @@ import { THEMES } from "./page/theme";
 import { WIDGET_API } from "./page/widget-api";
 import { version } from "../package.json";
 import { DASHBOARD_VERSION } from "./prompts";
-import { writeAtomically } from "./tools";
+import { MODEL_ONLY, writeAtomically } from "./tools";
 
 /**
  * The dashboard page file: the server writes it from the built-in template (or from a page that Claude
@@ -953,6 +953,7 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
   server.registerTool(
     "writeDashboard",
     {
+      _meta: MODEL_ONLY,
       description: [
         "Writes the training dashboard page (default <data-dir>/garmin-dashboard.html) with the data of the",
         "last `weeks` weeks, and returns its path and a short digest of the data (totals, weekly sums, load,",
@@ -1047,6 +1048,7 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
   server.registerTool(
     "editDashboard",
     {
+      _meta: MODEL_ONLY,
       description: [
         "Changes the layout, the custom widgets or the languages of the dashboard page (a page from the",
         "template; call writeDashboard first). Without arguments it only reads: the reply has the layout, the",
@@ -1153,7 +1155,7 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
           .describe("The .html file; relative paths are inside the data dir")
           .optional(),
       }),
-      _meta: { ui: { resourceUri: VIEW_URI } },
+      _meta: { ui: { ...MODEL_ONLY.ui, resourceUri: VIEW_URI } },
     },
     async (a) => {
       const { blocks, ...reply } = await writer.view(a);

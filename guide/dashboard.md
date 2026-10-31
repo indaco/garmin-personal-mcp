@@ -152,6 +152,9 @@ chat". The tool has two optional arguments:
 - A layout that you change in the chat is not saved in the file.
 - A client can block the code of custom widgets. Then a custom widget shows an error, and the other
   widgets show as usual. Claude Desktop runs custom widgets. The page file always runs them.
+- The page in the chat calls no tool of the server. Each tool tells the client that only the
+  assistant can call it. A client that obeys the MCP Apps rules does not let the page, or a custom
+  widget in it, call a tool.
 
 | Client                                                | What you get                                                             |
 | ----------------------------------------------------- | ------------------------------------------------------------------------ |

@@ -7,7 +7,14 @@ import { addDays, localToday } from "./dates";
 import { digest } from "./digest";
 import { log } from "./log";
 import { workoutOf } from "./page/running";
-import { type GarminTools, firstArray, sleepSummary, summarize, writeAtomically } from "./tools";
+import {
+  type GarminTools,
+  MODEL_ONLY,
+  firstArray,
+  sleepSummary,
+  summarize,
+  writeAtomically,
+} from "./tools";
 
 type Json = Record<string, unknown>;
 /** An inclusive date range, yyyy-MM-dd. */
@@ -522,6 +529,7 @@ export function registerDashboard(server: McpServer, dashboard: GarminDashboard)
   server.registerTool(
     "getDashboardData",
     {
+      _meta: MODEL_ONLY,
       description: [
         "All the data of the training dashboard in one call: HR zones, fitness age, the activities of the",
         "last `weeks` weeks (compact summaries, with strength sets and laps where they apply), the activities",
