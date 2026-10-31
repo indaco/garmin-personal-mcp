@@ -1,6 +1,6 @@
-Set up a Garmin training dashboard for me: ask what it shows, then write it. Use the tools of the
-`garmin-personal` MCP server. The page covers the last **{{weeks}} weeks** (today is {{today}}). Answer in
-my language.
+Make a Garmin training dashboard for me: ask what it shows, then write it. Use the tools of the
+`garmin-personal` MCP server. The page covers the last **{{weeks}} weeks** (today is {{today}}).
+Answer in my language.
 
 Ask every question below each time this prompt runs, also when the conversation already has answers
 from an earlier run. If your client has a tool for questions with choices (in Claude Code:
@@ -17,10 +17,10 @@ such a tool, ask the questions in chat as numbered lists, with the default first
    - **Headline** (the line under the title): options "{{headline}}" (default) and "Type my own".
    When I choose "Type my own" and give no text, ask for the text in chat.
 2. Second round:
-   - **Data** (multiple choice): recovery (sleep, HRV, stress, body battery, resting HR), fitness age,
-     HR zones, activity names. For me, all are selected by default; for a shared page, ask about each
-     one. The server leaves out of the file what I do not select.
-   - **Coach notes**: include (default) or leave out.
+   - **Data** (multiple choice): recovery (sleep, HRV, stress, body battery, resting HR), fitness
+     age, HR zones, activity names. For me, the default is all of them. For a shared page, ask about
+     each one. The server removes from the file the data that I do not select.
+   - **Coach notes**: include (default) or exclude.
    - **Languages**: options "English and the language of my Garmin profile, opens in the profile
      language" (default), "All: {{languageNames}}", "English only" and "Italian only". Say that I can
      type another choice, for example "English and Italian, opens in Italian".
@@ -35,13 +35,13 @@ such a tool, ask the questions in chat as numbered lists, with the default first
    of runs. Options "No" (default) and "Yes, compare them across weeks". Say that a yes adds the
    Workout trend widget for those runs (when I keep the running board), and that the page then
    downloads the laps of the last 8 runs of each workout, once: this build takes longer.
-4. Call `writeDashboard` with `weeks` = {{weeks}}, the `path` and `settings`:
+4. Call `writeDashboard` with `weeks` = {{weeks}}, the `path` and `settings`. The settings are
    `title`, `headline`, `sports` (the boards to keep), `exclude` (from `recovery`, `fitnessAge`,
-   `zones`, `names`, `notes`), `languages` (the codes to keep: {{languages}}), `language` (the one it
-   opens in), `themes`, `theme`, `workouts` (true when I said yes to the workout comparison). Leave
-   out a setting that keeps its default. If there is no page at
-   the path, also give `layout` = "preset".
-5. Unless I left out the coach notes: write at most 5 coach notes from the digest. Each note names a
+   `zones`, `names`, `notes`), `languages` (the codes to keep: {{languages}}), `language` (the one
+   it opens in), `themes`, `theme`, `workouts` (true when I said yes to the workout comparison). Do
+   not give a setting that keeps its default. If there is no page at the path, also give `layout` =
+   "preset".
+5. Unless I excluded the coach notes: write at most 5 coach notes from the digest. Each note names a
    specific number of the digest. Training suggestions only, no medical advice. Plain text, in my
    language. Then call `writeDashboard` again with the same `weeks`, `path` and the `notes`, without
    `settings`: the page keeps them.

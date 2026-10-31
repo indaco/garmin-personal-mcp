@@ -10,8 +10,8 @@ Answer in my language.
    without one, ask in chat as numbered lists, with the default first:
    - **Settings**: only when `settings` has more than `title` and `headline`. Tell me those settings
      in words, for example "only strength training", "without sleep data" or "Italian only". If
-     `settings` has `exclude`, name each item it leaves out and say that the defaults put them back
-     into the page, also on each automatic update: this matters for a page that I share.
+     `settings` has `exclude`, name each item that it excludes. Say that the defaults add them to
+     the page again, also on each automatic update: this matters for a page that I share.
      Options "Keep these settings" (default) and "Use the defaults: all sports, all data, English and
      the language of my Garmin profile, all themes, opens in midnight, no workout comparison". Say
      that I can type my own choice, for example "all sports, keep the rest".

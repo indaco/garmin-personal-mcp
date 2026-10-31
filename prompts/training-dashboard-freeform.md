@@ -169,13 +169,13 @@ Under the header, put a window bar. It selects whole Monday-Sunday weeks inside 
 presets (last 4, 8, 12... weeks, and all) and a from-week and a to-week selector. Every widget about
 training follows the window, and the browser calculates it again from the embedded data. This
 includes totals, charts, calendar, records, strength exercise stats, and the period comparison. The
-period comparison compares the window with the same number of weeks just before it (from
+period comparison compares the window with the same number of weeks right before it (from
 `activities` and `previousActivities`). Say "partial" when these weeks start before the data. The
 tiles "last 7 days against the 4-week average" end on the last day of the window, and take their
 baseline from all embedded data. The widgets about today do not follow the window, and say so:
 readiness, fitness age and the 14-day recovery panel. The URL hash also keeps the window (for
-example `#running@2026-09-07_2026-10-26`). The last week can still be in progress, when today is not a
-Sunday. Mark it (for example with *), and do not flag its load ramp.
+example `#running@2026-09-07_2026-10-26`). The last week can still be in progress, when today is not
+a Sunday. Mark it (for example with *), and do not flag its load ramp.
 
 ### Tabs and filter
 
@@ -211,10 +211,10 @@ active.
 6. **Load safety**: the weekly load with its ramp % (highlight the flagged weeks), monotony and
    strain.
 7. **Intensity minutes** for each week, against a line at 150 min.
-8. **Consistency calendar**: a GitHub-style heatmap of daily training minutes. When the user
-   points to a day (or touches it on a phone), show a tooltip at once. The tooltip shows the date,
-   total minutes, and each activity with its name, distance and time. Use your own tooltip, not
-   the `title` attribute: it is slow, some viewers do not show it, and it never shows on touch.
+8. **Consistency calendar**: a GitHub-style heatmap of daily training minutes. When the user moves
+   the pointer over a day (or touches it on a phone), show a tooltip at once. The tooltip shows the
+   date, total minutes, and each activity with its name, distance and time. Use your own tooltip,
+   not the `title` attribute: it is slow, some viewers do not show it, and it never shows on touch.
 9. **Load vs. recovery**: one chart with daily load (bars, stacked by type) and HRV (line) on
    twin axes - the heart of the dashboard.
 10. **Recovery panel**: HRV with baseline band, resting HR, sleep hours by stage and score, sleep
@@ -262,14 +262,14 @@ charts ("one session so far"). Trends start at 2 sessions.
    split type of each race and long run. Also grade-adjusted pace against pace, and ascent for
    each week.
 10. **Workout trend**, only when I said yes to the workout comparison: the runs of the same workout
-   across weeks (the run name without the place that Garmin puts before " - "), up to 3 workouts
-   side by side, with a choice of metric: pace, avg HR, efficiency, cadence, ground contact,
-   vertical ratio, stride and power. For a run whose laps mark a warm-up, rest or cool-down, take
-   pace, HR, cadence, power and running form (`gctMs`, `vertRatioPct`, `strideCm` of each lap) from
-   its work laps (intensity `active` or `interval`) of 20 m and 8 s or more: a shorter one is a lap
-   that the watch adds between steps. Show the reps and the fade: the pace of the last rep against
-   the first of the same workout step (`step`, the step with the most reps), only when those reps
-   have the same distance or time (within 15%).
+   across weeks, up to 3 workouts side by side. A workout is the run name without the place that
+   Garmin puts before " - ". Give a choice of metric: pace, avg HR, efficiency, cadence, ground
+   contact, vertical ratio, stride and power. For a run whose laps mark a warm-up, rest or
+   cool-down, use only its work laps (intensity `active` or `interval`) of 20 m and 8 s or more.
+   Take pace, HR, cadence, power and running form (`gctMs`, `vertRatioPct`, `strideCm` of each lap)
+   from those laps. A shorter lap is a lap that the watch adds between steps. Show the reps and the
+   fade: the pace of the last rep against the first of the same workout step (`step`, the step with
+   the most reps), only when those reps have the same distance or time (within 15%).
 
 **Walk** adds pace and avg HR for each week, and steps, cadence and body battery change for each
 walk. It also adds daily steps against the goal, with floors (last 14 days). **Hike** adds
@@ -313,10 +313,10 @@ default. Midnight uses these colours: background `#0e1217`, panels `#161c24` and
 `#26303d`, text `#e6ebf2`, muted text `#8d99aa`, accent `#7cc4ff`, good `#3ecf8e`, bad `#ef5a5a`,
 warning `#f2c94c`. Design the other themes yourself. Define every colour as a CSS token, with one
 set of tokens for each theme. Dark themes use these bright type colours: Run `#ff7a45`, Strength
-`#a78bfa`, Walk `#34d399`, Hike `#a3e635`, Bike `#60a5fa`, Swim `#22d3ee`, Racket sports `#fbbf24`, Other
-`#94a3b8`. Light themes use darker variants of the same hues for contrast. Charts read the tokens
-and draw again when the theme changes. Keep the choice in `localStorage`, wrapped in try/catch, so
-the page still works when storage is blocked. Apply it before the first paint.
+`#a78bfa`, Walk `#34d399`, Hike `#a3e635`, Bike `#60a5fa`, Swim `#22d3ee`, Racket sports `#fbbf24`,
+Other `#94a3b8`. Light themes use darker variants of the same hues for contrast. Charts read the
+tokens and draw again when the theme changes. Keep the choice in `localStorage`, wrapped in
+try/catch, so the page still works when the browser blocks storage. Apply it before the first paint.
 
 Selection: a click on a filter selects what it shows, and never hides it. A click on a chart legend
 item shows only that series. A second click on the same item shows all series again. The type chips

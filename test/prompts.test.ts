@@ -95,9 +95,7 @@ describe("prompts", () => {
         '"Use the defaults: all sports, all data, English and\n     the language of my Garmin profile, all themes, opens in midnight, no workout comparison"',
       );
       expect(text).toContain('"all sports, keep the rest"');
-      expect(text).toContain(
-        "name each item it leaves out and say that the defaults put them back",
-      );
+      expect(text).toContain("name each item that it excludes. Say that the defaults add them to");
       expect(text).toContain(
         "If I typed my own choice, give `settings` = `settings` changed as I said.",
       );
