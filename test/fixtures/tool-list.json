@@ -493,6 +493,26 @@
     }
   },
   {
+    "name": "showDashboard",
+    "description": "Shows the training dashboard in the chat, in assistants that show MCP Apps: the page of `path`\n(default <data-dir>/garmin-dashboard.html) with its layout, custom widgets, languages and settings,\nor the preset page when there is none, with new data of the last `weeks` weeks. Writes nothing and\nhas no coach notes. Returns the page path, the digest of the data and the page settings. Other\nassistants show only this reply: there, writeDashboard writes the page as a file.",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "weeks": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991,
+          "description": "Weeks to cover, default the page's or 12, max 52"
+        },
+        "path": {
+          "type": "string",
+          "description": "The .html file; relative paths are inside the data dir"
+        }
+      }
+    }
+  },
+  {
     "name": "writeDashboard",
     "description": "Writes the training dashboard page (default <data-dir>/garmin-dashboard.html) with the data of the\nlast `weeks` weeks, and returns its path and a short digest of the data (totals, weekly sums, load,\nbest efforts, races, strength top sets, HRV, recovery, fitness age, sync) for the coach notes.\nAn existing page keeps all its code, layout and widgets: only its data is replaced. A page from an\nolder template gets the new template and keeps its layout and widgets. Every page from the template\nalso gets the custom widgets of the widget library (<data-dir>/widgets.json), not placed on a board.\n`layout` writes a new page\nfrom the template: `preset` (the default widgets) or `blank` (empty boards). `page` writes your own\npage code instead; it must contain /* garmin-data:start */null/* garmin-data:end */. A replaced\npage is kept as <file>.bak. `notes`: at most 5 plain-text coach notes; the server escapes them.\n`settings` replace the page's settings (title, headline, sports, data to leave out, languages,\nthemes); without them the page keeps its own. The page holds only the data, languages and themes\nthey keep. `pageLanguages` in the result lists the languages of the page's Language menu, and\n`settings` the settings that the page keeps. `missingProfileLanguage` is the language of the Garmin\nprofile when the page has no texts in it (it shows English); editDashboard `languages` adds it.\n`missingWidgetTexts` lists the custom widgets that miss texts in a language of the page, with\nthose languages; editDashboard `widgetTexts` adds them.\n`preview: true` writes nothing: it returns the digest, the activities of each board and the\n`settings` of the page.",
     "inputSchema": {

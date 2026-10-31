@@ -31,6 +31,9 @@ import { writeAtomically } from "./tools";
 export const DASHBOARD_FILE = "garmin-dashboard.html";
 /** The user's custom widgets, in the data dir: every page from the template gets them. */
 export const LIBRARY_FILE = "widgets.json";
+/** The dashboard page as an MCP App: hosts that show apps render it for showDashboard. */
+export const VIEW_URI = "ui://garmin-personal/dashboard.html";
+const VIEW_MIME = "text/html;profile=mcp-app";
 const MAX_NOTES = 5;
 const REUSE_MS = 15 * 60_000;
 
@@ -59,6 +62,22 @@ export interface PreviewResult {
   digest: Digest;
   /** The settings of the page, or the given ones: a new build can ask whether to keep them. */
   settings: Settings;
+}
+
+/** The page blocks that the dashboard in the chat starts with (`window.GARMIN` and `GARMIN_SETTINGS`). */
+export interface ViewBlocks {
+  data: unknown;
+  layout: unknown;
+  widgets: unknown;
+  languages: unknown;
+  i18n: unknown;
+  settings: Settings;
+}
+
+export interface ViewResult {
+  path: string;
+  digest: Digest;
+  blocks: ViewBlocks;
 }
 
 export interface WriteResult {
@@ -337,7 +356,7 @@ export class DashboardWriter {
   constructor(
     private readonly getData: (weeks?: number, workouts?: boolean) => Promise<string>,
     private readonly dataDir: string,
-    private readonly template: () => Promise<string>,
+    readonly template: () => Promise<string>,
   ) {}
 
   write(options: WriteOptions): Promise<WriteResult> {
@@ -365,6 +384,49 @@ export class DashboardWriter {
         boards: countBy(listOf(data.activities), groupOf),
         digest: digest(filterData(data, settings)),
         settings,
+      };
+    });
+    this.#queue = run.catch(() => {});
+    return run;
+  }
+
+  /** The blocks of the page with new data, for the dashboard in the chat (an MCP App); writes nothing. */
+  view(options: Pick<WriteOptions, "weeks" | "path">): Promise<ViewResult> {
+    const run = this.#queue.then(async () => {
+      const target = this.#target(options.path);
+      const old = await readExisting(target);
+      let settings: Settings;
+      try {
+        settings = settingsOf(old);
+      } catch (e) {
+        throw unreadable(e, target);
+      }
+      // the user's state moves into the template as on an upgrade; a page that Claude wrote has none
+      let page = await this.template();
+      if (old !== undefined && templateVersion(old) > 0) {
+        page = writeBlock(page, "layout", readBlock(old, "layout") ?? null);
+        page = writeBlock(page, "widgets", readBlock(old, "widgets") ?? []);
+        page = writeBlock(page, "i18n", readBlock(old, "i18n") ?? {});
+      } else {
+        // a fixed rev: a layout edited in the chat stays for the next view
+        page = writeBlock(page, "layout", { rev: "preset", base: "preset", boards: {} });
+      }
+      page = await this.#withLibrary(page, old);
+      const raw = JSON.parse(
+        await this.#data(options.weeks ?? weeksOf(old), settings.workouts === true),
+      ) as Json;
+      page = withData(page, raw, settings, []);
+      return {
+        path: target,
+        digest: digest(filterData(raw, settings)),
+        blocks: {
+          data: readBlock(page, "data"),
+          layout: readBlock(page, "layout"),
+          widgets: readBlock(page, "widgets"),
+          languages: readBlock(page, "languages"),
+          i18n: readBlock(page, "i18n"),
+          settings,
+        },
       };
     });
     this.#queue = run.catch(() => {});
@@ -1034,6 +1096,50 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
     },
     async (a) => ({
       content: [{ type: "text" as const, text: JSON.stringify(await writer.edit(a)) }],
+    }),
+  );
+
+  server.registerTool(
+    "showDashboard",
+    {
+      description: [
+        "Shows the training dashboard in the chat, in assistants that show MCP Apps: the page of `path`",
+        "(default <data-dir>/garmin-dashboard.html) with its layout, custom widgets, languages and settings,",
+        "or the preset page when there is none, with new data of the last `weeks` weeks. Writes nothing and",
+        "has no coach notes. Returns the page path, the digest of the data and the page settings. Other",
+        "assistants show only this reply: there, writeDashboard writes the page as a file.",
+      ].join("\n"),
+      inputSchema: z.object({
+        weeks: z
+          .number()
+          .int()
+          .describe("Weeks to cover, default the page's or 12, max 52")
+          .optional(),
+        path: z
+          .string()
+          .describe("The .html file; relative paths are inside the data dir")
+          .optional(),
+      }),
+      _meta: { ui: { resourceUri: VIEW_URI } },
+    },
+    async (a) => {
+      const { blocks, ...reply } = await writer.view(a);
+      // the blocks are for the page only: hosts keep structuredContent out of the model's context
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify({ ...reply, settings: blocks.settings }) },
+        ],
+        structuredContent: { ...blocks },
+      };
+    },
+  );
+
+  server.registerResource(
+    "Training dashboard",
+    VIEW_URI,
+    { mimeType: VIEW_MIME, description: "The dashboard page that showDashboard fills" },
+    async () => ({
+      contents: [{ uri: VIEW_URI, mimeType: VIEW_MIME, text: await writer.template() }],
     }),
   );
 }

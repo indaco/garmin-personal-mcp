@@ -174,6 +174,7 @@ Ask "list my last 5 activities". The first time that a garmin-personal tool asks
 | `getDashboardData`         | all the dashboard data in one call, with the server's totals and a local cache |
 | `writeDashboard`           | writes the dashboard page                                                      |
 | `editDashboard`            | changes the layout, the custom widgets and the languages of the page           |
+| `showDashboard`            | shows the dashboard in the chat, in assistants that support MCP Apps           |
 | `scheduleDashboardRefresh` | updates a dashboard page automatically, at the times you say in your own words |
 | `garminGet`                | all other GET endpoints of the Personal API                                    |
 
