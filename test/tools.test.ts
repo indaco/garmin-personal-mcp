@@ -2,6 +2,7 @@ import {
   existsSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   statSync,
   utimesSync,
   writeFileSync,
@@ -18,7 +19,8 @@ import { GarminApiError, type GarminApiClient } from "../src/api-client";
 import { registerDashboard, type GarminDashboard } from "../src/dashboard";
 import { registerDashboardWriter, type DashboardWriter } from "../src/dashboard-page";
 import { createServer } from "../src/server";
-import { GarminTools, registerTools, summarize } from "../src/tools";
+import { firstArray, GarminTools, registerTools, summarize } from "../src/tools";
+import { log } from "../src/log";
 import { fitFile } from "./fit-file";
 import toolList from "./fixtures/tool-list.json";
 
@@ -891,10 +893,37 @@ describe("exercise catalogue", () => {
     expect(api.getExerciseCatalogue).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps the catalogue in memory after the first read", async () => {
+    writeFileSync(catalogueFile(), JSON.stringify(squat));
+    await tools.getActivitySets(1);
+    rmSync(catalogueFile());
+    const out = JSON.parse(await tools.getActivitySets(1));
+    expect(out.exercises[0].primaryMuscles).toEqual(["Glutes"]);
+    expect(api.getExerciseCatalogue).not.toHaveBeenCalled();
+  });
+
+  it("gives sets without muscles when the catalogue cannot be read, and logs why", async () => {
+    // not a Garmin error and not bad JSON: the download step passes it on, the reader logs it
+    api.getExerciseCatalogue.mockRejectedValue(new TypeError("boom"));
+    const out = JSON.parse(await tools.getActivitySets(1));
+    expect(out.exercises[0]).not.toHaveProperty("primaryMuscles");
+    expect(log).toHaveBeenCalledWith("WARN", "Cannot read the exercise catalogue: boom");
+  });
+
   it("gives sets without muscles when there is no catalogue at all", async () => {
     api.getExerciseCatalogue.mockResolvedValue(new TextEncoder().encode('{"no":"categories"}'));
     const out = JSON.parse(await tools.getActivitySets(1));
     expect(out.exercises[0]).not.toHaveProperty("primaryMuscles");
+  });
+});
+
+describe("firstArray", () => {
+  it("finds the activity list under the names Garmin uses, else none", () => {
+    expect(firstArray({ items: [1] })).toEqual([1]);
+    expect(firstArray({ data: [2], activityList: [1] })).toEqual([1]);
+    expect(firstArray({ activities: "not a list" })).toBeUndefined();
+    expect(firstArray("text")).toBeUndefined();
+    expect(firstArray(null)).toBeUndefined();
   });
 });
 
