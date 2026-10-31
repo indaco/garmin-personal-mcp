@@ -1,4 +1,14 @@
-/* Header */
+/* Header: it stays at the top while the page scrolls. The bar is full width, so nothing shows beside
+   it on a wide screen, and anchor jumps and focus stop below it. */
+.site-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--bg);
+}
+html {
+  scroll-padding-top: 64px;
+}
 .top {
   display: flex;
   align-items: center;
