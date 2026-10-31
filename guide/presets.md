@@ -19,7 +19,7 @@ parts:
 - **The page code**: about 90 KB of HTML, CSS and JavaScript for the charts, tabs and themes.
 - **The data**: the `getDashboardData` result is about 150 KB. The model must copy it into the page,
   character by character.
-- **The thinking**: the model plans the page from a description of about 300 lines.
+- **The plan**: the model plans the page from a description of about 300 lines.
 
 The model writes such a page in many parts. Each part sends the conversation again, so the input
 tokens also grow.

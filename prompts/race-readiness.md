@@ -13,12 +13,13 @@ Race: {{race}}.
 Then answer in chat, in this order:
 
 - **Countdown**: the days left to the race.
-- **Training block**: a table of the run km (`weekly.<monday>.runKm`) and the load of each week (the
-  first week can be partial: say so); the longest run and its date; for the runs over 15 km, the pace
-  of the first and the second half and the HR drift (the drop in distance per heartbeat from the
-  first to the second half, in %). From the laps: leave out the warm-up, cool-down, rest and recovery
-  laps, take the distance of a lap as its time / pace (the lap km is rounded to 10 m), and split at
-  half the distance (a lap across the middle counts for its share on each side).
+- **Training block**: a table of the run km (`weekly.<monday>.runKm`) and the load of each week. The
+  first week can be partial: say so. Also the longest run and its date. For the runs over 15 km,
+  give the pace of the first and the second half and the HR drift (the drop in distance per
+  heartbeat from the first to the second half, in %). From the laps, do not use the warm-up,
+  cool-down, rest and recovery laps. Take the distance of a lap as its time / pace, because Garmin
+  rounds the lap km to 10 m. Split at half the distance (a lap across the middle counts for its
+  share on each side).
 - **Load and taper**: the load of the last 7 days against the weekly average of the last 28
   (`load.acuteToChronic`). In the last 2 weeks before a race the load should drop: say if it does, or
   how to use the days left.

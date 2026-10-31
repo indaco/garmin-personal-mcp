@@ -15,13 +15,13 @@ Then answer in chat, in this order, short:
 - **Summary**: date, name, distance, time, pace, average HR, and the training effect with its label.
 - **Plan against execution**: when the run followed a planned workout, a table with one row per
   step: the target (pace, HR or cadence, low to high), what the matching lap did, and hit or miss.
-  Match the steps to the laps in order, leaving out laps under 20 m or under 8 s: the watch adds
+  Match the steps to the laps in order, without the laps under 20 m or under 8 s: the watch adds
   them between steps. Without a planned workout, say so in one line.
-- **Reps**: for intervals, the pace, HR and running form (ground contact `gctMs`, vertical ratio
-  `vertRatioPct`, when the laps have them) of each active lap of 20 m and 8 s or more (a shorter one
-  is a lap that the watch adds between steps), and the fade: the last rep against the first of the
-  same workout step (`step`), in %, for each step with more than one rep, only when those reps have
-  the same distance or time. Skip this part for a steady run.
+- **Reps**: for intervals, each active lap of 20 m and 8 s or more, with its pace, HR and running
+  form (ground contact `gctMs`, vertical ratio `vertRatioPct`, when the laps have them). A shorter
+  lap is a lap that the watch adds between steps. Also the fade: the last rep against the first of
+  the same workout step (`step`), in %. Give the fade for each step with more than one rep, only
+  when those reps have the same distance or time. Skip this part for a steady run.
 - **HR drift**: for a steady run, the distance per heartbeat of the first half against the second
   half, from the laps, in %. The halves split at half the distance: a lap across the middle counts
   for its share of distance on each side. Under 5% shows a solid aerobic base. Skip this part for
