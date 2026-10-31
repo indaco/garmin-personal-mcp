@@ -1,5 +1,6 @@
-// The inputs of assets/dashboard.gif: the page sources and the scripts that make the demo. `pnpm demo`
-// writes their hash next to the GIF; the site build and the site test refuse a GIF whose inputs changed.
+// The inputs of the demo images (assets/dashboard.gif, assets/dashboard-chat.webp): the page sources and
+// the scripts that make the demo. `pnpm demo` writes their hash next to the GIF; the site build and the
+// site test refuse images whose inputs changed.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";

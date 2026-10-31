@@ -283,6 +283,26 @@ describe("site sections", () => {
     expect(await visible()).toEqual(["c-codex"]);
   });
 
+  it("shows the dashboard as a page file or in the chat, one view at a time", async () => {
+    const { page, errors } = await site();
+    const visible = () =>
+      page.$$eval(".shot .view", (views) =>
+        views.filter((v) => (v as HTMLElement).offsetParent).map((v) => v.id),
+      );
+    expect(await visible()).toEqual(["v-file"]);
+    const gif = await page.locator("#v-file img").boundingBox();
+    await page.click("#t-chat");
+    expect(await visible()).toEqual(["v-chat"]);
+    // the image of the page in a chat is there, and the view keeps the shape of the GIF
+    const img = page.locator("#v-chat img");
+    await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(1520);
+    const chat = await page.locator("#v-chat .chat").boundingBox();
+    expect(Math.abs(chat!.height - gif!.height)).toBeLessThan(2);
+    await page.keyboard.press("ArrowLeft");
+    expect([await focused(page), await visible()]).toEqual(["t-file", ["v-file"]]);
+    expect(errors).toEqual([]);
+  });
+
   it("copies the install command and tells screen readers", async () => {
     const { page } = await site({ permissions: ["clipboard-read", "clipboard-write"] });
     await page.click(".install .copy");

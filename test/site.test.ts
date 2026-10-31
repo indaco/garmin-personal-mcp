@@ -15,11 +15,10 @@ const g = (group: string, n: number) => Array.from({ length: n }, () => ({ group
 describe("site facts", () => {
   const f = facts();
 
-  it("has a demo GIF recorded from the current page and demo data", () => {
-    // the README and the website show assets/dashboard.gif: after a change to its inputs, run pnpm demo
-    expect(gifIsCurrent(), `assets/dashboard.gif is stale: run pnpm demo (${STAMP_FILE})`).toBe(
-      true,
-    );
+  it("has demo images recorded from the current page and demo data", () => {
+    // the README and the website show assets/dashboard.gif, the website also assets/dashboard-chat.webp:
+    // after a change to their inputs, run pnpm demo
+    expect(gifIsCurrent(), `the demo images are stale: run pnpm demo (${STAMP_FILE})`).toBe(true);
   });
 
   it("lists the tools that the server registers, from the README table", () => {
