@@ -12,6 +12,9 @@ export default defineConfig({
       ],
       // lcov for Codecov, text-summary for the terminal and the CI log
       reporter: ["text-summary", "lcov"],
+      // a floor at today's numbers: a change that leaves new code untested fails the run.
+      // Raise it when coverage goes up, in the same change.
+      thresholds: { statements: 100, functions: 100, lines: 100, branches: 96 },
     },
   },
 });
