@@ -135,6 +135,8 @@ export class GarminTools {
   // ------------------------------------------------------------------ health
 
   async getHrvRange(fromDate: string, toDate: string): Promise<string> {
+    // no day cap: one small row per day, as getWeight
+    checkRange(fromDate, toDate, Infinity);
     return toJson(await this.api.getJson(`/hrv-service/hrv/daily/${fromDate}/${toDate}`, {}));
   }
 
@@ -191,6 +193,7 @@ export class GarminTools {
   }
 
   async getFitnessAge(date: string): Promise<string> {
+    if (!isDate(date)) throw new Error("date must be a real date yyyy-MM-dd");
     return toJson(await this.api.getJson(`/fitnessage-service/fitnessage/v2/${date}`, {}));
   }
 
@@ -482,7 +485,11 @@ function toJson(value: unknown, drop?: (key: string, v: unknown) => boolean): st
     isObject(v) &&
     Object.keys(v).length > 0 &&
     Object.entries(v).every(([k, x]) => dropped(k, x) || emptied(x));
-  return JSON.stringify(value, (k, v: unknown) => (dropped(k, v) || emptied(v) ? undefined : v));
+  // the root always stays, so the answer is JSON; an item of ids only leaves its array (a null would count as an entry)
+  return JSON.stringify(value, (k, v: unknown) => {
+    if (k !== "" && (dropped(k, v) || emptied(v))) return undefined;
+    return Array.isArray(v) ? v.filter((x) => !emptied(x)) : v;
+  });
 }
 
 /** The activity list inside Garmin's answer when it is not a bare array. */

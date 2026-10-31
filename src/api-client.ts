@@ -31,7 +31,7 @@ export class GarminApiClient {
     try {
       return JSON.parse(new TextDecoder().decode(body));
     } catch {
-      throw new GarminApiError(`Response is not JSON: ${preview(body)}`);
+      throw new GarminApiError(`Response is not JSON: ${this.#preview(body, this.#token)}`);
     }
   }
 
@@ -94,7 +94,9 @@ export class GarminApiClient {
       throw new GarminApiError(`Network error reading ${path}: ${(e as Error).message}`);
     }
     if (!resp.ok) {
-      throw new GarminApiError(`GET ${path} -> HTTP ${resp.status}: ${preview(body)}`);
+      throw new GarminApiError(
+        `GET ${path} -> HTTP ${resp.status}: ${this.#preview(body, this.#token)}`,
+      );
     }
     return body;
   }
@@ -144,7 +146,7 @@ export class GarminApiClient {
     if (!resp.ok) {
       throw new GarminApiError(
         `Token request failed: HTTP ${resp.status} (Content-Type: ${contentType}, body: ` +
-          `${preview(text)}) - check that the personal API key is valid and not expired`,
+          `${this.#preview(text, apiKey)}) - check that the personal API key is valid and not expired`,
       );
     }
     const body = text.trim();
@@ -197,6 +199,12 @@ export class GarminApiClient {
   /** The text of a fetch error without the key or the token: some fetch errors quote a header. */
   #scrub(message: string, ...secrets: (string | undefined)[]): string {
     return secrets.reduce<string>((m, s) => (s ? m.replaceAll(s, "***") : m), message);
+  }
+
+  /** The start of a body for an error message, without the secret: a server can echo the request. */
+  #preview(body: Uint8Array | string, secret: string | undefined): string {
+    const s = typeof body === "string" ? body : new TextDecoder().decode(body);
+    return preview(this.#scrub(s, secret));
   }
 
   async #apiKey(): Promise<string> {
@@ -259,7 +267,6 @@ function asLong(v: unknown): number | undefined {
   return Number.isSafeInteger(n) ? n : undefined;
 }
 
-function preview(body: Uint8Array | string): string {
-  const s = typeof body === "string" ? body : new TextDecoder().decode(body);
+function preview(s: string): string {
   return s.length > 500 ? `${s.slice(0, 500)}...` : s;
 }
