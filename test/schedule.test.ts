@@ -337,6 +337,14 @@ describe("AutoRefresh", () => {
   };
   const auto = (platform: NodeJS.Platform) =>
     new AutoRefresh(config, platform, join(dir, "home"), exec, "/opt/node/bin", NPX_ENTRY);
+  /** A node folder that exists, with node and npx in it. */
+  const nodeBin = () => {
+    const bin = join(dir, "node/bin");
+    mkdirSync(bin, { recursive: true });
+    for (const f of ["node", "npx"]) writeFileSync(join(bin, f), "");
+    return bin;
+  };
+  const stateOf = () => JSON.parse(readFileSync(join(config.dataDir, "auto-refresh.json"), "utf8"));
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), "schedule-"));
@@ -364,7 +372,7 @@ describe("AutoRefresh", () => {
   });
 
   it("installs one launchd job, and a second page or schedule replaces it", async () => {
-    const a = auto("darwin");
+    const a = new AutoRefresh(config, "darwin", join(dir, "home"), exec, nodeBin(), NPX_ENTRY);
     const plistFile = join(
       dir,
       "home/Library/LaunchAgents/com.indaco.garmin-personal-mcp.refresh.plist",
@@ -401,7 +409,7 @@ describe("AutoRefresh", () => {
 
   it("keeps the other lines of the user's crontab", async () => {
     crontab = "15 3 * * * backup.sh\n";
-    const a = auto("linux");
+    const a = new AutoRefresh(config, "linux", join(dir, "home"), exec, nodeBin(), NPX_ENTRY);
     await a.set({});
     expect(crontab).toMatch(
       /^15 3 \* \* \* backup\.sh\n0 7 \* \* \* .*# garmin-personal-mcp refresh\n$/,
@@ -409,6 +417,89 @@ describe("AutoRefresh", () => {
     expect((await a.status()).installed).toBe(true);
     await a.off();
     expect(crontab).toBe("15 3 * * * backup.sh\n");
+  });
+
+  it("says the job cannot start when its node is gone", async () => {
+    const bin = nodeBin();
+    const a = new AutoRefresh(config, "linux", join(dir, "home"), exec, bin, NPX_ENTRY);
+    await a.set({});
+    // npx fetches the server: only npx itself must exist
+    expect(stateOf().job).toEqual({ program: join(bin, "npx") });
+    expect((await a.status()).installed).toBe(true);
+    rmSync(join(dir, "node"), { recursive: true });
+    expect((await a.status()).installed).toBe(false);
+  });
+
+  it("says the job cannot start when its installed server file is gone", async () => {
+    const bin = nodeBin();
+    const entry = join(dir, "app/dist/index.js");
+    mkdirSync(join(dir, "app/dist"), { recursive: true });
+    writeFileSync(entry, "");
+    const a = new AutoRefresh(config, "linux", join(dir, "home"), exec, bin, entry);
+    await a.set({});
+    expect(stateOf().job).toEqual({ program: join(bin, "node"), entry });
+    expect((await a.status()).installed).toBe(true);
+    rmSync(entry);
+    expect((await a.status()).installed).toBe(false);
+  });
+
+  it("checks only the scheduler for a schedule saved before the job was recorded", async () => {
+    writeFileSync(
+      join(config.dataDir, "auto-refresh.json"),
+      JSON.stringify({ cron: "0 7 * * *", pages: [join(config.dataDir, "garmin-dashboard.html")] }),
+    );
+    crontab = "0 7 * * * x # garmin-personal-mcp refresh\n";
+    expect((await auto("linux").status()).installed).toBe(true);
+  });
+
+  it("schedules npx for a server in a pnpm, bun or yarn cache", async () => {
+    for (const entry of [
+      "/home/u/.cache/pnpm/dlx/9f11d7eae4fe2ed5074378e66f47f8ff/mvt8ezid-23wm/node_modules/pkg/dist/index.js",
+      "/tmp/bunx-501-pkg@latest/node_modules/pkg/dist/index.js",
+      "/tmp/xfs-1a2b3c4d/dlx-4242/node_modules/pkg/dist/index.js",
+      "C:\\Users\\u\\AppData\\Local\\Temp\\bunx-1000-pkg@latest\\node_modules\\pkg\\dist\\index.js",
+    ]) {
+      crontab = "";
+      await new AutoRefresh(config, "linux", join(dir, "home"), exec, "/opt/node/bin", entry).set(
+        {},
+      );
+      expect(crontab, entry).toMatch(/\/npx' '-y' '@indaco\/garmin-personal-mcp@latest'/);
+    }
+  });
+
+  it("runs a server in a folder that only looks like a cache with its node", async () => {
+    for (const entry of [
+      "/home/u/dlx-tools/pkg/dist/index.js",
+      "/home/u/bunx-cache/pkg/dist/index.js",
+      "/home/u/my_npx/pkg/dist/index.js",
+      "/home/u/dlxx/pkg/dist/index.js",
+    ]) {
+      crontab = "";
+      await new AutoRefresh(config, "linux", join(dir, "home"), exec, "/opt/node/bin", entry).set(
+        {},
+      );
+      expect(crontab, entry).toContain(`'/opt/node/bin/node' '${entry}' 'refresh' '--auto'`);
+    }
+  });
+
+  it("asks launchd whether the job is loaded, and needs its plist", async () => {
+    let loaded = true;
+    const launchd: Run = async (cmd, args) => {
+      calls.push({ cmd, args });
+      return { code: args[0] === "print" && !loaded ? 113 : 0, stdout: "", stderr: "" };
+    };
+    const a = new AutoRefresh(config, "darwin", join(dir, "home"), launchd, nodeBin(), NPX_ENTRY);
+    await a.set({});
+    expect((await a.status()).installed).toBe(true);
+    expect(calls.find((c) => c.args[0] === "print")?.args).toEqual([
+      "print",
+      `gui/${process.getuid!()}/com.indaco.garmin-personal-mcp.refresh`,
+    ]);
+    loaded = false;
+    expect((await a.status()).installed).toBe(false);
+    loaded = true;
+    rmSync(join(dir, "home/Library/LaunchAgents/com.indaco.garmin-personal-mcp.refresh.plist"));
+    expect((await a.status()).installed).toBe(false);
   });
 
   it("stops and keeps the user's crontab when crontab -l fails for another reason", async () => {
@@ -568,12 +659,42 @@ describe("AutoRefresh", () => {
   });
 
   it("reports an error of the scheduler, and keeps the schedule it had", async () => {
+    const plistFile = join(
+      dir,
+      "home/Library/LaunchAgents/com.indaco.garmin-personal-mcp.refresh.plist",
+    );
     const broken = new AutoRefresh(config, "darwin", join(dir, "home"), failing, "/n");
     await expect(broken.set({})).rejects.toThrow(/launchctl failed \(5\): Bootstrap failed/);
     expect(existsSync(join(config.dataDir, "auto-refresh.json"))).toBe(false);
+    // no schedule before: the new plist goes too
+    expect(existsSync(plistFile)).toBe(false);
     await auto("darwin").set({ cron: "0 6 * * *" });
+    vi.mocked(log).mockClear();
     await expect(broken.set({ cron: "0 9 * * *" })).rejects.toThrow(/launchctl failed/);
     expect((await auto("darwin").status()).cron).toBe("0 6 * * *");
+    // launchd booted the old job out: the old plist is back, and a failed reload is logged
+    expect(readFileSync(plistFile, "utf8")).toContain("<key>Hour</key><integer>6</integer>");
+    expect(readFileSync(plistFile, "utf8")).not.toContain("<integer>9</integer>");
+    expect(vi.mocked(log)).toHaveBeenCalledWith(
+      "WARN",
+      "schedule: the old job could not be restored: launchctl failed (5): Bootstrap failed: 5",
+    );
+  });
+
+  it("loads the old job again after a failed reinstall on macOS", async () => {
+    let bootstraps = 0;
+    const flaky: Run = async (cmd, args) => {
+      calls.push({ cmd, args });
+      const fail = args[0] === "bootstrap" && ++bootstraps === 2;
+      return { code: fail ? 5 : 0, stdout: "", stderr: fail ? "Bootstrap failed: 5" : "" };
+    };
+    const a = new AutoRefresh(config, "darwin", join(dir, "home"), flaky, nodeBin(), NPX_ENTRY);
+    await a.set({ cron: "0 6 * * *" });
+    vi.mocked(log).mockClear();
+    await expect(a.set({ cron: "0 9 * * *" })).rejects.toThrow(/launchctl failed/);
+    expect(bootstraps).toBe(3);
+    expect(vi.mocked(log)).not.toHaveBeenCalled();
+    expect(await a.status()).toMatchObject({ cron: "0 6 * * *", installed: true });
   });
 
   it("writes the next run into each scheduled page as due, and removes it when stopped", async () => {
