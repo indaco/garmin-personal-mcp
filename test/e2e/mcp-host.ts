@@ -5,24 +5,34 @@ import { AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/
 interface HostLog {
   sizes: number[];
   links: string[];
+  modes: string[];
 }
 
 declare global {
   interface Window {
-    showApp(html: string, structuredContent: Record<string, unknown>): Promise<HostLog>;
+    showApp(
+      html: string,
+      structuredContent: Record<string, unknown>,
+      modes?: ("inline" | "fullscreen")[],
+    ): Promise<HostLog>;
     hostLog: HostLog;
   }
 }
 
-window.showApp = async (html, structuredContent) => {
-  const log: HostLog = { sizes: [], links: [] };
+window.showApp = async (html, structuredContent, modes) => {
+  const log: HostLog = { sizes: [], links: [], modes: [] };
   window.hostLog = log;
   const frame = document.createElement("iframe");
   // no allow-same-origin: the page gets an opaque origin, without storage
   frame.sandbox.add("allow-scripts");
   frame.style.width = "1200px";
   document.body.append(frame);
-  const bridge = new AppBridge(null, { name: "test-host", version: "1" }, { openLinks: {} });
+  const bridge = new AppBridge(
+    null,
+    { name: "test-host", version: "1" },
+    { openLinks: {} },
+    { hostContext: modes ? { displayMode: "inline", availableDisplayModes: modes } : {} },
+  );
   bridge.onsizechange = ({ height }) => {
     if (height !== undefined) log.sizes.push(height);
     frame.style.height = `${height}px`;
@@ -30,6 +40,10 @@ window.showApp = async (html, structuredContent) => {
   bridge.onopenlink = async ({ url }) => {
     log.links.push(url);
     return {};
+  };
+  bridge.onrequestdisplaymode = async ({ mode }) => {
+    log.modes.push(mode);
+    return { mode: mode !== "pip" && modes?.includes(mode) ? mode : "inline" };
   };
   bridge.oninitialized = () =>
     void bridge.sendToolResult({ content: [{ type: "text", text: "{}" }], structuredContent });

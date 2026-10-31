@@ -13,6 +13,8 @@ const ICONS: Record<string, string> = {
   generic: "M8 2v12M2 8h12",
   eye: "M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM8 6a2 2 0 1 1 0 4 2 2 0 0 1 0-4",
   settings: "M2 4h6M12 4h2M2 8h2M8 8h6M2 12h8M14 12h0M10 2.5v3M6 6.5v3M12 10.5v3",
+  expand: "M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4",
+  collapse: "M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4",
 };
 
 export function icon(name: string): SVGElement {

@@ -8,26 +8,56 @@ import type { ViewBlocks } from "../dashboard-page";
 const PROTOCOL = "2026-01-26";
 const send = (message: object) => window.parent.postMessage({ jsonrpc: "2.0", ...message }, "*");
 
+let id = 0;
+const replies = new Map<number, (result: Record<string, unknown> | undefined) => void>();
+const request = (method: string, params: object) =>
+  new Promise<Record<string, unknown> | undefined>((resolve) => {
+    replies.set(++id, resolve);
+    send({ id, method, params });
+  });
+
+interface HostContext {
+  displayMode?: string;
+  availableDisplayModes?: string[];
+}
+
+/** The display of the frame: `offered` when the host can show the page full screen. */
+export const screen = { offered: false, full: false, redraw: () => {} };
+
+function follow(context: HostContext | undefined): void {
+  if (context?.availableDisplayModes) {
+    screen.offered = context.availableDisplayModes.includes("fullscreen");
+  }
+  if (context?.displayMode) screen.full = context.displayMode === "fullscreen";
+}
+
+/** Asks the host for full screen, or back to the chat; the host answers with the mode it chose. */
+export async function toggleFullscreen(): Promise<void> {
+  const r = await request("ui/request-display-mode", {
+    mode: screen.full ? "inline" : "fullscreen",
+  });
+  follow({ displayMode: r?.mode as string | undefined });
+  screen.redraw();
+}
+
 /** In a frame and without data: the page waits for the host. */
 export const inChat = () => window.parent !== window && !window.GARMIN?.data;
 
 /** Sends `ui/initialize`, then calls `show` with the blocks of the first tool result. */
 export function connect(show: (blocks: ViewBlocks) => void): void {
-  let id = 0;
-  const replies = new Map<number, () => void>();
-  const request = (method: string, params: object) =>
-    new Promise<void>((resolve) => {
-      replies.set(++id, resolve);
-      send({ id, method, params });
-    });
   let shown = false;
 
   window.addEventListener("message", (e) => {
     // only the host talks to the page
     if (e.source !== window.parent || e.data?.jsonrpc !== "2.0") return;
-    const m = e.data as { id?: number; method?: string; params?: { structuredContent?: unknown } };
+    const m = e.data as {
+      id?: number;
+      method?: string;
+      params?: { structuredContent?: unknown } & HostContext;
+      result?: Record<string, unknown>;
+    };
     if (m.method === undefined) {
-      replies.get(m.id!)?.();
+      replies.get(m.id!)?.(m.result);
       replies.delete(m.id!);
     } else if (m.method === "ui/notifications/tool-result") {
       const blocks = m.params?.structuredContent as ViewBlocks | undefined;
@@ -35,6 +65,9 @@ export function connect(show: (blocks: ViewBlocks) => void): void {
         shown = true;
         show(blocks);
       }
+    } else if (m.method === "ui/notifications/host-context-changed") {
+      follow(m.params);
+      screen.redraw();
     } else if (m.id !== undefined) {
       // ping, teardown: nothing to do, but a request needs a reply
       send({ id: m.id, result: {} });
@@ -53,8 +86,9 @@ export function connect(show: (blocks: ViewBlocks) => void): void {
   void request("ui/initialize", {
     protocolVersion: PROTOCOL,
     appInfo: { name: "garmin-personal-dashboard", version: "1" },
-    appCapabilities: {},
-  }).then(() => {
+    appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] },
+  }).then((r) => {
+    follow(r?.hostContext as HostContext | undefined);
     send({ method: "ui/notifications/initialized", params: {} });
     // the host sizes the frame to the page, measured as the ext-apps client does
     let last = 0;

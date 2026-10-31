@@ -8,6 +8,7 @@ import { Chart, chart, destroyCharts, themeCharts } from "./charts";
 import { announce, h, keepFocus } from "./dom";
 import { dragTile, keyMove, resizeTile } from "./edit-drag";
 import { icon, logo } from "./icons";
+import { screen, toggleFullscreen } from "./mcp-app";
 import {
   addLanguages,
   CATALOGUES,
@@ -106,6 +107,7 @@ export function start(): void {
   pageLayout = parseLayout(G.layout);
   layout = merge(pageLayout, readLocal());
   mine = stale(pageLayout, readLocal());
+  screen.redraw = render;
   window.Chart = Chart; // for custom widgets and the page tests
   addLanguages(G.languages);
   addLanguages(G.i18n);
@@ -300,11 +302,27 @@ function header(data: Data): HTMLElement {
           ),
         ),
       ),
-      h("div", { class: "menus" }, accountMenu()),
+      h("div", { class: "menus" }, screen.offered && screenButton(), accountMenu()),
     ),
     windowBar(inProgress),
     namesBar(data),
     tabBar(data),
+  );
+}
+
+/** Full screen in the chat, when the host offers it; the page file never shows it. */
+function screenButton(): HTMLElement {
+  const label = t(screen.full ? "chat.exitFullscreen" : "chat.fullscreen");
+  return h(
+    "button",
+    {
+      type: "button",
+      class: "screen-mode",
+      "aria-label": label,
+      title: label,
+      onclick: () => void toggleFullscreen(),
+    },
+    icon(screen.full ? "collapse" : "expand"),
   );
 }
 

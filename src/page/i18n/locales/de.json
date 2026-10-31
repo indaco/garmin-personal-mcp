@@ -6,6 +6,8 @@
   "period": "{from} bis {to}",
   "inProgress": "* laufende Woche",
   "menu.settings": "Einstellungen",
+  "chat.fullscreen": "Vollbild",
+  "chat.exitFullscreen": "Vollbild beenden",
   "menu.theme": "Design",
   "footer.updated": "Daten aus Garmin Connect, aktualisiert am {date}",
   "footer.failed": "Nicht von Garmin gelesene Tage: {n} (ihre Werte zeigen k. A.)",

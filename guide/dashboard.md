@@ -327,6 +327,8 @@ page with new data.
 - The page has the layout, the custom widgets, the languages and the settings of your saved page.
   Without a saved page, it has the preset widgets.
 - The server writes no file, and the page has no coach notes.
+- When the assistant can show the page full screen, a button next to **Settings** does it. The same
+  button goes back to the chat.
 - The data goes only to the page. The assistant gets the digest of the data, as with
   `writeDashboard`.
 - A layout that you change in the chat is not saved in the file.

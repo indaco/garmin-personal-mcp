@@ -42,7 +42,7 @@ async function viewBlocks() {
 }
 
 /** The page shown by the test host, as a host shows the showDashboard resource. */
-async function showInHost(html: string, blocks: ViewBlocks) {
+async function showInHost(html: string, blocks: ViewBlocks, modes?: ("inline" | "fullscreen")[]) {
   const page = await (
     await browser.newContext({ viewport: { width: 1280, height: 900 } })
   ).newPage();
@@ -53,7 +53,11 @@ async function showInHost(html: string, blocks: ViewBlocks) {
   });
   await page.setContent("<!doctype html><body></body>");
   await page.addScriptTag({ content: host });
-  await page.evaluate(([h, b]) => window.showApp(h, { ...b }), [html, blocks] as const);
+  await page.evaluate(([h, b, m]) => window.showApp(h, { ...b }, m), [
+    html,
+    blocks,
+    modes,
+  ] as const);
   const frame = page.frames()[1];
   await frame.waitForSelector(".tile");
   return { page, frame, errors };
@@ -63,6 +67,8 @@ it("shows the dashboard in a host frame from the showDashboard blocks", async ()
   const { page, frame, errors } = await showInHost(template(), await viewBlocks());
   expect(await frame.$$eval(".tile", (els) => els.length)).toBeGreaterThan(5);
   expect(await frame.innerText("#app")).toContain("Training + Recovery");
+  // a host that offers no full screen gets no button
+  expect(await frame.$(".screen-mode")).toBeNull();
   // the host sizes the frame to the page
   await expect
     .poll(() => page.evaluate(() => window.hostLog.sizes.at(-1) ?? 0))
@@ -95,4 +101,16 @@ it("shows the error in a custom widget when the host blocks eval, and the rest o
   expect(await frame.innerText("[data-id=mine]")).not.toContain("ran");
   expect(await frame.innerText("[data-id=kpis]")).not.toBe("");
   expect(errors.filter((e) => e.startsWith("pageerror"))).toEqual([]);
+});
+
+it("asks the host for full screen and back, when the host offers it", async () => {
+  const { page, frame, errors } = await showInHost(template(), await viewBlocks(), [
+    "inline",
+    "fullscreen",
+  ]);
+  await frame.click("button.screen-mode[aria-label='Full screen']");
+  await frame.click("button.screen-mode[aria-label='Exit full screen']");
+  await frame.waitForSelector("button.screen-mode[aria-label='Full screen']");
+  expect(await page.evaluate(() => window.hostLog.modes)).toEqual(["fullscreen", "inline"]);
+  expect(errors).toEqual([]);
 });
