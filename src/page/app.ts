@@ -71,23 +71,23 @@ declare global {
   }
 }
 
-const G = window.GARMIN ?? { data: null, layout: null, widgets: [] };
 /** The server writes the notes HTML-escaped (pages that Claude designs show them as HTML); widgets get plain text. */
 const plain = (s: string) =>
   new DOMParser().parseFromString(s, "text/html").documentElement.textContent ?? "";
-if (G.data?.notes) G.data.notes = G.data.notes.map(plain);
-const S: Settings = window.GARMIN_SETTINGS ?? {};
 const LAYOUT_KEY = `garmin-layout:${location.pathname}`;
 const ALWAYS: readonly string[] = ["running", "strengthTraining", "walking", "cycling", "racket"];
 
-let langChoice = store.get("garmin-lang") ?? S.language ?? "auto";
+// read in start(): in the chat (an MCP App) the blocks arrive after the script runs
+let G: NonNullable<Window["GARMIN"]>;
+let S: Settings;
+let langChoice: string;
 let lang = "en";
 let t: T = translator("en");
 let fmt = formatter("en");
-const pageLayout = parseLayout(G.layout);
-let layout: Layout = merge(pageLayout, readLocal());
+let pageLayout: Layout;
+let layout: Layout;
 // the browser's layout, kept until you choose it or the new one that Claude wrote
-let mine: Layout | null = stale(pageLayout, readLocal());
+let mine: Layout | null;
 let view: View;
 let editing = false;
 // edit mode works on a copy: Done saves it, Discard drops it
@@ -99,6 +99,13 @@ let tabs: string[] = [];
 let weeks: string[] = [];
 
 export function start(): void {
+  G = window.GARMIN ?? { data: null, layout: null, widgets: [] };
+  if (G.data?.notes) G.data.notes = G.data.notes.map(plain);
+  S = window.GARMIN_SETTINGS ?? {};
+  langChoice = store.get("garmin-lang") ?? S.language ?? "auto";
+  pageLayout = parseLayout(G.layout);
+  layout = merge(pageLayout, readLocal());
+  mine = stale(pageLayout, readLocal());
   window.Chart = Chart; // for custom widgets and the page tests
   addLanguages(G.languages);
   addLanguages(G.i18n);
@@ -185,7 +192,11 @@ function render(): void {
     );
     return;
   }
-  history.replaceState(null, "", formatHash(view));
+  try {
+    history.replaceState(null, "", formatHash(view));
+  } catch {
+    // a frame without a URL of its own (an MCP App in a srcdoc frame): the view is not in the address
+  }
   // a theme or language change renders again; the account menu stays as it was
   accountOpen = document.querySelector(".account[open]") !== null;
   const data = G.data;
