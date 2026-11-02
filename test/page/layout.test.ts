@@ -96,13 +96,14 @@ describe("seen record", () => {
   });
 
   it("reads a __proto__ key as plain data", () => {
-    const text = '{"boards":{"__proto__":[],"all":[]},"seen":{"__proto__":["a"],"all":["b"]}}';
+    const text =
+      '{"boards":{"__proto__":[{"id":"a","widget":"w","span":1}],"all":[]},"seen":{"__proto__":["a"],"all":["b"]}}';
     const result = parseLayout(JSON.parse(text));
-    // __proto__ is no listed board here, because boards is built on a plain object; the record
-    // must still be a plain object with the default prototype
+    expect(Object.getPrototypeOf(result.boards)).toBe(Object.prototype);
     expect(Object.getPrototypeOf(result.seen)).toBe(Object.prototype);
+    expect(Object.keys(result.boards)).toEqual(["__proto__", "all"]);
+    expect(Object.keys(result.seen ?? {})).toEqual(["__proto__", "all"]);
     expect(Object.prototype).not.toHaveProperty("0");
-    expect(result.seen).toEqual({ all: ["b"] });
   });
 
   it("stamps the preset names the first time it lists a board", () => {
@@ -475,6 +476,16 @@ describe("withPresetWidgets", () => {
   it("treats a listed board without a record as one that met nothing", () => {
     const r = run({ run: [] });
     expect(idsOf(r)).toEqual(WANT);
+  });
+
+  it("keeps a board called __proto__ as plain data", () => {
+    const l = parseLayout(JSON.parse('{"boards":{"__proto__":[]}}'));
+    const r = withPresetWidgets(l, want);
+    expect(Object.keys(r.layout.boards)).toEqual(["__proto__"]);
+    expect(Object.getPrototypeOf(r.layout.boards)).toBe(Object.prototype);
+    expect(Object.keys(r.layout.seen ?? {})).toEqual(["__proto__"]);
+    expect(Object.keys(r.added)).toEqual(["__proto__"]);
+    expect(Object.getPrototypeOf(r.added)).toBe(Object.prototype);
   });
 
   it("uses the generic list for an unknown board name", () => {

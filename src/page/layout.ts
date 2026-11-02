@@ -140,26 +140,12 @@ export function remove(board: Instance[], id: string): Instance[] {
 /** A layout from untrusted JSON (the page block, local storage, a pasted text): what cannot be used is dropped. */
 export function parseLayout(v: unknown): Layout {
   const o = isObject(v) ? v : {};
-  const boards: Record<string, Instance[]> = {};
-  for (const [name, list] of Object.entries(isObject(o.boards) ? o.boards : {})) {
-    if (!Array.isArray(list)) continue;
-    const seen = new Set<string>();
-    boards[name] = [];
-    for (const item of list) {
-      if (!isObject(item) || typeof item.id !== "string" || typeof item.widget !== "string")
-        continue;
-      if (seen.has(item.id)) continue;
-      seen.add(item.id);
-      const span = Math.min(3, Math.max(1, Math.round(Number(item.span) || 1))) as Span;
-      boards[name].push({
-        id: item.id,
-        widget: item.widget,
-        ...(typeof item.type === "string" ? { type: item.type } : {}),
-        span,
-        ...(item.hidden === true ? { hidden: true } : {}),
-      });
-    }
-  }
+  // fromEntries defines own keys, so a __proto__ board is data and never sets a prototype
+  const boards: Record<string, Instance[]> = Object.fromEntries(
+    Object.entries(isObject(o.boards) ? o.boards : {}).flatMap(([name, list]) =>
+      Array.isArray(list) ? [[name, parseBoard(list)] as const] : [],
+    ),
+  );
   const seen = parseSeen(o.seen, boards);
   return {
     rev: typeof o.rev === "string" ? o.rev : "",
@@ -167,6 +153,25 @@ export function parseLayout(v: unknown): Layout {
     boards,
     ...(seen ? { seen } : {}),
   };
+}
+
+function parseBoard(list: unknown[]): Instance[] {
+  const ids = new Set<string>();
+  const board: Instance[] = [];
+  for (const item of list) {
+    if (!isObject(item) || typeof item.id !== "string" || typeof item.widget !== "string") continue;
+    if (ids.has(item.id)) continue;
+    ids.add(item.id);
+    const span = Math.min(3, Math.max(1, Math.round(Number(item.span) || 1))) as Span;
+    board.push({
+      id: item.id,
+      widget: item.widget,
+      ...(typeof item.type === "string" ? { type: item.type } : {}),
+      span,
+      ...(item.hidden === true ? { hidden: true } : {}),
+    });
+  }
+  return board;
 }
 
 function parseSeen(
@@ -200,27 +205,37 @@ export function withPresetWidgets(
   preset: (board: string) => Instance[],
 ): { layout: Layout; added: Record<string, string[]>; changed: boolean } {
   if (layout.base === "blank") return { layout, added: {}, changed: false };
-  const boards: Record<string, Instance[]> = {};
-  const seen: Record<string, readonly string[]> = { ...layout.seen };
-  const added: Record<string, string[]> = {};
-  let changed = false;
-  for (const [name, list] of Object.entries(layout.boards)) {
+  const old = layout.seen ?? {};
+  const results = Object.entries(layout.boards).map(([name, list]) => {
     const want = preset(name);
-    const met = new Set(Object.hasOwn(seen, name) ? seen[name] : []);
+    const names = want.map((i) => i.widget);
+    const met = new Set(Object.hasOwn(old, name) ? old[name] : []);
+    const ids: string[] = [];
     let next = list;
     for (const [at, w] of want.entries()) {
       if (met.has(w.widget) || next.some((i) => i.widget === w.widget)) continue;
       const fresh: Instance = { id: freeId(next, w.widget), widget: w.widget, span: w.span };
       next = insertAfterPrevious(next, want.slice(0, at), fresh);
-      (added[name] ??= []).push(fresh.id);
-      changed = true;
+      ids.push(fresh.id);
     }
-    boards[name] = next;
-    const names = want.map((i) => i.widget);
-    if (JSON.stringify(seen[name]) !== JSON.stringify(names)) changed = true;
-    seen[name] = names;
-  }
-  return { layout: { ...layout, boards, seen }, added, changed };
+    const recordChanged =
+      JSON.stringify(Object.hasOwn(old, name) ? old[name] : null) !== JSON.stringify(names);
+    return { name, next, names, ids, changed: ids.length > 0 || recordChanged };
+  });
+  // fromEntries defines own keys, so a board called __proto__ stays data
+  const boards = Object.fromEntries(results.map((r) => [r.name, r.next]));
+  const seen = Object.fromEntries([
+    ...Object.entries(old),
+    ...results.map((r) => [r.name, r.names] as const),
+  ]);
+  const added = Object.fromEntries(
+    results.filter((r) => r.ids.length > 0).map((r) => [r.name, r.ids]),
+  );
+  return {
+    layout: { ...layout, boards, seen },
+    added,
+    changed: results.some((r) => r.changed),
+  };
 }
 
 /** After the first instance of the nearest earlier preset widget on the board; at the end if none. */
