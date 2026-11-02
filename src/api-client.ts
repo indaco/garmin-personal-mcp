@@ -3,6 +3,8 @@ import type { Config } from "./config";
 import { log } from "./log";
 
 const TOKEN_PATH = "/personalapitoken-service/personal-api/personal-api-key/token";
+/** Where the user creates a new personal API key. */
+const KEY_PAGE_URL = "https://connect.garmin.com/app/settings/personalApiToken";
 const EXERCISE_CATALOGUE_URL = "https://connect.garmin.com/web-data/exercises/Exercises.json";
 /** Re-obtain the token a bit before the documented 24h validity. */
 const DEFAULT_TOKEN_TTL_MS = 23 * 3600_000;
@@ -10,6 +12,11 @@ const DEFAULT_TOKEN_TTL_MS = 23 * 3600_000;
 export class GarminApiError extends Error {
   override name = "GarminApiError";
 }
+
+/** The key, and where it comes from: the fix for a refused key is different for each source. */
+type ApiKey =
+  | { readonly key: string; readonly from: "env" }
+  | { readonly key: string; readonly from: "file"; readonly file: string };
 
 /**
  * Minimal client for the Garmin Connect Personal API.
@@ -127,7 +134,8 @@ export class GarminApiClient {
   }
 
   async #requestToken(): Promise<string> {
-    const apiKey = await this.#apiKey();
+    const source = await this.#apiKey();
+    const apiKey = source.key;
     let resp: Response;
     let text: string;
     try {
@@ -144,9 +152,14 @@ export class GarminApiClient {
     }
     const contentType = resp.headers.get("Content-Type") ?? "none";
     if (!resp.ok) {
+      // the assistant shows this text to the user: it must tell how to recover
+      const fix =
+        resp.status === 401 || resp.status === 403
+          ? `the personal API key is incorrect, expired or revoked. ${replaceKey(source)}`
+          : "the Garmin token service did not answer correctly. Try again later.";
       throw new GarminApiError(
         `Token request failed: HTTP ${resp.status} (Content-Type: ${contentType}, body: ` +
-          `${this.#preview(text, apiKey)}) - check that the personal API key is valid and not expired`,
+          `${this.#preview(text, apiKey)}) - ${fix}`,
       );
     }
     const body = text.trim();
@@ -207,7 +220,7 @@ export class GarminApiClient {
     return preview(this.#scrub(s, secret));
   }
 
-  async #apiKey(): Promise<string> {
+  async #apiKey(): Promise<ApiKey> {
     const env = process.env.GARMIN_PERSONAL_API_KEY?.trim();
     if (env) {
       if (!isHeaderSafe(env)) {
@@ -215,7 +228,7 @@ export class GarminApiClient {
           "GARMIN_PERSONAL_API_KEY has spaces, line breaks or other characters that a key cannot have",
         );
       }
-      return env;
+      return { key: env, from: "env" };
     }
     const file = this.config.apiKeyFile;
     let key: string;
@@ -232,7 +245,20 @@ export class GarminApiClient {
         `The API key file has more than the key (spaces, line breaks or other characters): ${file}`,
       );
     }
-    return key;
+    return { key, from: "file", file };
+  }
+}
+
+/**
+ * How to put a new key in place: the server reads a key file again for each token, but not its
+ * environment. No default branch: a new source makes tsc report a missing return (TS2366).
+ */
+function replaceKey(source: ApiKey): string {
+  switch (source.from) {
+    case "file":
+      return `Create a new key at ${KEY_PAGE_URL} and save it in ${source.file}: the next call uses it, no restart is necessary.`;
+    case "env":
+      return `Create a new key at ${KEY_PAGE_URL}, put it in GARMIN_PERSONAL_API_KEY in the MCP client configuration and restart the client.`;
   }
 }
 

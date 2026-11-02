@@ -175,15 +175,42 @@ describe("token", () => {
     expect(calls.filter((c) => c.url === TOKEN_URL)).toHaveLength(1);
   });
 
-  it("reports a refused key with the status, content type and body", async () => {
+  it("reports a refused key from the environment with the change in the client configuration", async () => {
     mockFetch({ status: 401, body: "bad key", contentType: "text/plain" });
     await expect(client().getJson("/x")).rejects.toThrow(
-      "Token request failed: HTTP 401 (Content-Type: text/plain, body: bad key) - check that the personal API key is valid and not expired",
+      "Token request failed: HTTP 401 (Content-Type: text/plain, body: bad key) - the personal API key " +
+        "is incorrect, expired or revoked. Create a new key at " +
+        "https://connect.garmin.com/app/settings/personalApiToken, put it in GARMIN_PERSONAL_API_KEY " +
+        "in the MCP client configuration and restart the client.",
     );
   });
 
-  it("leaves the API key out of a refused token answer", async () => {
-    mockFetch({ status: 401, body: `bad key ${KEY} and ${KEY}`, contentType: "text/plain" });
+  it("reports a refused key from the key file with the file to save the new key in", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    const file = join(mkdtempSync(join(tmpdir(), "garmin-")), "api-key");
+    writeFileSync(file, "file-key");
+    mockFetch({ status: 403, body: "forbidden", contentType: "text/plain" });
+    await expect(client(file).getJson("/x")).rejects.toThrow(
+      "Token request failed: HTTP 403 (Content-Type: text/plain, body: forbidden) - the personal API key " +
+        "is incorrect, expired or revoked. Create a new key at " +
+        `https://connect.garmin.com/app/settings/personalApiToken and save it in ${file}: the next ` +
+        "call uses it, no restart is necessary.",
+    );
+  });
+
+  it.each([400, 404, 429, 500, 503])(
+    "does not blame the key for HTTP %i from the token service",
+    async (status) => {
+      mockFetch({ status, body: "<html>down</html>", contentType: "text/html" });
+      await expect(client().getJson("/x")).rejects.toThrow(
+        `Token request failed: HTTP ${status} (Content-Type: text/html, body: <html>down</html>) - ` +
+          "the Garmin token service did not answer correctly. Try again later.",
+      );
+    },
+  );
+
+  it.each([401, 503])("leaves the API key out of a token answer with HTTP %i", async (status) => {
+    mockFetch({ status, body: `bad key ${KEY} and ${KEY}`, contentType: "text/plain" });
     const error = await client()
       .getJson("/x")
       .then(String, (e: Error) => e.message);
