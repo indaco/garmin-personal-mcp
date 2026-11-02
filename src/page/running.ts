@@ -221,15 +221,20 @@ export const RACE_KM: Record<string, number> = {
 };
 const EFFORT_KM: Record<string, number> = { "1k": 1, mile: 1.609, ...RACE_KM };
 
-/** Race times (Riegel) from the best effort of 5 km or more that predicts the fastest times. */
-export function predictRaces(best: Record<string, number>) {
-  const options = Object.entries(best)
+/** Race times (Riegel) from each best effort of 5 km or more, the fastest predicted times first. */
+export function racePredictionsOf(best: Record<string, number>) {
+  return Object.entries(best)
     .filter(([d, s]) => (EFFORT_KM[d] ?? 0) >= 5 && s > 0)
     .map(([distance, s]) => ({
       from: { distance, seconds: s },
       times: Object.fromEntries(
         Object.entries(RACE_KM).map(([r, km]) => [r, riegel(s, EFFORT_KM[distance], km)]),
       ),
-    }));
-  return options.toSorted((a, b) => a.times["10k"] - b.times["10k"])[0];
+    }))
+    .toSorted((a, b) => a.times["10k"] - b.times["10k"]);
+}
+
+/** Race times (Riegel) from the best effort of 5 km or more that predicts the fastest times. */
+export function predictRaces(best: Record<string, number>) {
+  return racePredictionsOf(best)[0];
 }

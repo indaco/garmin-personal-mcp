@@ -1,8 +1,8 @@
 import { addDays } from "./dates";
-import { round } from "./fit";
-import { type Activity, dayOf, mondayOf, sessionSeconds, seconds } from "./page/calc";
+import { hms, round } from "./fit";
+import { type Activity, dayOf, groupOf, mondayOf, sessionSeconds, seconds } from "./page/calc";
 import { loadOf, loadRatio, zonesOf } from "./page/metrics";
-import { workoutOf } from "./page/running";
+import { racePredictionsOf, type SplitKind, splitOf, workoutOf } from "./page/running";
 import { completed, type StrengthSet } from "./page/strength";
 
 type Json = Record<string, unknown>;
@@ -57,6 +57,32 @@ export interface Digest {
   };
   bestEfforts: Record<string, { time: string; date: string; name: unknown }>;
   races: Json[];
+  /** Runs (board "running") that are a race or over 15 km, newest first, with the page's split. */
+  longRuns: {
+    date: string;
+    name: unknown;
+    km: number;
+    /** "m:ss/km"; null without a split (no laps, or fewer than 2 laps with distance). */
+    firstPace: string | null;
+    secondPace: string | null;
+    kind: SplitKind | null;
+    /** 1 decimal; null when a counted lap has no HR, or without a split. */
+    hrDriftPct: number | null;
+  }[];
+  /** The longest run (board "running") of the period; absent without a run that has a distance. */
+  longestRun?: { date: string; name: unknown; km: number };
+  /** One row per best effort of 5 km or more, fastest first (the first row is the page's prediction). */
+  racePredictions: {
+    /** The effort distance key: "5k", "10k", "half" or "marathon". */
+    from: string;
+    /** The effort time, as in bestEfforts. */
+    time: string;
+    date: string;
+    "5k": string;
+    "10k": string;
+    half: string;
+    marathon: string;
+  }[];
   /** The run names with more than one session: the workouts that the workout trend compares. */
   repeatedRuns: Record<string, number>;
   strengthExercises: Record<string, { sessions: number; first?: TopSet; last?: TopSet }>;
@@ -68,8 +94,9 @@ export interface Digest {
 
 /**
  * Sums and copies of a getDashboardData result, with the page's load functions, so a coach note can
- * quote what the page shows. A number that the data cannot back is null (n/a); a load from the HR
- * estimate is counted in `estimatedLoads`.
+ * quote what the page shows. The long runs and the race predictions come from the page's split and
+ * Riegel functions. A number that the data cannot back is null (n/a); a load from the HR estimate is
+ * counted in `estimatedLoads`.
  */
 export function digest(data: Json): Digest {
   const acts = list(data.activities).filter((a) => dayOf(a as Activity) !== undefined);
@@ -116,15 +143,50 @@ export function digest(data: Json): Digest {
   // sessions without any load: n/a, not 0; no session at all is rest, a true 0
   const unknown = (loads: typeof week) => loads.length > 0 && loads.every((l) => l === undefined);
 
-  const bestEfforts: Digest["bestEfforts"] = {};
-  for (const a of acts) {
-    for (const [distance, time] of Object.entries(isObject(a.best) ? a.best : {})) {
-      const known = bestEfforts[distance];
-      if (typeof time === "string" && (!known || seconds(time) < seconds(known.time))) {
-        bestEfforts[distance] = { time, date: dayOf(a as Activity)!, name: a.name };
-      }
-    }
-  }
+  const bestEfforts = fastestEfforts(acts);
+
+  // the page's Long runs and Race predictor: the same functions, so the coach quotes the page
+  const runs = acts.filter((a) => groupOf(a as Activity) === "running");
+  const longRuns: Digest["longRuns"] = runs
+    .filter((a) => a.race === true || num(a.km) > 15)
+    .map((a) => {
+      const s = Array.isArray(a.laps)
+        ? splitOf(a.laps as Parameters<typeof splitOf>[0])
+        : undefined;
+      return {
+        date: dayOf(a as Activity)!,
+        name: a.name,
+        km: round(num(a.km), 1),
+        firstPace: s ? paceText(s.first) : null,
+        secondPace: s ? paceText(s.second) : null,
+        kind: s ? s.kind : null,
+        hrDriftPct: s?.drift === undefined ? null : round(s.drift, 1),
+      };
+    });
+  // the first one wins a tie
+  const longest = runs.reduce<Json | undefined>(
+    (top, a) => (num(a.km) > num(top?.km) ? a : top),
+    undefined,
+  );
+  const longestRun = longest
+    ? { date: dayOf(longest as Activity)!, name: longest.name, km: round(num(longest.km), 1) }
+    : undefined;
+  // the page predicts from the efforts of the runs only
+  const runEfforts = fastestEfforts(runs);
+  const racePredictions: Digest["racePredictions"] = racePredictionsOf(
+    mapValues(runEfforts, (b) => seconds(b.time)),
+  ).map((o) => {
+    const effort = runEfforts[o.from.distance];
+    return {
+      from: o.from.distance,
+      time: effort.time,
+      date: effort.date,
+      "5k": hms(o.times["5k"]),
+      "10k": hms(o.times["10k"]),
+      half: hms(o.times.half),
+      marathon: hms(o.times.marathon),
+    };
+  });
 
   // activities come most recent first: the first top set seen is the last one done
   const strengthExercises: Digest["strengthExercises"] = {};
@@ -175,6 +237,9 @@ export function digest(data: Json): Digest {
         date: dayOf(a as Activity),
         ...pick(a, ["name", "km", "duration", "pace", "avgHR"]),
       })),
+    longRuns,
+    ...(longestRun ? { longestRun } : {}),
+    racePredictions,
     repeatedRuns: repeatedRuns(acts),
     strengthExercises,
     hrvLast14: list(data.hrv).slice(-14),
@@ -202,6 +267,25 @@ function topSet(sets: Json[]): string | undefined {
     .filter((s) => num(s.reps) > 0 && num(s.kg) > 0)
     .toSorted((a, b) => num(b.kg) - num(a.kg) || num(b.reps) - num(a.reps))[0];
   return top ? `${num(top.kg)} kg x ${num(top.reps)}` : undefined;
+}
+
+/** The fastest effort of each distance, with its activity. */
+function fastestEfforts(acts: Json[]): Digest["bestEfforts"] {
+  const best: Digest["bestEfforts"] = {};
+  for (const a of acts) {
+    for (const [distance, time] of Object.entries(isObject(a.best) ? a.best : {})) {
+      const known = best[distance];
+      if (typeof time === "string" && (!known || seconds(time) < seconds(known.time))) {
+        best[distance] = { time, date: dayOf(a as Activity)!, name: a.name };
+      }
+    }
+  }
+  return best;
+}
+
+/** A pace as the lap pace: "m:ss/km". */
+function paceText(sec: number): string {
+  return `${hms(sec)}/km`;
 }
 
 function sum(): Sum {

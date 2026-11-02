@@ -3,6 +3,7 @@ import {
   efficiency,
   paceSeconds,
   predictRaces,
+  racePredictionsOf,
   splitOf,
   workOf,
   workoutMetrics,
@@ -358,5 +359,18 @@ describe("race predictor", () => {
 
   it("has no prediction from efforts under 5 km", () => {
     expect(predictRaces({ "1k": 200, mile: 330 })).toBeUndefined();
+  });
+
+  it("gives a prediction from each effort of 5 km or more, fastest first", () => {
+    const best = { "1k": 200, "5k": 1200, "10k": 2600, half: 5600 };
+    const all = racePredictionsOf(best);
+    // 10 km from 5k: 2502 s, from half: 2538 s, from 10k: 2600 s
+    expect(all.map((o) => o.from.distance)).toEqual(["5k", "half", "10k"]);
+    expect(all.map((o) => o.times["10k"])).toEqual(
+      all.map((o) => o.times["10k"]).toSorted((a, b) => a - b),
+    );
+    expect(predictRaces(best)).toEqual(all[0]);
+    expect(racePredictionsOf({})).toEqual([]);
+    expect(racePredictionsOf({ mile: 400 })).toEqual([]);
   });
 });

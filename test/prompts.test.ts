@@ -502,9 +502,11 @@ describe("coach prompts", () => {
     expect(text).toContain("Race: half on 2026-11-15, goal time 1:45:00.");
     // the digest from a preview, not the whole getDashboardData result
     expect(text).toContain("Call `writeDashboard` with `preview` = true and `weeks` = 12.");
-    expect(text).toContain(
-      "Call `listActivities` with `startDate` = 2026-08-05 and `limit` = 100.",
-    );
+    // one call: the long runs and the race predictions are in the digest
+    expect(text).not.toContain("listActivities");
+    expect(text).not.toContain("getActivityLaps");
+    expect(text).toContain("`longRuns`");
+    expect(text).toContain("`racePredictions`");
     expect(text).toContain("my goal time of 1:45:00");
     expect(text).toContain("from the goal time when it is realistic");
     expect(text).not.toContain("is missing");

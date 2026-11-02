@@ -251,7 +251,6 @@ export function registerPrompts(server: McpServer): void {
         readinessDescription,
         render(readinessPrompt, {
           today: localToday(),
-          startDate: addDays(localToday(), -7 * 12),
           race: `${distance || "distance not given"} on ${date || "a date not given"}${goal ? `, goal time ${goal}` : ""}`,
           missing:
             date && distance

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { digest } from "../src/digest";
+import { hms, round } from "../src/fit";
 import { sessionSeconds } from "../src/page/calc";
+import { predictRaces, splitOf } from "../src/page/running";
 
 const squat = (sets: Record<string, number>[]) => ({ exercise: "Back Squat", sets });
 
@@ -18,6 +20,26 @@ const strength = (day: string, exercises: unknown[]) => ({
   ...run(day, "strength_training"),
   exercises,
 });
+
+/** A run of the Run board (SDK sport "running") on a day, with its km and more fields. */
+const onBoard = (day: string, name: string, km: number, more: Record<string, unknown> = {}) => ({
+  ...run(day),
+  sport: "running",
+  name,
+  km,
+  ...more,
+});
+
+/** A lap with its time, the watch's pace and its average HR. */
+const lapOf = (km: number, time: string, pace: string, avgHR?: number) => ({
+  km,
+  time,
+  pace,
+  ...(avgHR === undefined ? {} : { avgHR }),
+});
+
+/** The pace text of the digest. */
+const paceText = (sec: number) => `${hms(sec)}/km`;
 
 /** A run on a day with a training load. */
 const loaded = (day: string, trainingLoad: number) => ({ ...run(day), trainingLoad });
@@ -56,6 +78,7 @@ const data = {
       id: 5,
       name: "City 10K",
       type: "running",
+      sport: "running",
       start: "2026-10-25 07:00:00",
       km: 10,
       duration: "50:00",
@@ -86,6 +109,7 @@ const data = {
       id: 3,
       name: "Easy Run",
       type: "running",
+      sport: "running",
       start: "2026-10-20 07:00:00",
       km: 5.5,
       duration: "30:00",
@@ -405,6 +429,127 @@ describe("digest", () => {
     // a timed set without reps is done; 0 reps is not done, even with a time
     expect(out.strengthExercises.Plank).toEqual({ sessions: 1 });
     expect(out.strengthExercises).not.toHaveProperty("Dip");
+  });
+
+  it("lists the races and the runs over 15 km with the page's split and HR drift", () => {
+    // 8 km at 5:00/km and 8 km at 4:50/km; the km of the first lap is rounded up
+    const laps = [lapOf(8.01, "40:00", "5:00/km", 150), lapOf(8, "38:40", "4:50/km", 155)];
+    const s = splitOf(laps)!;
+    const out = digest({
+      ...data,
+      activities: [
+        onBoard("2026-10-24", "Long Run", 16.04, { laps }),
+        // a lap without HR: no drift
+        onBoard("2026-10-17", "Hill Run", 16, {
+          laps: [laps[0], { ...laps[1], avgHR: undefined }],
+        }),
+        onBoard("2026-10-10", "No Laps", 16),
+        onBoard("2026-10-03", "Exactly 15", 15, { laps }),
+        // one lap: no split
+        onBoard("2026-09-26", "Just Over", 15.1, { laps: [laps[0]] }),
+        onBoard("2026-09-19", "City 10K", 10, { race: true }),
+        // a ride is not a run, also as a race
+        { ...run("2026-09-12", "cycling"), sport: "cycling", km: 40, race: true, laps },
+      ],
+    });
+    const none = { firstPace: null, secondPace: null, kind: null, hrDriftPct: null };
+    expect(out.longRuns).toEqual([
+      {
+        date: "2026-10-24",
+        name: "Long Run",
+        km: 16,
+        firstPace: paceText(s.first),
+        secondPace: paceText(s.second),
+        kind: s.kind,
+        hrDriftPct: round(s.drift!, 1),
+      },
+      {
+        date: "2026-10-17",
+        name: "Hill Run",
+        km: 16,
+        firstPace: "5:00/km",
+        secondPace: "4:50/km",
+        kind: "negative",
+        hrDriftPct: null,
+      },
+      { date: "2026-10-10", name: "No Laps", km: 16, ...none },
+      { date: "2026-09-26", name: "Just Over", km: 15.1, ...none },
+      { date: "2026-09-19", name: "City 10K", km: 10, ...none },
+    ]);
+    // time / pace makes the halves 8 km each: the page's numbers, not the rounded km
+    expect(out.longRuns[0]).toMatchObject({ firstPace: "5:00/km", secondPace: "4:50/km" });
+    // speed per beat: 8 / (2400 x 150) against 8 / (2320 x 155)
+    expect(out.longRuns[0].hrDriftPct).toBe(-0.1);
+    // the race of the fixture has no laps
+    expect(d.longRuns).toEqual([{ date: "2026-10-25", name: "City 10K", km: 10, ...none }]);
+  });
+
+  it("gives the longest run of the period", () => {
+    const out = digest({
+      ...data,
+      activities: [
+        onBoard("2026-10-24", "Easy", 8.04),
+        onBoard("2026-10-17", "Long", 18.06),
+        // the first one wins a tie
+        onBoard("2026-10-10", "Long Too", 18.06),
+        { ...run("2026-10-03", "cycling"), sport: "cycling", km: 60 },
+      ],
+    });
+    expect(out.longestRun).toEqual({ date: "2026-10-17", name: "Long", km: 18.1 });
+    // runs without a distance, or no run at all: no longest run
+    const noKm = digest({ ...data, activities: [{ ...onBoard("2026-10-24", "Drill", 0) }] });
+    expect(noKm).not.toHaveProperty("longestRun");
+    expect(digest({ ...data, activities: [data.activities[0]] })).not.toHaveProperty("longestRun");
+    expect(d.longestRun).toEqual({ date: "2026-10-25", name: "City 10K", km: 10 });
+  });
+
+  it("predicts race times from each best effort of 5 km or more, fastest first", () => {
+    const page = predictRaces({ "5k": 24 * 60, "10k": 49 * 60 + 30 })!;
+    expect(d.racePredictions).toHaveLength(2);
+    expect(d.racePredictions[0]).toEqual({
+      from: page.from.distance,
+      time: d.bestEfforts[page.from.distance].time,
+      date: "2026-10-25",
+      "5k": hms(page.times["5k"]),
+      "10k": hms(page.times["10k"]),
+      half: hms(page.times.half),
+      marathon: hms(page.times.marathon),
+    });
+    // 5 km in 24:00 predicts 10 km in 50:02: the 10 km of 49:30 is the estimate
+    expect(d.racePredictions.map((r) => r.from)).toEqual(["10k", "5k"]);
+    expect(d.racePredictions[1]).toMatchObject({ time: "24:00", "5k": "24:00", "10k": "50:02" });
+    const short = digest({
+      ...data,
+      activities: [{ ...run("2026-10-24"), best: { "1k": "3:50", mile: "6:20" } }],
+    });
+    expect(short.racePredictions).toEqual([]);
+    expect(digest({ ...data, activities: [run("2026-10-24")] }).racePredictions).toEqual([]);
+  });
+
+  it("predicts race times from the efforts of the runs only, as the page does", () => {
+    const out = digest({
+      ...data,
+      activities: [
+        // a walk with Garmin's fastest splits, faster than the run
+        {
+          ...run("2026-10-24", "walking"),
+          name: "Walk",
+          sport: "walking",
+          best: { "5k": "20:00" },
+        },
+        onBoard("2026-10-20", "Tempo", 10, { best: { "5k": "24:00" } }),
+      ],
+    });
+    expect(out.racePredictions).toHaveLength(1);
+    expect(out.racePredictions[0]).toMatchObject({
+      from: "5k",
+      time: "24:00",
+      date: "2026-10-20",
+      "5k": "24:00",
+      "10k": "50:02",
+    });
+    // the digest's best efforts still list every activity
+    expect(out.bestEfforts["5k"]).toEqual({ time: "20:00", date: "2026-10-24", name: "Walk" });
   });
 
   it("lists the run names that repeat most first", () => {

@@ -356,11 +356,12 @@ second half. It ends with the sleep and HRV of the night after the run, and a sh
 ### race-readiness
 
 The assistant reads the server's summary of 12 weeks (a `writeDashboard` preview, which writes
-nothing) and the laps of your long runs. It gives the days to the race, the weekly run distance and
-load, the long runs with their pace split and HR drift, and whether your load drops in the last 2
-weeks (the taper). It predicts your race time from your best efforts of 5 km or more (Riegel, an
-estimate: the fastest prediction counts), compares it with your goal, and checks the HRV and sleep of
-the last 7 nights. It ends with a target pace for each quarter of the race.
+nothing). It has the weekly run distance and load, the long runs with their pace split and HR drift,
+and the race predictions, as the dashboard computes them. The assistant gives the days to the race
+and these numbers, and tells whether your load drops in the last 2 weeks (the taper). The race
+prediction uses your best efforts of 5 km or more (Riegel, an estimate: the fastest prediction
+counts). The assistant compares it with your goal and checks the HRV and sleep of the last 7
+nights. It ends with a target pace for each quarter of the race.
 
 | Argument   | Values                                         | Default                  |
 | ---------- | ---------------------------------------------- | ------------------------ |
