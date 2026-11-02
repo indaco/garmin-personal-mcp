@@ -62,6 +62,7 @@ assistant chooses the tools and can combine their data. Some examples:
 - Strength: "How much weight did I lift in total in each strength session this month?"
 - Workouts: "Did I do the reps and rests my workout planned?"
 - Recovery: "How did I sleep this week, and how was my HRV?"
+- Recovery: "Should I train hard today?"
 - Recovery: "Show my steps, stress and Body Battery for the last 7 days."
 - Recovery: "Did my Body Battery recover overnight this week, and which days drained it most?"
 - Body: "How has my weight changed over the last 3 months?"
@@ -81,8 +82,8 @@ assistant chooses the tools and can combine their data. Some examples:
   coach, with your own widgets and languages. See [Dashboard](#dashboard).
 - **The dashboard in the chat**: in Claude Desktop, ask "show my training dashboard" and the page
   opens in the reply, with new data. See [Dashboard in the chat](#dashboard-in-the-chat).
-- **Coach prompts**: a review of one run or one strength session against its planned workout, and a
-  readiness check before a race. See [Coach prompts](#coach-prompts).
+- **Coach prompts**: a review of one run or one strength session against its planned workout, a
+  readiness check before a race, and a check of today. See [Coach prompts](#coach-prompts).
 
 ## Quick start
 
@@ -163,28 +164,28 @@ Ask "list my last 5 activities". The first time that a garmin-personal tool asks
 
 ## Tools
 
-| Tool                       | What it gives                                                                  |
-| -------------------------- | ------------------------------------------------------------------------------ |
-| `listActivities`           | each activity with pace, HR, load and effect, by date, type or name            |
-| `getActivity`              | the details of one activity                                                    |
-| `getActivityLaps`          | the laps of an activity, from its .FIT file                                    |
-| `getActivitySets`          | the strength sets of an activity, with the muscles, from its .FIT file         |
-| `getActivityWorkouts`      | the planned workout of an activity: steps, targets and notes                   |
-| `downloadActivityFit`      | saves the .FIT file of an activity in the data folder                          |
-| `getHrvRange`              | HRV during the night                                                           |
-| `getDailyHeartRate`        | the heart rate of a day, with the resting HR                                   |
-| `getSleep`                 | the sleep of a night, or of up to 14 nights: hours, phases, score and need     |
-| `getWeight`                | weight and body composition for a range of dates                               |
-| `getBodyBattery`           | how Body Battery charged and drained, for up to 14 days                        |
-| `getHeartRateZones`        | your HR zones                                                                  |
-| `getFitnessAge`            | fitness age against actual age                                                 |
-| `getDailySummary`          | steps, stress and Body Battery, for a day or a range                           |
-| `getDashboardData`         | all the dashboard data in one call, with the server's totals and a local cache |
-| `writeDashboard`           | writes the dashboard page                                                      |
-| `editDashboard`            | changes the layout, the custom widgets and the languages of the page           |
-| `showDashboard`            | shows the dashboard inside the chat, in Claude Desktop                         |
-| `scheduleDashboardRefresh` | updates a dashboard page automatically, at the times you say in your own words |
-| `garminGet`                | all other GET endpoints of the Personal API                                    |
+| Tool                       | What it gives                                                                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `listActivities`           | each activity with pace, HR, load and effect, by date, type or name                                                        |
+| `getActivity`              | the details of one activity                                                                                                |
+| `getActivityLaps`          | the laps of an activity, from its .FIT file; for a run also the half split, the HR drift and the fade of each workout step |
+| `getActivitySets`          | the strength sets of an activity, with the muscles, the top set and the e1RM, from its .FIT file                           |
+| `getActivityWorkouts`      | the planned workout of an activity: steps, targets and notes                                                               |
+| `downloadActivityFit`      | saves the .FIT file of an activity in the data folder                                                                      |
+| `getHrvRange`              | HRV during the night                                                                                                       |
+| `getDailyHeartRate`        | the heart rate of a day, with the resting HR                                                                               |
+| `getSleep`                 | the sleep of a night, or of up to 14 nights: hours, phases, score and need                                                 |
+| `getWeight`                | weight and body composition for a range of dates                                                                           |
+| `getBodyBattery`           | how Body Battery charged and drained, for up to 14 days                                                                    |
+| `getHeartRateZones`        | your HR zones                                                                                                              |
+| `getFitnessAge`            | fitness age against actual age                                                                                             |
+| `getDailySummary`          | steps, stress and Body Battery, for a day or a range                                                                       |
+| `getDashboardData`         | all the dashboard data in one call, with the server's totals and a local cache                                             |
+| `writeDashboard`           | writes the dashboard page                                                                                                  |
+| `editDashboard`            | changes the layout, the custom widgets and the languages of the page                                                       |
+| `showDashboard`            | shows the dashboard inside the chat, in Claude Desktop                                                                     |
+| `scheduleDashboardRefresh` | updates a dashboard page automatically, at the times you say in your own words                                             |
+| `garminGet`                | all other GET endpoints of the Personal API                                                                                |
 
 [Tools](guide/tools.md) gives the endpoints, the details of each tool and the data that the
 Personal API does not have.
@@ -341,6 +342,7 @@ These prompts answer in the chat. They do not change a dashboard.
 | [run-review](#run-review)           | reviews one run as a coach                                  | `/mcp__garmin-personal__run-review`                             |
 | [race-readiness](#race-readiness)   | tells if you are ready for a race, with a plan for its pace | `/mcp__garmin-personal__race-readiness 2026-11-15 half 1:45:00` |
 | [strength-review](#strength-review) | reviews one strength session as a coach                     | `/mcp__garmin-personal__strength-review`                        |
+| [train-today](#train-today)         | tells if you should train hard today, with fitness and form | `/mcp__garmin-personal__train-today`                            |
 
 A missing value shows as "n/a": the assistant does not estimate it.
 
@@ -358,11 +360,12 @@ second half. It ends with the sleep and HRV of the night after the run, and a sh
 ### race-readiness
 
 The assistant reads the server's summary of 12 weeks (a `writeDashboard` preview, which writes
-nothing) and the laps of your long runs. It gives the days to the race, the weekly run distance and
-load, the long runs with their pace split and HR drift, and whether your load drops in the last 2
-weeks (the taper). It predicts your race time from your best efforts of 5 km or more (Riegel, an
-estimate: the fastest prediction counts), compares it with your goal, and checks the HRV and sleep of
-the last 7 nights. It ends with a target pace for each quarter of the race.
+nothing). It has the weekly run distance and load, the long runs with their pace split and HR drift,
+and the race predictions, as the dashboard computes them. The assistant gives the days to the race
+and these numbers, and tells whether your load drops in the last 2 weeks (the taper). The race
+prediction uses your best efforts of 5 km or more (Riegel, an estimate: the fastest prediction
+counts). The assistant compares it with your goal and checks the HRV and sleep of the last 7
+nights. It ends with a target pace for each quarter of the race.
 
 | Argument   | Values                                         | Default                  |
 | ---------- | ---------------------------------------------- | ------------------------ |
@@ -385,6 +388,19 @@ planned rest, and ends with the sleep and HRV of the night after the session, an
 | Argument   | Values                                                       | Default                   |
 | ---------- | ------------------------------------------------------------ | ------------------------- |
 | `activity` | an activity id, or words of the activity name (`Upper Body`) | the last strength session |
+
+### train-today
+
+The assistant reads the server's summary of the dashboard data (a `writeDashboard` preview, which
+writes nothing). It uses the weeks of your dashboard page, so the numbers are the same as on the
+page. It gives the verdict of the dashboard's Readiness widget: go easy, normal or ready to push.
+This verdict is the dashboard's own rule, not Garmin's Training Readiness. A table shows each input
+and the rule it meets: the HRV status, the sleep score, the resting HR against the average of the
+7 days before, and the load ratio of 7 to 28 days. When a value is from an older night, the
+assistant gives its date. Then it gives your fitness, fatigue and form, and a short coach note.
+
+Without HRV and sleep data, for example when the page leaves out the recovery data, the summary has
+no readiness: the verdict and its inputs show as "n/a". The prompt has no arguments.
 
 ## Configuration
 
