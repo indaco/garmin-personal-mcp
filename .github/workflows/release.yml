@@ -83,29 +83,16 @@ jobs:
           node-version: 26
           package-manager-cache: false
 
-      # the same checks as the check and page jobs of ci.yml; keep them in step
+      # the page job of ci.yml, then the package; the check job has the rest of ci.yml
       - name: Install
         run: pnpm install --frozen-lockfile
-
-      - name: Lint and format check
-        run: pnpm lint
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Test
-        run: pnpm test
 
       - name: Build
         run: pnpm build
 
-      # stdout carries MCP messages only: one initialize request, one JSON line back
-      - name: Smoke test
-        run: |
-          out=$(echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
-            | timeout 10 node dist/index.js)
-          test "$(printf '%s\n' "$out" | wc -l)" -eq 1
-          printf '%s' "$out" | node -e 'JSON.parse(require("fs").readFileSync(0, "utf8"))'
+      # the site tests load the built website
+      - name: Build the website
+        run: pnpm build:site
 
       - name: Third-party notices are up to date
         run: git diff --exit-code THIRD-PARTY-NOTICES.md
@@ -114,10 +101,9 @@ jobs:
       - name: Install the Chromium headless shell
         run: pnpm exec playwright-core install --only-shell chromium
 
-      # the release ships the npm package: the dashboard page and its view in the chat (MCP App); CI
-      # tests the website, and the website is deployed by hand
+      # all the page tests of ci.yml, the website included: a red CI must not publish
       - name: Page tests
-        run: pnpm test:page test/e2e/dashboard.e2e.ts test/e2e/mcp-app.e2e.ts
+        run: pnpm test:page
 
       - name: Package contents
         run: |
@@ -143,10 +129,64 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # The check job of ci.yml, without the Codecov upload: a release publishes only what CI passes.
+  # Keep the two in step.
+  check:
+    name: Check (Node ${{ matrix.node }})
+    needs: tag-validate
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24, 26]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      # a release builds from scratch: no cache in a job of the release
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint and format check
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        if: matrix.node != 26
+        run: pnpm test
+
+      # the coverage floor also stops a release
+      - name: Test with coverage
+        if: matrix.node == 26
+        run: pnpm test:coverage
+
+      - name: Build
+        run: pnpm build
+
+      # stdout carries MCP messages only: one initialize request, one JSON line back
+      - name: Smoke test
+        run: |
+          out=$(echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+            | timeout 10 node dist/index.js)
+          test "$(printf '%s\n' "$out" | wc -l)" -eq 1
+          printf '%s' "$out" | node -e 'JSON.parse(require("fs").readFileSync(0, "utf8"))'
+
   # It can publish, so it runs no third-party action, no dependency install and no repo script.
   publish:
     name: Publish to npm
-    needs: build
+    needs: [build, check]
     runs-on: ubuntu-24.04
     environment:
       name: Release
@@ -229,7 +269,7 @@ jobs:
     name: Install smoke test
     needs: release-notes
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
@@ -246,10 +286,10 @@ jobs:
           version="${TAG_NAME#v}"
           pkg="@indaco/garmin-personal-mcp@${version}"
 
-          # the registry can lag behind the publish
-          for i in $(seq 1 30); do
+          # npm says "may take a few minutes": v0.7.0 needed more than 5. Wait up to 15.
+          for i in $(seq 1 90); do
             if [ "$(npm view "$pkg" version 2>/dev/null || true)" = "$version" ]; then break; fi
-            if [ "$i" -eq 30 ]; then echo "::error::$pkg is not on the registry"; exit 1; fi
+            if [ "$i" -eq 90 ]; then echo "::error::$pkg is not on the registry after 15 minutes"; exit 1; fi
             sleep 10
           done
 
