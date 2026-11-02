@@ -851,6 +851,16 @@ describe("edit mode", () => {
     expect(JSON.parse(text)).toEqual({ base: "preset", boards: two.boards });
   });
 
+  it("copies the record of the preset widgets that a board met in its first edit", async () => {
+    const { page } = await open(browser, pageFile());
+    await startEdit(page);
+    await page.click("[aria-label='Hide Coach notes']");
+    await page.click("text=Copy layout");
+    const copied = JSON.parse(await page.inputValue(".layout-text"));
+    expect(copied.seen).toEqual({ all: ALL_PRESET });
+    expect(copied.boards.all).toHaveLength(ALL_PRESET.length);
+  });
+
   it("starts empty on a blank layout", async () => {
     const { page } = await open(
       browser,

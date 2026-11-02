@@ -716,6 +716,7 @@ export class DashboardWriter {
             layout,
             board,
             list.filter((i) => i.widget !== id),
+            preset,
           );
           layoutChanged = true;
         }
@@ -734,6 +735,7 @@ export class DashboardWriter {
         layout,
         p.board,
         add(board, p.widget, { type: p.type, span: spanOf(p.span) }),
+        preset,
       );
       layoutChanged = true;
     }
@@ -1155,7 +1157,7 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         layout: z
           .record(z.string(), z.unknown())
           .describe(
-            "A whole layout: { base, boards: { all: [{ id, widget, type?, span, hidden? }] } }",
+            "A whole layout: { base, boards: { all: [{ id, widget, type?, span, hidden? }] }, seen?: { all: [widget names] } }. `seen` is the record of the preset widgets that each board has met: give it back as you got it.",
           )
           .optional(),
         place: z

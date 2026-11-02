@@ -20,7 +20,13 @@ export interface Layout {
   /** What a board that the layout does not list shows: the preset widgets, or nothing. */
   base: "preset" | "blank";
   boards: Record<string, Instance[]>;
+  /** For each listed board, the preset widgets it has met: the merge never adds them again. */
+  seen?: Record<string, readonly string[]>;
 }
+
+/** Longest `seen` record of one board; the largest preset is smaller. */
+const MAX_SEEN = 32;
+const MAX_NAME = 64;
 
 /** A layout edited in this browser, with the rev of the page layout it started from. */
 export interface LocalLayout {
@@ -36,8 +42,19 @@ export function boardOf(
   return layout.boards[board] ?? (layout.base === "blank" ? [] : preset(board));
 }
 
-export function withBoard(layout: Layout, board: string, instances: Instance[]): Layout {
-  return { ...layout, boards: { ...layout.boards, [board]: instances } };
+/**
+ * Sets one board. The first time a board of a preset layout is listed, it has met every preset
+ * widget, so a widget that the user removes in this edit is not added back later.
+ */
+export function withBoard(
+  layout: Layout,
+  board: string,
+  instances: Instance[],
+  preset: (board: string) => Instance[],
+): Layout {
+  const next = { ...layout, boards: { ...layout.boards, [board]: instances } };
+  if (layout.base === "blank" || Object.hasOwn(layout.boards, board)) return next;
+  return { ...next, seen: { ...layout.seen, [board]: presetNames(preset, board) } };
 }
 
 /** The board shows its preset again; the other boards keep what they show. */
@@ -47,9 +64,11 @@ export function resetBoard(
   preset: (board: string) => Instance[],
 ): Layout {
   // a blank layout shows an unlisted board empty, so the preset is stored for this board only
-  if (layout.base === "blank") return withBoard(layout, board, preset(board));
+  if (layout.base === "blank") return withBoard(layout, board, preset(board), preset);
   const { [board]: _, ...boards } = layout.boards;
-  return { ...layout, boards };
+  const { [board]: __, ...seen } = layout.seen ?? {};
+  const { seen: ___, ...rest } = layout;
+  return { ...rest, boards, ...(Object.keys(seen).length > 0 ? { seen } : {}) };
 }
 
 /**
@@ -103,10 +122,15 @@ export function add(
   widget: string,
   { type, span = 1 }: { type?: string; span?: Span },
 ): Instance[] {
+  return [...board, { id: freeId(board, widget), widget, ...(type ? { type } : {}), span }];
+}
+
+/** The widget name as an id, with a number when the board has that id already. */
+export function freeId(board: Instance[], widget: string): string {
   const taken = new Set(board.map((i) => i.id));
   let id = widget;
   for (let n = 2; taken.has(id); n++) id = `${widget}-${n}`;
-  return [...board, { id, widget, ...(type ? { type } : {}), span }];
+  return id;
 }
 
 export function remove(board: Instance[], id: string): Instance[] {
@@ -136,11 +160,77 @@ export function parseLayout(v: unknown): Layout {
       });
     }
   }
+  const seen = parseSeen(o.seen, boards);
   return {
     rev: typeof o.rev === "string" ? o.rev : "",
     base: o.base === "blank" ? "blank" : "preset",
     boards,
+    ...(seen ? { seen } : {}),
   };
+}
+
+function parseSeen(
+  v: unknown,
+  boards: Record<string, Instance[]>,
+): Record<string, readonly string[]> | undefined {
+  if (!isObject(v)) return undefined;
+  const entries = Object.entries(v).flatMap(([board, names]) =>
+    Object.hasOwn(boards, board) && Array.isArray(names) ? [[board, namesOf(names)] as const] : [],
+  );
+  // fromEntries defines own keys, so a __proto__ key is data and never sets a prototype
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+function namesOf(names: unknown[]): string[] {
+  const ok = names.filter((n): n is string => typeof n === "string" && n.length <= MAX_NAME);
+  return [...new Set(ok)].slice(0, MAX_SEEN);
+}
+
+function presetNames(preset: (board: string) => Instance[], board: string): string[] {
+  return preset(board).map((i) => i.widget);
+}
+
+/**
+ * Gives each listed board of a preset layout the preset widgets that it has not met: after the
+ * nearest earlier preset widget on the board, with the preset width. The record then holds the
+ * current preset names. Running it again changes nothing, so the page and the server can both run it.
+ */
+export function withPresetWidgets(
+  layout: Layout,
+  preset: (board: string) => Instance[],
+): { layout: Layout; added: Record<string, string[]>; changed: boolean } {
+  if (layout.base === "blank") return { layout, added: {}, changed: false };
+  const boards: Record<string, Instance[]> = {};
+  const seen: Record<string, readonly string[]> = { ...layout.seen };
+  const added: Record<string, string[]> = {};
+  let changed = false;
+  for (const [name, list] of Object.entries(layout.boards)) {
+    const want = preset(name);
+    const met = new Set(Object.hasOwn(seen, name) ? seen[name] : []);
+    let next = list;
+    for (const [at, w] of want.entries()) {
+      if (met.has(w.widget) || next.some((i) => i.widget === w.widget)) continue;
+      const fresh: Instance = { id: freeId(next, w.widget), widget: w.widget, span: w.span };
+      next = insertAfterPrevious(next, want.slice(0, at), fresh);
+      (added[name] ??= []).push(fresh.id);
+      changed = true;
+    }
+    boards[name] = next;
+    const names = want.map((i) => i.widget);
+    if (JSON.stringify(seen[name]) !== JSON.stringify(names)) changed = true;
+    seen[name] = names;
+  }
+  return { layout: { ...layout, boards, seen }, added, changed };
+}
+
+/** After the first instance of the nearest earlier preset widget on the board; at the end if none. */
+function insertAfterPrevious(board: Instance[], earlier: Instance[], item: Instance): Instance[] {
+  for (const e of earlier.toReversed()) {
+    const own = board.findIndex((i) => i.id === e.widget && i.widget === e.widget);
+    const at = own >= 0 ? own : board.findIndex((i) => i.widget === e.widget);
+    if (at >= 0) return board.toSpliced(at + 1, 0, item);
+  }
+  return [...board, item];
 }
 
 /** The browser's layout while the page still has the layout it started from; otherwise the page layout. */
@@ -156,7 +246,10 @@ export function merge(page: Layout, local: LocalLayout | null): Layout {
 export function stale(page: Layout, local: LocalLayout | null): Layout | null {
   if (!local || local.baseRev === page.rev || !isObject(local.layout)) return null;
   const mine = { ...parseLayout(local.layout), rev: page.rev };
-  return JSON.stringify(mine) === JSON.stringify(page) ? null : mine;
+  // the record is no choice of the user, so a difference in it alone shows no banner
+  const { seen: _, ...theirs } = page;
+  const { seen: __, ...own } = mine;
+  return JSON.stringify(own) === JSON.stringify(theirs) ? null : mine;
 }
 
 function isObject(v: unknown): v is Record<string, unknown> {

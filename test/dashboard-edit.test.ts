@@ -44,6 +44,7 @@ beforeEach(async () => {
 const page = () => readFileSync(file, "utf8");
 const layout = () =>
   readBlock(page(), "layout") as { rev: string; base: string; boards: Record<string, unknown[]> };
+const seen = () => (layout() as { seen?: unknown }).seen;
 const widget = { id: "longest-ride", title: "Longest ride", code: "el.textContent = 'x';" };
 
 describe("editDashboard", () => {
@@ -73,6 +74,47 @@ describe("editDashboard", () => {
       boards: { all: [{ id: "a", widget: "hrv", span: 3 }] },
     });
     expect(layout().rev).not.toBe(rev);
+  });
+
+  describe("seen record", () => {
+    const board = [{ id: "hrv", widget: "hrv", span: 1 }];
+    const given = { base: "preset", boards: { all: board }, seen: { all: ["kpis", "hrv"] } };
+
+    it("keeps the record of a given layout and returns it", async () => {
+      const r = await writer.edit({ layout: given });
+      expect(seen()).toEqual({ all: ["kpis", "hrv"] });
+      expect(r.layout.seen).toEqual({ all: ["kpis", "hrv"] });
+    });
+
+    it("keeps the record of the saved page through a place", async () => {
+      await writer.edit({ layout: given });
+      await writer.edit({ place: [{ board: "all", widget: "calendar" }] });
+      expect(seen()).toEqual({ all: ["kpis", "hrv"] });
+    });
+
+    it("stamps a board that a place lists for the first time", async () => {
+      await writer.edit({ layout: given });
+      await writer.edit({ place: [{ board: "recovery", widget: "calendar" }] });
+      expect(seen()).toMatchObject({ all: ["kpis", "hrv"] });
+      expect(seen()).toHaveProperty("recovery", [
+        "readiness",
+        "fitnessAge",
+        "loadVsRecovery",
+        "hrv",
+        "restingHr",
+        "sleep",
+        "sleepNeed",
+        "bedtime",
+        "bodyBattery",
+      ]);
+    });
+
+    it("cleans a bad record of a given layout and still saves it", async () => {
+      await writer.edit({
+        layout: { boards: { all: board }, seen: { all: [1, "x", "x"], run: ["y"], hrv: "z" } },
+      });
+      expect(seen()).toEqual({ all: ["x"] });
+    });
   });
 
   it("places a widget at the end of a board that still shows its preset", async () => {

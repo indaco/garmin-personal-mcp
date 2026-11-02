@@ -385,7 +385,8 @@ library (`widgets.json` in the data folder).
 
 The browser saves the layout when you select **Done**, but only in that browser. To keep the layout
 in the page, select **Copy layout** and give the text to your assistant. The assistant saves it with
-`editDashboard`. When the assistant saves a layout, the page shows the new layout and asks which one
+`editDashboard`. The copied layout also has the record of the preset widgets that each board has
+met. The page uses this record to add new preset widgets one time. When the assistant saves a layout, the page shows the new layout and asks which one
 to use. **Keep mine** goes back to the layout of the browser. **Use the new one** deletes the layout
 from the browser.
 

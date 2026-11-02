@@ -914,7 +914,7 @@ function currentBoard(): Instance[] {
 
 /** An edit changes the draft only; Done saves it. */
 function saveBoard(board: Instance[]): void {
-  setDraft(withBoard(draft ?? layout, view.tab, board));
+  setDraft(withBoard(draft ?? layout, view.tab, board, preset));
 }
 
 function setDraft(next: Layout): void {
@@ -1200,7 +1200,7 @@ const findText = (...titles: string[]) =>
 
 function copyDialog(): void {
   const shown = draft ?? layout;
-  const text = JSON.stringify({ base: shown.base, boards: shown.boards });
+  const text = JSON.stringify({ base: shown.base, boards: shown.boards, seen: shown.seen });
   const area = h("textarea", { class: "layout-text", readonly: true, rows: 6 }, text);
   const copy = h("button", { class: "btn" }, t("copy.copy"));
   copy.addEventListener("click", async () => {
