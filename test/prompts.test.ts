@@ -392,6 +392,24 @@ describe("coach prompts", () => {
     },
   );
 
+  it("run-review quotes split and the fade of each step instead of computing them", async () => {
+    const text = (await render("run-review")).replace(/\s+/g, " ");
+    expect(text).toContain(
+      "The run is intervals when the `getActivityLaps` answer has `work`. Else it is steady.",
+    );
+    // the per-lap table of the reps stays
+    expect(text).toContain("each active lap of 20 m and 8 s or more, with its pace, HR");
+    expect(text).toContain(
+      'Also the fade of each step from `work.fade`: `pct` is the last rep against the first, in %. When `pct` is null, the reps are not alike: write "n/a".',
+    );
+    expect(text).toContain("`split.hrDriftPct`");
+    // the same boundary as the page: drift above 5% is bad
+    expect(text).toContain("5% or less shows a solid aerobic base.");
+    expect(text).toContain('When it is null, a lap has no heart rate: write "n/a".');
+    expect(text).toContain('When `split` is null, the run has fewer than 2 laps: write "n/a" too.');
+    expect(text).not.toContain("The halves split at half the distance");
+  });
+
   it("reviews a run by id, by name, or the latest run", async () => {
     const byId = await render("run-review", { activity: " 21000000123 " });
     expect(byId).toContain("`activityId` = 21000000123.");

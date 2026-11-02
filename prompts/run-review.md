@@ -7,8 +7,7 @@ Review one of my runs as a running coach. Use the tools of the `garmin-personal`
    `fromDate` and `toDate` = that day. When that night has not come yet, skip both calls and show the
    recovery as "n/a".
 
-The run is intervals when its laps mark a warm-up, rest, recovery or cool-down (`intensity`). A free
-run is steady even when the watch marks its auto laps `interval`.
+The run is intervals when the `getActivityLaps` answer has `work`. Else it is steady.
 
 Then answer in chat, in this order, short:
 
@@ -19,13 +18,13 @@ Then answer in chat, in this order, short:
   them between steps. Without a planned workout, say so in one line.
 - **Reps**: for intervals, each active lap of 20 m and 8 s or more, with its pace, HR and running
   form (ground contact `gctMs`, vertical ratio `vertRatioPct`, when the laps have them). A shorter
-  lap is a lap that the watch adds between steps. Also the fade: the last rep against the first of
-  the same workout step (`step`), in %. Give the fade for each step with more than one rep, only
-  when those reps have the same distance or time. Skip this part for a steady run.
-- **HR drift**: for a steady run, the distance per heartbeat of the first half against the second
-  half, from the laps, in %. The halves split at half the distance: a lap across the middle counts
-  for its share of distance on each side. Under 5% shows a solid aerobic base. Skip this part for
-  intervals.
+  lap is a lap that the watch adds between steps. Also the fade of each step from `work.fade`: `pct`
+  is the last rep against the first, in %. When `pct` is null, the reps are not alike: write "n/a".
+  Skip this part for a steady run.
+- **HR drift**: for a steady run, `split.hrDriftPct`: the drop in distance per heartbeat from the
+  first half to the second, in %. 5% or less shows a solid aerobic base. When it is null, a lap has
+  no heart rate: write "n/a". When `split` is null, the run has fewer than 2 laps: write "n/a" too.
+  Skip this part for intervals.
 - **Recovery**: the sleep score and hours of the night after the run, and its HRV (`lastNightAvg`)
   against Garmin's 7-day average of that night (`weeklyAvg`).
   A `getSleep` row with only the `date` means that night has no sleep data: show its sleep as "n/a".

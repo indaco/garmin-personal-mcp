@@ -6,6 +6,7 @@ import {
   exerciseName,
   groupSets,
   lapsOf,
+  runNumbers,
   setsOf,
   toConst,
   unzipFit,
@@ -35,6 +36,43 @@ function set(setType: number, repetitions?: number, weight?: number, duration?: 
     s.categorySubtype = [BARBELL_BOX_SQUAT];
   }
   return s;
+}
+
+/** A lap as the getActivityLaps answer gives it. */
+function lap(
+  km: number,
+  time: string,
+  pace?: string,
+  avgHR?: number,
+  intensity?: string,
+  step?: number,
+): Record<string, unknown> {
+  return {
+    km,
+    time,
+    ...(pace === undefined ? {} : { pace }),
+    ...(avgHR === undefined ? {} : { avgHR }),
+    ...(intensity === undefined ? {} : { intensity }),
+    ...(step === undefined ? {} : { step }),
+  };
+}
+
+/** A lap of the size of a real one: pace, HR, cadence and running form. */
+function fullLap(km: number, time: string, pace: string, intensity: string, step?: number) {
+  return {
+    lap: 1,
+    ...lap(km, time, pace, 160, intensity, step),
+    maxHR: 175,
+    cadenceSpm: 180,
+    ascentM: 2,
+    descentM: 1,
+    avgPowerW: 320,
+    gctMs: 240,
+    vertRatioPct: 7.1,
+    vertOscCm: 8.4,
+    strideCm: 120.5,
+    trigger: "manual",
+  };
 }
 
 describe("exercise names", () => {
@@ -252,6 +290,67 @@ describe("laps", () => {
           trigger: "session_end",
         },
       ],
+      // one lap: no half split
+      split: null,
+    });
+  });
+
+  it("gives the split and the work of a structured run", () => {
+    const fit = decodeFit(
+      fitFile(
+        [
+          Profile.MesgNum.LAP,
+          {
+            totalDistance: 1000,
+            totalTimerTime: 360,
+            enhancedAvgSpeed: 1000 / 360,
+            intensity: "warmup",
+          },
+        ],
+        [
+          Profile.MesgNum.LAP,
+          {
+            totalDistance: 400,
+            totalTimerTime: 96,
+            enhancedAvgSpeed: 400 / 96,
+            avgHeartRate: 170,
+            intensity: "interval",
+            wktStepIndex: 1,
+          },
+        ],
+        [
+          Profile.MesgNum.LAP,
+          {
+            totalDistance: 400,
+            totalTimerTime: 100,
+            enhancedAvgSpeed: 4,
+            avgHeartRate: 174,
+            intensity: "interval",
+            wktStepIndex: 1,
+          },
+        ],
+        [
+          Profile.MesgNum.LAP,
+          {
+            totalDistance: 1000,
+            totalTimerTime: 390,
+            enhancedAvgSpeed: 1000 / 390,
+            intensity: "cooldown",
+          },
+        ],
+        [Profile.MesgNum.SESSION, { sport: "running" }],
+      ),
+      14,
+    );
+    // the warm-up and the cool-down do not count in the split: 96 s at 170 against 100 s at 174
+    expect(lapsOf(fit, 14)).toMatchObject({
+      split: { firstPace: "4:00/km", secondPace: "4:10/km", kind: "positive", hrDriftPct: 6.2 },
+      work: {
+        reps: 2,
+        pace: "4:05/km",
+        avgHR: 172,
+        fade: [{ step: 1, reps: 2, firstPace: "4:00/km", lastPace: "4:10/km", pct: 4.2 }],
+      },
     });
   });
 
@@ -267,6 +366,25 @@ describe("laps", () => {
       10,
     );
     expect(lapsOf(fit, 10).laps).toEqual([{ lap: 1, km: 20, time: "40:00", kmh: 30, cadence: 85 }]);
+    // the split and the work are numbers of a run
+    expect(lapsOf(fit, 10)).not.toHaveProperty("split");
+    expect(lapsOf(fit, 10)).not.toHaveProperty("work");
+  });
+
+  it("gives no split and no work for a walk", () => {
+    const walkLap = { totalDistance: 1000, totalTimerTime: 600, enhancedAvgSpeed: 1000 / 600 };
+    const fit = decodeFit(
+      fitFile(
+        [Profile.MesgNum.LAP, walkLap],
+        [Profile.MesgNum.LAP, walkLap],
+        [Profile.MesgNum.SESSION, { sport: "walking" }],
+      ),
+      15,
+    );
+    const answer = lapsOf(fit, 15);
+    expect(answer.laps[0]).toMatchObject({ pace: "10:00/km" });
+    expect(answer).not.toHaveProperty("split");
+    expect(answer).not.toHaveProperty("work");
   });
 
   it("gives the workout step of a lap, so the reps of one drill stay together", () => {
@@ -308,6 +426,110 @@ describe("laps", () => {
   it("has no sport when the file has no session", () => {
     const fit = decodeFit(fitFile([Profile.MesgNum.LAP, { totalTimerTime: 3725 }]), 11);
     expect(lapsOf(fit, 11)).toEqual({ activityId: 11, laps: [{ lap: 1, km: 0, time: "1:02:05" }] });
+  });
+});
+
+describe("run numbers of the laps", () => {
+  it("gives the half split and the HR drift of a steady run", () => {
+    const r = runNumbers([lap(1, "5:00", "5:00/km", 150), lap(1, "4:50", "4:50/km", 162)]);
+    // 45,000 beats for the first km, 46,980 for the second: 4.2% less distance per beat
+    expect(r).toEqual({
+      split: { firstPace: "5:00/km", secondPace: "4:50/km", kind: "negative", hrDriftPct: 4.2 },
+    });
+  });
+
+  it("gives no HR drift when a counted lap has no HR", () => {
+    const r = runNumbers([lap(1, "5:00", "5:00/km", 150), lap(1, "5:00", "5:00/km")]);
+    expect(r.split).toEqual({
+      firstPace: "5:00/km",
+      secondPace: "5:00/km",
+      kind: "even",
+      hrDriftPct: null,
+    });
+    // a warm-up without HR does not count: the drift stays
+    const warm = runNumbers([
+      lap(1, "7:00", "7:00/km", undefined, "warmup"),
+      lap(1, "5:00", "5:00/km", 150),
+      lap(1, "5:00", "5:00/km", 150),
+    ]);
+    expect(warm.split?.hrDriftPct).toBe(0);
+  });
+
+  it("gives a null split when fewer than 2 laps count", () => {
+    expect(runNumbers([lap(1, "5:00", "5:00/km", 150)])).toEqual({ split: null });
+    expect(runNumbers([])).toEqual({ split: null });
+  });
+
+  it("gives the reps and the fade of each step of a structured workout", () => {
+    const r = runNumbers([
+      lap(1, "6:00", "6:00/km", 130, "warmup"),
+      lap(0.4, "1:36", "4:00/km", 170, "active", 2),
+      lap(0.4, "1:38", "4:05/km", 172, "active", 2),
+      // the watch adds a lap of a few metres between steps: not a rep
+      lap(0.01, "0:04", undefined, 150, "active", 3),
+      lap(0.4, "1:40", "4:10/km", 175, "active", 2),
+      lap(1, "4:30", "4:30/km", 168, "active", 4),
+      lap(1, "6:30", "6:30/km", 125, "cooldown"),
+    ]);
+    // 564 s over 2.2 km; HR time-weighted: 96,036 beats / 564 s = 170.3
+    expect(r.work).toEqual({
+      reps: 4,
+      pace: "4:16/km",
+      avgHR: 170,
+      fade: [{ step: 2, reps: 3, firstPace: "4:00/km", lastPace: "4:10/km", pct: 4.2 }],
+    });
+    expect(r.split).not.toBeNull();
+  });
+
+  it("gives a null average HR when a work lap has no HR", () => {
+    const r = runNumbers([
+      lap(1, "6:00", "6:00/km", 130, "warmup"),
+      lap(1, "4:00", "4:00/km", 170, "interval"),
+      lap(1, "4:06", "4:06/km", undefined, "interval"),
+    ]);
+    expect(r.work).toEqual({
+      reps: 2,
+      pace: "4:03/km",
+      avgHR: null,
+      // no step on the laps: one fade for all reps, without a step
+      fade: [{ reps: 2, firstPace: "4:00/km", lastPace: "4:06/km", pct: 2.5 }],
+    });
+    expect(r.work?.fade[0]).not.toHaveProperty("step");
+  });
+
+  it("gives a null fade percentage for reps more than 15% apart", () => {
+    const r = runNumbers([
+      lap(1, "6:00", "6:00/km", 130, "warmup"),
+      lap(1, "5:00", "5:00/km", 160, "active", 1),
+      lap(0.5, "2:20", "4:40/km", 165, "active", 1),
+    ]);
+    expect(r.work?.fade).toEqual([
+      { step: 1, reps: 2, firstPace: "5:00/km", lastPace: "4:40/km", pct: null },
+    ]);
+  });
+
+  it("gives the split from km and time when the laps have no pace", () => {
+    const r = runNumbers([lap(1, "5:00", undefined, 150), lap(1, "5:30", undefined, 150)]);
+    expect(r).toEqual({
+      split: { firstPace: "5:00/km", secondPace: "5:30/km", kind: "positive", hrDriftPct: 9.1 },
+    });
+  });
+
+  it("adds under 5% to the laps of an interval run", () => {
+    const laps = [
+      fullLap(2, "12:00", "6:00/km", "warmup"),
+      ...Array.from({ length: 8 }, (_, i) => [
+        fullLap(0.4, "1:36", `4:0${i}/km`, "interval", 1),
+        fullLap(0.01, "0:04", "6:40/km", "active", 2),
+        fullLap(0.2, "1:30", "7:30/km", "recovery", 3),
+      ]).flat(),
+      fullLap(1, "6:30", "6:30/km", "cooldown"),
+    ];
+    expect(laps).toHaveLength(26);
+    const before = JSON.stringify({ laps }).length;
+    const after = JSON.stringify({ laps, ...runNumbers(laps) }).length;
+    expect(runNumbers(laps).work?.fade).toHaveLength(1);
+    expect(after).toBeLessThanOrEqual(before * 1.05);
   });
 });
 

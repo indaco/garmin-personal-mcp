@@ -131,6 +131,9 @@ const step = (intensity: string, km: number, time: string, avgHR?: number) => ({
   ...(avgHR === undefined ? {} : { avgHR, cadenceSpm: 180, avgPowerW: 300 }),
 });
 
+/** A rep of 100 m of one step of the planned workout. */
+const stepRep = (index: number, time: string) => ({ ...step("active", 0.1, time), step: index });
+
 describe("work laps of a structured workout", () => {
   const intervals = [
     step("warmup", 2, "12:00", 130),
@@ -196,6 +199,81 @@ describe("work laps of a structured workout", () => {
     expect(w?.reps).toBe(7);
     // the glider: 5:20 against 5:00, not against the first cadence drill
     expect(w?.fade).toBeCloseTo(((320 - 300) / 300) * 100, 6);
+  });
+
+  it("gives the fade of each workout step with more than one rep, in the order of the steps", () => {
+    const w = workOf([
+      step("warmup", 1, "6:00"),
+      stepRep(2, "0:30"),
+      stepRep(2, "0:31"),
+      // the watch adds a lap of a few metres between steps: not a rep
+      { ...step("active", 0.01, "0:04"), step: 3 },
+      stepRep(2, "0:32"),
+      stepRep(4, "0:40"),
+      stepRep(6, "0:30"),
+      stepRep(6, "0:33"),
+    ]);
+    expect(w?.reps).toBe(6);
+    expect(w?.fades).toHaveLength(2);
+    expect(w?.fades[0]).toEqual({
+      step: 2,
+      reps: 3,
+      first: 300,
+      last: 320,
+      pct: expect.closeTo(((320 - 300) / 300) * 100, 6),
+    });
+    expect(w?.fades[1]).toEqual({
+      step: 6,
+      reps: 2,
+      first: 300,
+      last: 330,
+      pct: expect.closeTo(10, 6),
+    });
+    // the page keeps one fade: the step with the most reps
+    expect(w?.fade).toBeCloseTo(((320 - 300) / 300) * 100, 6);
+  });
+
+  it("gives one fade without a step when the laps have no step", () => {
+    const w = workOf(intervals);
+    expect(w?.fades).toEqual([{ reps: 2, first: 240, last: 252, pct: expect.closeTo(5, 6) }]);
+    expect(w?.fades[0]).not.toHaveProperty("step");
+  });
+
+  it("gives no fade for a step with one rep", () => {
+    const w = workOf([step("warmup", 1, "6:00"), stepRep(2, "0:30"), stepRep(4, "0:31")]);
+    expect(w?.reps).toBe(2);
+    expect(w?.fades).toEqual([]);
+  });
+
+  it("gives no fade percentage for reps more than 15% apart, and one at 15%", () => {
+    // 15% longer: alike by distance (and by time)
+    const at = workOf([
+      step("warmup", 1, "6:00"),
+      step("active", 1, "5:00"),
+      step("active", 1.15, "5:45"),
+    ]);
+    expect(at?.fades).toEqual([{ reps: 2, first: 300, last: 300, pct: 0 }]);
+    // 16% longer in distance and in time: not alike, the entry stays without a percentage
+    const over = workOf([
+      step("warmup", 1, "6:00"),
+      step("active", 1, "5:00"),
+      step("active", 1.16, "5:48"),
+    ]);
+    expect(over?.fades).toEqual([{ reps: 2, first: 300, last: 300 }]);
+    // alike by time only (both 5:00, 16% longer): the percentage stays
+    const byTime = workOf([
+      step("warmup", 1, "6:00"),
+      step("active", 1, "5:00"),
+      step("active", 1.16, "5:00"),
+    ]);
+    expect(byTime?.fades[0].pct).toBeCloseTo(((300 / 1.16 - 300) / 300) * 100, 6);
+    // alike by distance only (1 km each, 25% slower): the percentage stays
+    const byKm = workOf([
+      step("warmup", 1, "6:00"),
+      step("active", 1, "4:00"),
+      step("active", 1, "5:00"),
+    ]);
+    expect(byKm?.fades[0].pct).toBeCloseTo(25, 6);
   });
 
   it("takes the pace of a lap from the watch: its distance is rounded to 10 m", () => {

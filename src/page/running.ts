@@ -127,6 +127,7 @@ const alike = (v: number[]) => Math.max(...v) <= Math.min(...v) * 1.15;
  * and only when every work lap has them. The fade is the pace of the last rep against the first, in %,
  * within the workout step with the most reps when the laps have steps (two drills are not compared),
  * and only for reps of the same distance or time: a shorter last rep is faster for that reason alone.
+ * `fades` gives the fade of every step with more than one rep.
  */
 export function workOf(laps: Lap[]) {
   if (!laps.some((l) => OTHER.has(l.intensity as string))) return;
@@ -150,6 +151,24 @@ export function workOf(laps: Lap[]) {
     : work;
   const first = reps[0].sec / reps[0].km;
   const last = reps.at(-1)!.sec / reps.at(-1)!.km;
+  // one fade per step with more than one rep (the coach prompts); `fade` above stays the page's
+  const groups = work.every((x) => typeof x.l.step === "number")
+    ? [...steps.entries()]
+    : [[undefined, work] as const];
+  const fades = groups
+    .filter(([, g]) => g.length > 1)
+    .map(([index, g]) => {
+      const a = g[0].sec / g[0].km;
+      const b = g.at(-1)!.sec / g.at(-1)!.km;
+      const ok = alike(g.map((x) => x.km)) || alike(g.map((x) => x.sec));
+      return {
+        ...(index === undefined ? {} : { step: index as number }),
+        reps: g.length,
+        first: a,
+        last: b,
+        ...(ok ? { pct: ((b - a) / a) * 100 } : {}),
+      };
+    });
   return {
     reps: work.length,
     pace: sec / work.reduce((s, x) => s + x.km, 0),
@@ -163,6 +182,7 @@ export function workOf(laps: Lap[]) {
       reps.length > 1 && (alike(reps.map((x) => x.km)) || alike(reps.map((x) => x.sec)))
         ? ((last - first) / first) * 100
         : undefined,
+    fades,
   };
 }
 

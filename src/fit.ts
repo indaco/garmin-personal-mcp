@@ -1,6 +1,7 @@
 import { Decoder, Profile, Stream } from "@garmin/fitsdk";
 import { unzipSync } from "fflate";
 import { GarminApiError } from "./api-client";
+import { splitOf, workOf } from "./page/running";
 
 /** The fields of a FIT set message the tools read; enums are raw values (decoded without strings). */
 export interface FitSet {
@@ -163,7 +164,49 @@ export function lapsOf(fit: Messages, activityId: number) {
     putIfSet(o, "step", lap.wktStepIndex);
     return o;
   });
-  return { activityId, ...(sport ? { sport } : {}), laps };
+  return {
+    activityId,
+    ...(sport ? { sport } : {}),
+    laps,
+    ...(sport === "running" ? runNumbers(laps) : {}),
+  };
+}
+
+/** A pace as the lap pace: "m:ss/km". */
+const paceText = (sec: number) => `${hms(sec)}/km`;
+/** A percentage with 1 decimal; null when it applies but the data cannot give it. */
+const pctOrNull = (v: number | undefined) => (v === undefined ? null : round(v, 1));
+
+/** The numbers of a run that the coach prompts quote: half split and HR drift; reps and fades of a workout. */
+export function runNumbers(laps: Record<string, unknown>[]) {
+  const s = splitOf(laps);
+  const w = workOf(laps);
+  return {
+    split: s
+      ? {
+          firstPace: paceText(s.first),
+          secondPace: paceText(s.second),
+          kind: s.kind,
+          hrDriftPct: pctOrNull(s.drift),
+        }
+      : null,
+    ...(w
+      ? {
+          work: {
+            reps: w.reps,
+            pace: paceText(w.pace),
+            avgHR: w.hr === undefined ? null : Math.round(w.hr),
+            fade: w.fades.map((f) => ({
+              ...(f.step === undefined ? {} : { step: f.step }),
+              reps: f.reps,
+              firstPace: paceText(f.first),
+              lastPace: paceText(f.last),
+              pct: pctOrNull(f.pct),
+            })),
+          },
+        }
+      : {}),
+  };
 }
 
 /** The getActivitySets answer. */
