@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The changelog is generated and managed by [sley](https://github.com/indaco/sley).
 
+## v0.7.0 - 2026-11-02
+
+### 🚀 Enhancements
+
+- **dashboard:** tell page readers what a refresh added, one time in each browser ([ee2b750](https://github.com/indaco/garmin-personal-mcp/commit/ee2b750)) ([#164](https://github.com/indaco/garmin-personal-mcp/pull/164))
+- **dashboard:** give edited boards the new preset widgets of a release and tell the user ([0001652](https://github.com/indaco/garmin-personal-mcp/commit/0001652)) ([#163](https://github.com/indaco/garmin-personal-mcp/pull/163))
+- **prompts:** tell the user when an update moves the dashboard to new page code ([1b3dcd5](https://github.com/indaco/garmin-personal-mcp/commit/1b3dcd5)) ([#162](https://github.com/indaco/garmin-personal-mcp/pull/162))
+- give each exercise its top set and e1RM in getActivitySets ([a36bc1c](https://github.com/indaco/garmin-personal-mcp/commit/a36bc1c)) ([#157](https://github.com/indaco/garmin-personal-mcp/pull/157))
+- give the half split, HR drift and fade of each step in getActivityLaps ([cb473d9](https://github.com/indaco/garmin-personal-mcp/commit/cb473d9)) ([#156](https://github.com/indaco/garmin-personal-mcp/pull/156))
+- add readiness to the digest and the train-today prompt ([d80ad6f](https://github.com/indaco/garmin-personal-mcp/commit/d80ad6f)) ([#154](https://github.com/indaco/garmin-personal-mcp/pull/154))
+- race-readiness reads its long runs and race predictions from the digest ([1a48048](https://github.com/indaco/garmin-personal-mcp/commit/1a48048)) ([#153](https://github.com/indaco/garmin-personal-mcp/pull/153))
+
+### 🩹 Fixes
+
+- **api-client:** tell the user how to replace an expired Garmin API key ([3dd6fdb](https://github.com/indaco/garmin-personal-mcp/commit/3dd6fdb)) ([#161](https://github.com/indaco/garmin-personal-mcp/pull/161))
+- readable widget errors, n/a for missing cycling ascent, and widget value tests ([8bb1a12](https://github.com/indaco/garmin-personal-mcp/commit/8bb1a12)) ([#159](https://github.com/indaco/garmin-personal-mcp/pull/159))
+- own data for custom widgets, built-in languages in the prompt, keep chat edits during a refresh, Windows job script ([4e14ed8](https://github.com/indaco/garmin-personal-mcp/commit/4e14ed8)) ([#149](https://github.com/indaco/garmin-personal-mcp/pull/149))
+- keep added languages and the first backup on a rebuild; test the late limit and the MCP App in the release ([dc97f7f](https://github.com/indaco/garmin-personal-mcp/commit/dc97f7f)) ([#148](https://github.com/indaco/garmin-personal-mcp/pull/148))
+
+### 💅 Refactors
+
+- build the activity paces with the shared pace text ([a11720c](https://github.com/indaco/garmin-personal-mcp/commit/a11720c)) ([#160](https://github.com/indaco/garmin-personal-mcp/pull/160))
+
+### 📖 Documentation
+
+- **readme:** add glama and mcpservers badges ([adc8621](https://github.com/indaco/garmin-personal-mcp/commit/adc8621)) ([#158](https://github.com/indaco/garmin-personal-mcp/pull/158))
+
+### ❤️ Contributors
+
+- [@indaco](https://github.com/indaco)
+
 ## v0.6.0 - 2026-10-31
 
 ### 🚀 Enhancements
