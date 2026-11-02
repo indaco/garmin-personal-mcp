@@ -2312,7 +2312,11 @@ describe("custom widgets and languages", () => {
           custom("thing", "throw { code: 1 };"),
           custom("msg", "throw { message: 'no rows' };"),
           custom("long", "throw { text: 'x'.repeat(300) };"),
-          custom("loop", "const o = {}; o.self = o; throw o;"),
+          custom("loop", "const o = { a: 1 }; o.self = o; throw o;"),
+          custom("deep", "const a = { b: { c: null } }; a.b.c = a; throw a;"),
+          custom("shared", "const s = { n: 1 }; throw { x: s, y: s };"),
+          custom("longLoop", "const o = {}; o.self = o; o.t = 'x'.repeat(120); throw o;"),
+          custom("big", "throw { n: 1n };"),
           custom("nothing", "throw undefined;"),
           custom("none", "throw null;"),
           custom("num", "throw { message: 5 };"),
@@ -2328,6 +2332,10 @@ describe("custom widgets and languages", () => {
           "msg",
           "long",
           "loop",
+          "deep",
+          "shared",
+          "longLoop",
+          "big",
           "nothing",
           "none",
           "num",
@@ -2358,8 +2366,22 @@ describe("custom widgets and languages", () => {
     expect(await page.textContent("[data-id=over] .error")).toBe(
       `This widget failed: {"t":"${"x".repeat(93)}…`,
     );
-    // JSON cannot write a circular object
+    // an object met again on its own path is a cycle; one shared by two keys is not
     expect(await page.textContent("[data-id=loop] .error")).toBe(
+      'This widget failed: {"a":1,"self":"[Circular]"}',
+    );
+    expect(await page.textContent("[data-id=deep] .error")).toBe(
+      'This widget failed: {"b":{"c":"[Circular]"}}',
+    );
+    expect(await page.textContent("[data-id=shared] .error")).toBe(
+      'This widget failed: {"x":{"n":1},"y":{"n":1}}',
+    );
+    const loopStart = '{"self":"[Circular]","t":"';
+    expect(await page.textContent("[data-id=longLoop] .error")).toBe(
+      `This widget failed: ${loopStart}${"x".repeat(99 - loopStart.length)}…`,
+    );
+    // JSON cannot write a BigInt: String() is the fallback
+    expect(await page.textContent("[data-id=big] .error")).toBe(
       "This widget failed: [object Object]",
     );
     expect(await page.textContent("[data-id=nothing] .error")).toBe(

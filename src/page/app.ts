@@ -842,11 +842,18 @@ function errorText(e: unknown): string {
   if (typeof e === "object" && e !== null) {
     const { message } = e as { message?: unknown };
     if (typeof message === "string") return message;
+    // the values from the root to the current one: an object met again on it is a cycle
+    const path: unknown[] = [];
     try {
-      const json = JSON.stringify(e);
+      const json = JSON.stringify(e, function (this: unknown, key: string, value: unknown) {
+        while (path.length > 0 && path.at(-1) !== this) path.pop();
+        if (path.includes(value)) return "[Circular]";
+        path.push(value);
+        return value;
+      });
       return json.length > 100 ? `${json.slice(0, 99)}…` : json;
     } catch {
-      // a circular object: JSON cannot write it
+      // a value JSON cannot write, such as a BigInt
     }
   }
   return String(e);
