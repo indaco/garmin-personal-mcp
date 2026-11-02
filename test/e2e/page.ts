@@ -47,13 +47,15 @@ export interface Opened {
 export async function open(
   browser: Browser,
   file: string,
-  options: BrowserContextOptions & { hash?: string } = {},
+  options: BrowserContextOptions & { hash?: string; init?: string } = {},
 ): Promise<Opened> {
-  const { hash = "", ...contextOptions } = options;
+  const { hash = "", init, ...contextOptions } = options;
   const context = await browser.newContext({
     viewport: { width: 1280, height: 900 },
     ...contextOptions,
   });
+  // a script that runs before the page script, e.g. to make localStorage throw
+  if (init !== undefined) await context.addInitScript(init);
   const page = await context.newPage();
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));

@@ -40,6 +40,7 @@ import {
   withBoard,
   withPresetWidgets,
 } from "./layout";
+import { type News, parseNews } from "./news";
 import { baseline, preset } from "./presets";
 import {
   allWidgets,
@@ -66,6 +67,7 @@ declare global {
       widgets: unknown;
       languages?: unknown;
       i18n?: unknown;
+      refresh?: unknown;
     };
     /** The page settings, set by the first script of the page. */
     GARMIN_SETTINGS?: Settings | null;
@@ -98,6 +100,10 @@ let accountOpen = false;
 let windowOpen = false;
 let tabs: string[] = [];
 let weeks: string[] = [];
+// the refresh record when this browser has not closed it yet
+let news: News | undefined;
+// closed in this tab: storage may be blocked
+let newsClosed = false;
 
 export function start(): void {
   G = window.GARMIN ?? { data: null, layout: null, widgets: [] };
@@ -134,6 +140,8 @@ export function start(): void {
     tabs = calc.tabsFor(data.activities, S);
     weeks = weeksOf(data.start, data.end);
   }
+  // after withhold, the custom widgets and the tabs: they say which widgets and boards the page shows
+  news = readNews();
   view = parseHash(location.hash, tabs, weeks);
   window.addEventListener("hashchange", () => {
     view = parseHash(location.hash, tabs, weeks);
@@ -727,6 +735,7 @@ function boardView(data: Data): HTMLElement {
     { id: "board", role: "tabpanel", "aria-labelledby": `tab-${view.tab}`, tabindex: "-1" },
     !editing && missedBanner(data),
     mine && !editing && staleBanner(mine),
+    news && !editing && !newsClosed && newsBanner(news),
     caption,
     grid,
   );
@@ -771,6 +780,66 @@ function staleBanner(local: Layout): HTMLElement {
         },
       },
       t("stale.new"),
+    ),
+  );
+}
+
+const NEWS_KEY = `garmin-news:${location.pathname}`;
+
+/** The record of the last refresh, for the page code that this page runs and that this browser has not closed. */
+function readNews(): News | undefined {
+  const id = document.querySelector<HTMLMetaElement>('meta[name="garmin-template"]')?.content;
+  const own = id !== undefined && /^[0-9a-f]{16}$/.test(id) ? id : undefined;
+  const parsed = parseNews(
+    G.refresh,
+    own,
+    (board) => tabs.includes(board),
+    (name) => widget(name) !== undefined,
+  );
+  return parsed && store.get(NEWS_KEY) !== parsed.code ? parsed : undefined;
+}
+
+/** What the last refresh did: the new version and the preset widgets that it added. Shows once in each browser. */
+function newsBanner(note: News): HTMLElement {
+  const list = new Intl.ListFormat(lang);
+  const boards = Object.entries(note.widgets);
+  return h(
+    "div",
+    { class: "banner", role: "region", "aria-label": t("news.label") },
+    h(
+      "p",
+      {},
+      note.server === undefined
+        ? t("news.textNoVersion")
+        : t("news.text", { version: note.server }),
+    ),
+    boards.length > 0 && h("p", {}, t("news.widgets")),
+    boards.length > 0 &&
+      h(
+        "ul",
+        {},
+        ...boards.map(([board, names]) =>
+          h(
+            "li",
+            {},
+            `${typeName(t, board)}: ${list.format(names.map((n) => widget(n)?.title(t) ?? n))}`,
+          ),
+        ),
+      ),
+    h("p", {}, h("a", { href: `${REPO}/releases`, rel: "noopener" }, t("news.link"))),
+    h(
+      "button",
+      {
+        class: "btn",
+        onclick: () => {
+          store.set(NEWS_KEY, note.code);
+          newsClosed = true;
+          render();
+          announce(t("news.closed"));
+          document.getElementById("board")?.focus();
+        },
+      },
+      t("news.close"),
     ),
   );
 }

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { Browser } from "playwright-core";
 import { build } from "tsdown";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { DashboardWriter, type ViewBlocks } from "../../src/dashboard-page";
+import { DashboardWriter, pageCode, type ViewBlocks, writeBlock } from "../../src/dashboard-page";
 import { data, launch } from "./page";
 import { preset } from "../../src/page/presets";
 
@@ -134,4 +134,20 @@ it("shows a preset widget that an edited board has not met, in the chat view", a
   const { frame, errors } = await showInHost(template(), blocks);
   expect(await frame.$("[data-id=coachNotes]")).not.toBeNull();
   expect(errors.filter((e) => e.startsWith("pageerror"))).toEqual([]);
+});
+
+it("shows no note about the last refresh in the chat", async () => {
+  const html = template();
+  const code = pageCode(html);
+  if (code.from !== "template" || code.id === undefined) throw new Error("build has no page code");
+  // the saved page has a record for its own page code, but the chat gets only the view() blocks
+  const withRecord = writeBlock(html, "refresh", {
+    from: "0.6.0",
+    server: "0.7.0",
+    code: code.id,
+    widgets: {},
+  });
+  const { frame, errors } = await showInHost(withRecord, await viewBlocks());
+  expect(await frame.$("[aria-label='New in this version']")).toBeNull();
+  expect(errors).toEqual([]);
 });

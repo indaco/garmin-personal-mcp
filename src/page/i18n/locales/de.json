@@ -489,5 +489,12 @@
   "sport.tableTennis": "Tischtennis",
   "sport.platformTennis": "Platform-Tennis",
   "due.label": "Aktualisierung verpasst",
-  "due.text": "Die automatische Aktualisierung hat diese Seite seit {date} nicht aktualisiert. Vielleicht war der Computer aus, oder die Aktualisierung ist fehlgeschlagen: Bitte deinen Assistenten, die automatische Aktualisierung zu prüfen."
+  "due.text": "Die automatische Aktualisierung hat diese Seite seit {date} nicht aktualisiert. Vielleicht war der Computer aus, oder die Aktualisierung ist fehlgeschlagen: Bitte deinen Assistenten, die automatische Aktualisierung zu prüfen.",
+  "news.label": "Neu in dieser Version",
+  "news.text": "Diese Seite nutzt jetzt Version {version} von garmin-personal-mcp.",
+  "news.textNoVersion": "Diese Seite nutzt jetzt eine neue Version von garmin-personal-mcp.",
+  "news.widgets": "Neue Widgets auf deinen Boards:",
+  "news.link": "Versionshinweise lesen",
+  "news.close": "Hinweis zur neuen Version schließen",
+  "news.closed": "Hinweis geschlossen"
 }

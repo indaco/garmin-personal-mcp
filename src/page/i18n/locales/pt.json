@@ -489,5 +489,12 @@
   "sport.tableTennis": "Tênis de mesa",
   "sport.platformTennis": "Platform tennis",
   "due.label": "Atualização perdida",
-  "due.text": "A atualização automática não atualizou esta página desde {date}. Talvez o computador estivesse desligado, ou a atualização falhou: peça ao seu assistente para verificar a atualização automática."
+  "due.text": "A atualização automática não atualizou esta página desde {date}. Talvez o computador estivesse desligado, ou a atualização falhou: peça ao seu assistente para verificar a atualização automática.",
+  "news.label": "Novidades desta versão",
+  "news.text": "Esta página usa agora a versão {version} do garmin-personal-mcp.",
+  "news.textNoVersion": "Esta página usa agora uma nova versão do garmin-personal-mcp.",
+  "news.widgets": "Novos widgets nos seus painéis:",
+  "news.link": "Ler as notas de lançamento",
+  "news.close": "Fechar a nota sobre a nova versão",
+  "news.closed": "Nota fechada"
 }

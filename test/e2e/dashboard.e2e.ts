@@ -9,6 +9,7 @@ import { en as enTexts } from "../../src/page/i18n/en";
 import { preset } from "../../src/page/presets";
 import { fitnessFatigueFrom, zonesOf } from "../../src/page/metrics";
 import { DASHBOARD_VERSION } from "../../src/prompts";
+import { pageCode } from "../../src/dashboard-page";
 import { data, launch, open, pageFile } from "./page";
 
 let browser: Browser;
@@ -2623,5 +2624,196 @@ describe("new preset widgets on edited boards", () => {
   it("does not show a widget that the page settings withhold", async () => {
     const { page } = await openRunning(running("r0"), {});
     expect(await tiles(page)).toEqual(["typeKpis", "activities"]);
+  });
+});
+
+const ownCode = () => {
+  const code = pageCode(readFileSync("dist/dashboard.html", "utf8"));
+  if (code.from !== "template" || code.id === undefined) throw new Error("build has no page code");
+  return code.id;
+};
+
+const record = (extra: object = {}) => ({
+  from: "0.6.0",
+  server: "0.7.0",
+  code: ownCode(),
+  widgets: {},
+  ...extra,
+});
+
+describe("new in this version", () => {
+  const note = "[role=region][aria-label='New in this version']";
+  const withWorkouts = { workouts: true };
+
+  it("shows the version, the link and a close button, and the widgets by board", async () => {
+    const refresh = record({ widgets: { running: ["workoutTrend"] } });
+    const { page, errors } = await open(browser, pageFile({ refresh, settings: withWorkouts }));
+    const text = await page.innerText(note);
+    expect(text).toContain("This page now uses version 0.7.0 of garmin-personal-mcp.");
+    expect(text).toContain("New widgets on your boards:");
+    expect(await page.innerText(`${note} li`)).toBe("Run: Workout trend");
+    expect(await page.getAttribute(`${note} a`, "href")).toMatch(/\/releases$/);
+    expect(await page.$(`${note} button[class~=btn]`)).not.toBeNull();
+    expect(errors).toEqual([]);
+  });
+
+  it("puts it after the late note and the layout banner", async () => {
+    const layout = { rev: "r1", base: "preset", seen: MET, boards: {} };
+    const file = pageFile({
+      layout,
+      refresh: record(),
+      data: { ...data, v: DASHBOARD_VERSION, updated: hours(-26), due: hours(-2) },
+    });
+    const { page } = await open(browser, file);
+    await page.evaluate(() =>
+      localStorage.setItem(
+        `garmin-layout:${location.pathname}`,
+        JSON.stringify({
+          baseRev: "r0",
+          layout: {
+            rev: "r0",
+            base: "preset",
+            boards: { all: [{ id: "coachNotes", widget: "coachNotes", span: 3 }] },
+          },
+        }),
+      ),
+    );
+    await page.reload();
+    await page.waitForSelector(".banner");
+    expect(
+      await page.$$eval(".banner", (els) => els.map((e) => e.getAttribute("aria-label"))),
+    ).toEqual(["Refresh missed", "New layout", "New in this version"]);
+  });
+
+  it("closes for good in this browser, says so, and moves focus to the board", async () => {
+    const { page, errors } = await open(browser, pageFile({ refresh: record() }));
+    await page.click(`${note} button`);
+    expect(await page.$(note)).toBeNull();
+    expect(await page.textContent("#announce")).toBe("Note closed");
+    expect(await page.evaluate(() => document.activeElement?.id)).toBe("board");
+    await page.reload();
+    await page.waitForSelector(".page");
+    expect(await page.$(note)).toBeNull();
+    expect(errors).toEqual([]);
+  });
+
+  it("shows again for a new page code, after a close for another one", async () => {
+    const init = `localStorage.setItem("garmin-news:" + location.pathname, "aaaaaaaaaaaaaaaa")`;
+    const { page } = await open(browser, pageFile({ refresh: record() }), { init });
+    expect(await page.$(note)).not.toBeNull();
+  });
+
+  it("hides in edit mode and comes back on Done", async () => {
+    const { page } = await open(browser, pageFile({ refresh: record() }));
+    await startEdit(page);
+    expect(await page.$(note)).toBeNull();
+    await page.click("text=Done");
+    expect(await page.$(note)).not.toBeNull();
+  });
+
+  it.each([
+    ["no record", null],
+    ["a record for other page code", { from: "n/a", server: "0.7.0", code: "aaaaaaaaaaaaaaaa" }],
+  ])("shows nothing for %s", async (_name, refresh) => {
+    const { page, errors } = await open(browser, pageFile({ refresh }));
+    expect(await page.$(note)).toBeNull();
+    expect(errors).toEqual([]);
+  });
+
+  it("shows nothing on a page with no page code id", async () => {
+    const file = pageFile({ refresh: record() });
+    writeFileSync(
+      file,
+      readFileSync(file, "utf8").replace(/<meta name="garmin-template"[^>]*>/, ""),
+    );
+    const { page, errors } = await open(browser, file);
+    expect(await page.$(note)).toBeNull();
+    expect(errors).toEqual([]);
+  });
+
+  it("works with a storage that throws, and closes for this tab", async () => {
+    const init = `Object.defineProperty(window, "localStorage", { get() { throw new Error("blocked"); } })`;
+    const { page, errors } = await open(browser, pageFile({ refresh: record() }), { init });
+    expect(await page.$(note)).not.toBeNull();
+    await page.click(`${note} button`);
+    expect(await page.$(note)).toBeNull();
+    await page.click("[role=tab][data-tab=running]");
+    await page.click("[role=tab][data-tab=all]");
+    expect(await page.$(note)).toBeNull();
+    expect(errors).toEqual([]);
+  });
+
+  it("lists only the boards that the page shows", async () => {
+    // the page shows All, Recovery and Bike: the running board is hidden by the settings
+    const refresh = record({ widgets: { running: ["workoutTrend"], cycling: ["bikeDetails"] } });
+    const { page, errors } = await open(
+      browser,
+      pageFile({ refresh, settings: { ...withWorkouts, sports: ["cycling"] } }),
+    );
+    expect(await page.$$eval(`${note} li`, (els) => els.map((e) => e.textContent))).toEqual([
+      "Bike: Rides",
+    ]);
+    expect(errors).toEqual([]);
+  });
+
+  it("writes it in the page language, and in English where the page has no texts", async () => {
+    const refresh = record({ widgets: { running: ["workoutTrend"] } });
+    const italian = await open(
+      browser,
+      pageFile({ refresh, settings: { ...withWorkouts, languages: ["en", "it"] } }),
+      { locale: "it-IT" },
+    );
+    expect(await italian.page.innerText(".banner li")).toBe("Corsa: Andamento degli allenamenti");
+    expect(await italian.page.getAttribute(".banner", "aria-label")).toBe(
+      "Novità di questa versione",
+    );
+    // a language that the page adds with no news texts falls back to English
+    const own = await open(
+      browser,
+      pageFile({
+        refresh,
+        settings: { ...withWorkouts, languages: ["en", "xx"] },
+        i18n: { xx: { title: "Xx" } },
+      }),
+      { locale: "xx" },
+    );
+    expect(await own.page.getAttribute(note, "aria-label")).toBe("New in this version");
+  });
+
+  it("shows only the text and the link when no widget is left, and no version when it is not x.y.z", async () => {
+    const none = await open(browser, pageFile({ refresh: record({ server: "0.7" }) }));
+    expect(await none.page.$(`${note} ul`)).toBeNull();
+    expect(await none.page.innerText(`${note} p`)).toBe(
+      "This page now uses a new version of garmin-personal-mcp.",
+    );
+    expect(await none.page.$(`${note} a`)).not.toBeNull();
+  });
+
+  it("shows names and titles as text, and survives a record of wrong types", async () => {
+    const hostile = record({
+      widgets: { running: ["<b>x</b>"], "<i>y</i>": ["workoutTrend"] },
+    });
+    const bold = { id: "ride", title: "<b>Ride</b>", span: 1, code: "el.textContent = 'x';" };
+    const a = await open(
+      browser,
+      pageFile({ refresh: hostile, settings: withWorkouts, widgets: [bold] }),
+    );
+    expect(await a.page.$(`${note} b, ${note} i`)).toBeNull();
+    expect(a.errors).toEqual([]);
+    const viaTitle = record({ widgets: { running: ["ride"] } });
+    const b = await open(browser, pageFile({ refresh: viaTitle, widgets: [bold] }));
+    expect(await b.page.innerText(`${note} li`)).toBe("Run: <b>Ride</b>");
+    expect(await b.page.$(`${note} b`)).toBeNull();
+    for (const refresh of [
+      [],
+      7,
+      "x",
+      record({ widgets: [] }),
+      JSON.parse('{"code":"' + ownCode() + '","widgets":{"__proto__":["workoutTrend"]}}'),
+    ]) {
+      const { page, errors } = await open(browser, pageFile({ refresh }));
+      expect(errors).toEqual([]);
+      expect(await page.$(".page")).not.toBeNull();
+    }
   });
 });

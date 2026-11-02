@@ -546,4 +546,11 @@ out. To add one:
 | `sport.platformTennis` | Platform tennis |
 | `due.label` | Refresh missed |
 | `due.text` | The automatic refresh has not updated this page since {date}. The computer was perhaps off, or the refresh failed: ask your assistant to check the automatic refresh. |
+| `news.label` | New in this version |
+| `news.text` | This page now uses version {version} of garmin-personal-mcp. |
+| `news.textNoVersion` | This page now uses a new version of garmin-personal-mcp. |
+| `news.widgets` | New widgets on your boards: |
+| `news.link` | Read the release notes |
+| `news.close` | Close the note about the new version |
+| `news.closed` | Note closed |
 <!-- keys:end -->
