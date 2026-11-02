@@ -1,5 +1,5 @@
 import { addDays } from "./dates";
-import { hms, round } from "./fit";
+import { hms, paceText, round } from "./fit";
 import { type Activity, dayOf, groupOf, mondayOf, sessionSeconds, seconds } from "./page/calc";
 import { fitnessFatigueFrom, loadOf, loadRatio, readinessOf, zonesOf } from "./page/metrics";
 import { racePredictionsOf, type SplitKind, splitOf, workoutOf } from "./page/running";
@@ -326,11 +326,6 @@ function fastestEfforts(acts: Json[]): Digest["bestEfforts"] {
     }
   }
   return best;
-}
-
-/** A pace as the lap pace: "m:ss/km". */
-function paceText(sec: number): string {
-  return `${hms(sec)}/km`;
 }
 
 function sum(): Sum {

@@ -174,7 +174,7 @@ export function lapsOf(fit: Messages, activityId: number) {
 }
 
 /** A pace as the lap pace: "m:ss/km". */
-const paceText = (sec: number) => `${hms(sec)}/km`;
+export const paceText = (sec: number) => `${hms(sec)}/km`;
 /** A percentage with 1 decimal; null when it applies but the data cannot give it. */
 const pctOrNull = (v: number | undefined) => (v === undefined ? null : round(v, 1));
 
