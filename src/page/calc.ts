@@ -126,6 +126,14 @@ export function weeksOf(start: string, end: string): string[] {
   return weeks;
 }
 
+/** How late the automatic refresh may be: launchd and Task Scheduler start a missed run after a wake. */
+const LATE_MS = 60 * 60 * 1000;
+
+/** The automatic refresh was due over an hour before `now`; never without a valid due time. */
+export function isLate(due: string | undefined, now: number): boolean {
+  return Date.parse(due ?? "") + LATE_MS < now;
+}
+
 /** The activities of the weeks `from` to `to` (Mondays, both included). */
 export function activitiesIn<T extends Activity>(acts: T[], from: string, to: string): T[] {
   const end = addDays(to, 6);

@@ -139,7 +139,8 @@ pnpm typecheck           # tsc --noEmit
 pnpm test                # Vitest
 pnpm test:coverage       # Vitest with coverage, report in coverage/
 pnpm build               # tsdown, the page template, then the third-party notices
-pnpm test:page           # the dashboard page in headless Chromium, after the build
+pnpm build:site          # the website in dist-site/, after the build
+pnpm test:page           # the dashboard page and the website in headless Chromium, after both builds
 ```
 
 `pnpm test:page` needs the Chromium headless shell. Install it one time:

@@ -834,14 +834,14 @@ describe("FIT tools", () => {
     await expect(tools.getActivityLaps(81)).rejects.toThrow(/is not a \.FIT file/);
     expect(existsSync(join(dataDir, "fit", "81.fit"))).toBe(false);
     api.getBytes.mockResolvedValue(strengthFit());
-    await expect(tools.getActivityLaps(81)).resolves.toBeDefined();
+    expect(JSON.parse(await tools.getActivityLaps(81))).toEqual({ activityId: 81, laps: [] });
   });
 
   it("lets a new call download again after a failed download", async () => {
     api.getBytes.mockRejectedValueOnce(new GarminApiError("down"));
     await expect(tools.getActivityLaps(82)).rejects.toThrow("down");
     api.getBytes.mockResolvedValue(strengthFit());
-    await expect(tools.getActivityLaps(82)).resolves.toBeDefined();
+    expect(JSON.parse(await tools.getActivityLaps(82))).toEqual({ activityId: 82, laps: [] });
     expect(api.getBytes).toHaveBeenCalledTimes(2);
   });
 

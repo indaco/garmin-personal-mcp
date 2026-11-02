@@ -7,6 +7,7 @@ import {
   groupOf,
   groupsIn,
   isIndoor,
+  isLate,
   mondayOf,
   named,
   seconds,
@@ -239,5 +240,25 @@ describe("distance and time for pace", () => {
 
   it("gives zero for no session", () => {
     expect(timedDistance([])).toEqual({ km: 0, seconds: 0 });
+  });
+});
+
+describe("late automatic refresh", () => {
+  const due = "2026-10-31T07:00:00.000Z";
+  const at = (min: number) => Date.parse(due) + min * 60_000;
+  it("is not late up to 60 minutes after the due time", () => {
+    expect(isLate(due, at(-120))).toBe(false);
+    expect(isLate(due, at(59))).toBe(false);
+    expect(isLate(due, at(60) - 1)).toBe(false);
+    expect(isLate(due, at(60))).toBe(false);
+  });
+  it("is late after 60 minutes", () => {
+    expect(isLate(due, at(60) + 1)).toBe(true);
+    expect(isLate(due, at(61))).toBe(true);
+  });
+  it("is never late without a due time or with a bad one", () => {
+    expect(isLate(undefined, at(600))).toBe(false);
+    expect(isLate("", at(600))).toBe(false);
+    expect(isLate("tomorrow", at(600))).toBe(false);
   });
 });

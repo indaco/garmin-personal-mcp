@@ -3,7 +3,16 @@ import * as metrics from "./metrics";
 import * as running from "./running";
 import * as strength from "./strength";
 import * as sports from "./sports";
-import { type Activity, activitiesIn, boardOrder, GROUPS, groupOf, named, weeksOf } from "./calc";
+import {
+  type Activity,
+  activitiesIn,
+  boardOrder,
+  GROUPS,
+  groupOf,
+  isLate,
+  named,
+  weeksOf,
+} from "./calc";
 import { Chart, chart, destroyCharts, themeCharts } from "./charts";
 import { announce, h, keepFocus } from "./dom";
 import { dragTile, keyMove, resizeTile } from "./edit-drag";
@@ -737,13 +746,9 @@ function boardView(data: Data): HTMLElement {
   );
 }
 
-/** How late the automatic refresh may be: launchd and Task Scheduler start a missed run after a wake. */
-const LATE_MS = 60 * 60 * 1000;
-
 /** The automatic refresh was due over an hour ago and has not written the page since. */
 function missedBanner(data: Data): HTMLElement | false {
-  const due = Date.parse(data.due ?? "");
-  if (!(due + LATE_MS < Date.now())) return false;
+  if (!isLate(data.due, Date.now())) return false;
   return h(
     "div",
     { class: "banner", role: "region", "aria-label": t("due.label") },

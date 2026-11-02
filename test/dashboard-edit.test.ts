@@ -142,9 +142,12 @@ describe("editDashboard", () => {
     await expect(
       writer.edit({ place: [{ board: "all", widget: "kpis", type: "paddle" }] }),
     ).rejects.toThrow(/paddle/);
-    await expect(
-      writer.edit({ place: [{ board: "all", widget: "kpis", type: "running" }] }),
-    ).resolves.toBeDefined();
+    const result = await writer.edit({
+      place: [{ board: "all", widget: "kpis", type: "running" }],
+    });
+    expect(result.changed).toBe(true);
+    const all = layout().boards.all as { widget: string; type?: string }[];
+    expect(all.at(-1)).toMatchObject({ widget: "kpis", type: "running" });
   });
 
   it("adds a language, and lists the texts it still misses", async () => {
