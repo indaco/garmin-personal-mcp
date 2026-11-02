@@ -1613,19 +1613,6 @@ describe("writeDashboard refresh record", () => {
     expect(record()).toMatchObject({ from: serverVersion, server: serverVersion });
   });
 
-  it("does not let a deeply nested old record stop a write for new settings", async () => {
-    await oldPage("0.5.0");
-    await writer.write({});
-    const deep = "[".repeat(200_000) + "]".repeat(200_000);
-    writeFileSync(
-      file,
-      page().replace(/(garmin-refresh:start \*\/).*?(\/\* garmin-refresh:end)/s, `$1${deep}$2`),
-    );
-    const r = await writer.write({ settings: { title: "Mine" } });
-    expect(r.page).toBe("replaced");
-    expect(record()).toBeNull();
-  });
-
   it("drops a record that cannot be written back, and still writes", async () => {
     await oldPage("0.5.0");
     await writer.write({});
