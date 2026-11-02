@@ -35,8 +35,12 @@ export const QUESTIONS: Record<string, [question: string, tools: string][]> = {
     ["How far did I swim this month, and at what pace?", "listActivities"],
   ],
   cycling: [
-    ["List my rides of this month, with distance and heart rate.", "listActivities"],
-    ["Show the laps of my last ride.", "getActivityLaps"],
+    ["Compare the grit and flow of my last mountain-bike rides.", "listActivities"],
+    ["How many metres per hour did I climb on my last 5 rides?", "listActivities"],
+    [
+      "How much of my riding time was in Z1-2 and how much in Z4-5 over my last 5 rides?",
+      "listActivities",
+    ],
   ],
   padel: [
     ["How many padel sessions did I play this month, and how long were they?", "listActivities"],
@@ -52,7 +56,7 @@ export const QUESTIONS: Record<string, [question: string, tools: string][]> = {
 };
 
 /** The sports whose questions are written for the page, not taken from the README. */
-export const AUTHORED = new Set(["swimming", "cycling", "padel"]);
+export const AUTHORED = new Set(["swimming", "padel"]);
 
 /** The line under the questions of a sport, or "". */
 export function note(sport: string): string {

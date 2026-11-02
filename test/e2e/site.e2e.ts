@@ -271,6 +271,9 @@ describe("site sections", () => {
     );
     await page.click(".wall .f-strength");
     expect(await page.$(".qs-set.on .qs-note")).toBeNull();
+    // the ride questions come from the README: no note
+    await page.click(".wall .f-cycling");
+    expect(await page.$(".qs-set.on .qs-note")).toBeNull();
   });
 
   it("shows one client pane at a time, and the arrow keys move between the clients", async () => {
