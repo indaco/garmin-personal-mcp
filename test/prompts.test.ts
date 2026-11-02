@@ -534,6 +534,39 @@ describe("coach prompts", () => {
     );
   });
 
+  it("checks today's training with the page's readiness and fitness from one call", async () => {
+    const { prompts } = await client.listPrompts();
+    expect(prompts.find((p) => p.name === "train-today")?.arguments ?? []).toEqual([]);
+    const text = await render("train-today");
+    const flat = text.replace(/\s+/g, " ");
+    expect(text.includes("{{")).toBe(false);
+    expect(text).toContain("Today is 2026-10-28.");
+    // the digest from a preview, with the weeks of the page
+    expect(text).toContain("Call `writeDashboard` with `preview` = true.");
+    expect(text).not.toContain("listActivities");
+    expect(text).toContain("`readiness.verdict`");
+    expect(text).toContain("`fitnessFatigue`");
+    // the rules of the page's readiness(), in the same order
+    expect(flat).toContain(
+      '"easy" when the HRV status is LOW, or the sleep score is less than 60, or the resting HR is 5 bpm or more above the 7-day average.',
+    );
+    expect(flat).toContain(
+      '"push" when the HRV status is BALANCED, the sleep score is 80 or more, and the load ratio is less than 1.3.',
+    );
+    expect(flat).toContain(
+      "Say that this is the dashboard's own rule, not Garmin's Training Readiness.",
+    );
+    expect(flat).toContain(
+      'If the digest has no `readiness`, write "n/a" for the verdict and for each input: there is no HRV and no sleep data.',
+    );
+    expect(flat).toContain(
+      "If `settings.exclude` has `recovery`, say that the dashboard leaves out the recovery data.",
+    );
+    expect(flat).toContain(
+      '**Never invent or estimate a missing value**: a missing value or a failed call shows as "n/a".',
+    );
+  });
+
   it("keeps a race distance with a dollar pattern or a marker as typed", async () => {
     const text = await render("race-readiness", {
       date: "2026-12-06",

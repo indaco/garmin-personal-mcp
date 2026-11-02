@@ -29,6 +29,7 @@ export function registerPrompts(server: McpServer): void {
   const reviewPrompt = load("run-review.md");
   const readinessPrompt = load("race-readiness.md");
   const strengthPrompt = load("strength-review.md");
+  const trainPrompt = load("train-today.md");
 
   const dashboardDescription =
     "Build a personal training + recovery dashboard (volume, load, HRV, sleep) from Garmin data";
@@ -265,6 +266,12 @@ export function registerPrompts(server: McpServer): void {
         }),
       );
     },
+  );
+
+  const trainDescription =
+    "Tell if you should train hard today: the dashboard's readiness verdict, its inputs, fitness and form";
+  server.registerPrompt("train-today", { description: trainDescription }, () =>
+    result(trainDescription, render(trainPrompt, { today: localToday() })),
   );
 }
 

@@ -86,6 +86,10 @@
     ]
   },
   {
+    "name": "train-today",
+    "description": "Tell if you should train hard today: the dashboard's readiness verdict, its inputs, fitness and form"
+  },
+  {
     "name": "training-dashboard",
     "description": "Build a personal training + recovery dashboard (volume, load, HRV, sleep) from Garmin data",
     "arguments": [
