@@ -12,8 +12,8 @@ import { log } from "./log";
 type Json = Record<string, unknown>;
 
 const DAY_MS = 24 * 3600_000;
-/** The activities of one search page; a larger page without a date window can answer HTTP 500. */
-const SEARCH_PAGE = 100;
+/** The activities of one search page: Garmin answers HTTP 500 to a page of about 190 or more, also in a date window. */
+export const SEARCH_PAGE = 100;
 
 /**
  * MCP tools over the Garmin Connect Personal API (read-only). Every tool returns a JSON string.
@@ -41,7 +41,6 @@ export class GarminTools {
   ): Promise<string> {
     const wanted = names?.map((n) => n.toLowerCase()).filter(Boolean) ?? [];
     const asked = limit == null || limit <= 0 ? 20 : Math.min(limit, 200);
-    // pages of 100: Garmin answers HTTP 500 to one page of about 200 activities without a date window
     const search = async (max: number, type?: string, subType?: string) => {
       const all: unknown[] = [];
       for (let start = 0; start < max; start += SEARCH_PAGE) {

@@ -10,6 +10,7 @@ import { workoutOf } from "./page/running";
 import {
   type GarminTools,
   MODEL_ONLY,
+  SEARCH_PAGE,
   firstArray,
   sleepSummary,
   summarize,
@@ -31,7 +32,6 @@ export const weeksCovered = (weeks: number | undefined): number =>
   weeks == null ? DEFAULT_WEEKS : Math.min(Math.max(weeks, 1), MAX_WEEKS);
 /** The last days of a cached range are fetched again: Garmin can still add activities or finish a night's data. */
 const REFRESH_DAYS = 2;
-const PAGE = 200;
 
 /** What one getDashboardData call counts. */
 interface Sync {
@@ -147,11 +147,11 @@ export class GarminDashboard {
           delete byId[id];
         }
       }
-      for (let page = 0; ; page += PAGE) {
+      for (let page = 0; ; page += SEARCH_PAGE) {
         sync.calls++;
         const json = await this.api.getJson("/activitylist-service/activities/search/activities", {
           start: String(page),
-          limit: String(PAGE),
+          limit: String(SEARCH_PAGE),
           startDate: rFrom,
           endDate: rTo,
         });
@@ -166,7 +166,7 @@ export class GarminDashboard {
           const activity = isObject(a) ? a : {};
           byId[asString(activity.activityId)] = summarize(activity);
         }
-        if (list.length < PAGE) {
+        if (list.length < SEARCH_PAGE) {
           break;
         }
       }
