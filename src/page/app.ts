@@ -829,16 +829,27 @@ function tile(data: Data, inst: Instance, def: WidgetDef | undefined): HTMLEleme
       def.render(body, ctxFor(def.custom ? ownArrays(data) : data, inst));
     } catch (e) {
       body.replaceChildren(
-        h(
-          "p",
-          { class: "error" },
-          t("widget.failed", { message: e instanceof Error ? e.message : String(e) }),
-        ),
+        h("p", { class: "error" }, t("widget.failed", { message: errorText(e) })),
       );
       console.warn(`widget ${inst.widget}:`, e);
     }
   }
   return el;
+}
+
+/** The text of a thrown value: its message (an Error has one), else a short JSON or String(). */
+function errorText(e: unknown): string {
+  if (typeof e === "object" && e !== null) {
+    const { message } = e as { message?: unknown };
+    if (typeof message === "string") return message;
+    try {
+      const json = JSON.stringify(e);
+      return json.length > 100 ? `${json.slice(0, 99)}…` : json;
+    } catch {
+      // a circular object: JSON cannot write it
+    }
+  }
+  return String(e);
 }
 
 /** The data with a copy of each top-level array; the items are the same objects. */

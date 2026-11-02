@@ -2164,8 +2164,31 @@ describe("custom widgets and languages", () => {
           custom("bad", "this is not code ("),
           custom("text", "throw 'plain text';"),
           custom("thing", "throw { code: 1 };"),
+          custom("msg", "throw { message: 'no rows' };"),
+          custom("long", "throw { text: 'x'.repeat(300) };"),
+          custom("loop", "const o = {}; o.self = o; throw o;"),
+          custom("nothing", "throw undefined;"),
+          custom("none", "throw null;"),
+          custom("num", "throw { message: 5 };"),
+          // {"t":"…"} is 8 characters plus the text: 100 in all fits, 101 is cut
+          custom("fits", "throw { t: 'x'.repeat(92) };"),
+          custom("over", "throw { t: 'x'.repeat(93) };"),
         ],
-        layout: on("broken", "bad", "text", "thing", "coachNotes"),
+        layout: on(
+          "broken",
+          "bad",
+          "text",
+          "thing",
+          "msg",
+          "long",
+          "loop",
+          "nothing",
+          "none",
+          "num",
+          "fits",
+          "over",
+          "coachNotes",
+        ),
       }),
     );
     expect(await page.textContent("[data-id=broken] .error")).toBe(
@@ -2174,9 +2197,29 @@ describe("custom widgets and languages", () => {
     expect(await page.textContent("[data-id=bad] .error")).toContain("This widget failed");
     // a thrown value that is not an Error still fills the placeholder
     expect(await page.textContent("[data-id=text] .error")).toBe("This widget failed: plain text");
-    expect(await page.textContent("[data-id=thing] .error")).toBe(
+    // an object shows its message, else a short JSON text
+    expect(await page.textContent("[data-id=thing] .error")).toBe('This widget failed: {"code":1}');
+    expect(await page.textContent("[data-id=msg] .error")).toBe("This widget failed: no rows");
+    expect(await page.textContent("[data-id=num] .error")).toBe(
+      'This widget failed: {"message":5}',
+    );
+    const long = (await page.textContent("[data-id=long] .error")) ?? "";
+    expect(long).toMatch(/^This widget failed: \{"text":"x+…$/);
+    expect(long.length - "This widget failed: ".length).toBe(100);
+    expect(await page.textContent("[data-id=fits] .error")).toBe(
+      `This widget failed: {"t":"${"x".repeat(92)}"}`,
+    );
+    expect(await page.textContent("[data-id=over] .error")).toBe(
+      `This widget failed: {"t":"${"x".repeat(93)}…`,
+    );
+    // JSON cannot write a circular object
+    expect(await page.textContent("[data-id=loop] .error")).toBe(
       "This widget failed: [object Object]",
     );
+    expect(await page.textContent("[data-id=nothing] .error")).toBe(
+      "This widget failed: undefined",
+    );
+    expect(await page.textContent("[data-id=none] .error")).toBe("This widget failed: null");
     expect(await page.textContent("[data-id=coachNotes] .notes")).toContain("Load");
     expect(errors).toEqual([]);
   });
