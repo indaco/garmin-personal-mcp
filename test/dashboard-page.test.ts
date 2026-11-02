@@ -9,6 +9,7 @@ import {
   readBlock,
   templateVersion,
   withData,
+  writeBlock,
 } from "../src/dashboard-page";
 import { digest } from "../src/digest";
 import { DASHBOARD_VERSION } from "../src/prompts";
@@ -71,6 +72,22 @@ const dataPage = (json: string) =>
   `<script>/* garmin-data:start */${json}/* garmin-data:end */</script>`;
 /** The ids of a widgets block. */
 const widgetIds = (widgets: unknown) => (widgets as { id: string }[]).map((w) => w.id);
+/** A writer that runs `during` (another process writing the page) in its first Garmin call, and counts its calls. */
+function racingWriter(json: unknown, during: () => unknown) {
+  const calls = { garmin: 0, template: 0 };
+  const w = new DashboardWriter(
+    async () => {
+      if (calls.garmin++ === 0) await during();
+      return JSON.stringify(json);
+    },
+    dir,
+    async () => {
+      calls.template++;
+      return templateText;
+    },
+  );
+  return { w, calls };
+}
 /** The page without its data block: what an update must keep. */
 const code = (s: string) =>
   s.replace(/\/\* garmin-data:start \*\/[\s\S]*?\/\* garmin-data:end \*\//, "");
@@ -358,6 +375,49 @@ describe("writeDashboard", () => {
     );
     expect(await fresh.write({ layout: "preset" })).toMatchObject({ backup: `${file}.bak` });
     expect(readFileSync(`${file}.bak`, "utf8")).toBe(before);
+  });
+
+  it("starts again from the page when another writer changed it during the Garmin calls", async () => {
+    await writer.write({});
+    let calls = 0;
+    const racing = new DashboardWriter(
+      async () => {
+        calls++;
+        // an edit lands while this writer waits for Garmin
+        if (calls === 1) {
+          writeFileSync(
+            file,
+            page().replace(
+              /(garmin-layout:start \*\/).*?(\/\*)/,
+              '$1{"rev":"r9","base":"blank","boards":{}}$2',
+            ),
+          );
+        }
+        return JSON.stringify(data);
+      },
+      dir,
+      async () => templateText,
+    );
+    expect((await racing.write({})).page).toBe("updated");
+    expect(readBlock(page(), "layout")).toEqual({ rev: "r9", base: "blank", boards: {} });
+    // the second try uses the same data: Garmin is called once
+    expect(calls).toBe(1);
+  });
+
+  it("writes nothing when the page changes again during the second try", async () => {
+    await writer.write({});
+    let n = 0;
+    const racing = new DashboardWriter(
+      async () => JSON.stringify(data),
+      dir,
+      async () => {
+        // template() runs after the page is read: another writer changes the page each time
+        writeFileSync(file, page().replace("</script>", `// edit ${++n}\n</script>`));
+        return templateText;
+      },
+    );
+    await expect(racing.write({})).rejects.toThrow(/changed twice while it was being updated/);
+    expect(page()).toContain("// edit 2");
   });
 
   it("keeps the custom widgets of the page that the widget library does not have", async () => {
@@ -886,5 +946,107 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
     await expect(writer.view({})).rejects.toThrow(
       /settings block of the page is not valid JSON in .*garmin-dashboard\.html: give new settings, or delete the file/,
     );
+  });
+  describe("while another process writes the page", () => {
+    it.each([
+      ["layout", { rev: "r9", base: "blank", boards: {} }, [1, 2]],
+      ["widgets", [{ id: "w", title: "W", code: "x" }], [1, 2]],
+      ["i18n", { de: { title: "Training" } }, [1, 2]],
+      ["settings", { sports: ["running"] }, [1]],
+    ] as const)(
+      "keeps an edit to the %s block made during the Garmin calls",
+      async (block, value, ids) => {
+        await writer.write({});
+        const { w, calls } = racingWriter(full, () =>
+          writeFileSync(file, writeBlock(page(), block, value)),
+        );
+        expect((await w.write({ notes: ["n"] })).page).toBe("updated");
+        expect(readBlock(page(), block)).toEqual(value);
+        const written = readBlock(page(), "data") as Full;
+        expect(written.notes).toEqual(["n"]);
+        expect(written.activities.map((a) => a.id)).toEqual(ids);
+        // the second try uses the snapshot: Garmin is called once
+        expect(calls).toEqual({ garmin: 1, template: 2 });
+      },
+    );
+
+    it("reads the page once and writes it when nothing changed it", async () => {
+      await writer.write({});
+      const before = code(page());
+      const { w, calls } = racingWriter(full, () => {});
+      expect((await w.write({})).page).toBe("updated");
+      expect(code(page())).toBe(before);
+      expect(calls).toEqual({ garmin: 1, template: 1 });
+    });
+
+    it("starts again when only the data changed (a parallel refresh), and writes its own data", async () => {
+      await writer.write({});
+      const { w, calls } = racingWriter(full, () =>
+        writeFileSync(file, writeBlock(page(), "data", { ...full, notes: ["other"] })),
+      );
+      expect((await w.write({ notes: ["mine"] })).page).toBe("updated");
+      expect(readBlock(page(), "data")).toMatchObject({ notes: ["mine"] });
+      expect(calls).toEqual({ garmin: 1, template: 2 });
+    });
+
+    it("refuses to refresh a page deleted during the Garmin calls, and makes no new one", async () => {
+      await writer.write({});
+      const { w } = racingWriter(full, () => rmSync(file));
+      await expect(w.write({ onlyExisting: true })).rejects.toThrow(/does not exist/);
+      expect(existsSync(file)).toBe(false);
+      expect(existsSync(`${file}.bak`)).toBe(false);
+    });
+
+    it("refuses to write over a file that stopped being a page during the Garmin calls", async () => {
+      await writer.write({});
+      const { w } = racingWriter(full, () => writeFileSync(file, "<p>my notes</p>"));
+      await expect(w.write({})).rejects.toThrow(/not a dashboard page/);
+      expect(page()).toBe("<p>my notes</p>");
+    });
+
+    it("keeps the page and the .bak when a rebuild fails on a page that changes twice", async () => {
+      await writer.write({});
+      writeFileSync(`${file}.bak`, "older");
+      let n = 0;
+      const w = new DashboardWriter(
+        async () => JSON.stringify(full),
+        dir,
+        async () => {
+          writeFileSync(file, page().replace("</script>", `// edit ${++n}\n</script>`));
+          return templateText;
+        },
+      );
+      await expect(w.write({ layout: "blank" })).rejects.toThrow(
+        /garmin-dashboard\.html changed twice while it was being updated: run the update again/,
+      );
+      expect(readFileSync(`${file}.bak`, "utf8")).toBe("older");
+      expect(page()).toContain("// edit 2");
+      expect(readBlock(page(), "layout")).toMatchObject({ base: "preset" });
+    });
+
+    it("keeps in .bak an edit made during the second write of a build", async () => {
+      let edit = false;
+      const w = new DashboardWriter(
+        async () => JSON.stringify(full),
+        dir,
+        async () => {
+          if (edit) {
+            edit = false;
+            writeFileSync(file, writeBlock(page(), "i18n", { de: { title: "Training" } }));
+          }
+          return templateText;
+        },
+      );
+      await w.write({});
+      expect(await w.write({ layout: "blank" })).toMatchObject({ backup: `${file}.bak` });
+      edit = true;
+      // the page is no longer the one this build wrote: the edited page goes to .bak
+      expect(await w.write({ layout: "preset" })).toMatchObject({ backup: `${file}.bak` });
+      const bak = readFileSync(`${file}.bak`, "utf8");
+      expect(readBlock(bak, "i18n")).toEqual({ de: { title: "Training" } });
+      // the page written by the second try is the build's page: the next write keeps that .bak
+      expect(await w.write({ layout: "blank" })).not.toHaveProperty("backup");
+      expect(readFileSync(`${file}.bak`, "utf8")).toBe(bak);
+    });
   });
 });

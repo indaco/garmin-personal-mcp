@@ -482,15 +482,8 @@ export class DashboardWriter {
     return run;
   }
 
-  async #write({
-    weeks,
-    notes = [],
-    layout,
-    page,
-    path,
-    settings,
-    onlyExisting,
-  }: WriteOptions): Promise<WriteResult> {
+  async #write(options: WriteOptions, again = false): Promise<WriteResult> {
+    const { weeks, notes = [], layout, page, path, settings, onlyExisting } = options;
     if (layout && page) {
       throw new Error(
         "Give either `layout` (a page from the template) or `page` (your own page), not both",
@@ -563,6 +556,13 @@ export class DashboardWriter {
     const raw = JSON.parse(await this.#data(weeks ?? weeksOf(old), own.workouts === true)) as Json;
     next = withData(next, raw, own, notes, await this.schedule.due(target));
 
+    // another process (a scheduled refresh, a second client) can write the page while this one waits for Garmin
+    // shortcut: a write in the milliseconds between this read and writeAtomically is still lost; a lock file would close it
+    if ((await readExisting(target)) !== old) {
+      if (again)
+        throw new Error(`${target} changed twice while it was being updated: run the update again`);
+      return this.#write(options, true);
+    }
     // the second write of a build (notes, a typed title) must not overwrite the page from before the build
     const sameBuild =
       this.#wrote?.target === target &&
