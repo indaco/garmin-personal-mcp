@@ -13,6 +13,7 @@ import {
   writeBlock,
 } from "../src/dashboard-page";
 import { digest } from "../src/digest";
+import { preset } from "../src/page/presets";
 import { DASHBOARD_VERSION } from "../src/prompts";
 import { version as serverVersion } from "../package.json";
 
@@ -1221,5 +1222,133 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
       expect(await w.write({ layout: "blank" })).not.toHaveProperty("backup");
       expect(readFileSync(`${file}.bak`, "utf8")).toBe(bak);
     });
+  });
+});
+
+const setLayout = (value: unknown) => writeFileSync(file, writeBlock(page(), "layout", value));
+const widgetsOf = (name: string) =>
+  (
+    readBlock(page(), "layout") as {
+      boards: Record<string, { widget: string }[]>;
+    }
+  ).boards[name]?.map((i) => i.widget);
+/** The page without its layout block and its update time. */
+const withoutLayout = (text: string) =>
+  text
+    .replace(/\/\* garmin-layout:start.*?garmin-layout:end \*\//s, "")
+    .replace(/"updated":"[^"]*"/, "");
+
+describe("writeDashboard new preset widgets", () => {
+  /** The running board of the preset, without workoutTrend. */
+  const missing = preset("running").filter((i) => i.widget !== "workoutTrend");
+  const edited = (extra: Record<string, unknown> = {}) => ({
+    rev: "r1",
+    base: "preset",
+    boards: { running: missing },
+    ...extra,
+  });
+
+  beforeEach(async () => {
+    await writer.write({});
+  });
+
+  it("adds the widget and the record on an update, keeping rev, kind and no .bak", async () => {
+    setLayout(edited());
+    const r = await writer.write({});
+    expect(r).toMatchObject({ page: "updated", addedWidgets: { running: ["workoutTrend"] } });
+    expect(r.backup).toBeUndefined();
+    expect(existsSync(`${file}.bak`)).toBe(false);
+    const layout = readBlock(page(), "layout") as { rev: string; seen: Record<string, string[]> };
+    expect(layout.rev).toBe("r1");
+    expect(layout.seen.running).toEqual(preset("running").map((i) => i.widget));
+    expect(widgetsOf("running")).toContain("workoutTrend");
+  });
+
+  it("adds them on an upgrade and keeps the .bak", async () => {
+    setLayout(edited());
+    writeFileSync(
+      file,
+      page().replace(/(<meta name="garmin-template" content=")[^"]*(")/, `$1${ID_A}$2`),
+    );
+    const r = await writer.write({});
+    expect(r).toMatchObject({
+      page: "upgraded",
+      backup: `${file}.bak`,
+      addedWidgets: { running: ["workoutTrend"] },
+    });
+    expect(widgetsOf("running")).toContain("workoutTrend");
+  });
+
+  it("adds them when new settings replace the page, and keeps the .bak", async () => {
+    templateText = template(
+      ID_B,
+      "window.S = /* garmin-settings:start */null/* garmin-settings:end */;\n",
+    );
+    rmSync(file);
+    await writer.write({});
+    setLayout(edited());
+    const r = await writer.write({ settings: { title: "Mine" } });
+    expect(r).toMatchObject({
+      page: "replaced",
+      backup: `${file}.bak`,
+      addedWidgets: { running: ["workoutTrend"] },
+    });
+    expect(widgetsOf("running")).toContain("workoutTrend");
+  });
+
+  it("adds nothing on a second write", async () => {
+    setLayout(edited());
+    await writer.write({});
+    const first = readBlock(page(), "layout");
+    const r = await writer.write({});
+    expect(r).not.toHaveProperty("addedWidgets");
+    expect(readBlock(page(), "layout")).toEqual(first);
+  });
+
+  it("saves only the record when the board has every preset widget", async () => {
+    setLayout(edited({ boards: { running: preset("running") } }));
+    const r = await writer.write({});
+    expect(r).not.toHaveProperty("addedWidgets");
+    expect(r.page).toBe("updated");
+    expect((readBlock(page(), "layout") as { seen: unknown }).seen).toEqual({
+      running: preset("running").map((i) => i.widget),
+    });
+  });
+
+  it("does not stop on a layout block that is not valid JSON", async () => {
+    writeFileSync(file, page().replace(/(garmin-layout:start \*\/).*?(\/\*)/, "$1{nope$2"));
+    const before = page();
+    const r = await writer.write({});
+    expect(r).not.toHaveProperty("addedWidgets");
+    expect(page().match(/garmin-layout:start \*\/(.*?)\/\* garmin-layout:end/)?.[1]).toBe(
+      before.match(/garmin-layout:start \*\/(.*?)\/\* garmin-layout:end/)?.[1],
+    );
+  });
+
+  it("leaves a blank layout, a new layout, a first write and your own page alone", async () => {
+    setLayout(edited({ base: "blank" }));
+    expect(await writer.write({})).not.toHaveProperty("addedWidgets");
+    expect(widgetsOf("running")).toEqual(missing.map((i) => i.widget));
+
+    setLayout(edited());
+    const fresh = await writer.write({ layout: "preset" });
+    expect(fresh).not.toHaveProperty("addedWidgets");
+    expect(readBlock(page(), "layout")).toMatchObject({ boards: {} });
+
+    rmSync(file);
+    expect(await writer.write({})).not.toHaveProperty("addedWidgets");
+
+    const own = `<script>/* garmin-data:start */null/* garmin-data:end */ /* garmin-layout:start */${JSON.stringify(edited())}/* garmin-layout:end */</script>`;
+    expect(await writer.write({ page: own })).not.toHaveProperty("addedWidgets");
+    expect(readBlock(page(), "layout")).toEqual(edited());
+  });
+
+  it("changes only the layout block: data, notes and settings stay as without the merge", async () => {
+    const notes = ["Easy week"];
+    await writer.write({ notes });
+    const plain = page();
+    setLayout(edited());
+    await writer.write({ notes });
+    expect(withoutLayout(page())).toBe(withoutLayout(plain));
   });
 });

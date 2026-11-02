@@ -12,7 +12,15 @@ import { CATALOGUE, inPage } from "./page/catalogue";
 import { ABOUT } from "./page/catalogue-about";
 import { BUILT_IN } from "./page/i18n/built-in";
 import { type Catalogue, en } from "./page/i18n/en";
-import { add, boardOf, type Layout, parseLayout, type Span, withBoard } from "./page/layout";
+import {
+  add,
+  boardOf,
+  type Layout,
+  parseLayout,
+  type Span,
+  withBoard,
+  withPresetWidgets,
+} from "./page/layout";
 import { preset } from "./page/presets";
 import { DATA_ITEMS, type Settings } from "./page/settings";
 import { THEMES } from "./page/theme";
@@ -96,6 +104,8 @@ interface WriteResultBase {
   missingProfileLanguage?: string;
   /** The custom widgets that have no texts in some languages of the page, with those languages. */
   missingWidgetTexts?: Record<string, string[]>;
+  /** The preset widgets that this write gave to edited boards, board -> widget ids. */
+  addedWidgets?: Record<string, string[]>;
 }
 
 /**
@@ -191,6 +201,26 @@ export function writeBlock(page: string, block: Block, value: unknown): string {
     marker(block),
     () => `/* garmin-${block}:start */${json}/* garmin-${block}:end */`,
   );
+}
+
+/**
+ * Gives each edited board of a page from the template the preset widgets that it has not met, and
+ * saves the record. The rev stays. A layout block that cannot be read leaves the page as it is: it
+ * must never stop a data update.
+ */
+function withNewPresetWidgets(page: string): { page: string; added: Record<string, string[]> } {
+  let layout: ReturnType<typeof parseLayout>;
+  try {
+    const saved = readBlock(page, "layout");
+    if (saved === undefined || saved === null) return { page, added: {} };
+    layout = parseLayout(saved);
+  } catch {
+    // an unreadable layout block is the user's to fix with editDashboard; the data update goes on
+    return { page, added: {} };
+  }
+  const merged = withPresetWidgets(layout, preset);
+  if (!merged.changed) return { page, added: {} };
+  return { page: writeBlock(page, "layout", merged.layout), added: merged.added };
 }
 
 /** A new layout rev: a browser edit made on another layout never applies to this one. */
@@ -603,6 +633,8 @@ export class DashboardWriter {
         "Settings need a page from the template; this page has no garmin-settings block",
       );
     }
+    let addedWidgets: Record<string, string[]> = {};
+    if (page === undefined) ({ page: next, added: addedWidgets } = withNewPresetWidgets(next));
     if (page === undefined && next !== old) next = styled(next, own);
     // a page that Claude wrote keeps its settings in its block too, so its updates filter the same way
     if (page !== undefined && marker("settings").test(next)) {
@@ -637,6 +669,7 @@ export class DashboardWriter {
       path: target,
       ...(kind === "upgraded" ? { page: kind, previousServer, server: version } : { page: kind }),
       ...(backup ? { backup } : {}),
+      ...(Object.keys(addedWidgets).length > 0 ? { addedWidgets } : {}),
       notes: own.exclude?.includes("notes") ? 0 : notes.length,
       digest: digest(filterData(raw, own)),
       pageLanguages: pageLanguages(next, own),
@@ -1048,6 +1081,8 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         'different page code gets the page code of the server and keeps its layout and widgets; the result then has `page: "upgraded"`,',
         "`previousServer` (the server version that wrote the page, n/a when unknown) and `server`. Every page from the template",
         "also gets the custom widgets of the widget library (<data-dir>/widgets.json), not placed on a board.",
+        "An edited board also gets the widgets that a release adds to its preset, one time; the result lists",
+        "them in `addedWidgets` (board -> widget ids).",
         "`layout` writes a new page",
         "from the template: `preset` (the default widgets) or `blank` (empty boards). It keeps the languages",
         "added with editDashboard `languages`. `page` writes your own",

@@ -60,6 +60,10 @@ Run the `training-dashboard-update` prompt. The server replaces only the data an
 Your layout, your custom widgets, your languages and your page settings stay. Leave `weeks` empty to keep the weeks of
 the page.
 
+When a release adds a widget to the preset of a board that you edited, the update also puts that widget
+on the board, one time, and saves in the page which preset widgets each board has met. A widget that
+you remove later stays removed. The scheduled refresh does the same.
+
 When the server has other page code than your page, the update writes the page code of the server.
 This also happens with an older server, and in a scheduled refresh. It keeps your layout, custom widgets, languages and page settings, and it keeps the old page as a
 `.bak` file. The assistant tells you which server version wrote the page before and which one wrote it now.

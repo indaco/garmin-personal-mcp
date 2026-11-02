@@ -14,7 +14,8 @@ import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { McpServer } from "@modelcontextprotocol/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Config } from "../src/config";
-import { DashboardWriter, pageCode, readBlock } from "../src/dashboard-page";
+import { DashboardWriter, pageCode, readBlock, writeBlock } from "../src/dashboard-page";
+import { preset } from "../src/page/presets";
 import { log } from "../src/log";
 import {
   AutoRefresh,
@@ -903,6 +904,55 @@ const WIDGETS = /* garmin-widgets:start */[]/* garmin-widgets:end */;
   expect(pageCode(page)).toEqual({ from: "template", id });
   expect(readBlock(page, "layout")).toEqual(layout);
   expect(existsSync(`${file}.bak`)).toBe(true);
+  rmSync(dir, { recursive: true });
+});
+
+it("refreshPages saves the new preset widgets and the record of an edited board", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "refresh-pages-"));
+  const template = `<!doctype html>
+<meta name="garmin-template" content="bbbbbbbbbbbbbbbb">
+<script>
+const DATA = /* garmin-data:start */null/* garmin-data:end */;
+const LAYOUT = /* garmin-layout:start */null/* garmin-layout:end */;
+const WIDGETS = /* garmin-widgets:start */[]/* garmin-widgets:end */;
+</script>
+`;
+  const raw = JSON.stringify({
+    start: "2026-08-03",
+    end: "2026-10-26",
+    weeks: 12,
+    activities: [],
+    previousActivities: [],
+    hrv: [],
+    recovery: [],
+    sync: { failedDays: 0 },
+  });
+  const writer = new DashboardWriter(
+    async () => raw,
+    dir,
+    async () => template,
+  );
+  const file = join(dir, "garmin-dashboard.html");
+  await writer.write({});
+  const board = preset("running").filter((i) => i.widget !== "workoutTrend");
+  writeFileSync(
+    file,
+    writeBlock(readFileSync(file, "utf8"), "layout", {
+      rev: "r1",
+      base: "preset",
+      boards: { running: board },
+    }),
+  );
+
+  expect((await refreshPages(writer, [file])).failed).toEqual([]);
+  const layout = readBlock(readFileSync(file, "utf8"), "layout") as {
+    rev: string;
+    boards: { running: { widget: string }[] };
+    seen: { running: string[] };
+  };
+  expect(layout.rev).toBe("r1");
+  expect(layout.boards.running.map((i) => i.widget)).toContain("workoutTrend");
+  expect(layout.seen.running).toContain("workoutTrend");
   rmSync(dir, { recursive: true });
 });
 
