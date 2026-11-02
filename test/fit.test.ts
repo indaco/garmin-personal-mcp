@@ -240,9 +240,16 @@ describe("sets", () => {
           exercise: "My Press",
           category: "Unknown",
           sets: [{ reps: 8, kg: 20.5, seconds: 30, restSec: 60 }],
+          top: { kg: 20.5, reps: 8 },
+          // 20.5 x (1 + 8 / 30) = 25.97, rounded to 0.1
+          e1rmKg: 26,
         },
       ],
     });
+  });
+
+  it("gives no exercises for a FIT file without sets", () => {
+    expect(setsOf({}, 8, undefined)).toEqual({ activityId: 8, exercises: [] });
   });
 });
 

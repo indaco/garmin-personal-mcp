@@ -225,7 +225,7 @@
   },
   {
     "name": "getActivitySets",
-    "description": "Strength training sets of an activity, read from the original .FIT file. One entry per\nexercise, in the order first done, with its movement category, its primary and secondary\nmuscles (from Garmin's exercise catalogue) and its active sets: reps,\nweight (kg, absent when none was recorded), set time in seconds and the rest after the set\n(restSec). Exercise names are stable across sessions, so they can be used for per-exercise\ntrends. Edits made later in Garmin Connect (renamed exercises, corrected reps or weights)\nare not in the .FIT file.",
+    "description": "Strength training sets of an activity, read from the original .FIT file. One entry per\nexercise, in the order first done, with its movement category, its primary and secondary\nmuscles (from Garmin's exercise catalogue) and its active sets: reps,\nweight (kg, absent when none was recorded), set time in seconds and the rest after the set\n(restSec). Each exercise with weight also has top (the heaviest set of 1 to 12 reps, then the\nmost reps; without one, the heaviest set) and e1rmKg (the best estimated 1RM, Epley, of its\nsets of 1 to 12 reps; null when it has none). Exercise names are stable across sessions, so\nthey can be used for per-exercise trends. Edits made later in Garmin Connect (renamed\nexercises, corrected reps or weights) are not in the .FIT file.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,

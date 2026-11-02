@@ -877,10 +877,39 @@ describe("FIT tools", () => {
           primaryMuscles: ["Quads"],
           secondaryMuscles: [],
           sets: [{ reps: 5, kg: 60, seconds: 20 }],
+          top: { kg: 60, reps: 5 },
+          e1rmKg: 70,
         },
       ],
     });
     expect(readFileSync(join(dataDir, "exercises.json"), "utf8")).toContain("BARBELL_BACK_SQUAT");
+  });
+
+  it("gives an exercise without weight no top set, and a heavy set of 15 reps a top set with e1rmKg null", async () => {
+    api.getBytes.mockResolvedValue(
+      fitFile(
+        [Profile.MesgNum.SET, { setType: 1, repetitions: 8, duration: 30, category: [21] }],
+        [Profile.MesgNum.SET, { setType: 1, repetitions: 15, weight: 50, category: [0] }],
+        [Profile.MesgNum.SET, { setType: 1, repetitions: 20, weight: 60, category: [0] }],
+        [Profile.MesgNum.SET, { setType: 1, repetitions: 0, weight: 20, category: [17] }],
+      ),
+    );
+    api.getExerciseCatalogue.mockRejectedValue(new GarminApiError("offline"));
+    expect(JSON.parse(await tools.getActivitySets(83)).exercises).toEqual([
+      { exercise: "Pull Up", category: "Pull Up", sets: [{ reps: 8, seconds: 30 }] },
+      {
+        exercise: "Bench Press",
+        category: "Bench Press",
+        sets: [
+          { reps: 15, kg: 50 },
+          { reps: 20, kg: 60 },
+        ],
+        top: { kg: 60, reps: 20 },
+        e1rmKg: null,
+      },
+      // an exercise of only sets not done keeps its sets, without a top set
+      { exercise: "Lunge", category: "Lunge", sets: [{ reps: 0, kg: 20 }] },
+    ]);
   });
 });
 

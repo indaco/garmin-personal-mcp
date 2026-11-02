@@ -66,6 +66,24 @@ export function completed(s: StrengthSet): boolean {
   return typeof s.reps === "number" ? s.reps > 0 : (s.seconds ?? 0) > 0;
 }
 
+const heaviest = (sets: StrengthSet[]) =>
+  sets.toSorted((x, y) => y.kg! - x.kg! || y.reps! - x.reps!)[0];
+
+/** The heaviest done set of 1 to 12 reps, then the most reps; without one, the heaviest done set. */
+export function topSet(sets: StrengthSet[]): { kg: number; reps: number } | undefined {
+  const weighted = sets.filter((s) => (s.kg ?? 0) > 0 && (s.reps ?? 0) > 0);
+  const top = heaviest(weighted.filter((s) => s.reps! <= 12)) ?? heaviest(weighted);
+  return top && { kg: top.kg!, reps: top.reps! };
+}
+
+/** The best Epley e1RM of the done sets of 1 to 12 reps with weight. */
+export function bestE1rm(sets: StrengthSet[]): number | undefined {
+  const e1rms = sets
+    .map((s) => epley(s.kg ?? 0, s.reps ?? 0))
+    .filter((v): v is number => v !== undefined);
+  return e1rms.length > 0 ? Math.max(...e1rms) : undefined;
+}
+
 export const exercisesOf = (a: Activity) =>
   Array.isArray(a.exercises) ? (a.exercises as Exercise[]) : [];
 
@@ -205,19 +223,17 @@ export function exerciseStats(acts: Activity[]): ExerciseStats[] {
       // an exercise of the plan that was skipped (only sets of 0 reps) is no session of it
       if (done.length === 0) continue;
       const weighted = done.filter((s) => (s.kg ?? 0) > 0 && (s.reps ?? 0) > 0);
-      const top = weighted.toSorted((x, y) => y.kg! - x.kg! || y.reps! - x.reps!)[0];
-      const e1rms = weighted
-        .map((s) => epley(s.kg!, s.reps!))
-        .filter((v): v is number => v !== undefined);
+      const top = topSet(done);
+      const e1rm = bestE1rm(done);
       const entry = byName.get(e.exercise) ?? { e, sessions: [] };
       entry.sessions.push({
         date,
         workout: a.name ?? "",
         activity: a,
         sets: e.sets,
-        ...(top ? { top: { kg: top.kg!, reps: top.reps! } } : {}),
+        ...(top ? { top } : {}),
         volume: weighted.reduce((s, x) => s + x.kg! * x.reps!, 0),
-        ...(e1rms.length > 0 ? { e1rm: Math.max(...e1rms) } : {}),
+        ...(e1rm === undefined ? {} : { e1rm }),
         maxReps: Math.max(0, ...done.map((s) => s.reps ?? 0)),
         reps: done.reduce((s, x) => s + (x.reps ?? 0), 0),
         longest: Math.max(0, ...done.filter(timed).map((s) => s.seconds ?? 0)),

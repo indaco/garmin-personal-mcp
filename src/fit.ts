@@ -2,6 +2,7 @@ import { Decoder, Profile, Stream } from "@garmin/fitsdk";
 import { unzipSync } from "fflate";
 import { GarminApiError } from "./api-client";
 import { splitOf, workOf } from "./page/running";
+import { bestE1rm, topSet } from "./page/strength";
 
 /** The fields of a FIT set message the tools read; enums are raw values (decoded without strings). */
 export interface FitSet {
@@ -218,7 +219,13 @@ export function setsOf(fit: Messages, activityId: number, catalogue: Catalogue |
       stepNames.set(`${t.exerciseCategory}/${t.exerciseName}`, step);
     }
   }
-  return { activityId, exercises: groupSets(fit.setMesgs ?? [], stepNames, catalogue) };
+  const exercises = groupSets(fit.setMesgs ?? [], stepNames, catalogue).map((e) => {
+    const top = topSet(e.sets);
+    if (!top) return e;
+    const best = bestE1rm(e.sets);
+    return { ...e, top, e1rmKg: best === undefined ? null : round(best, 1) };
+  });
+  return { activityId, exercises };
 }
 
 /**

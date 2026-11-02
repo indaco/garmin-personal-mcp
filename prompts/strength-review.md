@@ -12,9 +12,8 @@ server. Today is {{today}}.
    with `fromDate` and `toDate` = that day. When that night has not come yet, skip both calls and show
    the recovery as "n/a".
 
-A set with 0 reps was not done: leave it and its `restSec` out of every count and median. The
-estimated 1RM (e1RM) of a set is kg × (1 + reps / 30), for sets of 1 to 12 reps with weight only;
-say that it is an estimate.
+A set with 0 reps was not done: leave it and its `restSec` out of every count and median. The e1RM
+is an estimate: say so.
 
 Then answer in chat, in this order, short:
 
@@ -35,12 +34,12 @@ Then answer in chat, in this order, short:
   in the plan". When the done sets have no reps (timed sets), judge the sets only and show the reps
   as "n/a". The warm-up and cool-down stay out of Sets and Rest. Without a planned workout, say so in
   one line.
-- **Sets**: for each exercise, the top set and its e1RM. The top set is the heaviest set of 1 to 12
-  reps, then the most reps; when no set has 1 to 12 reps, it is the heaviest set. Give the same for
-  the previous session when it has that exercise, with the change in %. When the top set has more
-  than 12 reps, its e1RM is "n/a" and the change in % is of its weight. When the previous session
-  has the exercise in another form (timed sets against sets with reps, or sets without weight
-  against sets with weight), show its comparison as "n/a". For an exercise without weight, the most
+- **Sets**: for each exercise, the top set (`top`) and the e1RM (`e1rmKg`: the best estimate of its
+  sets of 1 to 12 reps) of `getActivitySets`. Give the same for the previous session when it has
+  that exercise, with the change in %. When `e1rmKg` is null, show "n/a" and give the change in % of
+  the top set's weight. When the previous session has the exercise in another form (timed sets
+  against sets with reps, or sets without weight against sets with weight), show its comparison as
+  "n/a". For an exercise without weight, the most
   reps in a set; for a timed one, the longest set in seconds, without a change: its time follows the
   lap button or the plan, not strength. The rep drop: the reps of the last set against the first set
   at the same weight, when the exercise has 2 or more of them. A rest-pause or cluster group is a
@@ -59,6 +58,6 @@ Then answer in chat, in this order, short:
 - **Coach note**: 2 or 3 sentences: what went well and what to change next time (a load to raise, a
   rest to cut or stretch). Base each sentence on a number above.
 
-Every number comes from a tool result. **Never invent or estimate a missing value**, apart from the
-e1RM that this prompt defines: a missing value or a failed call shows as "n/a". If a call fails, say
-which one and why in one line. Do not create or change a dashboard.
+Every number comes from a tool result. **Never invent or estimate a missing value**: a missing value
+or a failed call shows as "n/a". If a call fails, say which one and why in one line. Do not create
+or change a dashboard.

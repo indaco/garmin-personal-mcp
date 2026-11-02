@@ -167,7 +167,7 @@ Ask "list my last 5 activities". The first time that a garmin-personal tool asks
 | `listActivities`           | each activity with pace, HR, load and effect, by date, type or name                                                        |
 | `getActivity`              | the details of one activity                                                                                                |
 | `getActivityLaps`          | the laps of an activity, from its .FIT file; for a run also the half split, the HR drift and the fade of each workout step |
-| `getActivitySets`          | the strength sets of an activity, with the muscles, from its .FIT file                                                     |
+| `getActivitySets`          | the strength sets of an activity, with the muscles, the top set and the e1RM, from its .FIT file                           |
 | `getActivityWorkouts`      | the planned workout of an activity: steps, targets and notes                                                               |
 | `downloadActivityFit`      | saves the .FIT file of an activity in the data folder                                                                      |
 | `getHrvRange`              | HRV during the night                                                                                                       |

@@ -3,7 +3,7 @@ import { hms, round } from "./fit";
 import { type Activity, dayOf, groupOf, mondayOf, sessionSeconds, seconds } from "./page/calc";
 import { fitnessFatigueFrom, loadOf, loadRatio, readinessOf, zonesOf } from "./page/metrics";
 import { racePredictionsOf, type SplitKind, splitOf, workoutOf } from "./page/running";
-import { completed, type StrengthSet } from "./page/strength";
+import { completed, type StrengthSet, topSet as pageTopSet } from "./page/strength";
 
 type Json = Record<string, unknown>;
 
@@ -308,12 +308,10 @@ function repeatedRuns(acts: Json[]): Record<string, number> {
   return Object.fromEntries([...count].filter(([, n]) => n > 1).toSorted((x, y) => y[1] - x[1]));
 }
 
-/** The heaviest completed set, as "70 kg x 6"; undefined for sets without weight. */
+/** The page's top set, as "70 kg x 6"; undefined for sets without weight. */
 function topSet(sets: Json[]): string | undefined {
-  const top = sets
-    .filter((s) => num(s.reps) > 0 && num(s.kg) > 0)
-    .toSorted((a, b) => num(b.kg) - num(a.kg) || num(b.reps) - num(a.reps))[0];
-  return top ? `${num(top.kg)} kg x ${num(top.reps)}` : undefined;
+  const top = pageTopSet(sets as StrengthSet[]);
+  return top ? `${top.kg} kg x ${top.reps}` : undefined;
 }
 
 /** The fastest effort of each distance, with its activity. */

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bestE1rm,
   completed,
   exerciseStats,
   median,
@@ -9,7 +10,9 @@ import {
   pushPull,
   setsByCategory,
   slug,
+  topSet,
 } from "../../src/page/strength";
+import { epley } from "../../src/page/metrics";
 import { addDays } from "../../src/dates";
 
 const squat = (sets: Record<string, number>[]) => ({
@@ -244,6 +247,20 @@ describe("exercise stats", () => {
     // the top set and the 1RM from the first to the last session
     expect(s.change).toBeCloseTo(((84 - 55 * (1 + 8 / 30)) / (55 * (1 + 8 / 30))) * 100, 6);
     expect(s.medianRest).toBe(90);
+    // a heavier set of 13 reps is not the top set: the 12 reps set is
+    const heavy = exerciseStats([
+      {
+        start: "2026-10-29 18:00:00",
+        exercises: [
+          squat([
+            { reps: 13, kg: 90 },
+            { reps: 12, kg: 80 },
+          ]),
+        ],
+      },
+    ])[0];
+    expect(heavy.sessions[0].top).toEqual({ kg: 80, reps: 12 });
+    expect(heavy.sessions[0].e1rm).toBe(epley(80, 12));
   });
 
   it("uses reps for exercises without weight, and seconds for timed ones", () => {
@@ -331,5 +348,60 @@ describe("exercise stats", () => {
 
   it("uses the name itself when it has no letter or digit", () => {
     expect(slug("💪")).toBe("💪");
+  });
+});
+
+describe("top set and e1RM", () => {
+  it("takes the heaviest set of 1 to 12 reps before a heavier set of more reps", () => {
+    const sets = [
+      { reps: 12, kg: 80 },
+      { reps: 13, kg: 90 },
+    ];
+    expect(topSet(sets)).toEqual({ kg: 80, reps: 12 });
+    expect(bestE1rm(sets)).toBe(epley(80, 12));
+  });
+
+  it("takes the most reps at the same weight", () => {
+    expect(
+      topSet([
+        { reps: 5, kg: 80 },
+        { reps: 8, kg: 80 },
+      ]),
+    ).toEqual({ kg: 80, reps: 8 });
+  });
+
+  it("takes the heaviest set when no set has 1 to 12 reps", () => {
+    const sets = [
+      { reps: 15, kg: 40 },
+      { reps: 20, kg: 50 },
+    ];
+    expect(topSet(sets)).toEqual({ kg: 50, reps: 20 });
+    expect(bestE1rm(sets)).toBeUndefined();
+  });
+
+  it("has no top set without a weighted done set", () => {
+    const noTop = [
+      [{ reps: 10 }],
+      [{ seconds: 60, reps: 1 }],
+      // a timed set with weight and no reps
+      [{ seconds: 30, kg: 20 }],
+      [{ reps: 0, kg: 100 }],
+      [],
+    ];
+    for (const sets of noTop) {
+      expect(topSet(sets)).toBeUndefined();
+      expect(bestE1rm(sets)).toBeUndefined();
+    }
+  });
+
+  it("gives the best e1RM of all sets of 1 to 12 reps, not the e1RM of the top set", () => {
+    const sets = [
+      { reps: 1, kg: 100 },
+      { reps: 10, kg: 90 },
+      { reps: 15, kg: 95 },
+    ];
+    expect(topSet(sets)).toEqual({ kg: 100, reps: 1 });
+    expect(bestE1rm(sets)).toBe(120);
+    expect(epley(90, 10)).toBe(120);
   });
 });

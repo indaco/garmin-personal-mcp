@@ -401,6 +401,23 @@ describe("digest", () => {
       },
       Plank: { sessions: 1 },
     });
+    // a heavier set of 13 reps is not the top set: the heaviest set of 1 to 12 reps is
+    const out = digest({
+      ...data,
+      activities: [
+        strength("2026-10-20", [
+          squat([
+            { reps: 13, kg: 90 },
+            { reps: 12, kg: 80 },
+            { reps: 10, kg: 80 },
+          ]),
+        ]),
+      ],
+    });
+    expect(out.strengthExercises["Back Squat"].last).toEqual({
+      date: "2026-10-20",
+      top: "80 kg x 12",
+    });
   });
 
   it("keeps the last 14 nights of HRV and copies recovery, fitness age and sync", () => {

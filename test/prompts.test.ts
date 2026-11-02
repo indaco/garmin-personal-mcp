@@ -435,9 +435,17 @@ describe("coach prompts", () => {
     expect(text).toContain(
       "A set with 0 reps was not done: leave it and its `restSec` out of every count and median.",
     );
+    // the tool gives the top set and the e1RM: the prompt quotes them and computes neither
     expect(text).toContain(
-      'When the top set has more than 12 reps, its e1RM is "n/a" and the change in % is of its weight.',
+      "the top set (`top`) and the e1RM (`e1rmKg`: the best estimate of its sets of 1 to 12 reps) of `getActivitySets`.",
     );
+    expect(text).toContain(
+      'When `e1rmKg` is null, show "n/a" and give the change in % of the top set\'s weight.',
+    );
+    expect(text).toContain("The e1RM is an estimate: say so.");
+    expect(text).toContain("**Never invent or estimate a missing value**: a missing value");
+    expect(text).not.toContain("kg × (1 + reps / 30)");
+    expect(text).not.toContain("The top set is the heaviest set");
     expect(text).toContain(
       'When the previous session has the exercise in another form (timed sets against sets with reps, or sets without weight against sets with weight), show its comparison as "n/a".',
     );
@@ -474,8 +482,6 @@ describe("coach prompts", () => {
     expect(text).toContain("the previous session when it has that exercise");
     // a step can plan a range of reps as its target, without a duration
     expect(text).toContain("REPS plans `targetValueLow` to `targetValue` reps");
-    // a set over 12 reps has no e1RM: it is the top set only when no set has 1 to 12 reps
-    expect(text).toContain("the heaviest set of 1 to 12 reps, then the most reps;");
     // a rep target can have no upper value: Garmin sends 0
     expect(text).toContain("when `targetValue` is 0 or under it, at least `targetValueLow` reps");
     // a short rest inside the block is the condition: straight sets with a long rest after them are no group
