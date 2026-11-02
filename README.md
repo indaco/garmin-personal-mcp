@@ -99,7 +99,9 @@ nano ~/.config/garmin-mcp/api-key      # paste the key and save
 chmod 600 ~/.config/garmin-mcp/api-key
 ```
 
-You can also give the key in the environment variable `GARMIN_PERSONAL_API_KEY`.
+You can also give the key in the environment variable `GARMIN_PERSONAL_API_KEY`. The
+[automatic dashboard refresh](guide/dashboard.md#update-the-dashboard-on-a-schedule)
+reads only the key file.
 
 ### 2. Connect your client
 
@@ -145,7 +147,8 @@ startup_timeout_sec = 60
 ```
 
 Codex does not send your shell environment to the server. Use the key file, or add
-`env = { GARMIN_PERSONAL_API_KEY = "..." }` to the table.
+`env = { GARMIN_PERSONAL_API_KEY = "..." }` to the table. The automatic dashboard refresh
+needs the key file.
 
 **Other clients** (Gemini CLI, VS Code, Cursor and others): in the MCP configuration of the client,
 set the command `npx` and the arguments `-y @indaco/garmin-personal-mcp@latest`. Some clients do not
@@ -197,7 +200,7 @@ reach the assistant as the command name only, without the prompt.
 | [training-dashboard-update](#training-dashboard-update) | adds the new data, your layout stays                                                      | `/mcp__garmin-personal__training-dashboard-update`        |
 | [dashboard-setup](#dashboard-setup)                     | makes a page for you or for your coach, with only the sports and the data that you select | `/mcp__garmin-personal__dashboard-setup`                  |
 | [dashboard-widget](#dashboard-widget)                   | makes a new widget from your idea                                                         | `/mcp__garmin-personal__dashboard-widget my longest ride` |
-| [dashboard-language](#dashboard-language)               | adds a language to the page                                                               | `/mcp__garmin-personal__dashboard-language German`        |
+| [dashboard-language](#dashboard-language)               | adds a language to the page                                                               | `/mcp__garmin-personal__dashboard-language Dutch`         |
 
 The prompts remove all spaces around an argument, also the no-break space from a phone keyboard.
 
@@ -282,8 +285,8 @@ the widget.
 This prompt adds a language to the dashboard. The assistant translates the texts of the page, and
 `editDashboard` stores them in the page. The argument `language` is optional: the default is the
 language of the conversation. The argument `path` is optional: it is the file of the page, for
-example `coach.html`. In Claude Code: `/mcp__garmin-personal__dashboard-language German coach.html`. A
-text without a translation shows in English. To remove an added language, ask your assistant to
+example `coach.html`. In Claude Code: `/mcp__garmin-personal__dashboard-language Dutch coach.html`.
+A text without a translation shows in English. To remove an added language, ask your assistant to
 remove it: `editDashboard` with `removeLanguages`.
 [Languages](guide/languages.md) tells more.
 
@@ -385,12 +388,12 @@ planned rest, and ends with the sleep and HRV of the night after the session, an
 
 All the settings are environment variables, and all of them are optional.
 
-| Variable                  | Default                                  | Meaning                                                  |
-| ------------------------- | ---------------------------------------- | -------------------------------------------------------- |
-| `GARMIN_PERSONAL_API_KEY` | not set                                  | the personal API key. It has priority over the key file. |
-| `GARMIN_API_KEY_FILE`     | `~/.config/garmin-mcp/api-key`           | the file with the API key                                |
-| `GARMIN_DATA_DIR`         | `~/workspace/garmin-data`                | the data folder                                          |
-| `GARMIN_BASE_URL`         | `https://personal.connectapi.garmin.com` | the Personal API host                                    |
+| Variable                  | Default                                  | Meaning                                                                                            |
+| ------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `GARMIN_PERSONAL_API_KEY` | not set                                  | the personal API key. It has priority over the key file. The automatic refresh needs the key file. |
+| `GARMIN_API_KEY_FILE`     | `~/.config/garmin-mcp/api-key`           | the file with the API key                                                                          |
+| `GARMIN_DATA_DIR`         | `~/workspace/garmin-data`                | the data folder                                                                                    |
+| `GARMIN_BASE_URL`         | `https://personal.connectapi.garmin.com` | the Personal API host                                                                              |
 
 To set a variable in Claude Desktop, add an `env` object next to `args`:
 

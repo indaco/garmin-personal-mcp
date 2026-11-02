@@ -176,6 +176,9 @@ export function registerPrompts(server: McpServer): void {
         languageDescription,
         render(languagePrompt, {
           language: language || "my language (the language of this chat)",
+          builtIn: Object.keys(BUILT_IN)
+            .map((code) => `${languageName(code)} (${code})`)
+            .join(", "),
           pathArgument: pathPart(path),
           pathWith: pathWith(path),
         }),

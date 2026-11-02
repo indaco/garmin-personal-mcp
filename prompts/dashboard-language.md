@@ -1,5 +1,9 @@
 Add {{language}} to my Garmin training dashboard. Use the tools of the `garmin-personal` MCP server.
 
+These languages are built in: {{builtIn}}. If {{language}} is one of them, do not translate and do
+not call `editDashboard`. Tell me that the page has it built in and that the page settings choose
+the built-in languages. Offer to add it there, and stop.
+
 1. Call `editDashboard` with `englishTexts: true`{{pathArgument}}. If there is no dashboard,
    call `writeDashboard`{{pathWith}} first.
 2. Translate every English text into {{language}}:

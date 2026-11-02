@@ -341,6 +341,22 @@ describe("widget and language prompts", () => {
     expect(plain).not.toContain("`path`");
     expect(plain).toContain("call `writeDashboard` first");
   });
+
+  it("tells the assistant not to translate a built-in language", async () => {
+    // by name, by code, not built in, and the language of the chat
+    const cases: Record<string, string>[] = [
+      { language: "German" },
+      { language: "de" },
+      { language: "Dutch" },
+      {},
+    ];
+    for (const args of cases) {
+      const text = await render("dashboard-language", args);
+      expect(text).toContain("built in: Italian (it), German (de),");
+      expect(text).toContain("is one of them, do not translate");
+      expect(text.includes("{{")).toBe(false);
+    }
+  });
 });
 
 describe("workout comparison", () => {

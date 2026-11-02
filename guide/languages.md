@@ -13,8 +13,10 @@ the language. The settings menu of the page also says that the language is not i
 
 ## Add a language through your assistant
 
-Run the `dashboard-language` prompt. Give the language, for example "German". Without a language,
-The assistant uses the language of the conversation. The assistant:
+Run the `dashboard-language` prompt. Give the language, for example "Dutch". Without a language,
+the assistant uses the language of the conversation. For a built-in language, the assistant does
+not translate: the [page settings](dashboard.md#page-settings) choose it. For other languages, the
+assistant:
 
 1. gets the English texts from the `editDashboard` tool.
 2. translates them. Each `{placeholder}` stays as it is.
@@ -22,13 +24,13 @@ The assistant uses the language of the conversation. The assistant:
 4. translates your custom widgets too. Their texts stay in your widget library, so each page gets
    them.
 
-Reload the page. The **Language** menu shows the language by its own name, for example _Deutsch_.
-A text without a translation shows in English.
+Reload the page. The **Language** menu shows the language by its own name, for example
+_Nederlands_. A text without a translation shows in English.
 
 The server accepts only the keys of the English texts, with the same placeholders. After a server
 update with new texts, the update prompt tells the assistant which texts are missing.
 
-To remove a language that you added, ask your assistant. For example: "Remove the German language
+To remove a language that you added, ask your assistant. For example: "Remove the Dutch language
 from the page". The assistant calls `editDashboard` with `removeLanguages`. Built-in languages stay:
 the [page settings](dashboard.md#page-settings) choose them. When the settings add a built-in
 language, the assistant translates your custom widgets into it.
