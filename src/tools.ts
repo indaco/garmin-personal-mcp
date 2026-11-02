@@ -5,7 +5,7 @@ import { Profile } from "@garmin/fitsdk";
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { type GarminApiClient, GarminApiError } from "./api-client";
-import { type Catalogue, decodeFit, hms, lapsOf, round, setsOf, unzipFit } from "./fit";
+import { type Catalogue, decodeFit, hms, lapsOf, paceText, round, setsOf, unzipFit } from "./fit";
 import { addDays } from "./dates";
 import { log } from "./log";
 
@@ -377,7 +377,7 @@ export function summarize(a: Json): Json {
   putRounded(a, o, "avgVerticalRatio", "vertRatioPct", 1);
   const gap = asDouble(a.avgGradeAdjustedSpeed, 0);
   if (gap > 0) {
-    o.gap = `${hms(1000 / gap)}/km`;
+    o.gap = paceText(1000 / gap);
   }
 
   const best: Json = {};
@@ -404,7 +404,7 @@ export function summarize(a: Json): Json {
     const speed = asDouble(field(split, "averageSpeed"), 0);
     if (type === "RWD_RUN" && speed > 0) {
       const runWalk = (o.runWalk ??= {}) as Json;
-      runWalk.runPace = `${hms(1000 / speed)}/km`;
+      runWalk.runPace = paceText(1000 / speed);
       runWalk.runKm = round(asDouble(field(split, "distance"), 0) / 1000, 2);
     } else if (type === "RWD_WALK") {
       ((o.runWalk ??= {}) as Json).walkTime = hms(asDouble(field(split, "duration"), 0));
