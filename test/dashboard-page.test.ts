@@ -69,6 +69,8 @@ const page = () => readFileSync(file, "utf8");
 /** A page with only a data block, holding this JSON text. */
 const dataPage = (json: string) =>
   `<script>/* garmin-data:start */${json}/* garmin-data:end */</script>`;
+/** The ids of a widgets block. */
+const widgetIds = (widgets: unknown) => (widgets as { id: string }[]).map((w) => w.id);
 /** The page without its data block: what an update must keep. */
 const code = (s: string) =>
   s.replace(/\/\* garmin-data:start \*\/[\s\S]*?\/\* garmin-data:end \*\//, "");
@@ -323,6 +325,72 @@ describe("writeDashboard", () => {
     expect(r).toMatchObject({ page: "replaced", backup: `${file}.bak` });
     expect(readFileSync(`${file}.bak`, "utf8")).toBe(old);
     expect(readBlock(page(), "layout")).toMatchObject({ base: "blank", boards: {} });
+    // the template has no language block, so the new page has none either
+    expect(page()).not.toContain("garmin-i18n");
+  });
+
+  it("keeps the page of an update in .bak when a new layout follows it", async () => {
+    await writer.write({});
+    expect((await writer.write({})).page).toBe("updated");
+    const updated = page();
+    expect(await writer.write({ layout: "blank" })).toMatchObject({ backup: `${file}.bak` });
+    expect(readFileSync(`${file}.bak`, "utf8")).toBe(updated);
+  });
+
+  it("keeps the .bak of another page and of another writer", async () => {
+    await writer.write({});
+    // a replace that makes a .bak starts a build of this writer on this file
+    expect(await writer.write({ layout: "preset" })).toMatchObject({ backup: `${file}.bak` });
+    // another file with the same text: a replace of it keeps it in its own .bak
+    const other = join(dir, "other.html");
+    const copy = page();
+    writeFileSync(other, copy);
+    const r = await writer.write({ path: "other.html", layout: "blank" });
+    expect(r).toMatchObject({ backup: `${other}.bak` });
+    expect(readFileSync(`${other}.bak`, "utf8")).toBe(copy);
+    // a writer that did not write the page (a new server process) keeps it in .bak
+    await writer.write({ layout: "blank" });
+    const before = page();
+    const fresh = new DashboardWriter(
+      async () => JSON.stringify(data),
+      dir,
+      async () => templateText,
+    );
+    expect(await fresh.write({ layout: "preset" })).toMatchObject({ backup: `${file}.bak` });
+    expect(readFileSync(`${file}.bak`, "utf8")).toBe(before);
+  });
+
+  it("keeps the custom widgets of the page that the widget library does not have", async () => {
+    templateText = template(1);
+    await writer.write({});
+    writeFileSync(
+      file,
+      page().replace(
+        /(garmin-widgets:start \*\/).*?(\/\*)/,
+        '$1[{"id":"mine","title":"Mine","code":"x"}]$2',
+      ),
+    );
+    writeFileSync(
+      join(dir, "widgets.json"),
+      JSON.stringify([{ id: "lib", title: "Lib", code: "y" }]),
+    );
+    expect(widgetIds((await writer.view({})).blocks.widgets)).toEqual(["mine", "lib"]);
+    templateText = template(2);
+    expect((await writer.write({})).page).toBe("upgraded");
+    expect(widgetIds(readBlock(page(), "widgets"))).toEqual(["mine", "lib"]);
+  });
+
+  it("views and upgrades a page from the template that lost its layout and widgets blocks", async () => {
+    templateText = template(1);
+    await writer.write({});
+    writeFileSync(file, page().replace(/const (LAYOUT|WIDGETS) = .*\n/g, ""));
+    const { blocks } = await writer.view({});
+    expect(blocks.layout).toBeNull();
+    expect(blocks.widgets).toEqual([]);
+    templateText = template(2);
+    expect((await writer.write({})).page).toBe("upgraded");
+    expect(readBlock(page(), "layout")).toBeNull();
+    expect(readBlock(page(), "widgets")).toEqual([]);
   });
 
   it("upgrades a page from an older template and keeps its layout and widgets", async () => {
@@ -556,12 +624,16 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
     await writer.write({ settings: { exclude: ["zones"] } });
     expect(readBlock(page(), "settings")).toEqual({ exclude: ["zones"] });
     expect((await writer.write({})).page).toBe("updated");
+    const beforeLayout = page();
     await writer.write({ layout: "blank" });
     expect(readBlock(page(), "settings")).toEqual({ exclude: ["zones"] });
     expect(readBlock(page(), "data")).not.toHaveProperty("zones");
 
+    // the same build: the .bak keeps the page from before the new layout
     const r = await writer.write({ settings: { title: "Mine" } });
-    expect(r).toMatchObject({ page: "replaced", backup: `${file}.bak` });
+    expect(r.page).toBe("replaced");
+    expect(r).not.toHaveProperty("backup");
+    expect(readFileSync(`${file}.bak`, "utf8")).toBe(beforeLayout);
     expect(readBlock(page(), "settings")).toEqual({ title: "Mine" });
     expect((readBlock(page(), "data") as Full).zones).toEqual(full.zones);
     // empty settings give the page of the template again
@@ -715,6 +787,37 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
     // a page without a title or headline: no settings at all
     await writer.write({ layout: "preset", settings: {} });
     expect((await writer.preview({})).settings).toEqual({});
+  });
+
+  it("keeps the page from before a rebuild in .bak when the same build writes again", async () => {
+    const start = new Date(2026, 9, 28, 12).getTime();
+    vi.useFakeTimers({ now: start, toFake: ["Date"] });
+    try {
+      await writer.write({});
+      writeFileSync(file, page().replace("</script>", "// my page\n</script>"));
+      const mine = page();
+      await writer.write({ layout: "preset" });
+      // an update in the same build keeps the build going
+      expect(await writer.write({ notes: ["n"] })).toMatchObject({ page: "updated" });
+      // the notes call of the same build, 1 ms before the 15 minutes end
+      vi.setSystemTime(start + 15 * 60_000 - 1);
+      const r = await writer.write({ settings: { title: "Mine" } });
+      expect(r.page).toBe("replaced");
+      expect(r).not.toHaveProperty("backup");
+      expect(readFileSync(`${file}.bak`, "utf8")).toBe(mine);
+      // 15 minutes after the last write, a replace keeps the page before it again
+      vi.setSystemTime(start + 30 * 60_000 - 1);
+      const before = page();
+      expect(await writer.write({ layout: "blank" })).toMatchObject({ backup: `${file}.bak` });
+      expect(readFileSync(`${file}.bak`, "utf8")).toBe(before);
+      // a page that someone else changed is not the page of the build: it goes into .bak
+      writeFileSync(file, page().replace("</script>", "// edited\n</script>"));
+      const edited = page();
+      expect(await writer.write({ layout: "preset" })).toMatchObject({ backup: `${file}.bak` });
+      expect(readFileSync(`${file}.bak`, "utf8")).toBe(edited);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("names the file and the way out when the settings block of the page cannot be read", async () => {

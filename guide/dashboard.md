@@ -44,8 +44,10 @@ With `preset` and `blank`, the assistant does not write the page. The server wri
 its template, and the assistant writes only the coach notes. The page is the same in every client.
 
 The server writes `garmin-dashboard.html` in the data folder. The assistant gives you the path and
-the command to open the file. An existing page stays as `garmin-dashboard.html.bak`. To write the
-page in a different place, ask your assistant for a path. A relative path is in the data folder.
+the command to open the file. An existing page stays as `garmin-dashboard.html.bak`. A new page
+keeps the languages that you added. The `.bak` keeps the page from before the build, also when the
+assistant then writes the coach notes or your title. To write the page in a different place, ask
+your assistant for a path. A relative path is in the data folder.
 
 The page works offline. It has Chart.js inside, and its own code sends no requests. Its footer tells the date and
 time when the server wrote the data, in the time zone of the browser. When Garmin did not give some days, the footer also gives their number: their

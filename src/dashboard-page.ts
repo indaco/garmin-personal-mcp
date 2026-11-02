@@ -196,6 +196,22 @@ function weeksOf(page: string | undefined): number | undefined {
 /** The template version of a page; 0 for a page that Claude wrote. */
 export const templateVersion = (page: string) => Number(TEMPLATE_VERSION.exec(page)?.[1] ?? 0);
 
+/** The template with the user's state of `old`, a page from the template: layout, custom widgets and added languages. */
+function carryUserBlocks(template: string, old: string): string {
+  let page = writeBlock(template, "layout", readBlock(old, "layout") ?? null);
+  page = writeBlock(page, "widgets", readBlock(old, "widgets") ?? []);
+  return writeBlock(page, "i18n", readBlock(old, "i18n") ?? {});
+}
+
+/** The `i18n` block of `old`; {} when it cannot be read: a new layout is the way out of a broken page. */
+function addedLanguages(old: string): unknown {
+  try {
+    return readBlock(old, "i18n") ?? {};
+  } catch {
+    return {};
+  }
+}
+
 const escapeHtml = (s: string) =>
   s.replace(
     /[&<>"']/g,
@@ -381,6 +397,8 @@ export class DashboardWriter {
   #queue: Promise<unknown> = Promise.resolve();
   /** The data of the last call: a second call soon after (to add the notes) uses the same snapshot. */
   #last: { weeks: number; workouts: boolean; at: number; json: string } | undefined;
+  /** The last page of a build (a write that made or kept the .bak): a replace of it within REUSE_MS keeps the .bak. */
+  #wrote: { target: string; page: string; at: number } | undefined;
 
   constructor(
     private readonly getData: (weeks?: number, workouts?: boolean) => Promise<string>,
@@ -437,9 +455,7 @@ export class DashboardWriter {
       // the user's state moves into the template as on an upgrade; a page that Claude wrote has none
       let page = await this.template();
       if (old !== undefined && templateVersion(old) > 0) {
-        page = writeBlock(page, "layout", readBlock(old, "layout") ?? null);
-        page = writeBlock(page, "widgets", readBlock(old, "widgets") ?? []);
-        page = writeBlock(page, "i18n", readBlock(old, "i18n") ?? {});
+        page = carryUserBlocks(page, old);
       } else {
         // a fixed rev: a layout edited in the chat stays for the next view
         page = writeBlock(page, "layout", { rev: "preset", base: "preset", boards: {} });
@@ -516,15 +532,17 @@ export class DashboardWriter {
         base: layout ?? "preset",
         boards: {},
       });
+      // a new layout starts the boards again; the languages that the user added stay
+      if (old !== undefined && templateVersion(old) > 0) {
+        next = writeBlock(next, "i18n", addedLanguages(old));
+      }
       kind = old === undefined ? "created" : "replaced";
     } else if (
       templateVersion(old) > 0 &&
       (templateVersion(old) < templateVersion(template) || !same(own, oldSettings) || broken)
     ) {
       // a newer template or new settings: the user's state lives in the blocks, so it moves over as it is
-      next = writeBlock(template, "layout", readBlock(old, "layout") ?? null);
-      next = writeBlock(next, "widgets", readBlock(old, "widgets") ?? []);
-      next = writeBlock(next, "i18n", readBlock(old, "i18n") ?? {});
+      next = carryUserBlocks(template, old);
       kind = templateVersion(old) < templateVersion(template) ? "upgraded" : "replaced";
     } else {
       next = old;
@@ -545,12 +563,20 @@ export class DashboardWriter {
     const raw = JSON.parse(await this.#data(weeks ?? weeksOf(old), own.workouts === true)) as Json;
     next = withData(next, raw, own, notes, await this.schedule.due(target));
 
+    // the second write of a build (notes, a typed title) must not overwrite the page from before the build
+    const sameBuild =
+      this.#wrote?.target === target &&
+      this.#wrote.page === old &&
+      Date.now() - this.#wrote.at < REUSE_MS;
     let backup: string | undefined;
-    if (old !== undefined && kind !== "updated") {
+    if (old !== undefined && kind !== "updated" && !sameBuild) {
       backup = `${target}.bak`;
       await copyFile(target, backup);
     }
     await writeAtomically(target, next);
+    // the .bak keeps the page from before the build: only a write that made it, or kept it, starts the window
+    this.#wrote =
+      backup !== undefined || sameBuild ? { target, page: next, at: Date.now() } : undefined;
     return {
       path: target,
       page: kind,
@@ -962,9 +988,12 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         "older template gets the new template and keeps its layout and widgets. Every page from the template",
         "also gets the custom widgets of the widget library (<data-dir>/widgets.json), not placed on a board.",
         "`layout` writes a new page",
-        "from the template: `preset` (the default widgets) or `blank` (empty boards). `page` writes your own",
+        "from the template: `preset` (the default widgets) or `blank` (empty boards). It keeps the languages",
+        "added with editDashboard `languages`. `page` writes your own",
         "page code instead; it must contain /* garmin-data:start */null/* garmin-data:end */. A replaced",
-        "page is kept as <file>.bak. `notes`: at most 5 plain-text coach notes; the server escapes them.",
+        "page is kept as <file>.bak. The .bak keeps the page from before the build: a write that follows",
+        "within 15 minutes (the notes, a new title) does not replace it.",
+        "`notes`: at most 5 plain-text coach notes; the server escapes them.",
         "`settings` replace the page's settings (title, headline, sports, data to leave out, languages,",
         "themes); without them the page keeps its own. The page holds only the data, languages and themes",
         "they keep. `pageLanguages` in the result lists the languages of the page's Language menu, and",
