@@ -95,6 +95,28 @@ describe("pace split", () => {
     expect(splitOf([{ time: "5:00" }, lap(1, "5:00"), lap(1, "5:20")])?.first).toBe(300);
   });
 
+  it("takes the distance of a lap from its time and pace, not the rounded km", () => {
+    // the watch rounds the first lap up to 1.01 km: time / pace gives 1 km, as for the second lap
+    const s = splitOf([
+      { km: 1.01, time: "5:00", pace: "5:00/km" },
+      { km: 1, time: "4:50", pace: "4:50/km" },
+    ]);
+    expect(s).toMatchObject({ first: 300, second: 290, kind: "negative" });
+    // a lap with a pace and no km counts; a lap with neither a pace nor km does not
+    const noKm = splitOf([{ time: "10:00", pace: "5:00/km" }, lap(2, "10:00"), { time: "9:00" }]);
+    expect(noKm).toEqual({ first: 300, second: 300, kind: "even" });
+  });
+
+  it("uses the rounded km of a lap without a pace", () => {
+    const s = splitOf([lap(1.01, "5:00"), lap(1, "5:00")]);
+    expect(s?.first).toBe(300 / 1.01);
+    expect(s?.kind).toBe("even");
+    // a lap with km and a pace of 0 also keeps its km
+    expect(splitOf([{ ...lap(1.01, "5:00"), pace: "0:00/km" }, lap(1, "5:00")])?.first).toBe(
+      300 / 1.01,
+    );
+  });
+
   it("has no split without two laps of distance", () => {
     expect(splitOf([lap(1, "5:00")])).toBeUndefined();
     expect(splitOf([])).toBeUndefined();

@@ -46,20 +46,26 @@ export type SplitKind = "negative" | "even" | "positive";
 /**
  * The pace of the first and the second half of the distance, from the laps. "even" is within 1% (about
  * 3 s/km at 5:00/km); a faster second half is a negative split. The warm-up, cool-down, rest and
- * recovery laps of a structured run are left out. With HR on every lap, `drift` is the
+ * recovery laps of a structured run are left out. A lap's distance is its time / pace when it has
+ * a pace, because the lap km is rounded to 10 m. With HR on every lap, `drift` is the
  * drop in % of speed per heartbeat from the first to the second half (cardiac drift, Pa:HR).
  */
 export function splitOf(
-  laps: { km?: unknown; time?: unknown; avgHR?: unknown; intensity?: unknown }[],
+  laps: { km?: unknown; time?: unknown; pace?: unknown; avgHR?: unknown; intensity?: unknown }[],
 ): { first: number; second: number; kind: SplitKind; drift?: number } | undefined {
   const parts = laps
     // the warm-up, the cool-down and the rests of a structured run are not its running
     .filter((l) => !OTHER.has(l.intensity as string))
-    .map((l) => ({
-      km: typeof l.km === "number" ? l.km : 0,
-      sec: seconds(l.time),
-      hr: typeof l.avgHR === "number" && l.avgHR > 0 ? l.avgHR : undefined,
-    }))
+    .map((l) => {
+      const sec = seconds(l.time);
+      // the lap distance is rounded to 10 m: time over the watch's pace is finer
+      const pace = seconds(l.pace);
+      return {
+        km: pace > 0 ? sec / pace : typeof l.km === "number" ? l.km : 0,
+        sec,
+        hr: typeof l.avgHR === "number" && l.avgHR > 0 ? l.avgHR : undefined,
+      };
+    })
     .filter((l) => l.km > 0 && l.sec > 0);
   if (parts.length < 2) return undefined;
   const half = parts.reduce((s, l) => s + l.km, 0) / 2;
