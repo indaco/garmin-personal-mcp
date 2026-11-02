@@ -190,6 +190,10 @@ describe("site header", () => {
     expect(await background(page)).toBe(DARK);
     await page.click("#mode");
     expect([await theme(page), await background(page)]).toEqual(["light", WHITE]);
+    expect(await page.evaluate(() => localStorage.getItem("mode"))).toBe("light");
+    // the next visit gets the saved choice before the page script runs: Chromium can start a reload
+    // before it stores the write of the click, and then the new page reads no choice (flaky in CI)
+    await page.context().addInitScript(() => localStorage.setItem("mode", "light"));
     await page.reload({ waitUntil: "load" });
     expect(await theme(page)).toBe("light");
     // the system turns light: the saved choice now matches it, so the page follows the system again
