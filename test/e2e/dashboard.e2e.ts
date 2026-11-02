@@ -4,6 +4,9 @@ import axe from "axe-core";
 import type { Browser, Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { THEMES } from "../../src/page/theme";
+import { digest } from "../../src/digest";
+import { en as enTexts } from "../../src/page/i18n/en";
+import { fitnessFatigueFrom, zonesOf } from "../../src/page/metrics";
 import { DASHBOARD_VERSION } from "../../src/prompts";
 import { data, launch, open, pageFile } from "./page";
 
@@ -41,6 +44,8 @@ const hash = (page: Page) => page.evaluate(() => location.hash);
 /** A copy of the object without the given fields. */
 const without = (o: object, fields: string[]) =>
   Object.fromEntries(Object.entries(o).filter(([k]) => !fields.includes(k)));
+/** An activity without Garmin's load: the page estimates it from the HR. */
+const noGarminLoad = (a: object) => without(a, ["trainingLoad"]);
 /** The ISO time n hours from now. */
 const hours = (n: number) => new Date(Date.now() + n * 3_600_000).toISOString();
 /** Opens edit mode from the settings menu. */
@@ -137,6 +142,43 @@ const ratios = (page: Page) =>
       .filter((k) => (k.querySelector(".kpi-label")?.textContent ?? "").startsWith("Load ratio"))
       .map((k) => k.querySelector(".kpi-value")?.textContent),
   );
+
+/** The tiles of a widget: label → [value, sub text or null]. */
+const kpiTexts = (page: Page, widget: string) =>
+  page.$$eval(`[data-id=${widget}] .kpi`, (kpis) =>
+    Object.fromEntries(
+      kpis.map((k) => [
+        k.querySelector(".kpi-label")?.textContent,
+        [
+          k.querySelector(".kpi-value")?.textContent,
+          k.querySelector(".kpi-sub")?.textContent ?? null,
+        ],
+      ]),
+    ),
+  );
+
+/** The readiness tiles the page must show for the digest's readiness. */
+function readinessTiles(r: NonNullable<ReturnType<typeof digest>["readiness"]>) {
+  return {
+    "HRV status": [r.hrvStatus ?? "n/a", null],
+    "Sleep score": [r.sleepScore === null ? "n/a" : String(r.sleepScore), null],
+    "Resting HR": [
+      r.rhr === null ? "n/a" : `${r.rhr} bpm`,
+      r.rhrAvg7 === null ? null : `7 days before: ${r.rhrAvg7.toFixed(1)} bpm`,
+    ],
+    "Load ratio 7:28": [r.loadRatio === null ? "n/a" : r.loadRatio.toFixed(2), null],
+  };
+}
+
+/** A number as the page's fmt.num shows it in English: no decimals. */
+const whole = new Intl.NumberFormat("en", { maximumFractionDigits: 0 });
+
+/** The fitness, fatigue and form tiles for the last day of a fitnessFatigueFrom result. */
+const fitnessTiles = (ff: { fitness: number[]; fatigue: number[]; form: number[] }) => ({
+  "Fitness · 42 days": [whole.format(ff.fitness.at(-1)!), null],
+  "Fatigue · 7 days": [whole.format(ff.fatigue.at(-1)!), null],
+  Form: [whole.format(ff.form.at(-1)!), null],
+});
 
 /** The dataset labels of the bar charts in the tiles of `widget`. */
 const barLabels = (page: Page, widget: string) =>
@@ -1103,6 +1145,34 @@ describe("overview widgets", () => {
     expect(await page.$$eval("[data-id=readiness] .kpi", (k) => k.length)).toBe(4);
   });
 
+  it("shows the readiness inputs and verdict that the digest gives on the same data", async () => {
+    const r = digest({ ...data }).readiness!;
+    const { page, errors } = await open(browser, pageFile());
+    expect(await page.textContent(".verdict")).toBe(enTexts[`ready.${r.verdict!}`]);
+    // every input has a value on the fixture
+    expect(Object.values(r).every((v) => v !== null)).toBe(true);
+    expect(await kpiTexts(page, "readiness")).toEqual(readinessTiles(r));
+    expect(errors).toEqual([]);
+  });
+
+  it("shows n/a for the readiness inputs that the data does not have", async () => {
+    const noRecovery = { ...data, v: DASHBOARD_VERSION, recovery: [] };
+    let { page } = await open(browser, pageFile({ data: noRecovery }));
+    let r = digest(noRecovery).readiness!;
+    const lost = await kpiTexts(page, "readiness");
+    expect(lost["Sleep score"]).toEqual(["n/a", null]);
+    expect(lost["Resting HR"]).toEqual(["n/a", null]);
+    expect(lost["HRV status"]).toEqual([r.hrvStatus, null]);
+    expect(lost).toEqual(readinessTiles(r));
+    const noHrv = { ...data, v: DASHBOARD_VERSION, hrv: [] };
+    ({ page } = await open(browser, pageFile({ data: noHrv })));
+    r = digest(noHrv).readiness!;
+    const noHrvTiles = await kpiTexts(page, "readiness");
+    expect(noHrvTiles["HRV status"]).toEqual(["n/a", null]);
+    expect(noHrvTiles["Sleep score"]).toEqual([String(r.sleepScore), null]);
+    expect(noHrvTiles).toEqual(readinessTiles(r));
+  });
+
   it("shows the load ratio as n/a when the data does not cover its 28 days", async () => {
     const full = await open(browser, pageFile());
     const values = await ratios(full.page);
@@ -1574,6 +1644,43 @@ describe("type boards", () => {
       }),
     ));
     expect(await page.$$eval("[data-id=fitnessFatigue] .empty", (e) => e.length)).toBe(1);
+  });
+
+  it("shows the fitness, fatigue and form of the window, with the HR estimate and the window end", async () => {
+    const maxHR = zonesOf(data.zones).maxHR;
+    const every = [...data.activities, ...data.previousActivities];
+    // the full window: the digest's values
+    const full = await open(browser, pageFile());
+    const ff = digest({ ...data }).fitnessFatigue!;
+    const shown = await kpiTexts(full.page, "fitnessFatigue");
+    expect(shown).toEqual({
+      "Fitness · 42 days": [whole.format(ff.fitness), null],
+      "Fatigue · 7 days": [whole.format(ff.fatigue), null],
+      Form: [whole.format(ff.form), null],
+    });
+    expect(shown.Form).not.toEqual(shown["Fatigue · 7 days"]);
+    // estimated loads only: the HR estimate needs the max HR of the zones
+    const estimated = {
+      ...data,
+      activities: data.activities.map(noGarminLoad),
+      previousActivities: data.previousActivities.map(noGarminLoad),
+      v: DASHBOARD_VERSION,
+    };
+    const est = await open(browser, pageFile({ data: estimated }));
+    const estFf = fitnessFatigueFrom(
+      [...estimated.activities, ...estimated.previousActivities],
+      data.start,
+      data.end,
+      maxHR,
+    )!;
+    expect(await kpiTexts(est.page, "fitnessFatigue")).toEqual(fitnessTiles(estFf));
+    // an older window ends on the Sunday of its last week, not at the end of the data
+    const old = await open(browser, pageFile(), { hash: "#all@2026-08-03_2026-08-31" });
+    const oldFf = fitnessFatigueFrom(every, "2026-08-03", "2026-09-06", maxHR)!;
+    const oldShown = await kpiTexts(old.page, "fitnessFatigue");
+    expect(oldShown).toEqual(fitnessTiles(oldFf));
+    expect(oldShown["Fitness · 42 days"]).not.toEqual(shown["Fitness · 42 days"]);
+    expect([...full.errors, ...est.errors, ...old.errors]).toEqual([]);
   });
 
   it("says how to compare workouts when no run name repeats", async () => {
