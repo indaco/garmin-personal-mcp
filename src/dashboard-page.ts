@@ -234,10 +234,6 @@ export function needsNewCode(old: PageCode, template: PageCode): boolean {
       return false;
     case "template":
       return old.id === undefined || template.from !== "template" || old.id !== template.id;
-    default: {
-      const unreachable: never = old;
-      return unreachable;
-    }
   }
 }
 
