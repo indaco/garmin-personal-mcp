@@ -565,7 +565,7 @@ export class DashboardWriter {
     const own = asked ?? oldSettings;
 
     // read before withData gives the page the version of this server
-    const previousServer = old === undefined ? undefined : serverOf(old);
+    const previousServer = old === undefined ? "n/a" : serverOf(old);
     const template = await this.#template();
     const templateCode = pageCode(template);
     const oldCode = old === undefined ? undefined : pageCode(old);
@@ -635,9 +635,7 @@ export class DashboardWriter {
       backup !== undefined || sameBuild ? { target, page: next, at: Date.now() } : undefined;
     return {
       path: target,
-      ...(kind === "upgraded"
-        ? { page: kind, previousServer: previousServer ?? "n/a", server: version }
-        : { page: kind }),
+      ...(kind === "upgraded" ? { page: kind, previousServer, server: version } : { page: kind }),
       ...(backup ? { backup } : {}),
       notes: own.exclude?.includes("notes") ? 0 : notes.length,
       digest: digest(filterData(raw, own)),
