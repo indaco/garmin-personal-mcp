@@ -138,6 +138,28 @@ describe("prompts", () => {
     expect(text).not.toContain("older template");
   });
 
+  it("tells the update prompt to name both server versions after a refresh, in step 1", async () => {
+    const argSets: Record<string, string>[] = [
+      {},
+      { weeks: "8" },
+      { path: "coach.html" },
+      { weeks: "8", path: "coach.html" },
+    ];
+    for (const args of argSets) {
+      const text = (await render("training-dashboard-update", args)).replace(/\s+/g, " ");
+      const rule = text.indexOf('`page: "upgraded"`');
+      expect(rule).toBeGreaterThan(text.indexOf("1. Call `writeDashboard`"));
+      expect(rule).toBeLessThan(text.indexOf("2. Write at most"));
+      expect(rule).toBeLessThan(text.indexOf("3. Call `writeDashboard` again"));
+      const step1 = text.slice(text.indexOf("1. Call"), text.indexOf("2. Write at most"));
+      expect(step1).toContain("`previousServer`");
+      expect(step1).toContain("`server`");
+      expect(step1).toContain('"n/a"');
+      expect(step1).toContain("reply of this first call");
+      expect(step1).toContain("do not guess a version");
+    }
+  });
+
   it("updates with the weeks given, or the weeks of the page", async () => {
     expect(await render("training-dashboard-update", { weeks: "8" })).toContain("`weeks` = 8,");
     const keep = await render("training-dashboard-update", { weeks: " " });

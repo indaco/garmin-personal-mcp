@@ -5,6 +5,9 @@ tools of the `garmin-personal` MCP server. Answer in my language.
    `page`. The server keeps the page with its layout, widgets and languages, and replaces only its
    data. A page with different page code gets the page code of the server and keeps all of these. If there is no
    page yet, the server writes one from the template.
+   If the reply of this first call has `page: "upgraded"`, tell me that the page has the page code of
+   server `server` now, and that server `previousServer` wrote it before. Show a value that is
+   "n/a" as "n/a". The reply of step 3 does not have these values: do not guess a version.
 2. Write at most 5 coach notes from the digest of the reply. Each note names a specific number of the
    digest. Training suggestions only, no medical advice. Plain text, in my language.
 3. Call `writeDashboard` again with the same `weeks`{{pathArgument}} and the `notes`.
