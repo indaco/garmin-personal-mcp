@@ -76,6 +76,10 @@ describe("seen record", () => {
     expect(parsed({ all: ["a"], run: ["b"] })).toEqual({ all: ["a"] });
   });
 
+  it("drops a record of a name that is only inherited", () => {
+    expect(parsed({ constructor: ["x"], all: ["a"] })).toEqual({ all: ["a"] });
+  });
+
   it("drops a record that is not an object of arrays", () => {
     for (const bad of ["x", 3, null, ["all"], { all: "kpis" }, { all: 5 }, { all: { 0: "a" } }]) {
       expect(parseLayout({ boards: { all: board }, seen: bad })).not.toHaveProperty("seen");
@@ -350,6 +354,9 @@ const inst = (widget: string, over: Partial<Instance> = {}): Instance => ({
   ...over,
 });
 
+// the widgets of a page from before the record: "b" is the one that a later release adds
+const legacy = (board: string): string[] => (board === "run" ? ["a", "c", "d"] : []);
+
 describe("withPresetWidgets", () => {
   const WANT = ["a", "b", "c", "d"];
   const SPANS: Span[] = [1, 2, 3];
@@ -358,12 +365,12 @@ describe("withPresetWidgets", () => {
       ? WANT.map((widget, i) => ({ id: widget, widget, span: SPANS[i % 3] ?? 1 }))
       : [{ id: "g", widget: "g", span: 2 }];
   const run = (boards: Record<string, Instance[]>, seen?: Record<string, string[]>) =>
-    withPresetWidgets(layout({ boards, ...(seen ? { seen } : {}) }), want);
+    withPresetWidgets(layout({ boards, ...(seen ? { seen } : {}) }), want, legacy);
   const idsOf = (r: ReturnType<typeof run>, board = "run") => ids(r.layout.boards[board] ?? []);
 
   it("returns a blank layout as it is", () => {
     const l = layout({ base: "blank", boards: { run: [] } });
-    const r = withPresetWidgets(l, want);
+    const r = withPresetWidgets(l, want, legacy);
     expect(r).toEqual({ layout: l, added: {}, changed: false });
     expect(r.layout).toBe(l);
   });
@@ -382,7 +389,7 @@ describe("withPresetWidgets", () => {
   });
 
   it("keeps the preset order of two new neighbours", () => {
-    const r = run({ run: [inst("a"), inst("x")] });
+    const r = run({ run: [inst("a"), inst("x")] }, { run: ["a"] });
     expect(idsOf(r)).toEqual(["a", "b", "c", "d", "x"]);
     expect(r.added).toEqual({ run: ["b", "c", "d"] });
   });
@@ -441,7 +448,7 @@ describe("withPresetWidgets", () => {
     Object.freeze(input.boards.run);
     Object.freeze(input.boards);
     Object.freeze(input);
-    const r = withPresetWidgets(input, want);
+    const r = withPresetWidgets(input, want, legacy);
     expect(input).toEqual(frozen);
     expect(r.layout.rev).toBe("r7");
     expect(r.layout.base).toBe("preset");
@@ -460,27 +467,43 @@ describe("withPresetWidgets", () => {
       boards: { run: [inst("a"), inst("b"), inst("c"), inst("d")] },
       seen: { run: WANT },
     });
-    const r = withPresetWidgets(l, want);
+    const r = withPresetWidgets(l, want, legacy);
     expect(r.changed).toBe(false);
     expect(r.layout).toEqual(l);
   });
 
   it("gives nothing new on a second run", () => {
     const first = run({ run: [inst("a"), inst("x")], other: [] });
-    const second = withPresetWidgets(first.layout, want);
+    const second = withPresetWidgets(first.layout, want, legacy);
     expect(second.added).toEqual({});
     expect(second.changed).toBe(false);
     expect(second.layout).toEqual(first.layout);
   });
 
-  it("treats a listed board without a record as one that met nothing", () => {
-    const r = run({ run: [] });
-    expect(idsOf(r)).toEqual(WANT);
+  it("reads a board without a record as the widgets of the baseline", () => {
+    // the user removed "c" before the record existed: it must stay removed, "b" is the new one
+    const r = run({ run: [inst("a"), inst("d")] });
+    expect(idsOf(r)).toEqual(["a", "b", "d"]);
+    expect(r.added).toEqual({ run: ["b"] });
+    expect(r.layout.seen).toEqual({ run: WANT });
+  });
+
+  it("adds nothing to a board without a record when the baseline is the preset", () => {
+    const same = withPresetWidgets(layout({ boards: { run: [inst("a")] } }), want, (b) =>
+      want(b).map((i) => i.widget),
+    );
+    expect(same.added).toEqual({});
+    expect(same.layout.seen).toEqual({ run: WANT });
+  });
+
+  it("goes back past a missing nearest earlier widget to the next one", () => {
+    const r = run({ run: [inst("a"), inst("x"), inst("d")] }, { run: ["a", "b", "d"] });
+    expect(idsOf(r)).toEqual(["a", "c", "x", "d"]);
   });
 
   it("keeps a board called __proto__ as plain data", () => {
     const l = parseLayout(JSON.parse('{"boards":{"__proto__":[]}}'));
-    const r = withPresetWidgets(l, want);
+    const r = withPresetWidgets(l, want, legacy);
     expect(Object.keys(r.layout.boards)).toEqual(["__proto__"]);
     expect(Object.getPrototypeOf(r.layout.boards)).toBe(Object.prototype);
     expect(Object.keys(r.layout.seen ?? {})).toEqual(["__proto__"]);

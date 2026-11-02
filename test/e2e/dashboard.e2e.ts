@@ -2455,9 +2455,17 @@ describe("custom widgets and languages", () => {
   });
 });
 
+/** Every running preset widget but the one that a release adds: workoutTrend. */
+const UNTIL_TREND = {
+  running: preset("running")
+    .map((i) => i.widget)
+    .filter((w) => w !== "workoutTrend"),
+};
+
 const running = (rev: string, extra: object = {}) => ({
   rev,
   base: "preset",
+  seen: UNTIL_TREND,
   boards: {
     running: [
       { id: "typeKpis", widget: "typeKpis", span: 3 },
@@ -2474,8 +2482,8 @@ describe("new preset widgets on edited boards", () => {
 
   it("shows a widget that the board has not met, full width, in its preset place", async () => {
     const { page, errors } = await openRunning(running("r0"));
-    const ids = await tiles(page);
-    expect(ids.at(ids.indexOf("workoutTrend") + 1)).toBe("activities");
+    // the record lists the other widgets as met, so they stay off the board
+    expect(await tiles(page)).toEqual(["typeKpis", "workoutTrend", "activities"]);
     expect(await page.getAttribute("[data-id=workoutTrend]", "class")).toContain("span-3");
     expect(errors).toEqual([]);
   });
@@ -2483,17 +2491,20 @@ describe("new preset widgets on edited boards", () => {
   it("adds it to a browser layout of the same rev, with no banner", async () => {
     const file = pageFile({ layout: running("r0"), settings: withWorkouts });
     const { page } = await open(browser, file, { hash: "#running" });
-    await page.evaluate(() =>
-      localStorage.setItem(
-        `garmin-layout:${location.pathname}`,
-        JSON.stringify({
-          baseRev: "r0",
-          layout: {
-            base: "preset",
-            boards: { running: [{ id: "typeKpis", widget: "typeKpis", span: 3 }] },
-          },
-        }),
-      ),
+    await page.evaluate(
+      (seen) =>
+        localStorage.setItem(
+          `garmin-layout:${location.pathname}`,
+          JSON.stringify({
+            baseRev: "r0",
+            layout: {
+              base: "preset",
+              seen,
+              boards: { running: [{ id: "typeKpis", widget: "typeKpis", span: 3 }] },
+            },
+          }),
+        ),
+      UNTIL_TREND,
     );
     await page.reload();
     await page.waitForSelector(".page");
@@ -2503,17 +2514,20 @@ describe("new preset widgets on edited boards", () => {
 
   it("adds it to both layouts of the banner", async () => {
     const { page } = await openRunning(running("r1"));
-    await page.evaluate(() =>
-      localStorage.setItem(
-        `garmin-layout:${location.pathname}`,
-        JSON.stringify({
-          baseRev: "r0",
-          layout: {
-            base: "preset",
-            boards: { running: [{ id: "activities", widget: "activities", span: 3 }] },
-          },
-        }),
-      ),
+    await page.evaluate(
+      (seen) =>
+        localStorage.setItem(
+          `garmin-layout:${location.pathname}`,
+          JSON.stringify({
+            baseRev: "r0",
+            layout: {
+              base: "preset",
+              seen,
+              boards: { running: [{ id: "activities", widget: "activities", span: 3 }] },
+            },
+          }),
+        ),
+      UNTIL_TREND,
     );
     await page.reload();
     await page.waitForSelector(".banner");
@@ -2559,10 +2573,55 @@ describe("new preset widgets on edited boards", () => {
     expect(await tiles(other.page)).not.toContain("workoutTrend");
   });
 
+  describe("a layout from before the record", () => {
+    const old = {
+      base: "preset",
+      boards: { running: [{ id: "typeKpis", widget: "typeKpis", span: 3 }] },
+    };
+    const store = (page: Page, baseRev: string) =>
+      page.evaluate(
+        ([rev, layout]) =>
+          localStorage.setItem(
+            `garmin-layout:${location.pathname}`,
+            JSON.stringify({ baseRev: rev, layout }),
+          ),
+        [baseRev, old] as const,
+      );
+
+    it("gives the page layout nothing back that it left out", async () => {
+      const { page } = await openRunning({ rev: "r0", ...old });
+      expect(await tiles(page)).toEqual(["typeKpis"]);
+    });
+
+    it("gives a browser layout of the same rev nothing back", async () => {
+      const { page } = await openRunning(running("r0"));
+      await store(page, "r0");
+      await page.reload();
+      await page.waitForSelector(".page");
+      expect(await tiles(page)).toEqual(["typeKpis"]);
+    });
+
+    it("gives the browser layout of the banner nothing back", async () => {
+      const { page } = await openRunning(running("r1"));
+      await store(page, "r0");
+      await page.reload();
+      await page.waitForSelector(".banner");
+      await page.click(".banner >> text=Keep mine");
+      expect(await tiles(page)).toEqual(["typeKpis"]);
+    });
+  });
+
+  it("opens a page whose layout lists a board named like a property of Object", async () => {
+    const layout = JSON.parse(
+      '{"rev":"r0","base":"preset","boards":{"constructor":[],"toString":[]}}',
+    );
+    const { page, errors } = await open(browser, pageFile({ layout }));
+    expect(await page.$(".page")).not.toBeNull();
+    expect(errors).toEqual([]);
+  });
+
   it("does not show a widget that the page settings withhold", async () => {
     const { page } = await openRunning(running("r0"), {});
-    const ids = await tiles(page);
-    expect(ids).not.toContain("workoutTrend");
-    expect(ids.length).toBeGreaterThan(2);
+    expect(await tiles(page)).toEqual(["typeKpis", "activities"]);
   });
 });

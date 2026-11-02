@@ -934,13 +934,14 @@ const WIDGETS = /* garmin-widgets:start */[]/* garmin-widgets:end */;
   );
   const file = join(dir, "garmin-dashboard.html");
   await writer.write({});
-  const board = preset("running").filter((i) => i.widget !== "workoutTrend");
+  const board = preset("running").filter((i) => i.widget !== "longRuns");
   writeFileSync(
     file,
     writeBlock(readFileSync(file, "utf8"), "layout", {
       rev: "r1",
       base: "preset",
       boards: { running: board },
+      seen: { running: board.map((i) => i.widget) },
     }),
   );
 
@@ -951,8 +952,8 @@ const WIDGETS = /* garmin-widgets:start */[]/* garmin-widgets:end */;
     seen: { running: string[] };
   };
   expect(layout.rev).toBe("r1");
-  expect(layout.boards.running.map((i) => i.widget)).toContain("workoutTrend");
-  expect(layout.seen.running).toContain("workoutTrend");
+  expect(layout.boards.running.map((i) => i.widget)).toContain("longRuns");
+  expect(layout.seen.running).toContain("longRuns");
   rmSync(dir, { recursive: true });
 });
 

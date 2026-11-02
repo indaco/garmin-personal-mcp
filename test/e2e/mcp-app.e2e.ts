@@ -6,6 +6,7 @@ import { build } from "tsdown";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { DashboardWriter, type ViewBlocks } from "../../src/dashboard-page";
 import { data, launch } from "./page";
+import { preset } from "../../src/page/presets";
 
 let browser: Browser;
 let host: string;
@@ -121,6 +122,12 @@ it("shows a preset widget that an edited board has not met, in the chat view", a
     layout: {
       rev: "c",
       base: "preset",
+      // a record without coachNotes: that widget is the new one
+      seen: {
+        all: preset("all")
+          .map((i) => i.widget)
+          .filter((w) => w !== "coachNotes"),
+      },
       boards: { all: ["kpis", "activities"].map((id) => ({ id, widget: id, span: 3 })) },
     },
   };

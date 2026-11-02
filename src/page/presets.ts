@@ -96,9 +96,81 @@ const PRESETS: Record<string, [widget: string, span: Span][]> = {
   ],
 };
 
+/**
+ * The preset widgets of a page from before the `seen` record: the widgets that every such board
+ * has met. Frozen on purpose; never add a widget here when a release adds one to a preset.
+ */
+const BASELINE: Record<string, string[]> = {
+  all: [
+    "kpis",
+    "readiness",
+    "calendar",
+    "periodComparison",
+    "records",
+    "weeklyVolume",
+    "intensityMinutes",
+    "loadSafety",
+    "fitnessFatigue",
+    "loadVsRecovery",
+    "activities",
+    "coachNotes",
+  ],
+  recovery: [
+    "readiness",
+    "fitnessAge",
+    "loadVsRecovery",
+    "hrv",
+    "restingHr",
+    "sleep",
+    "sleepNeed",
+    "bedtime",
+    "bodyBattery",
+  ],
+  running: [
+    "typeKpis",
+    "typeWeekly",
+    "hrZones",
+    "bestEfforts",
+    "races",
+    "aerobicFitness",
+    "intensityShare",
+    "runningForm",
+    "runWalk",
+    "trainingEffect",
+    "racePredictor",
+    "longRuns",
+    "workoutTrend",
+    "activities",
+  ],
+  strengthTraining: [
+    "typeKpis",
+    "typeWeekly",
+    "hrZones",
+    "setsPerCategory",
+    "muscleBalance",
+    "exercises",
+    "strengthSessions",
+  ],
+  walking: ["typeKpis", "typeWeekly", "hrZones", "walkDetails", "steps", "activities"],
+  hiking: ["typeKpis", "typeWeekly", "hrZones", "hikeVertical", "activities"],
+  cycling: ["typeKpis", "typeWeekly", "hrZones", "bikeDetails", "activities"],
+  swimming: ["typeKpis", "typeWeekly", "hrZones", "swimDetails", "activities"],
+  racket: ["typeKpis", "typeWeekly", "hrZones", "racketDetails", "activities"],
+  generic: ["typeKpis", "typeWeekly", "hrZones", "activities"],
+};
+
+export const PRESET_BOARDS: readonly string[] = Object.keys(PRESETS);
+
+/** A board name is user data (`constructor`, `__proto__`): only an own key picks a list. */
+const listOf = (board: string): string => (Object.hasOwn(PRESETS, board) ? board : "generic");
+
+export function baseline(board: string): string[] {
+  return BASELINE[listOf(board)] ?? [];
+}
+
 export function preset(board: string): Instance[] {
   // any other SDK sport has the widgets of the Other board
-  return (PRESETS[board] ?? PRESETS.generic).map(([widget, span]) => ({
+  return (PRESETS[listOf(board)] ?? []).map(([widget, span]) => ({
     id: widget,
     widget,
     span,

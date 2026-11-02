@@ -241,7 +241,8 @@ themes and languages, the units and the activity-name filter, and how to change 
 ### training-dashboard-update
 
 This prompt replaces the data and the coach notes of the page. Your layout, your custom widgets and
-your languages stay. Reload the page to see the new data.
+your languages stay. Only a new preset widget of a release can join a board that you edited, one
+time. Reload the page to see the new data.
 
 | Argument | Values                                                                  | Default                 |
 | -------- | ----------------------------------------------------------------------- | ----------------------- |

@@ -56,8 +56,9 @@ to its release notes. Give this version when you report a problem.
 
 ## Update the dashboard
 
-Run the `training-dashboard-update` prompt. The server replaces only the data and the coach notes.
-Your layout, your custom widgets, your languages and your page settings stay. Leave `weeks` empty to keep the weeks of
+Run the `training-dashboard-update` prompt. The server replaces the data and the coach notes.
+Your layout, your custom widgets, your languages and your page settings stay. The layout changes only when
+a release adds a preset widget to a board that you edited (see below). Leave `weeks` empty to keep the weeks of
 the page.
 
 When a release adds a widget to the preset of a board that you edited, the update also puts that widget
@@ -67,9 +68,6 @@ you remove later stays removed. The scheduled refresh does the same.
 When the server has other page code than your page, the update writes the page code of the server.
 This also happens with an older server, and in a scheduled refresh. It keeps your layout, custom widgets, languages and page settings, and it keeps the old page as a
 `.bak` file. The assistant tells you which server version wrote the page before and which one wrote it now.
-
-When a release adds a widget to a preset, a board that you changed gets it one time, in its preset
-place. A widget that you remove after that stays removed.
 
 The first update sends approximately 35 requests to Garmin. Later updates use the local cache and
 send approximately 8.
@@ -386,8 +384,9 @@ Settings need a page from the template, or a page that the assistant designed (`
 ## How the page keeps your changes
 
 The page keeps its state in blocks of the file. The blocks hold the data, the layout, the custom
-widgets, the languages that you add and the [page settings](#page-settings). An update replaces only
-the data block and the block of the built-in languages. It also adds the widgets of your widget
+widgets, the languages that you add and the [page settings](#page-settings). An update replaces
+the data block and the block of the built-in languages. It changes the layout block only to add a new
+preset widget to a board that you edited. It also adds the widgets of your widget
 library (`widgets.json` in the data folder).
 
 The browser saves the layout when you select **Done**, but only in that browser. To keep the layout

@@ -197,19 +197,22 @@ function presetNames(preset: (board: string) => Instance[], board: string): stri
 
 /**
  * Gives each listed board of a preset layout the preset widgets that it has not met: after the
- * nearest earlier preset widget on the board, with the preset width. The record then holds the
+ * nearest earlier preset widget on the board, with the preset width. A board without a record has met
+ * the `baseline` widgets. The record then holds the
  * current preset names. Running it again changes nothing, so the page and the server can both run it.
  */
 export function withPresetWidgets(
   layout: Layout,
   preset: (board: string) => Instance[],
+  baseline: (board: string) => string[],
 ): { layout: Layout; added: Record<string, string[]>; changed: boolean } {
   if (layout.base === "blank") return { layout, added: {}, changed: false };
   const old = layout.seen ?? {};
   const results = Object.entries(layout.boards).map(([name, list]) => {
     const want = preset(name);
     const names = want.map((i) => i.widget);
-    const met = new Set(Object.hasOwn(old, name) ? old[name] : []);
+    // a board without a record is from before the record: it has met the baseline, not nothing
+    const met = new Set(Object.hasOwn(old, name) ? old[name] : baseline(name));
     const ids: string[] = [];
     let next = list;
     for (const [at, w] of want.entries()) {

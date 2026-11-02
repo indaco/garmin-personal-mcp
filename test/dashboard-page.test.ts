@@ -1239,12 +1239,13 @@ const withoutLayout = (text: string) =>
     .replace(/"updated":"[^"]*"/, "");
 
 describe("writeDashboard new preset widgets", () => {
-  /** The running board of the preset, without workoutTrend. */
-  const missing = preset("running").filter((i) => i.widget !== "workoutTrend");
+  /** The running board of the preset, without longRuns. */
+  const missing = preset("running").filter((i) => i.widget !== "longRuns");
   const edited = (extra: Record<string, unknown> = {}) => ({
     rev: "r1",
     base: "preset",
     boards: { running: missing },
+    seen: { running: missing.map((i) => i.widget) },
     ...extra,
   });
 
@@ -1255,13 +1256,13 @@ describe("writeDashboard new preset widgets", () => {
   it("adds the widget and the record on an update, keeping rev, kind and no .bak", async () => {
     setLayout(edited());
     const r = await writer.write({});
-    expect(r).toMatchObject({ page: "updated", addedWidgets: { running: ["workoutTrend"] } });
+    expect(r).toMatchObject({ page: "updated", addedWidgets: { running: ["longRuns"] } });
     expect(r.backup).toBeUndefined();
     expect(existsSync(`${file}.bak`)).toBe(false);
     const layout = readBlock(page(), "layout") as { rev: string; seen: Record<string, string[]> };
     expect(layout.rev).toBe("r1");
     expect(layout.seen.running).toEqual(preset("running").map((i) => i.widget));
-    expect(widgetsOf("running")).toContain("workoutTrend");
+    expect(widgetsOf("running")).toContain("longRuns");
   });
 
   it("adds them on an upgrade and keeps the .bak", async () => {
@@ -1274,9 +1275,9 @@ describe("writeDashboard new preset widgets", () => {
     expect(r).toMatchObject({
       page: "upgraded",
       backup: `${file}.bak`,
-      addedWidgets: { running: ["workoutTrend"] },
+      addedWidgets: { running: ["longRuns"] },
     });
-    expect(widgetsOf("running")).toContain("workoutTrend");
+    expect(widgetsOf("running")).toContain("longRuns");
   });
 
   it("adds them when new settings replace the page, and keeps the .bak", async () => {
@@ -1291,9 +1292,134 @@ describe("writeDashboard new preset widgets", () => {
     expect(r).toMatchObject({
       page: "replaced",
       backup: `${file}.bak`,
-      addedWidgets: { running: ["workoutTrend"] },
+      addedWidgets: { running: ["longRuns"] },
     });
+    expect(widgetsOf("running")).toContain("longRuns");
+  });
+
+  it("gives a page from before the record nothing back, and saves the record", async () => {
+    setLayout(edited({ seen: undefined }));
+    const r = await writer.write({});
+    expect(r).not.toHaveProperty("addedWidgets");
+    expect(widgetsOf("running")).toEqual(missing.map((i) => i.widget));
+    expect((readBlock(page(), "layout") as { seen: unknown }).seen).toEqual({
+      running: preset("running").map((i) => i.widget),
+    });
+  });
+
+  it("keeps a layout from editDashboard without a record through the next update", async () => {
+    await writer.edit({ layout: { base: "preset", boards: { all: preset("all").slice(0, 1) } } });
+    const r = await writer.write({});
+    expect(r).not.toHaveProperty("addedWidgets");
+    expect(widgetsOf("all")).toHaveLength(1);
+  });
+
+  it("does not throw on a board named like a property of Object", async () => {
+    for (const name of ["constructor", "__proto__", "toString"]) {
+      const layout = `{"rev":"r1","base":"preset","boards":{"${name}":[]},"seen":{"${name}":[]}}`;
+      setLayout(JSON.parse(layout));
+      // the board has a tab when the data has an activity of that sport
+      const sport = { ...data.activities[0], type: "other", sport: name };
+      writer = new DashboardWriter(
+        async () => JSON.stringify({ ...data, activities: [sport] }),
+        dir,
+        async () => templateText,
+      );
+      const r = await writer.write({});
+      expect(Object.hasOwn(r.addedWidgets ?? {}, name), name).toBe(true);
+      expect(Object.entries(r.addedWidgets ?? {})).toEqual([
+        [name, ["typeKpis", "typeWeekly", "hrZones", "activities"]],
+      ]);
+    }
+  });
+
+  /** The running board without workoutTrend, and not met: the only new widget is the opt-in one. */
+  const withoutTrend = () => {
+    const board = preset("running").filter((i) => i.widget !== "workoutTrend");
+    return edited({ boards: { running: board }, seen: { running: board.map((i) => i.widget) } });
+  };
+
+  it("saves a widget that the page withholds but does not report it", async () => {
+    setLayout(withoutTrend());
+    const r = await writer.write({});
+    expect(r).not.toHaveProperty("addedWidgets");
     expect(widgetsOf("running")).toContain("workoutTrend");
+  });
+
+  it("reports a widget that an opt-in setting turns on", async () => {
+    templateText = template(
+      ID_B,
+      "window.S = /* garmin-settings:start */null/* garmin-settings:end */;\n",
+    );
+    rmSync(file);
+    await writer.write({});
+    setLayout(withoutTrend());
+    // the settings of this write decide what the page shows, not those of the page before
+    const r = await writer.write({ settings: { workouts: true } });
+    expect(r).toMatchObject({ addedWidgets: { running: ["workoutTrend"] } });
+  });
+
+  it("reports a sport board only when the page has a tab for it", async () => {
+    const swim = preset("swimming").filter((i) => i.widget !== "swimDetails");
+    const layout = (name: string) =>
+      edited({
+        boards: { [name]: swim },
+        seen: { [name]: swim.map((i) => i.widget) },
+      });
+    // no swimming in the data and not a fixed tab: no tab
+    setLayout(layout("swimming"));
+    expect(await writer.write({})).not.toHaveProperty("addedWidgets");
+    // a fixed tab shows without data
+    const cycling = preset("cycling").filter((i) => i.widget !== "bikeDetails");
+    setLayout(
+      edited({
+        boards: { cycling },
+        seen: { cycling: cycling.map((i) => i.widget) },
+      }),
+    );
+    expect(await writer.write({})).toMatchObject({ addedWidgets: { cycling: ["bikeDetails"] } });
+  });
+
+  it("does not report the recovery board of a page that leaves recovery out", async () => {
+    templateText = template(
+      ID_B,
+      "window.S = /* garmin-settings:start */null/* garmin-settings:end */;\n",
+    );
+    rmSync(file);
+    await writer.write({});
+    const board = preset("recovery").filter((i) => i.widget !== "fitnessAge");
+    setLayout(
+      edited({ boards: { recovery: board }, seen: { recovery: board.map((i) => i.widget) } }),
+    );
+    expect(await writer.write({ settings: { exclude: ["recovery"] } })).not.toHaveProperty(
+      "addedWidgets",
+    );
+    setLayout(
+      edited({ boards: { recovery: board }, seen: { recovery: board.map((i) => i.widget) } }),
+    );
+    expect(await writer.write({ settings: { exclude: [] } })).toMatchObject({
+      addedWidgets: { recovery: ["fitnessAge"] },
+    });
+  });
+
+  it("reports the boards of the sports that the page keeps, and all and recovery", async () => {
+    templateText = template(
+      ID_B,
+      "window.S = /* garmin-settings:start */null/* garmin-settings:end */;\n",
+    );
+    rmSync(file);
+    await writer.write({});
+    const all = preset("all").filter((i) => i.widget !== "records");
+    setLayout(
+      edited({
+        boards: { running: missing, all },
+        seen: { running: missing.map((i) => i.widget), all: all.map((i) => i.widget) },
+      }),
+    );
+    const r = await writer.write({ settings: { sports: ["cycling"] } });
+    // running is left out: its widget is saved but not reported
+    expect(r.addedWidgets).toEqual({ all: ["records"] });
+    expect(widgetsOf("running")).toContain("longRuns");
   });
 
   it("adds nothing on a second write", async () => {
@@ -1340,6 +1466,9 @@ describe("writeDashboard new preset widgets", () => {
 
     const own = `<script>/* garmin-data:start */null/* garmin-data:end */ /* garmin-layout:start */${JSON.stringify(edited())}/* garmin-layout:end */</script>`;
     expect(await writer.write({ page: own })).not.toHaveProperty("addedWidgets");
+    expect(readBlock(page(), "layout")).toEqual(edited());
+    // the next update does not take the layout of your own page either
+    expect(await writer.write({})).not.toHaveProperty("addedWidgets");
     expect(readBlock(page(), "layout")).toEqual(edited());
   });
 
