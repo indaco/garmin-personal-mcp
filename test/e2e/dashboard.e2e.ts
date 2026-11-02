@@ -2184,6 +2184,10 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     expect(await page.textContent("[data-id=swimDetails]")).toContain("2:00/100 m");
     await page.click("[data-tab=cycling]");
     expect(await page.textContent("[data-id=bikeDetails] .kpis")).toContain("3 rides");
+    // 244 m in 1:09:33 of moving time
+    expect(await page.innerText("[data-id=hikeVertical]")).toContain("210 m/h");
+    // the whole ride counts, so the note says the route moves the number
+    expect(await page.innerText("[data-id=hikeVertical]")).toContain("on the same route");
     await page.click("[data-tab=racket]");
     // tennis and padel share the board; the sport column tells them apart
     const sports = await page.$$eval("[data-id=racketDetails] tbody tr", (r) =>

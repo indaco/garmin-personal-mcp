@@ -462,6 +462,7 @@
   "w.steps": "Tägliche Schritte",
   "w.hikeVertical": "Vertikalgeschwindigkeit",
   "hv.vam": "Höhe ({unit}) pro Stunde",
+  "hv.note": "Anstieg pro Stunde Bewegungszeit über die ganze Aktivität, flache Abschnitte und Abfahrten eingeschlossen: Eine hügeligere Strecke gibt bei gleicher Fitness einen höheren Wert. Aktivitäten auf derselben Strecke vergleichen.",
   "w.bikeDetails": "Radfahrten",
   "bd.outdoor": "Draußen",
   "bd.indoor": "Drinnen",

@@ -255,7 +255,7 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
   {
     id: "hikeVertical",
     title: "w.hikeVertical",
-    types: ["hiking", "walking", "running"],
+    types: ["hiking", "walking", "running", "cycling"],
     span: 3,
   },
   {

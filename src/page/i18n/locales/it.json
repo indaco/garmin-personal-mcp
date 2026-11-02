@@ -462,6 +462,7 @@
   "w.steps": "Passi giornalieri",
   "w.hikeVertical": "Velocità verticale",
   "hv.vam": "Dislivello ({unit}) all'ora",
+  "hv.note": "Dislivello per ora di tempo in movimento sull'intera attività, tratti in piano e discese compresi: un percorso più collinare dà un numero più alto a parità di forma. Confronta attività sullo stesso percorso.",
   "w.bikeDetails": "Uscite in bici",
   "bd.outdoor": "All'aperto",
   "bd.indoor": "Al chiuso",

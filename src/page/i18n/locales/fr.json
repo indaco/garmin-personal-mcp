@@ -462,6 +462,7 @@
   "w.steps": "Pas quotidiens",
   "w.hikeVertical": "Vitesse verticale",
   "hv.vam": "Dénivelé ({unit}) par heure",
+  "hv.note": "Dénivelé par heure de temps en mouvement sur toute l'activité, plats et descentes compris : un parcours plus vallonné donne un chiffre plus haut à forme égale. Comparer des activités sur le même parcours.",
   "w.bikeDetails": "Sorties à vélo",
   "bd.outdoor": "Extérieur",
   "bd.indoor": "Intérieur",

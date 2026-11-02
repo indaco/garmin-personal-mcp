@@ -462,6 +462,7 @@
   "w.steps": "Daily steps",
   "w.hikeVertical": "Vertical speed",
   "hv.vam": "Vertical {unit} per hour",
+  "hv.note": "Ascent per hour of moving time over the whole activity, flats and descents included: a hillier route gives a higher number at the same fitness. Compare activities on the same route.",
   "w.bikeDetails": "Rides",
   "bd.outdoor": "Outdoor",
   "bd.indoor": "Indoor",

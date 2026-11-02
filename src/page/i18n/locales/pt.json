@@ -462,6 +462,7 @@
   "w.steps": "Passos diários",
   "w.hikeVertical": "Velocidade vertical",
   "hv.vam": "Subida ({unit}) por hora",
+  "hv.note": "Subida por hora de tempo em movimento em toda a atividade, trechos planos e descidas incluídos: um percurso com mais subidas dá um número maior com a mesma forma. Comparar atividades no mesmo percurso.",
   "w.bikeDetails": "Pedaladas",
   "bd.outdoor": "Ao ar livre",
   "bd.indoor": "Indoor",

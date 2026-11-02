@@ -92,6 +92,13 @@ describe("preset record", () => {
 });
 
 describe("withPresetWidgets with the real preset", () => {
+  it("gives a Bike board from an older release the new widgets once", () => {
+    const cycling = preset("cycling").filter((i) => baseline("cycling").includes(i.widget));
+    const r = withPresetWidgets(parseLayout({ boards: { cycling } }), preset, baseline);
+    expect(r.added).toEqual({ cycling: ["hikeVertical"] });
+    expect(withPresetWidgets(r.layout, preset, baseline).added).toEqual({});
+  });
+
   it("does not throw and adds nothing new for an inherited board name", () => {
     for (const board of INHERITED) {
       const layout = parseLayout(JSON.parse(`{"boards":{"${board}":[]}}`));

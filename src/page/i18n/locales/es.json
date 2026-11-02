@@ -462,6 +462,7 @@
   "w.steps": "Pasos diarios",
   "w.hikeVertical": "Velocidad vertical",
   "hv.vam": "Desnivel ({unit}) por hora",
+  "hv.note": "Desnivel por hora de tiempo en movimiento en toda la actividad, llanos y bajadas incluidos: una ruta con más subidas da un número más alto con la misma forma. Comparar actividades en la misma ruta.",
   "w.bikeDetails": "Salidas en bici",
   "bd.outdoor": "Exterior",
   "bd.indoor": "Interior",
