@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The changelog is generated and managed by [sley](https://github.com/indaco/sley).
 
+## v0.8.0 - 2026-11-02
+
+### 🚀 Enhancements
+
+- **dashboard:** coach analyses for rides on the Bike board ([5843f89](https://github.com/indaco/garmin-personal-mcp/commit/5843f89)) ([#167](https://github.com/indaco/garmin-personal-mcp/pull/167))
+
+### 🤖 CI
+
+- **release:** run the CI checks before publish, and wait longer for npm ([90bcfaa](https://github.com/indaco/garmin-personal-mcp/commit/90bcfaa)) ([#166](https://github.com/indaco/garmin-personal-mcp/pull/166))
+
+### ❤️ Contributors
+
+- [@indaco](https://github.com/indaco)
+
 ## v0.7.0 - 2026-11-02
 
 ### 🚀 Enhancements
