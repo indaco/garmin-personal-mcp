@@ -983,8 +983,9 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
       description: [
         "Writes the training dashboard page (default <data-dir>/garmin-dashboard.html) with the data of the",
         "last `weeks` weeks, and returns its path and a short digest of the data (totals, weekly sums, load,",
-        "best efforts, races, long runs, race predictions, strength top sets, HRV, recovery, fitness age,",
-        "sync) for the coach notes.",
+        "best efforts, races, long runs, race predictions, strength top sets, readiness, fitness and form,",
+        "HRV, recovery, fitness age, sync) for the coach notes. Without HRV and sleep data the digest has",
+        "no readiness: give the verdict as n/a.",
         "An existing page keeps all its code, layout and widgets: only its data is replaced. A page from an",
         "older template gets the new template and keeps its layout and widgets. Every page from the template",
         "also gets the custom widgets of the widget library (<data-dir>/widgets.json), not placed on a board.",

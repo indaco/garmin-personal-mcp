@@ -1,7 +1,7 @@
 import { addDays } from "./dates";
 import { hms, round } from "./fit";
 import { type Activity, dayOf, groupOf, mondayOf, sessionSeconds, seconds } from "./page/calc";
-import { loadOf, loadRatio, zonesOf } from "./page/metrics";
+import { fitnessFatigueFrom, loadOf, loadRatio, readinessOf, zonesOf } from "./page/metrics";
 import { racePredictionsOf, type SplitKind, splitOf, workoutOf } from "./page/running";
 import { completed, type StrengthSet } from "./page/strength";
 
@@ -86,6 +86,25 @@ export interface Digest {
   /** The run names with more than one session: the workouts that the workout trend compares. */
   repeatedRuns: Record<string, number>;
   strengthExercises: Record<string, { sessions: number; first?: TopSet; last?: TopSet }>;
+  /**
+   * The page's readiness verdict for today and its inputs; null when the data cannot back a value.
+   * Absent without HRV and recovery rows (also when the page leaves out the recovery data).
+   */
+  readiness?: {
+    verdict: "easy" | "normal" | "push" | null;
+    hrvStatus: string | null;
+    /** The dates of the HRV row and of the recovery row used: the last rows, of any date. */
+    hrvDate: string | null;
+    sleepScore: number | null;
+    rhr: number | null;
+    /** The mean resting HR of the 7 rows before the last, 1 decimal. */
+    rhrAvg7: number | null;
+    recoveryDate: string | null;
+    /** As load.acuteToChronic; the verdict uses the exact ratio. */
+    loadRatio: number | null;
+  };
+  /** Today's fitness, fatigue and form of the page, 1 decimal; null when no activity has a load. */
+  fitnessFatigue: { fitness: number; fatigue: number; form: number } | null;
   hrvLast14: unknown[];
   recovery: unknown;
   fitnessAge: Json;
@@ -95,8 +114,9 @@ export interface Digest {
 /**
  * Sums and copies of a getDashboardData result, with the page's load functions, so a coach note can
  * quote what the page shows. The long runs and the race predictions come from the page's split and
- * Riegel functions. A number that the data cannot back is null (n/a); a load from the HR estimate is
- * counted in `estimatedLoads`.
+ * Riegel functions; the readiness and fitness from the page's readiness and fitness functions. A
+ * number that the data cannot back is null (n/a); a load from the HR estimate is counted in
+ * `estimatedLoads`.
  */
 export function digest(data: Json): Digest {
   const acts = list(data.activities).filter((a) => dayOf(a as Activity) !== undefined);
@@ -136,6 +156,7 @@ export function digest(data: Json): Digest {
   const every = [...acts, ...previous] as Activity[];
   const dataStart = typeof data.prevStart === "string" ? data.prevStart : undefined;
   const ratio = loadRatio(every, end, maxHR, dataStart);
+  const acuteToChronic = ratio.ratio === null ? null : round(ratio.ratio, 2);
   const loadsFrom = (from: string) =>
     every.filter((a) => dayOf(a)! >= from && dayOf(a)! <= end).map((a) => loadOf(a, maxHR));
   const week = loadsFrom(addDays(end, -6));
@@ -206,6 +227,13 @@ export function digest(data: Json): Digest {
     }
   }
 
+  // the page's readiness and fitness: the verdict from the exact ratio, only the shown values rounded
+  const hrv = list(data.hrv);
+  const recovery = list(data.recovery);
+  const ready = readinessOf(hrv, recovery, ratio.ratio);
+  // without a start (the server always gives one) fitness has no window
+  const ff = start ? fitnessFatigueFrom(every, start, end, maxHR) : null;
+
   const age = isObject(data.fitnessAge) ? data.fitnessAge : {};
   return {
     period: {
@@ -227,7 +255,7 @@ export function digest(data: Json): Digest {
       last7Days: unknown(week) ? null : round(ratio.acute, 1),
       weeklyAvgLast28Days:
         ratio.chronic === null || unknown(month) ? null : round(ratio.chronic, 1),
-      acuteToChronic: ratio.ratio === null ? null : round(ratio.ratio, 2),
+      acuteToChronic,
       estimatedLoads: month.filter((l) => l?.estimate).length,
     },
     bestEfforts,
@@ -242,7 +270,26 @@ export function digest(data: Json): Digest {
     racePredictions,
     repeatedRuns: repeatedRuns(acts),
     strengthExercises,
-    hrvLast14: list(data.hrv).slice(-14),
+    ...(hrv.length > 0 || recovery.length > 0
+      ? {
+          readiness: {
+            verdict: ready.verdict,
+            hrvStatus: ready.hrvStatus ?? null,
+            hrvDate: ready.hrvDate ?? null,
+            sleepScore: ready.sleepScore ?? null,
+            rhr: ready.rhr ?? null,
+            rhrAvg7: ready.rhrAvg === undefined ? null : round(ready.rhrAvg, 1),
+            recoveryDate: ready.recoveryDate ?? null,
+            loadRatio: acuteToChronic,
+          },
+        }
+      : {}),
+    fitnessFatigue: ff && {
+      fitness: round(ff.fitness.at(-1)!, 1),
+      fatigue: round(ff.fatigue.at(-1)!, 1),
+      form: round(ff.form.at(-1)!, 1),
+    },
+    hrvLast14: hrv.slice(-14),
     recovery: data.recovery,
     fitnessAge: pick(age, ["fitnessAge", "chronologicalAge", "achievableFitnessAge"]),
     sync: data.sync,

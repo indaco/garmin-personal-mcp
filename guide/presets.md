@@ -49,7 +49,7 @@ and models give other times and costs.
 | New language (325 texts) | Claude edits the page code (not measured)                 | 64 s, $0.48                     |
 
 In one run where Claude wrote the page, Claude also gave wrong totals in chat, because it did not
-see all the data. With the template, Claude reads a digest of about 7 KB that has every number for
+see all the data. With the template, Claude reads a digest of about 9 KB that has every number for
 the notes. A check of each run found no invented number in the notes. The `getDashboardData` result
 now also starts with this digest, so the totals come from the server and not from the assistant.
 

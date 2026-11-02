@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { digest } from "../src/digest";
 import { hms, round } from "../src/fit";
-import { sessionSeconds } from "../src/page/calc";
+import { type Activity, sessionSeconds } from "../src/page/calc";
+import { fitnessFatigueFrom, loadRatio, readinessOf } from "../src/page/metrics";
 import { predictRaces, splitOf } from "../src/page/running";
 
 const squat = (sets: Record<string, number>[]) => ({ exercise: "Back Squat", sets });
@@ -50,6 +51,24 @@ const row = (day: string, km: number) => ({ type: "running", start: `${day} 07:0
 /** An activity without its training load. */
 const noLoad = (a: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(a).filter(([k]) => k !== "trainingLoad"));
+
+/** HRV rows up to `last`, the last one with its status. */
+const hrvTo = (last: string, status: string) => [
+  { date: "2026-10-20", hrv: 60, status: "LOW" },
+  { date: last, hrv: 66, status },
+];
+
+/** Recovery rows: 7 days at 50 bpm, then today's row. */
+const recoveryTo = (today: Record<string, unknown>) => [
+  ...Array.from({ length: 7 }, (_, i) => ({ date: `2026-10-${19 + i}`, rhr: 50 })),
+  today,
+];
+
+/** Runs with an acute load in the last 7 days and the rest of the 28 days before them. */
+const loads = (acute: number, rest: number) => [
+  loaded("2026-10-25", acute),
+  loaded("2026-10-10", rest),
+];
 
 /** A small getDashboardData result, most recent activity first, as the server returns it. */
 const data = {
@@ -597,6 +616,177 @@ describe("digest", () => {
   it("skips an activity without a start date", () => {
     const e = digest({ ...data, activities: [{ id: 9, type: "running", km: 5 }] });
     expect(e.totals).toEqual({});
+  });
+
+  it("gives the page's readiness verdict and its inputs, rounded", () => {
+    const hrv = hrvTo("2026-10-26", "BALANCED");
+    const recovery = [
+      ...[50, 51, 52, 53, 50, 51, 52].map((rhr, i) => ({ date: `2026-10-${19 + i}`, rhr })),
+      { date: "2026-10-26", sleepScore: 85, rhr: 55 },
+    ];
+    const out = digest({ ...data, hrv, recovery });
+    expect(out.readiness).toEqual({
+      verdict: "normal",
+      hrvStatus: "BALANCED",
+      hrvDate: "2026-10-26",
+      sleepScore: 85,
+      rhr: 55,
+      // 359 / 7 = 51.29
+      rhrAvg7: 51.3,
+      recoveryDate: "2026-10-26",
+      loadRatio: 4,
+    });
+    const every = [...data.activities, ...data.previousActivities] as Activity[];
+    const ratio = loadRatio(every, data.end, undefined, data.prevStart).ratio;
+    expect(out.readiness?.verdict).toBe(readinessOf(hrv, recovery, ratio).verdict);
+  });
+
+  it("gives the verdict from the exact load ratio, not the rounded one", () => {
+    const ready = {
+      ...data,
+      hrv: hrvTo("2026-10-26", "BALANCED"),
+      recovery: recoveryTo({ date: "2026-10-26", sleepScore: 80, rhr: 50 }),
+      previousActivities: [],
+    };
+    // 81 against (81 + 169) / 4 = 1.296: under 1.3, shown as 1.3
+    expect(digest({ ...ready, activities: loads(81, 169) }).readiness).toMatchObject({
+      verdict: "push",
+      loadRatio: 1.3,
+    });
+    // 65 against (65 + 135) / 4 = 1.3
+    expect(digest({ ...ready, activities: loads(65, 135) }).readiness).toMatchObject({
+      verdict: "normal",
+      loadRatio: 1.3,
+    });
+    // 40 against (40 + 160) / 4 = 0.8
+    expect(digest({ ...ready, activities: loads(40, 160) }).readiness).toMatchObject({
+      verdict: "push",
+      loadRatio: 0.8,
+    });
+  });
+
+  it("has no load ratio in the readiness when the data does not cover the 28 days", () => {
+    const week = {
+      ...data,
+      weeks: 1,
+      start: "2026-10-19",
+      prevStart: "2026-10-05",
+      hrv: hrvTo("2026-10-26", "BALANCED"),
+      recovery: recoveryTo({ date: "2026-10-26", sleepScore: 85, rhr: 50 }),
+      activities: loads(81, 169),
+      previousActivities: [],
+    };
+    // without a ratio the verdict cannot be "push"
+    expect(digest(week).readiness).toMatchObject({ verdict: "normal", loadRatio: null });
+    expect(digest({ ...week, prevStart: "2026-09-29" }).readiness).toMatchObject({
+      verdict: "push",
+      loadRatio: 1.3,
+    });
+  });
+
+  it("gives the dates of the rows when they are from an older night", () => {
+    const out = digest({
+      ...data,
+      hrv: hrvTo("2026-10-24", "LOW"),
+      // no row for today: the last row is yesterday's, as on the page
+      recovery: recoveryTo({ date: "2026-10-26", sleepScore: 85, rhr: 50 }).slice(0, -1),
+    });
+    expect(out.readiness).toEqual({
+      verdict: "easy",
+      hrvStatus: "LOW",
+      hrvDate: "2026-10-24",
+      sleepScore: null,
+      rhr: 50,
+      rhrAvg7: 50,
+      recoveryDate: "2026-10-25",
+      loadRatio: 4,
+    });
+  });
+
+  it("gives null, not a guess, for each readiness value that the data cannot back", () => {
+    // HRV rows without a status, and a recovery row without a sleep score
+    expect(d.readiness).toEqual({
+      verdict: null,
+      hrvStatus: null,
+      hrvDate: "2026-10-26",
+      sleepScore: null,
+      rhr: 50,
+      rhrAvg7: null,
+      recoveryDate: "2026-10-26",
+      loadRatio: 4,
+    });
+  });
+
+  it("has no readiness without HRV and recovery rows, and no sleep or HRV text then", () => {
+    const out = digest({ ...data, hrv: [], recovery: [] });
+    expect(out).not.toHaveProperty("readiness");
+    // the page leaves both lists empty when it excludes recovery
+    expect(JSON.stringify(out)).not.toMatch(/sleep|"hrv(Status|Date)"/i);
+    expect(JSON.stringify(out.fitnessFatigue)).not.toMatch(/sleep|hrv/i);
+  });
+
+  it("gives the HRV inputs and null for sleep and resting HR with HRV rows only", () => {
+    expect(digest({ ...data, hrv: hrvTo("2026-10-26", "LOW"), recovery: [] }).readiness).toEqual({
+      verdict: "easy",
+      hrvStatus: "LOW",
+      hrvDate: "2026-10-26",
+      sleepScore: null,
+      rhr: null,
+      rhrAvg7: null,
+      recoveryDate: null,
+      loadRatio: 4,
+    });
+  });
+
+  it("gives the sleep and resting HR inputs and null for HRV with recovery rows only", () => {
+    const recovery = recoveryTo({ date: "2026-10-26", sleepScore: 85, rhr: 50 });
+    expect(digest({ ...data, hrv: [], recovery }).readiness).toEqual({
+      verdict: "normal",
+      hrvStatus: null,
+      hrvDate: null,
+      sleepScore: 85,
+      rhr: 50,
+      rhrAvg7: 50,
+      recoveryDate: "2026-10-26",
+      loadRatio: 4,
+    });
+  });
+
+  it("gives today's fitness, fatigue and form as the page, warmed up by the weeks before", () => {
+    const every = [...data.activities, ...data.previousActivities] as Activity[];
+    const f = fitnessFatigueFrom(every, data.start, data.end)!;
+    expect(d.fitnessFatigue).toEqual({
+      fitness: round(f.fitness.at(-1)!, 1),
+      fatigue: round(f.fatigue.at(-1)!, 1),
+      form: round(f.form.at(-1)!, 1),
+    });
+    // form is the fitness minus the fatigue of 25 Oct: today has no load
+    expect(d.fitnessFatigue).toEqual({ fitness: 5.2, fatigue: 18.3, form: -16 });
+  });
+
+  it("uses the page's load estimate for fitness, and has none without any load", () => {
+    const zones = [{ sport: "DEFAULT", maxHeartRateUsed: 200 }];
+    const activities = [
+      { type: "running", start: "2026-10-25 07:00:00", duration: "30:00", avgHR: 150 },
+    ];
+    const out = digest({ ...data, zones, activities, previousActivities: [] });
+    const f = fitnessFatigueFrom(activities, data.start, data.end, 200)!;
+    expect(out.fitnessFatigue).toEqual({
+      fitness: round(f.fitness.at(-1)!, 1),
+      fatigue: round(f.fatigue.at(-1)!, 1),
+      form: round(f.form.at(-1)!, 1),
+    });
+    expect(out.fitnessFatigue?.fitness).toBeGreaterThan(0);
+    const none = digest({
+      ...data,
+      activities: data.activities.map(noLoad),
+      previousActivities: data.previousActivities.map(noLoad),
+    });
+    expect(none.fitnessFatigue).toBeNull();
+  });
+
+  it("has no fitness without the start of the period", () => {
+    expect(digest({ ...data, start: undefined }).fitnessFatigue).toBeNull();
   });
 
   it("is a few KB for a real-sized period", () => {
