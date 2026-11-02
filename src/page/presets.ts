@@ -1,7 +1,8 @@
 import type { Instance, Span } from "./layout";
 
 /** The preset widgets of each board, in order, with their width in columns. */
-const PRESETS: Record<string, [widget: string, span: Span][]> = {
+type Row = [widget: string, span: Span][];
+const PRESETS: Record<string, Row> & { generic: Row } = {
   all: [
     ["kpis", 3],
     ["readiness", 2],
@@ -100,7 +101,7 @@ const PRESETS: Record<string, [widget: string, span: Span][]> = {
  * The preset widgets of a page from before the `seen` record: the widgets that every such board
  * has met. Frozen on purpose; never add a widget here when a release adds one to a preset.
  */
-const BASELINE: Record<string, string[]> = {
+const BASELINE: Record<string, string[]> & { generic: string[] } = {
   all: [
     "kpis",
     "readiness",
@@ -162,15 +163,16 @@ const BASELINE: Record<string, string[]> = {
 export const PRESET_BOARDS: readonly string[] = Object.keys(PRESETS);
 
 /** A board name is user data (`constructor`, `__proto__`): only an own key picks a list. */
-const listOf = (board: string): string => (Object.hasOwn(PRESETS, board) ? board : "generic");
+const pick = <T>(table: Record<string, T> & { generic: T }, board: string): T =>
+  Object.entries(table).find(([name]) => name === board)?.[1] ?? table.generic;
 
 export function baseline(board: string): string[] {
-  return BASELINE[listOf(board)] ?? [];
+  return pick(BASELINE, board);
 }
 
 export function preset(board: string): Instance[] {
   // any other SDK sport has the widgets of the Other board
-  return (PRESETS[listOf(board)] ?? []).map(([widget, span]) => ({
+  return pick(PRESETS, board).map(([widget, span]) => ({
     id: widget,
     widget,
     span,

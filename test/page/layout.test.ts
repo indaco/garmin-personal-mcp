@@ -224,6 +224,13 @@ describe("edits", () => {
 });
 
 describe("parseLayout", () => {
+  it("keeps a type that is a string, and reads a span that is no number as 1", () => {
+    const l = parseLayout({
+      boards: { run: [{ id: "a", widget: "kpis", type: "cycling", span: "wide" }] },
+    });
+    expect(l.boards.run).toEqual([{ id: "a", widget: "kpis", type: "cycling", span: 1 }]);
+  });
+
   it("accepts a valid layout", () => {
     const l = layout({ boards: { all: [{ id: "a", widget: "hrv", span: 2, hidden: true }] } });
     expect(parseLayout(l)).toEqual(l);
