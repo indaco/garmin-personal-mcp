@@ -332,7 +332,7 @@ export function summarize(a: Json): Json {
     o.duration = hms(durS);
   }
   if (distM > 0 && durS > 0) {
-    o.pace = `${hms(durS / (distM / 1000))}/km`;
+    o.pace = paceText(durS / (distM / 1000));
   }
   copy(a, o, "averageHR", "avgHR");
   copy(a, o, "maxHR", "maxHR");
