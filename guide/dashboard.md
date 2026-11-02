@@ -390,6 +390,11 @@ the data block and the block of the built-in languages. It changes the layout bl
 preset widget to a board that you edited. It also adds the widgets of your widget
 library (`widgets.json` in the data folder).
 
+An update that writes new page code also saves a refresh record in the page: the server version that
+wrote the page before, the version that wrote it now, and the preset widgets that the update added
+to the boards that you edited. A data-only update and a change of page settings keep the record. A new layout
+starts the page without it, and so does an update to an older version with other page code. The page uses the record to show what is new.
+
 The browser saves the layout when you select **Done**, but only in that browser. To keep the layout
 in the page, select **Copy layout** and give the text to your assistant. The assistant saves it with
 `editDashboard`. The copied layout also has the record of the preset widgets that each board has

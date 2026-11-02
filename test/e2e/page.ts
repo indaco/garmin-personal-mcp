@@ -19,6 +19,7 @@ export function pageFile(
     widgets?: unknown;
     i18n?: unknown;
     settings?: Settings;
+    refresh?: unknown;
   } = {},
 ): string {
   const s = blocks.settings ?? {};
@@ -26,6 +27,7 @@ export function pageFile(
   page = writeBlock(page, "layout", blocks.layout ?? null);
   page = writeBlock(page, "widgets", blocks.widgets ?? []);
   page = writeBlock(page, "i18n", blocks.i18n ?? {});
+  page = writeBlock(page, "refresh", blocks.refresh ?? null);
   // a test that gives its own data block gets it as it is
   page =
     "data" in blocks

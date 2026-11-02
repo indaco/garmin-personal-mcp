@@ -8,6 +8,7 @@ import {
   patchDue,
   readBlock,
   needsNewCode,
+  olderThan,
   pageCode,
   withData,
   writeBlock,
@@ -166,9 +167,18 @@ describe("writeDashboard", () => {
 
   it("has every block in the real template", () => {
     const real = readFileSync("src/page/template.html", "utf8");
-    for (const block of ["data", "layout", "widgets", "i18n", "settings", "languages"] as const) {
+    for (const block of [
+      "data",
+      "layout",
+      "widgets",
+      "i18n",
+      "settings",
+      "languages",
+      "refresh",
+    ] as const) {
       expect([block, readBlock(real, block) !== undefined]).toEqual([block, true]);
     }
+    expect(readBlock(real, "refresh")).toBeNull();
   });
 
   it("creates <data-dir>/garmin-dashboard.html from the template, with the preset layout", async () => {
@@ -1479,5 +1489,204 @@ describe("writeDashboard new preset widgets", () => {
     setLayout(edited());
     await writer.write({ notes });
     expect(withoutLayout(page())).toBe(withoutLayout(plain));
+  });
+});
+
+/** The refresh record of the saved page. */
+const record = () => readBlock(page(), "refresh");
+/** The running board of an edited layout, without this widget. */
+const running = (without: string) => {
+  const board = preset("running").filter((i) => i.widget !== without);
+  return {
+    rev: "r1",
+    base: "preset",
+    boards: { running: board },
+    seen: { running: board.map((i) => i.widget) },
+  };
+};
+
+describe("writeDashboard refresh record", () => {
+  const MARK = "window.R = /* garmin-refresh:start */null/* garmin-refresh:end */;\n";
+  const SETTINGS = "window.S = /* garmin-settings:start */null/* garmin-settings:end */;\n";
+  /** A page of code ID_A with a data block of this server version, then the template moves to ID_B. */
+  async function oldPage(server?: string) {
+    templateText = template(ID_A, MARK + SETTINGS);
+    await writer.write({});
+    if (server !== undefined) {
+      writeFileSync(file, writeBlock(page(), "data", { server }));
+    }
+    templateText = template(ID_B, MARK + SETTINGS);
+  }
+  const first = { from: "0.5.0", server: serverVersion, code: ID_B, widgets: {} };
+
+  it("saves the versions and the page code on an upgrade, with no widget", async () => {
+    await oldPage("0.5.0");
+    await writer.write({});
+    expect(record()).toEqual(first);
+  });
+
+  it("gives n/a as the old version of a page with no server", async () => {
+    await oldPage();
+    writeFileSync(file, writeBlock(page(), "data", { weeks: 12 }));
+    await writer.write({});
+    expect(record()).toMatchObject({ from: "n/a" });
+  });
+
+  it("saves widget names, not the numbered ids of the result", async () => {
+    await oldPage("0.5.0");
+    const board = preset("running").filter((i) => i.widget !== "longRuns");
+    // the id longRuns is taken by another widget, so the new instance is longRuns-2
+    const taken = { id: "longRuns", widget: "typeKpis", span: 1 };
+    const boards = { running: [...board, taken] };
+    writeFileSync(
+      file,
+      writeBlock(page(), "layout", {
+        rev: "r1",
+        base: "preset",
+        boards,
+        seen: { running: board.map((i) => i.widget) },
+      }),
+    );
+    const r = await writer.write({});
+    expect(r.addedWidgets).toEqual({ running: ["longRuns-2"] });
+    expect(record()).toMatchObject({ widgets: { running: ["longRuns"] } });
+  });
+
+  it("leaves out a widget that the page withholds, as the result does", async () => {
+    await oldPage("0.5.0");
+    writeFileSync(file, writeBlock(page(), "layout", running("workoutTrend")));
+    const r = await writer.write({});
+    expect(r).not.toHaveProperty("addedWidgets");
+    expect(record()).toMatchObject({ widgets: {} });
+  });
+
+  it("keeps the record on a data-only update, also when the update adds a widget", async () => {
+    await oldPage("0.5.0");
+    await writer.write({});
+    expect((await writer.write({})).page).toBe("updated");
+    expect(record()).toEqual(first);
+    writeFileSync(file, writeBlock(page(), "layout", running("longRuns")));
+    expect(await writer.write({})).toMatchObject({
+      page: "updated",
+      addedWidgets: { running: ["longRuns"] },
+    });
+    expect(record()).toEqual(first);
+  });
+
+  it("copies the record on a write for new settings with the same page code", async () => {
+    await oldPage("0.5.0");
+    await writer.write({});
+    const r = await writer.write({ settings: { title: "Mine" } });
+    expect(r.page).toBe("replaced");
+    expect(record()).toEqual(first);
+  });
+
+  it("drops a record that is not valid JSON and still writes", async () => {
+    await oldPage("0.5.0");
+    await writer.write({});
+    writeFileSync(
+      file,
+      page().replace(/(garmin-refresh:start \*\/).*?(\/\* garmin-refresh:end)/s, "$1{oops$2"),
+    );
+    const r = await writer.write({ settings: { title: "Mine" } });
+    expect(r.page).toBe("replaced");
+    expect(record()).toBeNull();
+  });
+
+  it("writes no record when a newer server wrote the page before", async () => {
+    await oldPage(`${Number(serverVersion.split(".")[0]) + 1}.0.0`);
+    expect((await writer.write({})).page).toBe("upgraded");
+    expect(record()).toBeNull();
+  });
+
+  it("orders versions by number, and ignores a version that is not x.y.z", () => {
+    expect(olderThan("0.9.0", "0.10.0")).toBe(true);
+    expect(olderThan("0.10.0", "0.9.0")).toBe(false);
+    expect(olderThan("1.2.3", "1.2.3")).toBe(false);
+    expect(olderThan("n/a", "1.0.0")).toBe(false);
+    expect(olderThan("1.0.0", "n/a")).toBe(false);
+  });
+
+  it("still writes a record when the server version is the same", async () => {
+    await oldPage(serverVersion);
+    await writer.write({});
+    expect(record()).toMatchObject({ from: serverVersion, server: serverVersion });
+  });
+
+  it("does not let a deeply nested old record stop a write for new settings", async () => {
+    await oldPage("0.5.0");
+    await writer.write({});
+    const deep = "[".repeat(200_000) + "]".repeat(200_000);
+    writeFileSync(
+      file,
+      page().replace(/(garmin-refresh:start \*\/).*?(\/\* garmin-refresh:end)/s, `$1${deep}$2`),
+    );
+    const r = await writer.write({ settings: { title: "Mine" } });
+    expect(r.page).toBe("replaced");
+    expect(record()).toBeNull();
+  });
+
+  it("drops a record that cannot be written back, and still writes", async () => {
+    await oldPage("0.5.0");
+    await writer.write({});
+    writeFileSync(
+      file,
+      page().replace(
+        /(garmin-refresh:start \*\/).*?(\/\* garmin-refresh:end)/s,
+        '$1{"poison":1}$2',
+      ),
+    );
+    // a value deep enough to pass a check can still fail in writeBlock: make only that call throw
+    const real = JSON.stringify;
+    const spy = vi.spyOn(JSON, "stringify").mockImplementation((v, ...rest) => {
+      if (
+        (v as { poison?: number } | null)?.poison === 1 &&
+        new Error().stack?.includes("writeBlock")
+      ) {
+        throw new RangeError("deep");
+      }
+      return real(v, ...(rest as [never, never]));
+    });
+    try {
+      const r = await writer.write({ settings: { title: "Mine" } });
+      expect(r.page).toBe("replaced");
+    } finally {
+      spy.mockRestore();
+    }
+    expect(record()).toBeNull();
+  });
+
+  it("gives a new layout and a new page no record", async () => {
+    await oldPage("0.5.0");
+    await writer.write({});
+    await writer.write({ layout: "preset" });
+    expect(record()).toBeNull();
+    rmSync(file);
+    await writer.write({});
+    expect(record()).toBeNull();
+  });
+
+  it("writes your own page, with or without the marker, as it is", async () => {
+    await oldPage("0.5.0");
+    await writer.write({});
+    const own = dataPage("null");
+    await writer.write({ page: own });
+    expect(page()).toContain("garmin-data:start");
+    expect(page()).not.toContain("garmin-refresh");
+  });
+
+  it("keeps the record when the assistant edits the page", async () => {
+    await oldPage("0.5.0");
+    await writer.write({});
+    await writer.edit({ languages: { de: { title: "Training" } } });
+    expect(record()).toEqual(first);
+  });
+
+  it("does not give the chat view the record", async () => {
+    await oldPage("0.5.0");
+    await writer.write({});
+    expect(Object.keys((await writer.view({})).blocks).toSorted()).toEqual(
+      ["data", "i18n", "languages", "layout", "settings", "widgets"].toSorted(),
+    );
   });
 });

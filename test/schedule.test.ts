@@ -957,6 +957,46 @@ const WIDGETS = /* garmin-widgets:start */[]/* garmin-widgets:end */;
   rmSync(dir, { recursive: true });
 });
 
+const recordTemplate = (id: string) => `<!doctype html>
+<meta name="garmin-template" content="${id}">
+<script>
+const DATA = /* garmin-data:start */null/* garmin-data:end */;
+const LAYOUT = /* garmin-layout:start */null/* garmin-layout:end */;
+const WIDGETS = /* garmin-widgets:start */[]/* garmin-widgets:end */;
+const R = /* garmin-refresh:start */null/* garmin-refresh:end */;
+</script>
+`;
+
+it("refreshPages saves the refresh record of an upgraded page", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "refresh-pages-"));
+  const raw = JSON.stringify({
+    start: "2026-08-03",
+    end: "2026-10-26",
+    weeks: 12,
+    activities: [],
+    previousActivities: [],
+    hrv: [],
+    recovery: [],
+    sync: { failedDays: 0 },
+  });
+  let id = "aaaaaaaaaaaaaaaa";
+  const writer = new DashboardWriter(
+    async () => raw,
+    dir,
+    async () => recordTemplate(id),
+  );
+  const file = join(dir, "garmin-dashboard.html");
+  await writer.write({});
+  id = "bbbbbbbbbbbbbbbb";
+
+  expect((await refreshPages(writer, [file])).failed).toEqual([]);
+  expect(readBlock(readFileSync(file, "utf8"), "refresh")).toMatchObject({
+    code: id,
+    widgets: {},
+  });
+  rmSync(dir, { recursive: true });
+});
+
 describe("run", () => {
   it("passes the input and gives the exit code, stdout and stderr, without a shell", async () => {
     const code =

@@ -45,7 +45,7 @@ const VIEW_MIME = "text/html;profile=mcp-app";
 const MAX_NOTES = 5;
 const REUSE_MS = 15 * 60_000;
 
-export type Block = "data" | "layout" | "widgets" | "i18n" | "settings" | "languages";
+export type Block = "data" | "layout" | "widgets" | "i18n" | "settings" | "languages" | "refresh";
 const marker = (b: Block) =>
   new RegExp(`/\\*\\s*garmin-${b}:start\\s*\\*/([\\s\\S]*?)/\\*\\s*garmin-${b}:end\\s*\\*/`);
 // the formatter writes the tag as <meta ... content="..." />
@@ -212,31 +212,32 @@ function withNewPresetWidgets(
   page: string,
   settings: Settings,
   tabs: ReadonlySet<string>,
-): { page: string; added: Record<string, string[]> } {
+): { page: string; added: Record<string, string[]>; names: Record<string, string[]> } {
   let layout: ReturnType<typeof parseLayout>;
   try {
     const saved = readBlock(page, "layout");
-    if (saved === undefined || saved === null) return { page, added: {} };
+    if (saved === undefined || saved === null) return { page, added: {}, names: {} };
     layout = parseLayout(saved);
   } catch {
     // an unreadable layout block is the user's to fix with editDashboard; the data update goes on
-    return { page, added: {} };
+    return { page, added: {}, names: {} };
   }
   const merged = withPresetWidgets(layout, preset, baseline);
-  if (!merged.changed) return { page, added: {} };
+  if (!merged.changed) return { page, added: {}, names: {} };
   // the page keeps a widget that it withholds, but the user is told only of the ones it shows, on the boards it shows
   const shown = new Set(CATALOGUE.filter((c) => inPage(c, settings)).map((c) => c.id));
-  const added = Object.fromEntries(
-    Object.entries(merged.added).flatMap(([board, list]) => {
-      if (!tabs.has(board)) return [];
-      const ids = list.filter((id) => {
-        const widget = merged.layout.boards[board]?.find((i) => i.id === id)?.widget;
-        return widget !== undefined && shown.has(widget);
-      });
-      return ids.length > 0 ? [[board, ids]] : [];
-    }),
-  );
-  return { page: writeBlock(page, "layout", merged.layout), added };
+  // the ids (longRuns-2) go to the assistant, the widget names (longRuns) to the page record
+  const shownIds = Object.entries(merged.added).flatMap(([board, list]) => {
+    if (!tabs.has(board)) return [];
+    const kept = list.flatMap((id) => {
+      const widget = merged.layout.boards[board]?.find((i) => i.id === id)?.widget;
+      return widget !== undefined && shown.has(widget) ? [{ id, widget }] : [];
+    });
+    return kept.length > 0 ? [[board, kept] as const] : [];
+  });
+  const added = Object.fromEntries(shownIds.map(([b, l]) => [b, l.map((k) => k.id)]));
+  const names = Object.fromEntries(shownIds.map(([b, l]) => [b, l.map((k) => k.widget)]));
+  return { page: writeBlock(page, "layout", merged.layout), added, names };
 }
 
 /** A new layout rev: a browser edit made on another layout never applies to this one. */
@@ -289,6 +290,22 @@ function carryUserBlocks(template: string, old: string): string {
   page = writeBlock(page, "widgets", readBlock(old, "widgets") ?? []);
   return writeBlock(page, "i18n", readBlock(old, "i18n") ?? {});
 }
+
+/** `next` with the `refresh` block of `old`; null when it cannot be read or written: it must never stop a write. */
+function carryRefresh(next: string, old: string): string {
+  try {
+    return writeBlock(next, "refresh", readBlock(old, "refresh") ?? null);
+  } catch {
+    // the block is editable: invalid JSON, or a value too deep to write back
+    return writeBlock(next, "refresh", null);
+  }
+}
+
+const VERSION = /^\d+\.\d+\.\d+$/;
+
+/** True when `a` is an older x.y.z than `b`; false when either is not x.y.z. */
+export const olderThan = (a: string, b: string): boolean =>
+  VERSION.test(a) && VERSION.test(b) && a.localeCompare(b, "en", { numeric: true }) < 0;
 
 /** The `i18n` block of `old`; {} when it cannot be read: a new layout is the way out of a broken page. */
 function addedLanguages(old: string): unknown {
@@ -639,6 +656,8 @@ export class DashboardWriter {
       // other page code or new settings: the user's state lives in the blocks, so it moves over as it is
       next = carryUserBlocks(template, old);
       kind = needsNewCode(oldCode, templateCode) ? "upgraded" : "replaced";
+      // new settings alone do not change what the last refresh did
+      if (kind === "replaced") next = carryRefresh(next, old);
     } else {
       next = old;
       kind = "updated";
@@ -651,13 +670,33 @@ export class DashboardWriter {
     }
     const raw = JSON.parse(await this.#data(weeks ?? weeksOf(old), own.workouts === true)) as Json;
     let addedWidgets: Record<string, string[]> = {};
+    let addedNames: Record<string, string[]> = {};
     // only a page from the template has a layout block that the server owns
     if (page === undefined && pageCode(next).from === "template") {
-      ({ page: next, added: addedWidgets } = withNewPresetWidgets(
+      ({
+        page: next,
+        added: addedWidgets,
+        names: addedNames,
+      } = withNewPresetWidgets(
         next,
         own,
         new Set(tabsFor(listOf(raw.activities) as Activity[], own)),
       ));
+      // a page that a newer server wrote is not "new in this version" with older page code
+      if (
+        kind === "upgraded" &&
+        templateCode.from === "template" &&
+        templateCode.id !== undefined &&
+        !olderThan(version, previousServer)
+      ) {
+        const record = {
+          from: previousServer,
+          server: version,
+          code: templateCode.id,
+          widgets: addedNames,
+        };
+        next = writeBlock(next, "refresh", record);
+      }
     }
     if (page === undefined && next !== old) next = styled(next, own);
     // a page that Claude wrote keeps its settings in its block too, so its updates filter the same way
