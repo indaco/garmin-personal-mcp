@@ -63,7 +63,8 @@ the page.
 
 When a release adds a widget to the preset of a board that you edited, the update also puts that widget
 on the board, one time, and saves in the page which preset widgets each board has met. A widget that
-you remove later stays removed. The scheduled refresh does the same.
+you remove later stays removed. The assistant tells you which widgets the update added to which board.
+The scheduled refresh does the same, without the message.
 
 When the server has other page code than your page, the update writes the page code of the server.
 This also happens with an older server, and in a scheduled refresh. It keeps your layout, custom widgets, languages and page settings, and it keeps the old page as a

@@ -160,6 +160,19 @@ describe("prompts", () => {
     }
   });
 
+  it("tells the update prompt to name the added widgets of the first call, in step 1", async () => {
+    const argSets: Record<string, string>[] = [{}, { weeks: "8", path: "coach.html" }];
+    for (const args of argSets) {
+      const text = (await render("training-dashboard-update", args)).replace(/\s+/g, " ");
+      const step1 = text.slice(text.indexOf("1. Call"), text.indexOf("2. Write at most"));
+      expect(step1).toContain("`addedWidgets`");
+      expect(step1).toContain("reply of this first call has `addedWidgets`");
+      expect(step1).toContain("The reply of step 3 does not have them");
+      expect(step1).toContain("Without `addedWidgets`, say nothing about added widgets");
+      expect(step1).toContain("do not make up a title");
+    }
+  });
+
   it("updates with the weeks given, or the weeks of the page", async () => {
     expect(await render("training-dashboard-update", { weeks: "8" })).toContain("`weeks` = 8,");
     const keep = await render("training-dashboard-update", { weeks: " " });

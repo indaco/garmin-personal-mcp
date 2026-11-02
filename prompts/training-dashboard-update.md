@@ -8,6 +8,9 @@ tools of the `garmin-personal` MCP server. Answer in my language.
    If the reply of this first call has `page: "upgraded"`, tell me that the page has the page code of
    server `server` now, and that server `previousServer` wrote it before. Show a value that is
    "n/a" as "n/a". The reply of step 3 does not have these values: do not guess a version.
+   If the reply of this first call has `addedWidgets` (board -> widget ids), tell me which widgets
+   the update added to which board. Give the ids as the reply gives them: do not make up a title.
+   The reply of step 3 does not have them. Without `addedWidgets`, say nothing about added widgets.
 2. Write at most 5 coach notes from the digest of the reply. Each note names a specific number of the
    digest. Training suggestions only, no medical advice. Plain text, in my language.
 3. Call `writeDashboard` again with the same `weeks`{{pathArgument}} and the `notes`.
