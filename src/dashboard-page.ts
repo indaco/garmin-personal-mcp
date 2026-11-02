@@ -81,10 +81,8 @@ export interface ViewResult {
   blocks: ViewBlocks;
 }
 
-export interface WriteResult {
+interface WriteResultBase {
   path: string;
-  /** created: no page before; updated: only the data changed; replaced: a new page or new settings; upgraded: the page code differs from the template. */
-  page: "created" | "updated" | "replaced" | "upgraded";
   backup?: string;
   notes: number;
   digest: Digest;
@@ -99,6 +97,21 @@ export interface WriteResult {
   /** The custom widgets that have no texts in some languages of the page, with those languages. */
   missingWidgetTexts?: Record<string, string[]>;
 }
+
+/**
+ * created: no page before; updated: only the data changed; replaced: a new page or new settings;
+ * upgraded: the page code differs from the template, and the result names the server versions.
+ */
+export type WriteResult = WriteResultBase &
+  (
+    | { page: "created" | "updated" | "replaced" }
+    | {
+        page: "upgraded";
+        /** The server version that wrote the page before; "n/a" when the page does not say. */
+        previousServer: string;
+        server: string;
+      }
+  );
 
 export interface CustomWidget {
   id: string;
@@ -191,6 +204,16 @@ function weeksOf(page: string | undefined): number | undefined {
     return typeof w === "number" && Number.isInteger(w) ? w : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/** The server version in a page's data block; "n/a" unless it is x.y.z (the page file is editable). */
+function serverOf(page: string): string {
+  try {
+    const v = (readBlock(page, "data") as { server?: unknown } | null)?.server;
+    return typeof v === "string" && /^\d+\.\d+\.\d+$/.test(v) ? v : "n/a";
+  } catch {
+    return "n/a";
   }
 }
 
@@ -545,6 +568,8 @@ export class DashboardWriter {
     }
     const own = asked ?? oldSettings;
 
+    // read before withData gives the page the version of this server
+    const previousServer = old === undefined ? undefined : serverOf(old);
     const template = await this.#template();
     const templateCode = pageCode(template);
     const oldCode = old === undefined ? undefined : pageCode(old);
@@ -614,7 +639,9 @@ export class DashboardWriter {
       backup !== undefined || sameBuild ? { target, page: next, at: Date.now() } : undefined;
     return {
       path: target,
-      page: kind,
+      ...(kind === "upgraded"
+        ? { page: kind, previousServer: previousServer ?? "n/a", server: version }
+        : { page: kind }),
       ...(backup ? { backup } : {}),
       notes: own.exclude?.includes("notes") ? 0 : notes.length,
       digest: digest(filterData(raw, own)),
@@ -1022,7 +1049,8 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         "HRV, recovery, fitness age, sync) for the coach notes. Without HRV and sleep data the digest has",
         "no readiness: give the verdict as n/a.",
         "An existing page keeps all its code, layout and widgets: only its data is replaced. A page with",
-        "different page code gets the page code of the server and keeps its layout and widgets. Every page from the template",
+        'different page code gets the page code of the server and keeps its layout and widgets; the result then has `page: "upgraded"`,',
+        "`previousServer` (the server version that wrote the page, n/a when unknown) and `server`. Every page from the template",
         "also gets the custom widgets of the widget library (<data-dir>/widgets.json), not placed on a board.",
         "`layout` writes a new page",
         "from the template: `preset` (the default widgets) or `blank` (empty boards). It keeps the languages",

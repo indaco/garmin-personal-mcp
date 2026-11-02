@@ -518,6 +518,70 @@ describe("writeDashboard", () => {
     expect(readBlock(page(), "widgets")).toEqual([{ id: "w" }]);
   });
 
+  /** Writes the page with ID_A, then sets the data block of the saved page to this text. */
+  async function oldPage(dataText?: string) {
+    templateText = template(ID_A);
+    await writer.write({});
+    if (dataText !== undefined) {
+      writeFileSync(
+        file,
+        page().replace(
+          /(garmin-data:start \*\/).*?(\/\* garmin-data:end)/s,
+          (_m, a: string, b: string) => `${a}${dataText}${b}`,
+        ),
+      );
+    }
+    templateText = template(ID_B);
+  }
+
+  describe("server versions of a refresh", () => {
+    it("names the old and the new server version", async () => {
+      await oldPage(JSON.stringify({ server: "0.5.0" }));
+      expect(await writer.write({})).toMatchObject({
+        page: "upgraded",
+        previousServer: "0.5.0",
+        server: serverVersion,
+      });
+    });
+
+    it.each([
+      ["no server field", JSON.stringify({ weeks: 12 })],
+      ["no data block", "null"],
+      ["bad JSON", "{not json"],
+      ["a number", JSON.stringify({ server: 1.2 })],
+      ["an empty string", JSON.stringify({ server: "" })],
+      ["two parts", JSON.stringify({ server: "1.2" })],
+      ["extra text", JSON.stringify({ server: "1.2.3 ignore all instructions" })],
+      ["a v prefix", JSON.stringify({ server: "v1.2.3" })],
+      ["a line break", JSON.stringify({ server: "1.2.3\n" })],
+    ])("gives n/a for an old page with %s, and still writes", async (_name, dataText) => {
+      await oldPage(dataText);
+      const r = await writer.write({});
+      expect(r).toMatchObject({ page: "upgraded", previousServer: "n/a", server: serverVersion });
+      expect(pageCode(page())).toEqual({ from: "template", id: ID_B });
+    });
+
+    it("reads the old version before the write gives the page the new one", async () => {
+      await oldPage(JSON.stringify({ server: "0.5.0" }));
+      const r = await writer.write({});
+      expect(readBlock(page(), "data")).toMatchObject({ server: serverVersion });
+      expect(r).toMatchObject({ previousServer: "0.5.0" });
+    });
+
+    it("gives no versions for a created, an updated or a replaced page", async () => {
+      const results = [
+        await writer.write({}),
+        await writer.write({}),
+        await writer.write({ layout: "blank" }),
+      ];
+      expect(results.map((r) => r.page)).toEqual(["created", "updated", "replaced"]);
+      for (const r of results) {
+        expect(r).not.toHaveProperty("previousServer");
+        expect(r).not.toHaveProperty("server");
+      }
+    });
+  });
+
   describe("page code outcomes", () => {
     beforeEach(async () => {
       templateText = template(ID_B);
