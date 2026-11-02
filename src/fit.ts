@@ -137,7 +137,7 @@ export function lapsOf(fit: Messages, activityId: number) {
     o.time = hms(lap.totalTimerTime ?? 0);
     if (speed != null && speed > 0) {
       if (foot) {
-        o.pace = `${hms(1000 / speed)}/km`;
+        o.pace = paceText(1000 / speed);
       } else {
         o.kmh = round(speed * 3.6, 1);
       }
