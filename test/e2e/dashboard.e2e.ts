@@ -1991,6 +1991,34 @@ const on = (...ids: string[]) => ({
   boards: { all: ids.map((id) => ({ id, widget: id, span: 1 })) },
 });
 
+/** The first row of the Activities table. */
+async function firstRow(file: string): Promise<string | null> {
+  const { page, errors } = await open(browser, file);
+  expect(errors).toEqual([]);
+  return page.textContent("[data-id=activities] tbody tr");
+}
+/** A custom widget that shows the length and the ends of the data arrays. */
+const probe = custom(
+  "probe",
+  "const d = ctx.data; el.textContent = [d.weeks, d.start, d.activities.length, d.activities[0].start, d.previousActivities.length, d.previousActivities[0].start, d.hrv.length, d.hrv.at(-1).date, d.recovery.length].join(' ');",
+);
+/** The probe tile and the first Activities row, before and after a redraw (tab switch). */
+async function probed(file: string): Promise<(string | null)[]> {
+  const { page, errors } = await open(browser, file);
+  const read = () =>
+    Promise.all([
+      page.textContent("[data-id=probe] .tile-body"),
+      page.textContent("[data-id=activities] tbody tr"),
+    ]);
+  const first = await read();
+  await page.click("[role=tab] >> nth=1");
+  await page.click("[data-tab=all]");
+  const again = await read();
+  expect(await page.$$(".tile .error")).toEqual([]);
+  expect(errors).toEqual([]);
+  return [...first, ...again];
+}
+
 /** A custom widget that draws a chart of `type`. */
 const chartOf = (type: string) =>
   `ctx.chart(el, { type: "${type}", data: { labels: ["a", "b"], datasets: [{ data: [1, 2] }] } });`;
@@ -2011,6 +2039,50 @@ describe("custom widgets and languages", () => {
     expect(await page.textContent(".rides")).toBe("3 rides </script>");
     expect(await chartsWithoutTooltip(page)).toEqual([]);
     expect(errors).toEqual([]);
+  });
+
+  it("keeps the order of the data for the other tiles when a custom widget reorders it", async () => {
+    const flip = custom(
+      "flip",
+      "ctx.data.activities.reverse(); ctx.data.previousActivities.reverse(); el.textContent = 'flipped';",
+    );
+    const alone = await firstRow(pageFile({ layout: on("activities") }));
+    const after = await firstRow(pageFile({ widgets: [flip], layout: on("flip", "activities") }));
+    expect(after).toBe(alone);
+  });
+
+  it("gives each custom widget its own data arrays, also after a redraw", async () => {
+    // sorts, cuts and adds to the arrays; it still draws (the arrays are not frozen)
+    const mess = custom(
+      "mess",
+      `const d = ctx.data;
+      d.activities.sort((a, b) => (a.start < b.start ? -1 : 1));
+      d.activities.splice(0, 5);
+      d.activities.push(d.activities[0]);
+      d.previousActivities.reverse();
+      d.hrv.reverse();
+      d.hrv.splice(0, 3);
+      d.recovery.push({});
+      el.textContent = "messed";`,
+    );
+    const alone = await probed(pageFile({ widgets: [probe], layout: on("probe", "activities") }));
+    expect(alone[0]).toBe(
+      [
+        data.weeks,
+        data.start,
+        data.activities.length,
+        data.activities[0].start,
+        data.previousActivities.length,
+        data.previousActivities[0].start,
+        data.hrv.length,
+        data.hrv.at(-1).date,
+        data.recovery.length,
+      ].join(" "),
+    );
+    const after = await probed(
+      pageFile({ widgets: [mess, probe], layout: on("mess", "probe", "activities") }),
+    );
+    expect(after).toEqual(alone);
   });
 
   it("shows the texts of a custom widget in the page language, else in English", async () => {

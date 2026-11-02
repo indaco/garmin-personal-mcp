@@ -824,7 +824,9 @@ function tile(data: Data, inst: Instance, def: WidgetDef | undefined): HTMLEleme
   );
   if (def) {
     try {
-      def.render(body, ctxFor(data, inst));
+      // a custom widget gets its own arrays: sorting them must not reorder the other tiles.
+      // shortcut: the activity objects are still shared, so a widget that changes a field changes it for all; deep-copy if that is ever seen
+      def.render(body, ctxFor(def.custom ? ownArrays(data) : data, inst));
     } catch (e) {
       body.replaceChildren(
         h(
@@ -837,6 +839,13 @@ function tile(data: Data, inst: Instance, def: WidgetDef | undefined): HTMLEleme
     }
   }
   return el;
+}
+
+/** The data with a copy of each top-level array; the items are the same objects. */
+function ownArrays(data: Data): Data {
+  return Object.fromEntries(
+    Object.entries(data).map(([k, v]) => [k, Array.isArray(v) ? [...v] : v]),
+  ) as unknown as Data;
 }
 
 function ctxFor(data: Data, inst: Instance): Ctx {
