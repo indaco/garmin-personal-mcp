@@ -6,7 +6,7 @@ import { DashboardWriter, readBlock } from "../src/dashboard-page";
 import { en } from "../src/page/i18n/en";
 
 const template = `<!doctype html>
-<meta name="garmin-template" content="3">
+<meta name="garmin-template" content="bbbbbbbbbbbbbbbb">
 <script>
 window.GARMIN = {
   data: /* garmin-data:start */null/* garmin-data:end */,
@@ -243,7 +243,7 @@ describe("editDashboard", () => {
 
   it("keeps the languages when the template is upgraded", async () => {
     await writer.edit({ languages: { de: { title: "Training + Erholung" } } });
-    writeFileSync(file, page().replace('content="3"', 'content="2"'));
+    writeFileSync(file, page().replace("bbbbbbbbbbbbbbbb", "aaaaaaaaaaaaaaaa"));
     expect((await writer.write({})).page).toBe("upgraded");
     expect(readBlock(page(), "i18n")).toEqual({ de: { title: "Training + Erholung" } });
   });

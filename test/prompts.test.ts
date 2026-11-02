@@ -132,6 +132,12 @@ describe("prompts", () => {
     expect(text.includes("{{")).toBe(false);
   });
 
+  it("tells the update prompt that a page with different page code gets the server's code", async () => {
+    const text = (await render("training-dashboard-update", {})).replace(/\s+/g, " ");
+    expect(text).toContain("A page with different page code gets the page code of the server");
+    expect(text).not.toContain("older template");
+  });
+
   it("updates with the weeks given, or the weeks of the page", async () => {
     expect(await render("training-dashboard-update", { weeks: "8" })).toContain("`weeks` = 8,");
     const keep = await render("training-dashboard-update", { weeks: " " });

@@ -40,8 +40,9 @@ const REUSE_MS = 15 * 60_000;
 export type Block = "data" | "layout" | "widgets" | "i18n" | "settings" | "languages";
 const marker = (b: Block) =>
   new RegExp(`/\\*\\s*garmin-${b}:start\\s*\\*/([\\s\\S]*?)/\\*\\s*garmin-${b}:end\\s*\\*/`);
-// the formatter writes the tag as <meta ... content="3" />
-const TEMPLATE_VERSION = /<meta name="garmin-template" content="(\d+)"\s*\/?>/;
+// the formatter writes the tag as <meta ... content="..." />
+const PAGE_CODE_TAG = /<meta name="garmin-template" content="([^"]*)"\s*\/?>/;
+const PAGE_CODE_ID = /^[0-9a-f]{16}$/;
 
 export interface WriteOptions {
   weeks?: number;
@@ -82,7 +83,7 @@ export interface ViewResult {
 
 export interface WriteResult {
   path: string;
-  /** created: no page before; updated: only the data changed; replaced: a new page or new settings; upgraded: a newer template. */
+  /** created: no page before; updated: only the data changed; replaced: a new page or new settings; upgraded: the page code differs from the template. */
   page: "created" | "updated" | "replaced" | "upgraded";
   backup?: string;
   notes: number;
@@ -193,8 +194,29 @@ function weeksOf(page: string | undefined): number | undefined {
   }
 }
 
-/** The template version of a page; 0 for a page that Claude wrote. */
-export const templateVersion = (page: string) => Number(TEMPLATE_VERSION.exec(page)?.[1] ?? 0);
+/** Where a page's code comes from. `id` is undefined when the tag holds no valid id, e.g. an old number. */
+export type PageCode = { from: "assistant" } | { from: "template"; id: string | undefined };
+
+/** The page code of a page: no tag means the assistant wrote it. */
+export function pageCode(page: string): PageCode {
+  const value = PAGE_CODE_TAG.exec(page)?.[1];
+  if (value === undefined) return { from: "assistant" };
+  return { from: "template", id: PAGE_CODE_ID.test(value) ? value : undefined };
+}
+
+/** True when a page from the template has other page code than the template, in any direction. */
+export function needsNewCode(old: PageCode, template: PageCode): boolean {
+  switch (old.from) {
+    case "assistant":
+      return false;
+    case "template":
+      return old.id === undefined || template.from !== "template" || old.id !== template.id;
+    default: {
+      const unreachable: never = old;
+      return unreachable;
+    }
+  }
+}
 
 /** The template with the user's state of `old`, a page from the template: layout, custom widgets and added languages. */
 function carryUserBlocks(template: string, old: string): string {
@@ -441,6 +463,16 @@ export class DashboardWriter {
     return run;
   }
 
+  /** The template; a build without a page code id would refresh each page on each write, so it stops here. */
+  async #template(): Promise<string> {
+    const html = await this.template();
+    const code = pageCode(html);
+    if (code.from !== "template" || code.id === undefined) {
+      throw new Error("the page template has no page code id: build the server again");
+    }
+    return html;
+  }
+
   /** The blocks of the page with new data, for the dashboard in the chat (an MCP App); writes nothing. */
   view(options: Pick<WriteOptions, "weeks" | "path">): Promise<ViewResult> {
     const run = this.#queue.then(async () => {
@@ -453,8 +485,8 @@ export class DashboardWriter {
         throw unreadable(e, target);
       }
       // the user's state moves into the template as on an upgrade; a page that Claude wrote has none
-      let page = await this.template();
-      if (old !== undefined && templateVersion(old) > 0) {
+      let page = await this.#template();
+      if (old !== undefined && pageCode(old).from === "template") {
         page = carryUserBlocks(page, old);
       } else {
         // a fixed rev: a layout edited in the chat stays for the next view
@@ -513,7 +545,9 @@ export class DashboardWriter {
     }
     const own = asked ?? oldSettings;
 
-    const template = await this.template();
+    const template = await this.#template();
+    const templateCode = pageCode(template);
+    const oldCode = old === undefined ? undefined : pageCode(old);
     let next: string;
     let kind: WriteResult["page"];
     if (page !== undefined) {
@@ -526,17 +560,18 @@ export class DashboardWriter {
         boards: {},
       });
       // a new layout starts the boards again; the languages that the user added stay
-      if (old !== undefined && templateVersion(old) > 0) {
+      if (old !== undefined && oldCode?.from === "template") {
         next = writeBlock(next, "i18n", addedLanguages(old));
       }
       kind = old === undefined ? "created" : "replaced";
     } else if (
-      templateVersion(old) > 0 &&
-      (templateVersion(old) < templateVersion(template) || !same(own, oldSettings) || broken)
+      old !== undefined &&
+      oldCode?.from === "template" &&
+      (needsNewCode(oldCode, templateCode) || !same(own, oldSettings) || broken)
     ) {
-      // a newer template or new settings: the user's state lives in the blocks, so it moves over as it is
+      // other page code or new settings: the user's state lives in the blocks, so it moves over as it is
       next = carryUserBlocks(template, old);
-      kind = templateVersion(old) < templateVersion(template) ? "upgraded" : "replaced";
+      kind = needsNewCode(oldCode, templateCode) ? "upgraded" : "replaced";
     } else {
       next = old;
       kind = "updated";
@@ -986,8 +1021,8 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         "best efforts, races, long runs, race predictions, strength top sets, readiness, fitness and form,",
         "HRV, recovery, fitness age, sync) for the coach notes. Without HRV and sleep data the digest has",
         "no readiness: give the verdict as n/a.",
-        "An existing page keeps all its code, layout and widgets: only its data is replaced. A page from an",
-        "older template gets the new template and keeps its layout and widgets. Every page from the template",
+        "An existing page keeps all its code, layout and widgets: only its data is replaced. A page with",
+        "different page code gets the page code of the server and keeps its layout and widgets. Every page from the template",
         "also gets the custom widgets of the widget library (<data-dir>/widgets.json), not placed on a board.",
         "`layout` writes a new page",
         "from the template: `preset` (the default widgets) or `blank` (empty boards). It keeps the languages",

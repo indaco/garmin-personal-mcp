@@ -14,6 +14,7 @@ import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { McpServer } from "@modelcontextprotocol/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Config } from "../src/config";
+import { DashboardWriter, pageCode, readBlock } from "../src/dashboard-page";
 import { log } from "../src/log";
 import {
   AutoRefresh,
@@ -863,6 +864,46 @@ it("refreshPages goes on after a page fails", async () => {
   expect(r.failed).toEqual([{ path: "a.html", error: "gone" }]);
   expect(r.lines[0]).toMatch(/failed a\.html: gone$/);
   expect(r.lines[1]).toMatch(/updated b\.html$/);
+});
+
+it("refreshPages gives a saved page with an old number the page code of the template", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "refresh-pages-"));
+  const id = "bbbbbbbbbbbbbbbb";
+  const template = `<!doctype html>
+<meta name="garmin-template" content="${id}">
+<script>
+const DATA = /* garmin-data:start */null/* garmin-data:end */;
+const LAYOUT = /* garmin-layout:start */null/* garmin-layout:end */;
+const WIDGETS = /* garmin-widgets:start */[]/* garmin-widgets:end */;
+</script>
+`;
+  const raw = JSON.stringify({
+    start: "2026-08-03",
+    end: "2026-10-26",
+    weeks: 12,
+    activities: [],
+    previousActivities: [],
+    hrv: [],
+    recovery: [],
+    sync: { failedDays: 0 },
+  });
+  const writer = new DashboardWriter(
+    async () => raw,
+    dir,
+    async () => template,
+  );
+  const file = join(dir, "garmin-dashboard.html");
+  await writer.write({ layout: "blank" });
+  const layout = readBlock(readFileSync(file, "utf8"), "layout");
+  writeFileSync(file, readFileSync(file, "utf8").replace(`content="${id}"`, 'content="15"'));
+
+  const r = await refreshPages(writer, [file]);
+  expect(r.failed).toEqual([]);
+  const page = readFileSync(file, "utf8");
+  expect(pageCode(page)).toEqual({ from: "template", id });
+  expect(readBlock(page, "layout")).toEqual(layout);
+  expect(existsSync(`${file}.bak`)).toBe(true);
+  rmSync(dir, { recursive: true });
 });
 
 describe("run", () => {

@@ -1,5 +1,6 @@
 // Writes dist/dashboard.html, the page template that writeDashboard fills: the HTML shell with the styles
 // and the page script inline, so the page works offline from a single file.
+import { withPageCodeId } from "./page-code-id.mjs";
 import { copyFileSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 const dir = "dist/page";
@@ -16,10 +17,13 @@ if (/<\/script/i.test(script) || /<\/style/i.test(css)) {
 // the home-screen icon of a page saved on a phone: iOS takes only a PNG, Android the 192 px icon
 const png = `data:image/png;base64,${readFileSync("assets/logo-192.png").toString("base64")}`;
 const touchIcon = `<link rel="apple-touch-icon" href="${png}" />\n    <link rel="icon" sizes="192x192" href="${png}" />`;
-const page = readFileSync("src/page/template.html", "utf8")
-  .replace("<!--touch-icon-->", () => touchIcon)
-  .replace("<!--style-->", () => `<style>${css}</style>`)
-  .replace("<!--script-->", () => `<script>\n${script}</script>`);
+// the id is the hash of the finished page, so any change to the script, styles or shell gives another id
+const page = withPageCodeId(
+  readFileSync("src/page/template.html", "utf8")
+    .replace("<!--touch-icon-->", () => touchIcon)
+    .replace("<!--style-->", () => `<style>${css}</style>`)
+    .replace("<!--script-->", () => `<script>\n${script}</script>`),
+);
 writeFileSync("dist/dashboard.html", page);
 // the page script lives only inside the template; the module list is for the notices, which remove it
 copyFileSync(`${dir}/modules.json`, "dist/page-modules.json");

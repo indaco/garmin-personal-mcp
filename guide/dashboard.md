@@ -60,8 +60,8 @@ Run the `training-dashboard-update` prompt. The server replaces only the data an
 Your layout, your custom widgets, your languages and your page settings stay. Leave `weeks` empty to keep the weeks of
 the page.
 
-When a new version of the server has a newer page template, the update writes the new template. It
-keeps your layout, custom widgets, languages and page settings, and it keeps the old page as a
+When the server has other page code than your page, the update writes the page code of the server.
+This also happens with an older server, and in a scheduled refresh. It keeps your layout, custom widgets, languages and page settings, and it keeps the old page as a
 `.bak` file.
 
 The first update sends approximately 35 requests to Garmin. Later updates use the local cache and

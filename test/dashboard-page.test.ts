@@ -7,7 +7,8 @@ import {
   languagesOf,
   patchDue,
   readBlock,
-  templateVersion,
+  needsNewCode,
+  pageCode,
   withData,
   writeBlock,
 } from "../src/dashboard-page";
@@ -15,8 +16,11 @@ import { digest } from "../src/digest";
 import { DASHBOARD_VERSION } from "../src/prompts";
 import { version as serverVersion } from "../package.json";
 
-const template = (version: number, extra = "") => `<!doctype html>
-<meta name="garmin-template" content="${version}">
+const ID_A = "aaaaaaaaaaaaaaaa";
+const ID_B = "bbbbbbbbbbbbbbbb";
+const ID_C = "cccccccccccccccc";
+const template = (id: string, extra = "") => `<!doctype html>
+<meta name="garmin-template" content="${id}">
 <script>
 const DATA = /* garmin-data:start */null/* garmin-data:end */;
 const LAYOUT = /* garmin-layout:start */null/* garmin-layout:end */;
@@ -54,7 +58,7 @@ let writer: DashboardWriter;
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "dashboard-page-"));
   file = join(dir, "garmin-dashboard.html");
-  templateText = template(2);
+  templateText = template(ID_B);
   asked = [];
   writer = new DashboardWriter(
     async (weeks) => {
@@ -114,11 +118,49 @@ describe("writeDashboard", () => {
     expect(all).toMatchObject({ notes: ["a &lt;b&gt;"] });
   });
 
-  it("reads the template version of the real template, as the formatter writes it", async () => {
-    const real = readFileSync("src/page/template.html", "utf8");
-    expect(templateVersion(real)).toBeGreaterThan(2);
-    expect(templateVersion('<meta name="garmin-template" content="7" />')).toBe(7);
-    expect(templateVersion('<meta name="garmin-template" content="7">')).toBe(7);
+  it("has the placeholder in the real template, and a page code id in the build when it exists", () => {
+    expect(readFileSync("src/page/template.html", "utf8")).toContain(
+      '<meta name="garmin-template" content="page-code-id" />',
+    );
+    // CI runs the unit tests before the build: without dist/, only this assertion is skipped
+    if (existsSync("dist/dashboard.html")) {
+      expect(pageCode(readFileSync("dist/dashboard.html", "utf8"))).toEqual({
+        from: "template",
+        id: expect.stringMatching(/^[0-9a-f]{16}$/),
+      });
+    }
+  });
+
+  it.each([
+    [`<meta name="garmin-template" content="${ID_A}" />`, { from: "template", id: ID_A }],
+    [`<meta name="garmin-template" content="${ID_A}">`, { from: "template", id: ID_A }],
+    ['<meta name="garmin-template" content="15" />', { from: "template", id: undefined }],
+    ['<meta name="garmin-template" content="0">', { from: "template", id: undefined }],
+    ['<meta name="garmin-template" content="">', { from: "template", id: undefined }],
+    ['<meta name="garmin-template" content="x<script>">', { from: "template", id: undefined }],
+    [
+      `<meta name="garmin-template" content="${"a".repeat(15)}">`,
+      { from: "template", id: undefined },
+    ],
+    [
+      `<meta name="garmin-template" content="${"a".repeat(17)}">`,
+      { from: "template", id: undefined },
+    ],
+    [
+      `<meta name="garmin-template" content="${"A".repeat(16)}">`,
+      { from: "template", id: undefined },
+    ],
+    ["<html>no tag</html>", { from: "assistant" }],
+  ])("reads the page code of %s", (html, expected) => {
+    expect(pageCode(html)).toEqual(expected);
+  });
+
+  it("needs new code for a template page with another or no id, never for the assistant's page", () => {
+    const tmpl = pageCode(template(ID_B));
+    expect(needsNewCode(pageCode("<html></html>"), tmpl)).toBe(false);
+    expect(needsNewCode({ from: "template", id: undefined }, tmpl)).toBe(true);
+    expect(needsNewCode({ from: "template", id: ID_B }, tmpl)).toBe(false);
+    expect(needsNewCode({ from: "template", id: ID_A }, tmpl)).toBe(true);
   });
 
   it("has every block in the real template", () => {
@@ -421,7 +463,7 @@ describe("writeDashboard", () => {
   });
 
   it("keeps the custom widgets of the page that the widget library does not have", async () => {
-    templateText = template(1);
+    templateText = template(ID_A);
     await writer.write({});
     writeFileSync(
       file,
@@ -435,26 +477,26 @@ describe("writeDashboard", () => {
       JSON.stringify([{ id: "lib", title: "Lib", code: "y" }]),
     );
     expect(widgetIds((await writer.view({})).blocks.widgets)).toEqual(["mine", "lib"]);
-    templateText = template(2);
+    templateText = template(ID_B);
     expect((await writer.write({})).page).toBe("upgraded");
     expect(widgetIds(readBlock(page(), "widgets"))).toEqual(["mine", "lib"]);
   });
 
   it("views and upgrades a page from the template that lost its layout and widgets blocks", async () => {
-    templateText = template(1);
+    templateText = template(ID_A);
     await writer.write({});
     writeFileSync(file, page().replace(/const (LAYOUT|WIDGETS) = .*\n/g, ""));
     const { blocks } = await writer.view({});
     expect(blocks.layout).toBeNull();
     expect(blocks.widgets).toEqual([]);
-    templateText = template(2);
+    templateText = template(ID_B);
     expect((await writer.write({})).page).toBe("upgraded");
     expect(readBlock(page(), "layout")).toBeNull();
     expect(readBlock(page(), "widgets")).toEqual([]);
   });
 
   it("upgrades a page from an older template and keeps its layout and widgets", async () => {
-    templateText = template(1);
+    templateText = template(ID_A);
     await writer.write({});
     writeFileSync(
       file,
@@ -467,13 +509,78 @@ describe("writeDashboard", () => {
     );
     const old = page();
 
-    templateText = template(2, "newCode();\n");
+    templateText = template(ID_B, "newCode();\n");
     const r = await writer.write({});
     expect(r).toMatchObject({ page: "upgraded", backup: `${file}.bak` });
     expect(readFileSync(`${file}.bak`, "utf8")).toBe(old);
     expect(page()).toContain("newCode();");
     expect(readBlock(page(), "layout")).toEqual({ rev: "r1", base: "preset", boards: {} });
     expect(readBlock(page(), "widgets")).toEqual([{ id: "w" }]);
+  });
+
+  describe("page code outcomes", () => {
+    beforeEach(async () => {
+      templateText = template(ID_B);
+      await writer.write({ layout: "blank" });
+      writeFileSync(
+        file,
+        page().replace(/(garmin-widgets:start \*\/).*?(\/\*)/, '$1[{"id":"w"}]$2'),
+      );
+    });
+
+    it.each([
+      ["an old number", "15"],
+      ["another id", ID_A],
+      ["a junk value", "x<script>"],
+      ["0", "0"],
+    ])("upgrades a page with %s and keeps its blocks", async (_name, content) => {
+      writeFileSync(
+        file,
+        page().replace(/(<meta name="garmin-template" content=")[^"]*(")/, `$1${content}$2`),
+      );
+      const layout = readBlock(page(), "layout");
+      const r = await writer.write({});
+      expect(r).toMatchObject({ page: "upgraded", backup: `${file}.bak` });
+      expect(existsSync(`${file}.bak`)).toBe(true);
+      expect(pageCode(page())).toEqual({ from: "template", id: ID_B });
+      expect(readBlock(page(), "layout")).toEqual(layout);
+      expect(readBlock(page(), "widgets")).toEqual([{ id: "w" }]);
+    });
+
+    it("upgrades a page from a higher id too (a downgrade of the server)", async () => {
+      templateText = template(ID_A);
+      expect((await writer.write({})).page).toBe("upgraded");
+      expect(pageCode(page())).toEqual({ from: "template", id: ID_A });
+    });
+
+    it("only updates a page with the same id, and makes no .bak", async () => {
+      const r = await writer.write({});
+      expect(r.page).toBe("updated");
+      expect(r.backup).toBeUndefined();
+      expect(existsSync(`${file}.bak`)).toBe(false);
+    });
+
+    it("keeps the layout of a page with an id when it is viewed", async () => {
+      const layout = readBlock(page(), "layout");
+      expect(layout).not.toBeNull();
+      expect((await writer.view({})).blocks.layout).toEqual(layout);
+    });
+  });
+
+  it("stops write and view when the template has no valid page code id", async () => {
+    templateText = template("page-code-id");
+    const message = /the page template has no page code id: build the server again/;
+    await expect(writer.write({})).rejects.toThrow(message);
+    await expect(writer.view({})).rejects.toThrow(message);
+    expect(existsSync(file)).toBe(false);
+
+    templateText = template(ID_B);
+    await writer.write({});
+    const before = page();
+    templateText = template("15");
+    await expect(writer.write({})).rejects.toThrow(message);
+    expect(page()).toBe(before);
+    expect(existsSync(`${file}.bak`)).toBe(false);
   });
 
   it("fills a page that Claude wrote, and never upgrades it", async () => {
@@ -484,14 +591,16 @@ describe("writeDashboard", () => {
     expect(code(page())).toBe(code(own));
     expect(readBlock(page(), "data")).toMatchObject({ v: 3 });
 
-    templateText = template(9);
+    templateText = template(ID_C);
     expect((await writer.write({})).page).toBe("updated");
     expect(code(page())).toBe(code(own));
   });
 
   it("refuses a page without the data markers, and a page together with a layout", async () => {
     await expect(writer.write({ page: "<html></html>" })).rejects.toThrow(/garmin-data/);
-    await expect(writer.write({ page: template(1), layout: "preset" })).rejects.toThrow(/either/);
+    await expect(writer.write({ page: template(ID_A), layout: "preset" })).rejects.toThrow(
+      /either/,
+    );
     expect(existsSync(file)).toBe(false);
   });
 
@@ -536,7 +645,7 @@ const profile = (base: object, locale: string) =>
 describe("writeDashboard settings", () => {
   /** A template with the blocks, the title and the theme CSS of the real one. */
   const styledTemplate = `<!doctype html>
-<meta name="garmin-template" content="6">
+<meta name="garmin-template" content="aaaaaaaaaaaaaaaa">
 <title>Training + Recovery</title>
 <style>:root,:root[data-theme="midnight"],:root[data-theme="system"]{--bg:#000}:root[data-theme="ocean"]{--bg:#012}:root[data-theme="paper"]{--bg:#fff}@media (prefers-color-scheme:light){:root[data-theme="system"]{--bg:#eee}}:root[data-theme="paper"],:root[data-theme="mist"]{--line:#ccc}</style>
 <script>
@@ -674,7 +783,7 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
 
     await writer.write({ notes: ["new"] }); // training-dashboard-update
     await writer.write({ onlyExisting: true }); // the automatic refresh
-    templateText = styledTemplate.replace('content="6"', 'content="7"');
+    templateText = styledTemplate.replace(ID_A, ID_B);
     expect((await writer.write({})).page).toBe("upgraded");
     expect(readBlock(page(), "settings")).toEqual(kept);
     expect(page()).toContain("<title>Road to Rome</title>");

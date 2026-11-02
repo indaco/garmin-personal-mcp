@@ -3,7 +3,7 @@ tools of the `garmin-personal` MCP server. Answer in my language.
 
 1. Call `writeDashboard` with {{weeksArgument}}{{pathArgument}}, without `layout` and without
    `page`. The server keeps the page with its layout, widgets and languages, and replaces only its
-   data. A page from an older template gets the new template and keeps all of these. If there is no
+   data. A page with different page code gets the page code of the server and keeps all of these. If there is no
    page yet, the server writes one from the template.
 2. Write at most 5 coach notes from the digest of the reply. Each note names a specific number of the
    digest. Training suggestions only, no medical advice. Plain text, in my language.
