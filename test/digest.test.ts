@@ -13,6 +13,12 @@ const run = (day: string, type = "running") => ({
   duration: "30:00",
 });
 
+/** A strength session on a day with its exercises. */
+const strength = (day: string, exercises: unknown[]) => ({
+  ...run(day, "strength_training"),
+  exercises,
+});
+
 /** A run on a day with a training load. */
 const loaded = (day: string, trainingLoad: number) => ({ ...run(day), trainingLoad });
 
@@ -377,6 +383,28 @@ describe("digest", () => {
       ],
     });
     expect(Object.keys(out.strengthExercises)).toEqual(["Back Squat"]);
+  });
+
+  it("leaves out an exercise whose sets were all not done", () => {
+    const out = digest({
+      ...data,
+      activities: [
+        strength("2026-10-22", [
+          squat([{ reps: 0, kg: 80 }]),
+          { exercise: "Plank", sets: [{ seconds: 60 }] },
+          { exercise: "Dip", sets: [{ reps: 0, seconds: 30 }] },
+        ]),
+        strength("2026-10-20", [squat([{ reps: 5, kg: 60 }])]),
+      ],
+    });
+    expect(out.strengthExercises["Back Squat"]).toEqual({
+      sessions: 1,
+      first: { date: "2026-10-20", top: "60 kg x 5" },
+      last: { date: "2026-10-20", top: "60 kg x 5" },
+    });
+    // a timed set without reps is done; 0 reps is not done, even with a time
+    expect(out.strengthExercises.Plank).toEqual({ sessions: 1 });
+    expect(out.strengthExercises).not.toHaveProperty("Dip");
   });
 
   it("lists the run names that repeat most first", () => {

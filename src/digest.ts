@@ -3,6 +3,7 @@ import { round } from "./fit";
 import { type Activity, dayOf, mondayOf, sessionSeconds, seconds } from "./page/calc";
 import { loadOf, loadRatio, zonesOf } from "./page/metrics";
 import { workoutOf } from "./page/running";
+import { completed, type StrengthSet } from "./page/strength";
 
 type Json = Record<string, unknown>;
 
@@ -130,6 +131,8 @@ export function digest(data: Json): Digest {
   for (const a of acts) {
     for (const e of list(a.exercises)) {
       if (typeof e.exercise !== "string") continue;
+      // as on the page: an exercise of only 0-rep sets was skipped
+      if (!list(e.sets).some((s) => completed(s as StrengthSet))) continue;
       const x = (strengthExercises[e.exercise] ??= { sessions: 0 });
       x.sessions++;
       const top = topSet(list(e.sets));
