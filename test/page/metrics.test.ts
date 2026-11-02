@@ -6,6 +6,7 @@ import {
   dailyLoads,
   epley,
   fitnessFatigue,
+  fitnessFatigueFrom,
   intensityMinutes,
   loadOf,
   loadRatio,
@@ -14,6 +15,7 @@ import {
   periodWindow,
   ramp,
   readiness,
+  readinessOf,
   riegel,
   rolling,
   sd,
@@ -27,6 +29,28 @@ const act = (start: string, extra: Record<string, unknown> = {}) => ({
   duration: "30:00",
   ...extra,
 });
+
+/** Recovery rows, one a day up to 2026-10-26; the last one is today. */
+const recoveryRows = (rhr: (number | undefined)[], today: Record<string, unknown> = {}) =>
+  [...rhr, undefined].map((v, i, all) => ({
+    date: `2026-10-${26 - all.length + 1 + i}`,
+    ...(v === undefined ? {} : { rhr: v }),
+    ...(i === all.length - 1 ? today : {}),
+  }));
+const balanced = [{ date: "2026-10-26", status: "BALANCED" }];
+/** Seven days before today at 50 bpm. */
+const week50 = [50, 50, 50, 50, 50, 50, 50];
+
+/** The verdict of readinessOf, checked against readiness() of the inputs it picked. */
+const verdictOf = (
+  hrv: Record<string, unknown>[],
+  today: Record<string, unknown>,
+  ratio: number | null,
+) => {
+  const r = readinessOf(hrv, recoveryRows(week50, today), ratio);
+  expect(r.verdict).toBe(readiness(r));
+  return r.verdict;
+};
 
 describe("zones", () => {
   it("reads the default sport of Garmin's zone list", () => {
@@ -206,6 +230,107 @@ describe("readiness", () => {
 
   it("has no verdict without its inputs", () => {
     expect(readiness({})).toBeNull();
+  });
+});
+
+describe("readiness inputs", () => {
+  it("picks today's inputs as the page does and gives the verdict of readiness()", () => {
+    const good = { sleepScore: 85, rhr: 50 };
+    expect(verdictOf([{ date: "2026-10-26", status: "LOW" }], good, 1)).toBe("easy");
+    expect(verdictOf(balanced, { ...good, sleepScore: 59 }, 1)).toBe("easy");
+    expect(verdictOf(balanced, { ...good, sleepScore: 60 }, 1)).toBe("normal");
+    // the resting HR 5 bpm or more above the 7-day average
+    expect(verdictOf(balanced, { ...good, rhr: 55 }, 1)).toBe("easy");
+    expect(verdictOf(balanced, { ...good, rhr: 54.9 }, 1)).toBe("push");
+    expect(verdictOf(balanced, { ...good, sleepScore: 80 }, 1.296)).toBe("push");
+    expect(verdictOf(balanced, { ...good, sleepScore: 80 }, 1.3)).toBe("normal");
+    expect(verdictOf(balanced, { ...good, sleepScore: 80 }, 0.8)).toBe("push");
+    expect(verdictOf(balanced, { ...good, sleepScore: 80 }, null)).toBe("normal");
+    expect(verdictOf(balanced, { ...good, sleepScore: 79 }, 1)).toBe("normal");
+  });
+
+  it("returns each input with the date of its row", () => {
+    expect(readinessOf(balanced, recoveryRows(week50, { sleepScore: 85, rhr: 52 }), 0.94)).toEqual({
+      verdict: "push",
+      hrvStatus: "BALANCED",
+      hrvDate: "2026-10-26",
+      sleepScore: 85,
+      rhr: 52,
+      rhrAvg: 50,
+      recoveryDate: "2026-10-26",
+      ratio: 0.94,
+    });
+  });
+
+  it("has no verdict and no inputs without HRV and recovery rows", () => {
+    const r = readinessOf([], [], 1);
+    expect(r.verdict).toBeNull();
+    expect(r.hrvStatus).toBeUndefined();
+    expect(r.sleepScore).toBeUndefined();
+    expect(r.rhr).toBeUndefined();
+    expect(r.rhrAvg).toBeUndefined();
+    expect(r.hrvDate).toBeUndefined();
+    expect(r.recoveryDate).toBeUndefined();
+  });
+
+  it("reads a value of the wrong type as missing", () => {
+    const hrv = [{ date: 20_261_026, status: 3 }];
+    const recovery = [{ date: 20_261_026, sleepScore: "85", rhr: Number.NaN }];
+    expect(readinessOf(hrv, recovery, 1)).toEqual({ verdict: null, ratio: 1 });
+  });
+
+  it("takes the last HRV row and the last recovery row, also from an older night", () => {
+    const hrv = [
+      { date: "2026-10-23", status: "LOW" },
+      { date: "2026-10-24", status: "BALANCED" },
+    ];
+    // no row for today: the last row is yesterday's, as on the page
+    const recovery = recoveryRows(week50, { sleepScore: 85, rhr: 50 }).slice(0, -1);
+    const r = readinessOf(hrv, recovery, 1);
+    expect(r).toMatchObject({ hrvStatus: "BALANCED", hrvDate: "2026-10-24" });
+    expect(r.recoveryDate).toBe("2026-10-25");
+    expect(r.sleepScore).toBeUndefined();
+    expect(r.rhr).toBe(50);
+  });
+
+  it("averages the resting HR of the 7 rows before the last, without the missing ones", () => {
+    // the first of 9 rows is out of the 7 days; the second is in them
+    const r = readinessOf(balanced, recoveryRows([100, 64, 50, 50, 50, 50, 50, 50]), 1);
+    expect(r.rhrAvg).toBe(52);
+    const few = readinessOf(balanced, recoveryRows([54, undefined, 50]), 1);
+    expect(few.rhrAvg).toBe(52);
+    expect(readinessOf(balanced, recoveryRows([undefined, undefined]), 1).rhrAvg).toBeUndefined();
+    expect(readinessOf(balanced, recoveryRows([]), 1).rhrAvg).toBeUndefined();
+  });
+});
+
+describe("fitness, fatigue and form of a window", () => {
+  it("has no values when no activity has a load", () => {
+    expect(fitnessFatigueFrom([act("2026-10-01")], "2026-10-01", "2026-10-03", 190)).toBeNull();
+    expect(fitnessFatigueFrom([], "2026-10-01", "2026-10-03", 190)).toBeNull();
+  });
+
+  it("warms the averages up from the first activity before the window", () => {
+    const acts = [act("2026-09-01", { trainingLoad: 100 }), act("2026-10-02", { avgHR: 152 })];
+    const f = fitnessFatigueFrom(acts, "2026-10-01", "2026-10-03", 190)!;
+    const all = fitnessFatigue(dailyLoads(acts, "2026-09-01", "2026-10-03", 190));
+    expect(f.fitness).toEqual(all.fitness.slice(-3));
+    expect(f.fatigue).toEqual(all.fatigue.slice(-3));
+    expect(f.form).toEqual(all.form.slice(-3));
+    expect(f.fitness[0]).toBeGreaterThan(0);
+    // 30 days of warm-up: less than the 42 days of fitness
+    expect(f.warmupDays).toBe(30);
+  });
+
+  it("starts at 0 on the first day when no activity is before the window", () => {
+    const f = fitnessFatigueFrom(
+      [act("2026-10-02", { trainingLoad: 42 })],
+      "2026-10-01",
+      "2026-10-03",
+    )!;
+    expect(f.fitness).toEqual([0, 1, 1 - 1 / 42]);
+    expect(f.form[0]).toBe(0);
+    expect(f.warmupDays).toBe(0);
   });
 });
 

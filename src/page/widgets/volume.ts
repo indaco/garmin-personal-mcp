@@ -221,19 +221,11 @@ register({
     const max = maxHR(ctx);
     const end = windowEnd(ctx);
     const acts = everyActivity(ctx);
-    if (acts.every((a) => !calc.loadOf(a, max))) return ctx.empty(el);
+    const ff = calc.fitnessFatigueFrom(acts, ctx.from, end, max);
+    if (!ff) return ctx.empty(el);
+    const { fitness, fatigue, form } = ff;
     const days: string[] = [];
     for (let d = ctx.from; d <= end; d = addDays(d, 1)) days.push(d);
-    // the period before the window warms the averages up, so fitness does not start at 0
-    const first = acts
-      .map(dayOf)
-      .filter((d): d is string => d !== undefined)
-      .toSorted()[0];
-    const all = calc.fitnessFatigue(
-      calc.dailyLoads(acts, first < ctx.from ? first : ctx.from, end, max),
-    );
-    const skip = all.fitness.length - days.length;
-    const [fitness, fatigue, form] = [all.fitness, all.fatigue, all.form].map((x) => x.slice(skip));
     append(
       el,
       kpiRow(
@@ -279,7 +271,7 @@ register({
       el,
       note(t("ff.note")),
       // 42 days is the fitness time constant
-      skip < 42 && note(t("ff.short")),
+      ff.warmupDays < 42 && note(t("ff.short")),
       acts.some((a) => calc.loadOf(a, max)?.estimate) && note(t("ls.estimated")),
     );
   },

@@ -100,23 +100,9 @@ register({
   id: "readiness",
   render(el, ctx) {
     const { t, fmt, calc, data } = ctx;
-    const hrv = last(data.hrv);
-    const rows = data.recovery;
-    const today = last(rows);
-    const before = rows
-      .slice(-8, -1)
-      .map((r) => num(r.rhr))
-      .filter((v): v is number => v !== undefined);
-    const rhrAvg = calc.mean(before) ?? undefined;
     const ratio = calc.loadRatio(everyActivity(ctx), data.end, maxHR(ctx), data.prevStart).ratio;
-    const inputs = {
-      hrvStatus: typeof hrv?.status === "string" ? hrv.status : undefined,
-      sleepScore: num(today?.sleepScore),
-      rhr: num(today?.rhr),
-      rhrAvg,
-      ratio,
-    };
-    const verdict = calc.readiness(inputs);
+    const inputs = calc.readinessOf(data.hrv, data.recovery, ratio);
+    const { verdict, rhrAvg } = inputs;
     append(
       el,
       h(

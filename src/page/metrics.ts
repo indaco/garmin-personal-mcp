@@ -101,6 +101,28 @@ export function fitnessFatigue(daily: number[]) {
   return { fitness, fatigue, form };
 }
 
+/**
+ * Fitness, fatigue and form of each day from..to; null when no activity has a load. The days from the
+ * first activity before `from` warm the averages up, so fitness does not start at 0; `warmupDays`
+ * counts them.
+ */
+export function fitnessFatigueFrom(acts: Activity[], from: string, to: string, maxHR?: number) {
+  if (acts.every((a) => !loadOf(a, maxHR))) return null;
+  const first = acts
+    .map(dayOf)
+    .filter((d): d is string => d !== undefined)
+    .toSorted()[0];
+  const start = first < from ? first : from;
+  const all = fitnessFatigue(dailyLoads(acts, start, to, maxHR));
+  const warmupDays = (Date.parse(from) - Date.parse(start)) / 86_400_000;
+  return {
+    fitness: all.fitness.slice(warmupDays),
+    fatigue: all.fatigue.slice(warmupDays),
+    form: all.form.slice(warmupDays),
+    warmupDays,
+  };
+}
+
 export function mean(values: number[]): number | null {
   return values.length > 0 ? values.reduce((s, v) => s + v, 0) / values.length : null;
 }
@@ -196,6 +218,38 @@ export function readiness(x: ReadinessInputs): "easy" | "push" | "normal" | null
     return "push";
   }
   return "normal";
+}
+
+const finite = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+
+/**
+ * The readiness inputs as the page reads them, with the dates of their rows, and the verdict: the last
+ * HRV row and the last recovery row of any date, and the mean resting HR of the 7 rows before the last.
+ */
+export function readinessOf(
+  hrv: Record<string, unknown>[],
+  recovery: Record<string, unknown>[],
+  ratio: number | null,
+) {
+  const night = hrv.at(-1);
+  const today = recovery.at(-1);
+  const before = recovery
+    .slice(-8, -1)
+    .map((r) => finite(r.rhr))
+    .filter((v): v is number => v !== undefined);
+  const inputs: ReadinessInputs = {
+    hrvStatus: typeof night?.status === "string" ? night.status : undefined,
+    sleepScore: finite(today?.sleepScore),
+    rhr: finite(today?.rhr),
+    rhrAvg: mean(before) ?? undefined,
+    ratio,
+  };
+  return {
+    verdict: readiness(inputs),
+    ...inputs,
+    hrvDate: typeof night?.date === "string" ? night.date : undefined,
+    recoveryDate: typeof today?.date === "string" ? today.date : undefined,
+  };
 }
 
 /** The same number of weeks just before the window; partial when they start before the data. */
