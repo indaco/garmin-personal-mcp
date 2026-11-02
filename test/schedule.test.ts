@@ -31,6 +31,7 @@ import {
   type Run,
   type Status,
   taskXml,
+  windowsScript,
   withCronLine,
 } from "../src/schedule";
 
@@ -148,6 +149,49 @@ describe("cron", () => {
     expect(cronLine(job, parseCron("30 6 * * 1-5"))).toMatch(
       /^30 6 \* \* 1-5 GARMIN_DATA_DIR='\/data\/it'\\''s 100\\%' .*>> '.*refresh\.log' 2>&1 # garmin-personal-mcp refresh$/,
     );
+  });
+
+  it("writes a Windows script that reads UTF-8 and keeps a percent sign", () => {
+    const script = windowsScript({
+      program: "C:\\Users\\José\\node\\node.exe",
+      args: ["C:\\Users\\José\\100%\\dist\\index.js", "refresh", "--auto"],
+      env: { GARMIN_DATA_DIR: "C:\\Users\\José\\garmin 100%", PATH: "C:\\Users\\José\\node" },
+      log: "C:\\Users\\José\\.cache\\garmin-personal-mcp\\refresh.log",
+    });
+    expect(script.split("\r\n")).toEqual([
+      "@echo off",
+      "chcp 65001 >nul",
+      'set "GARMIN_DATA_DIR=C:\\Users\\José\\garmin 100%%"',
+      'set "PATH=C:\\Users\\José\\node;%PATH%"',
+      '"C:\\Users\\José\\node\\node.exe" "C:\\Users\\José\\100%%\\dist\\index.js" "refresh" "--auto" >> "C:\\Users\\José\\.cache\\garmin-personal-mcp\\refresh.log" 2>&1',
+      "",
+    ]);
+  });
+
+  it("escapes each percent sign in a Windows script and keeps carets, ampersands and 東京", () => {
+    const script = windowsScript({
+      program: "C:\\Program Files\\nodejs\\npx.cmd",
+      args: ["-y", "pkg@latest", "refresh", "--auto"],
+      env: {
+        GARMIN_DATA_DIR: "C:\\Users\\a&b ^c 東京",
+        GARMIN_API_KEY_FILE: "C:\\keys\\%USERPROFILE%\\100%%\\key",
+        GARMIN_BASE_URL: "https://example.test",
+        PATH: "C:\\Program Files\\nodejs 5%",
+      },
+      log: "C:\\Users\\a&b ^c 東京 1%\\refresh.log",
+    });
+    expect(script.split("\r\n")).toEqual([
+      "@echo off",
+      "chcp 65001 >nul",
+      'set "GARMIN_DATA_DIR=C:\\Users\\a&b ^c 東京"',
+      'set "GARMIN_API_KEY_FILE=C:\\keys\\%%USERPROFILE%%\\100%%%%\\key"',
+      'set "GARMIN_BASE_URL=https://example.test"',
+      // the % of %PATH% stays single: it must expand
+      'set "PATH=C:\\Program Files\\nodejs 5%%;%PATH%"',
+      // npx.cmd without call: it is the last line, so control need not come back
+      '"C:\\Program Files\\nodejs\\npx.cmd" "-y" "pkg@latest" "refresh" "--auto" >> "C:\\Users\\a&b ^c 東京 1%%\\refresh.log" 2>&1',
+      "",
+    ]);
   });
 
   it("replaces only its own crontab line", () => {
@@ -592,10 +636,14 @@ describe("AutoRefresh", () => {
 
   it("runs an installed copy with node.exe on Windows", async () => {
     const installed = "C:\\npm\\node_modules\\pkg\\dist\\index.js";
-    await new AutoRefresh(config, "win32", join(dir, "home"), exec, "C:\\node", installed).set({});
-    expect(readFileSync(join(config.dataDir, "auto-refresh.cmd"), "utf8")).toContain(
-      `call "${join("C:\\node", "node.exe")}" "${installed}" "refresh" "--auto"`,
-    );
+    const node = "C:\\Users\\José\\node";
+    await new AutoRefresh(config, "win32", join(dir, "home"), exec, node, installed).set({});
+    const bytes = readFileSync(join(config.dataDir, "auto-refresh.cmd"));
+    const script = bytes.toString("utf8");
+    expect(script).toContain(`\r\n"${join(node, "node.exe")}" "${installed}" "refresh" "--auto"`);
+    expect(script).not.toContain("call ");
+    // UTF-8 bytes, as chcp 65001 reads them: é is C3 A9
+    expect(bytes.includes(Buffer.from("José", "utf8"))).toBe(true);
   });
 
   it("names the output of a command that fails without an error text", async () => {
@@ -610,6 +658,10 @@ describe("AutoRefresh", () => {
     const script = readFileSync(join(config.dataDir, "auto-refresh.cmd"), "utf8");
     expect(script).toContain('set "PATH=/opt/node/bin;%PATH%"');
     expect(script).toContain("npx.cmd");
+    // no byte order mark: it would break the @echo off line
+    expect(
+      readFileSync(join(config.dataDir, "auto-refresh.cmd")).subarray(0, 3).toString("hex"),
+    ).not.toBe("efbbbf");
     const taskFile = join(config.dataDir, "auto-refresh-task.xml");
     const task = readFileSync(taskFile, "utf16le");
     expect(task.startsWith("\ufeff<?xml")).toBe(true);

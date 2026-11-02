@@ -330,13 +330,22 @@ export function withCronLine(crontab: string, line: string | undefined): string 
   return [...kept, ...(line ? [line] : [])].map((l) => `${l}\n`).join("");
 }
 
-/** The .cmd file the Windows task runs. */
+/** A value in a batch file: % starts a variable, so a literal % is %%. */
+const bat = (s: string) => s.replaceAll("%", "%%");
+
+/**
+ * The .cmd file the Windows task runs. cmd.exe reads a batch file in the OEM code page: chcp 65001
+ * makes it read the next lines as UTF-8, for a user folder such as C:\Users\José. No `call`: it
+ * expands % a second time; npx.cmd is the last line, so it does not need to come back.
+ */
 export function windowsScript(job: Job): string {
   const env = Object.entries(job.env).map(([k, v]) =>
-    k === "PATH" ? `set "PATH=${v};%PATH%"` : `set "${k}=${v}"`,
+    k === "PATH" ? `set "PATH=${bat(v)};%PATH%"` : `set "${k}=${bat(v)}"`,
   );
-  const command = [job.program, ...job.args].map((a) => `"${a}"`).join(" ");
-  return ["@echo off", ...env, `call ${command} >> "${job.log}" 2>&1`, ""].join("\r\n");
+  const command = [job.program, ...job.args].map((a) => `"${bat(a)}"`).join(" ");
+  return ["@echo off", "chcp 65001 >nul", ...env, `${command} >> "${bat(job.log)}" 2>&1`, ""].join(
+    "\r\n",
+  );
 }
 
 const tags = (names: string[]) => names.map((n) => `<${n} />`).join("");
