@@ -64,6 +64,9 @@ When the server has other page code than your page, the update writes the page c
 This also happens with an older server, and in a scheduled refresh. It keeps your layout, custom widgets, languages and page settings, and it keeps the old page as a
 `.bak` file. The assistant tells you which server version wrote the page before and which one wrote it now.
 
+When a release adds a widget to a preset, a board that you changed gets it one time, in its preset
+place. A widget that you remove after that stays removed.
+
 The first update sends approximately 35 requests to Garmin. Later updates use the local cache and
 send approximately 8.
 

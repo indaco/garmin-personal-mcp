@@ -47,6 +47,7 @@ import {
   storedSpan,
   toggleHidden,
   withBoard,
+  withPresetWidgets,
 } from "./layout";
 import { preset } from "./presets";
 import {
@@ -114,8 +115,11 @@ export function start(): void {
   S = window.GARMIN_SETTINGS ?? {};
   langChoice = store.get("garmin-lang") ?? S.language ?? "auto";
   pageLayout = parseLayout(G.layout);
-  layout = merge(pageLayout, readLocal());
-  mine = stale(pageLayout, readLocal());
+  const local = readLocal();
+  // runs on load and saves nothing: the merge repeats the same way, and Done saves it with its record
+  layout = withPresetWidgets(merge(pageLayout, local), preset).layout;
+  const old = stale(pageLayout, local);
+  mine = old && withPresetWidgets(old, preset).layout;
   screen.redraw = render;
   window.Chart = Chart; // for custom widgets and the page tests
   addLanguages(G.languages);

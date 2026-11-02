@@ -114,3 +114,17 @@ it("asks the host for full screen and back, when the host offers it", async () =
   expect(await page.evaluate(() => window.hostLog.modes)).toEqual(["fullscreen", "inline"]);
   expect(errors).toEqual([]);
 });
+
+it("shows a preset widget that an edited board has not met, in the chat view", async () => {
+  const blocks = {
+    ...(await viewBlocks()),
+    layout: {
+      rev: "c",
+      base: "preset",
+      boards: { all: ["kpis", "activities"].map((id) => ({ id, widget: id, span: 3 })) },
+    },
+  };
+  const { frame, errors } = await showInHost(template(), blocks);
+  expect(await frame.$("[data-id=coachNotes]")).not.toBeNull();
+  expect(errors.filter((e) => e.startsWith("pageerror"))).toEqual([]);
+});

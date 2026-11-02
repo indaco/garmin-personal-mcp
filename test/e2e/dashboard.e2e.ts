@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { THEMES } from "../../src/page/theme";
 import { digest } from "../../src/digest";
 import { en as enTexts } from "../../src/page/i18n/en";
+import { preset } from "../../src/page/presets";
 import { fitnessFatigueFrom, zonesOf } from "../../src/page/metrics";
 import { DASHBOARD_VERSION } from "../../src/prompts";
 import { data, launch, open, pageFile } from "./page";
@@ -53,6 +54,9 @@ async function startEdit(page: Page): Promise<void> {
   await page.click(".account summary");
   await page.click(".account-panel >> text=Edit layout");
 }
+
+/** A record that the all board met the whole preset, so a test layout of few widgets stays small. */
+const MET = { all: preset("all").map((i) => i.widget) };
 
 const ALL_PRESET = [
   "kpis",
@@ -530,11 +534,13 @@ describe("edit mode", () => {
   const one = {
     rev: "r0",
     base: "preset",
+    seen: MET,
     boards: { all: [{ id: "coachNotes", widget: "coachNotes", span: 3 }] },
   };
   const two = {
     rev: "r1",
     base: "preset",
+    seen: MET,
     boards: {
       all: [
         { id: "coachNotes", widget: "coachNotes", span: 3 },
@@ -848,7 +854,7 @@ describe("edit mode", () => {
     await startEdit(page);
     await page.click("text=Copy layout");
     const text = await page.inputValue(".layout-text");
-    expect(JSON.parse(text)).toEqual({ base: "preset", boards: two.boards });
+    expect(JSON.parse(text)).toEqual({ base: "preset", boards: two.boards, seen: MET });
   });
 
   it("copies the record of the preset widgets that a board met in its first edit", async () => {
@@ -2144,6 +2150,7 @@ const custom = (id: string, code: string) => ({ id, title: `Custom ${id}`, span:
 const on = (...ids: string[]) => ({
   rev: "c",
   base: "preset",
+  seen: MET,
   boards: { all: ids.map((id) => ({ id, widget: id, span: 1 })) },
 });
 
@@ -2445,5 +2452,117 @@ describe("custom widgets and languages", () => {
     expect(await page.textContent("h1")).toBe("Training + Erholung");
     expect(await page.textContent("[data-id=readiness] h2")).toBe("Readiness today");
     expect(await page.evaluate(() => document.documentElement.lang)).toBe("de");
+  });
+});
+
+const running = (rev: string, extra: object = {}) => ({
+  rev,
+  base: "preset",
+  boards: {
+    running: [
+      { id: "typeKpis", widget: "typeKpis", span: 3 },
+      { id: "activities", widget: "activities", span: 3 },
+    ],
+  },
+  ...extra,
+});
+
+describe("new preset widgets on edited boards", () => {
+  const withWorkouts = { workouts: true };
+  const openRunning = (layout: unknown, settings: object = withWorkouts) =>
+    open(browser, pageFile({ layout, settings }), { hash: "#running" });
+
+  it("shows a widget that the board has not met, full width, in its preset place", async () => {
+    const { page, errors } = await openRunning(running("r0"));
+    const ids = await tiles(page);
+    expect(ids.at(ids.indexOf("workoutTrend") + 1)).toBe("activities");
+    expect(await page.getAttribute("[data-id=workoutTrend]", "class")).toContain("span-3");
+    expect(errors).toEqual([]);
+  });
+
+  it("adds it to a browser layout of the same rev, with no banner", async () => {
+    const file = pageFile({ layout: running("r0"), settings: withWorkouts });
+    const { page } = await open(browser, file, { hash: "#running" });
+    await page.evaluate(() =>
+      localStorage.setItem(
+        `garmin-layout:${location.pathname}`,
+        JSON.stringify({
+          baseRev: "r0",
+          layout: {
+            base: "preset",
+            boards: { running: [{ id: "typeKpis", widget: "typeKpis", span: 3 }] },
+          },
+        }),
+      ),
+    );
+    await page.reload();
+    await page.waitForSelector(".page");
+    expect(await tiles(page)).toContain("workoutTrend");
+    expect(await page.$(".banner")).toBeNull();
+  });
+
+  it("adds it to both layouts of the banner", async () => {
+    const { page } = await openRunning(running("r1"));
+    await page.evaluate(() =>
+      localStorage.setItem(
+        `garmin-layout:${location.pathname}`,
+        JSON.stringify({
+          baseRev: "r0",
+          layout: {
+            base: "preset",
+            boards: { running: [{ id: "activities", widget: "activities", span: 3 }] },
+          },
+        }),
+      ),
+    );
+    await page.reload();
+    await page.waitForSelector(".banner");
+    expect(await tiles(page)).toContain("workoutTrend");
+    await page.click(".banner >> text=Keep mine");
+    expect(await tiles(page)).toContain("workoutTrend");
+    expect(await saved(page)).toContain("workoutTrend");
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await page.waitForSelector(".page");
+    expect(await tiles(page)).toContain("workoutTrend");
+  });
+
+  it("writes nothing to the browser on load, and Done with no change saves nothing", async () => {
+    const { page } = await openRunning(running("r0"));
+    expect(await saved(page)).toBeNull();
+    await startEdit(page);
+    await page.click("text=Done");
+    expect(await page.textContent("#announce")).toBe("No changes to save");
+    expect(await saved(page)).toBeNull();
+  });
+
+  it("keeps a widget that you removed removed after a reload", async () => {
+    const { page } = await openRunning(running("r0"));
+    await startEdit(page);
+    await page.click("[aria-label='Hide Workout trend']");
+    await page.click(".edit-bar >> text=Add widget");
+    await page.click("dialog >> text=Remove Workout trend");
+    await page.click("text=Done");
+    expect(await tiles(page)).not.toContain("workoutTrend");
+    expect(JSON.parse((await saved(page)) ?? "null").layout.seen.running).toContain("workoutTrend");
+    await page.reload();
+    await page.waitForSelector(".page");
+    expect(await tiles(page)).not.toContain("workoutTrend");
+  });
+
+  it("adds nothing to a blank layout or to a board that the layout does not list", async () => {
+    const blank = await openRunning({ ...running("r0"), base: "blank" });
+    expect(await tiles(blank.page)).toEqual(["typeKpis", "activities"]);
+    const other = await open(browser, pageFile({ layout: running("r0"), settings: withWorkouts }), {
+      hash: "#recovery",
+    });
+    expect(await tiles(other.page)).not.toContain("workoutTrend");
+  });
+
+  it("does not show a widget that the page settings withhold", async () => {
+    const { page } = await openRunning(running("r0"), {});
+    const ids = await tiles(page);
+    expect(ids).not.toContain("workoutTrend");
+    expect(ids.length).toBeGreaterThan(2);
   });
 });
