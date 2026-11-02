@@ -55,7 +55,9 @@ register({
     const vs = (now: number, before: number) =>
       h("span", {}, delta(ctx, calc.change(now, before / 4)), " ", t("kpi.vs4w"));
     const hasDistance = ctx.type !== "all" && DISTANCE.has(ctx.type);
-    const ascent = acts.reduce((s, a) => s + (typeof a.ascentM === "number" ? a.ascentM : 0), 0);
+    // rides without ascent data give n/a, not flat riding
+    const climbs = acts.map((a) => a.ascentM).filter((v): v is number => typeof v === "number");
+    const ascent = climbs.length > 0 ? climbs.reduce((s, v) => s + v, 0) : undefined;
     const tiles = [
       kpi(t("tk.sessions"), fmt.num(sum.sessions), vs(week.sessions, base.sessions)),
       kpi(

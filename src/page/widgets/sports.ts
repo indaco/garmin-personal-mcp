@@ -222,9 +222,13 @@ register({
               {
                 type: "bar",
                 label: t("lr.ascent"),
-                data: weekly.map((w) =>
-                  fmt.to.elev(w.reduce((s, a) => s + (num(a.ascentM) ?? 0), 0)),
-                ),
+                // a week without ascent data is a gap, not flat riding
+                data: weekly.map((w) => {
+                  const m = w
+                    .map((a) => num(a.ascentM))
+                    .filter((v): v is number => v !== undefined);
+                  return m.length > 0 ? fmt.to.elev(m.reduce((s, v) => s + v, 0)) : null;
+                }),
                 backgroundColor: `${ctx.color("hiking")}88`,
                 yAxisID: "y1",
               },

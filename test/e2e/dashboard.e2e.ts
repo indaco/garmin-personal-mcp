@@ -164,6 +164,21 @@ const chartDataset = (page: Page, widget: string, label: string) =>
     [widget, label],
   );
 
+/** The value of the "Ascent" tile of the cycling board for the given activities. */
+async function cyclingAscent(activities: unknown[]): Promise<{ text: string | null; page: Page }> {
+  const { page, errors } = await open(
+    browser,
+    pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }),
+    { hash: "#cycling" },
+  );
+  expect(errors).toEqual([]);
+  const text = await page
+    .locator("[data-id=typeKpis] .kpi", { has: page.locator(".kpi-label", { hasText: "Ascent" }) })
+    .locator(".kpi-value")
+    .textContent();
+  return { text, page };
+}
+
 describe("the page", () => {
   it("keeps the template small", () => {
     // minified, with only the Chart.js parts the page uses: Chart.js is most of it, and the page
@@ -1352,6 +1367,30 @@ describe("type boards", () => {
     });
     expect(await page.textContent("[data-id=intensityShare]")).toContain("Approximate");
     expect(errors).toEqual([]);
+  });
+
+  it("shows n/a for the cycling ascent without ascent data, and keeps a real 0", async () => {
+    const base = without(
+      data.activities.find((a: Record<string, unknown>) => a.type === "cycling"),
+      ["ascentM"],
+    );
+    const ride = (n: number, start: string, ascentM?: number) => ({
+      ...base,
+      id: 900 + n,
+      start: `${start} 09:00:00`,
+      ...(ascentM === undefined ? {} : { ascentM }),
+    });
+    // week A: no ascent data; week B: a real 0 m; week C: 120 m and one ride without data
+    const weekA = [ride(1, "2026-10-06"), ride(2, "2026-10-08")];
+    const weekB = [ride(3, "2026-10-13", 0), ride(4, "2026-10-15", 0)];
+    const weekC = [ride(5, "2026-10-20", 120), ride(6, "2026-10-22")];
+    expect((await cyclingAscent(weekA)).text).toBe("n/a");
+    expect((await cyclingAscent(weekB)).text).toBe("0 m");
+    const all = await cyclingAscent([...weekA, ...weekB, ...weekC]);
+    expect(all.text).toBe("120 m");
+    // 13 weeks: no ride in the first 9 and the 13th; A is a gap, B a real 0, C the known 120
+    const bars = await chartDataset(all.page, "bikeDetails", "Weekly ascent");
+    expect(bars.data).toEqual([...Array.from({ length: 10 }, () => null), 0, 120, null]);
   });
 
   it("names the training effects with the catalogue texts", async () => {
