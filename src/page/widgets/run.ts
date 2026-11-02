@@ -309,7 +309,7 @@ register({
     const floors = calc.zonesOf(ctx.data.zones).floors;
     const weeks = ctx.weeks.map(() => [0, 0, 0]);
     let approximate = false;
-    for (const a of runs(ctx)) {
+    for (const a of ctx.activities) {
       const z = calc.zoneSeconds(a, floors);
       const i = weekOf(ctx, a);
       if (!z || i < 0) continue;

@@ -73,7 +73,8 @@ const PRESETS: Record<string, Row> & { generic: Row } = {
     ["typeWeekly", 2],
     ["hrZones", 1],
     ["bikeDetails", 3],
-    ["hikeVertical", 3],
+    ["hikeVertical", 2],
+    ["intensityShare", 1],
     ["activities", 3],
   ],
   swimming: [

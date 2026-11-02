@@ -175,7 +175,7 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
   {
     id: "intensityShare",
     title: "w.intensityShare",
-    types: ["running"],
+    types: ["running", "cycling"],
     span: 1,
   },
   {

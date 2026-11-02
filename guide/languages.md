@@ -426,7 +426,7 @@ out. To add one:
 | `af.vsFirst` | vs first week\|vs first {n} weeks |
 | `af.aerobicNote` | Efficiency (metres per heartbeat) counts only aerobic runs, with an average HR below zone 4: intervals, tempo runs and races raise HR for other reasons. Higher is better. |
 | `af.noZones` | Efficiency (metres per heartbeat) counts every run: the data has no HR zones to pick the aerobic runs. Higher is better. |
-| `w.intensityShare` | Easy and hard running |
+| `w.intensityShare` | Easy and hard training |
 | `is.easy` | Z1-2 (easy) |
 | `is.hard` | Z4-5 (hard) |
 | `w.runningForm` | Running form |

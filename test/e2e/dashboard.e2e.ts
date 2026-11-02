@@ -2188,6 +2188,12 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     expect(await page.innerText("[data-id=hikeVertical]")).toContain("210 m/h");
     // the whole ride counts, so the note says the route moves the number
     expect(await page.innerText("[data-id=hikeVertical]")).toContain("on the same route");
+    // the ride of 2026-10-11: 327 + 1357 of 4175 zone seconds are easy, 784 + 347 hard
+    const easy = (await chartDataset(page, "intensityShare", "Z1-2 (easy)")).data as number[];
+    const hard = (await chartDataset(page, "intensityShare", "Z4-5 (hard)")).data as number[];
+    expect(easy.filter((v) => v !== null)).toHaveLength(3);
+    expect(easy.at(-4)).toBeCloseTo((1684 / 4175) * 100, 1);
+    expect(hard.at(-4)).toBeCloseTo((1131 / 4175) * 100, 1);
     await page.click("[data-tab=racket]");
     // tennis and padel share the board; the sport column tells them apart
     const sports = await page.$$eval("[data-id=racketDetails] tbody tr", (r) =>

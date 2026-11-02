@@ -95,7 +95,7 @@ describe("withPresetWidgets with the real preset", () => {
   it("gives a Bike board from an older release the new widgets once", () => {
     const cycling = preset("cycling").filter((i) => baseline("cycling").includes(i.widget));
     const r = withPresetWidgets(parseLayout({ boards: { cycling } }), preset, baseline);
-    expect(r.added).toEqual({ cycling: ["hikeVertical"] });
+    expect(r.added).toEqual({ cycling: ["hikeVertical", "intensityShare"] });
     expect(withPresetWidgets(r.layout, preset, baseline).added).toEqual({});
   });
 
