@@ -2,8 +2,8 @@ Update my Garmin **training + recovery dashboard** with the new data (today is {
 tools of the `garmin-personal` MCP server. Answer in my language.
 
 1. Call `writeDashboard` with {{weeksArgument}}{{pathArgument}}, without `layout` and without
-   `page`. The server keeps the page with its layout, widgets and languages, and replaces only its
-   data. A page with different page code gets the page code of the server and keeps all of these. If there is no
+   `page`. The server keeps the page with its layout, widgets and languages, and replaces its
+   data and adds the new preset widgets of a release to a board that I edited. A page with different page code gets the page code of the server and keeps all of these. If there is no
    page yet, the server writes one from the template.
    If the reply of this first call has `page: "upgraded"`, tell me that the page has the page code of
    server `server` now, and that server `previousServer` wrote it before. Show a value that is

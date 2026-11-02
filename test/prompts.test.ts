@@ -237,6 +237,13 @@ describe("prompts", () => {
     expect(update).not.toContain("ask me once");
   });
 
+  it("tells the setup prompt to name the widgets that its write added", async () => {
+    const text = (await render("dashboard-setup")).replace(/\s+/g, " ");
+    const step4 = text.slice(text.indexOf("4. Call `writeDashboard`"), text.indexOf("5. Unless"));
+    expect(step4).toContain("If the reply has `addedWidgets`");
+    expect(step4).toContain("Without it, say nothing about them");
+  });
+
   it("asks the setup questions with the built-in languages and themes, and the weeks", async () => {
     const text = await render("dashboard-setup", { weeks: "8" });
     expect(text).toContain("last **8 weeks** (today is 2026-10-28)");
