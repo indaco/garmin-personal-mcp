@@ -248,6 +248,50 @@ register({
         200,
       );
     }
+    // mountain-bike dynamics (grit, flow): only on a board that has them
+    const trails = rides
+      .filter((a) => num(a.grit) !== undefined || num(a.flow) !== undefined)
+      .toSorted((a, b) => String(a.start).localeCompare(String(b.start)));
+    if (trails.length > 1) {
+      ctx.chart(
+        el,
+        {
+          type: "line",
+          data: {
+            labels: trails.map((a) => fmt.day(day(a))),
+            datasets: [
+              {
+                label: t("bd.flow"),
+                data: trails.map((a) => num(a.flow) ?? null),
+                borderColor: ctx.color("cycling"),
+                yAxisID: "y",
+                spanGaps: true,
+              },
+              {
+                label: t("bd.grit"),
+                data: trails.map((a) => num(a.grit) ?? null),
+                borderColor: ctx.color("hiking"),
+                borderDash: [6, 4], // not told apart by colour alone
+                yAxisID: "y1",
+                spanGaps: true,
+              },
+            ],
+          },
+          options: {
+            scales: {
+              y: { title: { display: true, text: t("bd.flow") } },
+              y1: {
+                position: "right",
+                grid: { drawOnChartArea: false },
+                title: { display: true, text: t("bd.grit") },
+              },
+            },
+          },
+        },
+        180,
+      );
+    }
+    const dynamics = trails.length > 0;
     append(
       el,
       table(
@@ -258,6 +302,7 @@ register({
           t("tk.speed"),
           t("col.ascent"),
           t("bd.where"),
+          ...(dynamics ? [t("bd.grit"), t("bd.flow")] : []),
         ],
         rides.map((a) => [
           fmt.day(day(a)),
@@ -266,9 +311,11 @@ register({
           fmt.speed(speed(a)),
           fmt.elev(num(a.ascentM)),
           isIndoor(a.type ?? "") ? t("bd.indoor") : t("bd.outdoor"),
+          ...(dynamics ? [fmt.num(num(a.grit), 1), fmt.num(num(a.flow), 1)] : []),
         ]),
-        [2, 3, 4],
+        dynamics ? [2, 3, 4, 6, 7] : [2, 3, 4],
       ),
+      dynamics && note(t("bd.trailNote")),
     );
   },
 });

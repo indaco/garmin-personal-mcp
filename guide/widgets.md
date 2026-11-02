@@ -44,7 +44,7 @@ it by hand.
 | Pace and walks | `walkDetails` | Weekly pace and average HR, and steps, cadence and body battery change of each walk. | walking, hiking | 2 |
 | Daily steps | `steps` | Daily steps against the goal, and floors, for the last 14 days. | - | 1 |
 | Vertical speed | `hikeVertical` | Vertical metres per hour of each activity with ascent. | hiking, walking, running | 3 |
-| Rides | `bikeDetails` | Weekly speed and ascent, each ride, and indoor against outdoor time. | cycling | 3 |
+| Rides | `bikeDetails` | Weekly speed and ascent, each ride, and indoor against outdoor time; for mountain-bike rides, the grit and flow of each ride. | cycling | 3 |
 | Swims | `swimDetails` | Each swim with pace per 100 m, SWOLF, lengths, strokes and pool length. | swimming | 3 |
 | Sessions and intensity | `racketDetails` | Each racket session: sport, HR, time in Z3+, Z4-5 share, calories per hour, training effect, and its load against a run of the same length. | racket, generic | 3 |
 

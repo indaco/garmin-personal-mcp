@@ -150,6 +150,17 @@ describe("summarize", () => {
     expect(s.strokes).toBe(980);
   });
 
+  it("keeps the grit and flow of a mountain-bike ride", () => {
+    const s = summarize({
+      activityType: { typeKey: "mountain_biking" },
+      grit: 41.26,
+      avgFlow: 3.04,
+    });
+    expect(s.grit).toBe(41.3);
+    expect(s.flow).toBe(3);
+    expect(summarize({ activityType: { typeKey: "cycling" } })).not.toHaveProperty("flow");
+  });
+
   // numeric text counts as a number, also with spaces around it, but not hex, NaN or Infinity
   it.each([
     ["5000", 5],

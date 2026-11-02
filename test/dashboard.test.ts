@@ -414,6 +414,25 @@ describe("getDashboardData", () => {
     expect(Object.keys(readCache().activities)).toEqual(["1"]);
   });
 
+  it("fetches the activities again, once, when the cache is from before a new summary field", async () => {
+    garminActivities = [activity(1, "2026-10-20")];
+    await dashboard.getDashboardData(2);
+    const cache = readCache();
+    delete cache.activitiesSummary;
+    writeFileSync(cacheFile(), JSON.stringify(cache));
+    api.getJson.mockClear();
+
+    await dashboard.getDashboardData(2);
+    expect(callsTo("/activitylist").map(([, q]) => [q.startDate, q.endDate])).toEqual([
+      ["2026-09-21", "2026-10-26"],
+    ]);
+    api.getJson.mockClear();
+    await dashboard.getDashboardData(2);
+    expect(callsTo("/activitylist").map(([, q]) => [q.startDate, q.endDate])).toEqual([
+      ["2026-10-25", "2026-10-26"],
+    ]);
+  });
+
   it("drops a cached activity that Garmin no longer has in a refetched day", async () => {
     garminActivities = [activity(1, "2026-10-26"), activity(2, "2026-10-20")];
     await dashboard.getDashboardData(2);

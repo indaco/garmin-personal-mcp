@@ -370,6 +370,9 @@ export function summarize(a: Json): Json {
   copy(a, o, "steps", "steps");
   putRounded(a, o, "avgPower", "avgPowerW", 0);
   putRounded(a, o, "normPower", "normPowerW", 0);
+  // mountain-bike dynamics: grit is how hard the trail was, flow how smoothly it was ridden (lower is smoother)
+  putRounded(a, o, "grit", "grit", 1);
+  putRounded(a, o, "avgFlow", "flow", 1);
   putRounded(a, o, "avgStrideLength", "strideCm", 1);
   putRounded(a, o, "avgGroundContactTime", "gctMs", 0);
   putRounded(a, o, "avgVerticalOscillation", "vertOscCm", 1);
@@ -615,9 +618,10 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
         "cadence, ascent; when Garmin has them: elapsed time (if longer than moving time), race flag,",
         "Garmin training load, aerobic/anaerobic training effect and label, seconds in HR zones 1-5,",
         "calories, moderate/vigorous intensity minutes, body battery change, steps, swim SWOLF, pool",
-        "length, lengths and strokes, power, running form (stride, ground contact, vertical",
-        "oscillation and ratio), grade-adjusted pace, best efforts (1k, mile, 5k, 10k, half,",
-        "marathon) and run/walk segments. Dates are yyyy-MM-dd. Set raw=true for Garmin's full JSON.",
+        "length, lengths and strokes, power, mountain-bike grit and flow, running form (stride, ground",
+        "contact, vertical oscillation and ratio), grade-adjusted pace, best efforts (1k, mile, 5k,",
+        "10k, half, marathon) and run/walk segments. Dates are yyyy-MM-dd. Set raw=true for Garmin's",
+        "full JSON.",
       ].join("\n"),
       inputSchema: z.object({
         startDate: z.string().describe("Start date yyyy-MM-dd (optional)").optional(),

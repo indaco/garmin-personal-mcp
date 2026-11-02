@@ -274,7 +274,8 @@ charts ("one session so far"). Trends start at 2 sessions.
 **Walk** adds pace and avg HR for each week, and steps, cadence and body battery change for each
 walk. It also adds daily steps against the goal, with floors (last 14 days). **Hike** adds
 vertical metres per hour. **Bike** adds average speed and ascent for each week, the ascent for
-each ride and the indoor/outdoor split. **Swim** adds pace per 100 m, SWOLF, lengths and strokes
+each ride and the indoor/outdoor split; for mountain-bike rides, `grit` (how hard the ride was) and
+`flow` (lower is smoother) of each ride. **Swim** adds pace per 100 m, SWOLF, lengths and strokes
 for each session. **Racket sports** adds the sport, avg HR and time in Z3+ for each session, Z4-5 share and peak HR.
 It also adds calories per hour, training effect, and its load against a run of the same length.
 

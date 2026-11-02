@@ -433,7 +433,7 @@
   },
   {
     "name": "listActivities",
-    "description": "List the user's Garmin activities (most recent first) as a compact summary: id, name, type,\nlocal start time, distance (km), moving duration, average pace, average/max heart rate,\ncadence, ascent; when Garmin has them: elapsed time (if longer than moving time), race flag,\nGarmin training load, aerobic/anaerobic training effect and label, seconds in HR zones 1-5,\ncalories, moderate/vigorous intensity minutes, body battery change, steps, swim SWOLF, pool\nlength, lengths and strokes, power, running form (stride, ground contact, vertical\noscillation and ratio), grade-adjusted pace, best efforts (1k, mile, 5k, 10k, half,\nmarathon) and run/walk segments. Dates are yyyy-MM-dd. Set raw=true for Garmin's full JSON.",
+    "description": "List the user's Garmin activities (most recent first) as a compact summary: id, name, type,\nlocal start time, distance (km), moving duration, average pace, average/max heart rate,\ncadence, ascent; when Garmin has them: elapsed time (if longer than moving time), race flag,\nGarmin training load, aerobic/anaerobic training effect and label, seconds in HR zones 1-5,\ncalories, moderate/vigorous intensity minutes, body battery change, steps, swim SWOLF, pool\nlength, lengths and strokes, power, mountain-bike grit and flow, running form (stride, ground\ncontact, vertical oscillation and ratio), grade-adjusted pace, best efforts (1k, mile, 5k,\n10k, half, marathon) and run/walk segments. Dates are yyyy-MM-dd. Set raw=true for Garmin's\nfull JSON.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,

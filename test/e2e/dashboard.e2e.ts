@@ -203,9 +203,11 @@ const barLabels = (page: Page, widget: string) =>
 const chartDataset = (page: Page, widget: string, label: string) =>
   page.evaluate(
     ([w, l]) => {
+      // a widget can draw more than one chart: take the dataset of the label from any of them
       const d = Object.values(window.Chart!.instances)
-        .find((c) => c.canvas.closest(`[data-widget=${w}]`))!
-        .data.datasets.find((x) => x.label === l)!;
+        .filter((c) => c.canvas.closest(`[data-widget=${w}]`))
+        .flatMap((c) => c.data.datasets)
+        .find((x) => x.label === l)!;
       return { data: d.data, spanGaps: (d as { spanGaps?: unknown }).spanGaps };
     },
     [widget, label],
@@ -1478,6 +1480,66 @@ describe("type boards", () => {
     // 13 weeks: no ride in the first 9 and the 13th; A is a gap, B a real 0, C the known 120
     const bars = await chartDataset(all.page, "bikeDetails", "Weekly ascent");
     expect(bars.data).toEqual([...Array.from({ length: 10 }, () => null), 0, 120, null]);
+  });
+
+  it("shows the grit and flow of mountain-bike rides, ride after ride", async () => {
+    const road = data.activities.find((a: Record<string, unknown>) => a.type === "cycling");
+    const trail = (n: number, start: string, grit: number | undefined, flow: number) => ({
+      ...road,
+      id: 950 + n,
+      type: "mountain_biking",
+      name: "Hillside - Trail Loop",
+      start: `${start} 09:00:00`,
+      ...(grit === undefined ? {} : { grit }),
+      flow,
+    });
+    // a ride with flow but no grit leaves a gap in the grit line, not a 0
+    const rides = [
+      trail(1, "2026-10-20", 30, 4.2),
+      road,
+      trail(3, "2026-10-13", undefined, 3.6),
+      trail(2, "2026-10-06", 12.5, 3.1),
+    ];
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: rides } }),
+      { hash: "#cycling" },
+    );
+    const head = await page.$$eval("[data-id=bikeDetails] thead th", (c) =>
+      c.map((x) => x.textContent),
+    );
+    expect(head.slice(-2)).toEqual(["Grit", "Flow"]);
+    const roadRow = await page.$$eval("[data-id=bikeDetails] tbody tr", (r) =>
+      r.map((x) => [...x.children].slice(-2).map((c) => c.textContent)),
+    );
+    expect(roadRow).toContainEqual(["n/a", "n/a"]);
+    // oldest ride first; only the rides that have the value
+    expect((await chartDataset(page, "bikeDetails", "Flow")).data).toEqual([3.1, 3.6, 4.2]);
+    expect((await chartDataset(page, "bikeDetails", "Grit")).data).toEqual([12.5, null, 30]);
+    expect(await page.innerText("[data-id=bikeDetails]")).toContain("lower is smoother");
+    expect(errors).toEqual([]);
+  });
+
+  it("gives one mountain-bike ride its columns but no chart", async () => {
+    const road = data.activities.find((a: Record<string, unknown>) => a.type === "cycling");
+    const trail = { ...road, id: 960, type: "mountain_biking", grit: 20, flow: 3.5 };
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: [trail, road] } }),
+      { hash: "#cycling" },
+    );
+    const head = await page.$$eval("[data-id=bikeDetails] thead th", (c) =>
+      c.map((x) => x.textContent),
+    );
+    expect(head.slice(-2)).toEqual(["Grit", "Flow"]);
+    expect(await page.locator("[data-id=bikeDetails] canvas").count()).toBe(1);
+    expect(errors).toEqual([]);
+  });
+
+  it("has no grit and flow without mountain-bike data", async () => {
+    const { page, errors } = await open(browser, pageFile(), { hash: "#cycling" });
+    expect(await page.innerText("[data-id=bikeDetails]")).not.toMatch(/\bGrit\b|\bFlow\b/);
+    expect(errors).toEqual([]);
   });
 
   it("names the training effects with the catalogue texts", async () => {

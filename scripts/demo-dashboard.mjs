@@ -247,23 +247,29 @@ function steady(i, sec, hr, label) {
   return { zones, load: trimp(sec / 60, hr) * r(0.9, 1.1), label };
 }
 
-function ride(i, km) {
-  const speed = r(24, 28.5) + fitness(i) * 1.5;
+function ride(i, distance) {
+  const type = pick(["cycling", "road_biking", "mountain_biking"]);
+  const trail = type === "mountain_biking";
+  const km = trail ? distance * 0.5 : distance;
+  const speed = (trail ? r(13, 16) : r(24, 28.5)) + fitness(i) * 1.5;
   const sec = (km / speed) * 3600;
   const hr = Math.round(r(124, 136));
   const { zones, load } = steady(i, sec, hr);
   const power = Math.round(r(165, 195) + fitness(i) * 15);
   const a = {
-    name: pick(["Weekend Ride", "Hill Loop", "Coffee Ride", "Lake Ride"]),
-    type: pick(["cycling", "road_biking"]),
+    name: trail ? "Forest Trails" : pick(["Weekend Ride", "Hill Loop", "Coffee Ride", "Lake Ride"]),
+    type,
     sport: "cycling",
     km: round(km, 2),
     duration: hms(sec),
     pace: `${hms(sec / km)}/km`,
     avgHR: hr,
     maxHR: hr + ri(14, 26),
-    ascentM: Math.round(km * r(7, 16)),
+    ascentM: Math.round(km * (trail ? r(20, 30) : r(7, 16))),
   };
+  // mountain-bike dynamics: the flow gets smoother as the season goes on
+  if (trail)
+    Object.assign(a, { grit: round(r(15, 40), 1), flow: round(r(3.4, 4.4) - fitness(i), 1) });
   effort(a, zones, load, sec, r(0.1, 0.8), "aerobic_base");
   return Object.assign(a, {
     calories: Math.round((power * sec) / 1000 / 0.24 / 4.184),
