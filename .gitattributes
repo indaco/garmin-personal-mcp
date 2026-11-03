@@ -1,0 +1,3 @@
+# LF in each checkout: the prompts, the guides and the tests read these files, and compare their
+# text. Without this, Git on Windows checks out CRLF. Git finds binary files by itself.
+* text=auto eol=lf

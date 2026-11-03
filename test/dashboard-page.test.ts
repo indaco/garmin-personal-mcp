@@ -966,7 +966,7 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
 
   it("writes a path that starts with ~ in the home folder", async () => {
     await expect(writer.write({ path: "~/no-such-folder-garmin/x.txt" })).rejects.toThrow(
-      new RegExp(`${homedir()}/no-such-folder-garmin/x\\.txt`),
+      join(homedir(), "no-such-folder-garmin", "x.txt"),
     );
   });
 

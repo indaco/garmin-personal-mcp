@@ -17,7 +17,9 @@ const logFile = () => join(home, ".cache/garmin-personal-mcp/garmin-personal-mcp
 
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), "garmin-home-"));
+  // homedir() reads HOME on macOS and Linux, USERPROFILE on Windows
   vi.stubEnv("HOME", home);
+  vi.stubEnv("USERPROFILE", home);
 });
 
 afterEach(() => {

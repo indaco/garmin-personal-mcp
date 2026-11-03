@@ -369,6 +369,9 @@ const dataOf = (file: string) =>
     /garmin-data:start \*\/(.*?)\/\* garmin-data:end/.exec(readFileSync(file, "utf8"))![1],
   );
 
+// these tests fake launchd or crontab: their paths and process.getuid need a real POSIX system
+const onPosix = it.skipIf(process.platform === "win32");
+
 describe("AutoRefresh", () => {
   let dir: string;
   let config: Config;
@@ -407,7 +410,7 @@ describe("AutoRefresh", () => {
     writeFileSync(join(config.dataDir, "coach.html"), "page");
   });
 
-  it("is off until the user turns it on", async () => {
+  onPosix("is off until the user turns it on", async () => {
     const a = auto("darwin");
     expect(await a.status()).toEqual({ scheduled: false });
     expect(await a.pages()).toEqual([]);
@@ -417,7 +420,7 @@ describe("AutoRefresh", () => {
     expect(await a.pages()).toEqual([join(config.dataDir, "garmin-dashboard.html")]);
   });
 
-  it("installs one launchd job, and a second page or schedule replaces it", async () => {
+  onPosix("installs one launchd job, and a second page or schedule replaces it", async () => {
     const a = new AutoRefresh(config, "darwin", join(dir, "home"), exec, nodeBin(), NPX_ENTRY);
     const plistFile = join(
       dir,
@@ -498,7 +501,7 @@ describe("AutoRefresh", () => {
     expect((await auto("linux").status()).installed).toBe(true);
   });
 
-  it("schedules npx for a server in a pnpm, bun or yarn cache", async () => {
+  onPosix("schedules npx for a server in a pnpm, bun or yarn cache", async () => {
     for (const entry of [
       "/home/u/.cache/pnpm/dlx/9f11d7eae4fe2ed5074378e66f47f8ff/mvt8ezid-23wm/node_modules/pkg/dist/index.js",
       "/tmp/bunx-501-pkg@latest/node_modules/pkg/dist/index.js",
@@ -513,7 +516,7 @@ describe("AutoRefresh", () => {
     }
   });
 
-  it("runs a server in a folder that only looks like a cache with its node", async () => {
+  onPosix("runs a server in a folder that only looks like a cache with its node", async () => {
     for (const entry of [
       "/home/u/dlx-tools/pkg/dist/index.js",
       "/home/u/bunx-cache/pkg/dist/index.js",
@@ -528,7 +531,7 @@ describe("AutoRefresh", () => {
     }
   });
 
-  it("asks launchd whether the job is loaded, and needs its plist", async () => {
+  onPosix("asks launchd whether the job is loaded, and needs its plist", async () => {
     let loaded = true;
     const launchd: Run = async (cmd, args) => {
       calls.push({ cmd, args });
@@ -624,17 +627,25 @@ describe("AutoRefresh", () => {
     });
   });
 
-  it("runs an installed copy with its node, and a copy in the npx cache with npx", async () => {
-    const installed = "/usr/local/lib/node_modules/pkg/dist/index.js";
-    await new AutoRefresh(config, "linux", join(dir, "home"), exec, "/opt/node/bin", installed).set(
-      {},
-    );
-    expect(crontab).toContain(`'/opt/node/bin/node' '${installed}' 'refresh' '--auto'`);
-    await auto("linux").set({});
-    expect(crontab).toMatch(
-      /'\/opt\/node\/bin\/npx' '-y' '@indaco\/garmin-personal-mcp@latest' 'refresh' '--auto'/,
-    );
-  });
+  onPosix(
+    "runs an installed copy with its node, and a copy in the npx cache with npx",
+    async () => {
+      const installed = "/usr/local/lib/node_modules/pkg/dist/index.js";
+      await new AutoRefresh(
+        config,
+        "linux",
+        join(dir, "home"),
+        exec,
+        "/opt/node/bin",
+        installed,
+      ).set({});
+      expect(crontab).toContain(`'/opt/node/bin/node' '${installed}' 'refresh' '--auto'`);
+      await auto("linux").set({});
+      expect(crontab).toMatch(
+        /'\/opt\/node\/bin\/npx' '-y' '@indaco\/garmin-personal-mcp@latest' 'refresh' '--auto'/,
+      );
+    },
+  );
 
   it("runs an installed copy with node.exe on Windows", async () => {
     const installed = "C:\\npm\\node_modules\\pkg\\dist\\index.js";
@@ -685,7 +696,7 @@ describe("AutoRefresh", () => {
     expect(calls).toEqual([]);
   });
 
-  it("never puts the API key in the job", async () => {
+  onPosix("never puts the API key in the job", async () => {
     process.env.GARMIN_PERSONAL_API_KEY = "env-secret";
     try {
       for (const p of ["darwin", "linux", "win32"] as const) await auto(p).set({});
@@ -712,7 +723,7 @@ describe("AutoRefresh", () => {
     expect(calls).toEqual([]);
   });
 
-  it("reports an error of the scheduler, and keeps the schedule it had", async () => {
+  onPosix("reports an error of the scheduler, and keeps the schedule it had", async () => {
     const plistFile = join(
       dir,
       "home/Library/LaunchAgents/com.indaco.garmin-personal-mcp.refresh.plist",
@@ -735,7 +746,7 @@ describe("AutoRefresh", () => {
     );
   });
 
-  it("loads the old job again after a failed reinstall on macOS", async () => {
+  onPosix("loads the old job again after a failed reinstall on macOS", async () => {
     let bootstraps = 0;
     const flaky: Run = async (cmd, args) => {
       calls.push({ cmd, args });
@@ -787,7 +798,7 @@ describe("AutoRefresh", () => {
     expect((await a.status()).last).toEqual(last);
   });
 
-  it("runs once for a missed run time, and not for a time before the schedule", async () => {
+  onPosix("runs once for a missed run time, and not for a time before the schedule", async () => {
     const a = auto("darwin");
     expect(await a.missed()).toBe(false);
     await a.set({ cron: "0 7 * * *" });
@@ -815,7 +826,7 @@ describe("AutoRefresh", () => {
     expect(await auto("linux").missed()).toBe(true);
   });
 
-  it("does not catch up a time of a new cron set after the last run", async () => {
+  onPosix("does not catch up a time of a new cron set after the last run", async () => {
     const page = join(config.dataDir, "garmin-dashboard.html");
     writeFileSync(
       join(config.dataDir, "auto-refresh.json"),
