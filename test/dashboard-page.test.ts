@@ -1692,6 +1692,11 @@ describe("writeBlock", () => {
     expect(readBlock(out, "layout")).toEqual(value);
   });
 
+  it("writes a value 1,000 levels deep", () => {
+    const value = JSON.parse("[".repeat(1000) + "]".repeat(1000)) as unknown;
+    expect(readBlock(writeBlock(empty, "layout", value), "layout")).toEqual(value);
+  });
+
   it("names the block of a value too deep to write back", () => {
     const deep = JSON.parse("[".repeat(200_000) + "]".repeat(200_000)) as unknown;
     let err: unknown;

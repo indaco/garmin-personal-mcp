@@ -21,6 +21,7 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;
 const LAYOUT = /* garmin-layout:start */null/* garmin-layout:end */;
 const WIDGETS = /* garmin-widgets:start */[]/* garmin-widgets:end */;
 const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
+const REFRESH = /* garmin-refresh:start */null/* garmin-refresh:end */;
 </script>
 `;
 const data = {
@@ -54,14 +55,19 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }));
 const page = () => readFileSync(file, "utf8");
 const library = () => join(dir, "widgets.json");
 
-/** A page from the template with `block` set to a deep value; returns the page text. */
-async function pageWith(block: DeepBlock, otherLibrary = false): Promise<string> {
-  await writer.write({});
+/** Sets a block of the page file to this JSON text, as a hand edit does. */
+function setBlock(block: string, json: string): void {
   const re = new RegExp(`(garmin-${block}:start \\*/).*?(/\\* garmin-${block}:end)`, "s");
   writeFileSync(
     file,
-    page().replace(re, (_, a: string, b: string) => a + DEEP_BLOCKS[block] + b),
+    page().replace(re, (_, a: string, b: string) => a + json + b),
   );
+}
+
+/** A page from the template with `block` set to a deep value; returns the page text. */
+async function pageWith(block: DeepBlock, otherLibrary = false): Promise<string> {
+  await writer.write({});
+  setBlock(block, DEEP_BLOCKS[block]);
   if (otherLibrary) {
     writeFileSync(library(), JSON.stringify([{ id: "other", title: "O", code: "return 2" }]));
   }
@@ -135,4 +141,73 @@ describe("a page block too deep to write back", () => {
       expect(existsSync(library())).toBe(false);
     },
   );
+});
+
+describe("a page block too deep to write back: what still works", () => {
+  it.each(["layout", "i18n"] as const)(
+    "a data update keeps a deep %s block as it is",
+    async (block) => {
+      await pageWith(block);
+      expect((await writer.write({})).page).toBe("updated");
+      expect(page()).toContain(DEEP_BLOCKS[block]);
+    },
+  );
+
+  it.each(["layout", "i18n"] as const)(
+    "an edit that only reads works with a deep %s block",
+    async (block) => {
+      await pageWith(block);
+      expect((await writer.edit({})).changed).toBe(false);
+    },
+  );
+
+  it("an edit writes a deep layout back with only the fields that it knows", async () => {
+    await pageWith("layout");
+    await expect(place.run()).resolves.toMatchObject({ changed: true });
+    expect(page()).not.toContain(DEEP);
+    expect(readBlock(page(), "layout")).not.toHaveProperty("x");
+  });
+
+  it("an edit that does not change the languages keeps a deep i18n block as it is", async () => {
+    await pageWith("i18n");
+    await expect(place.run()).resolves.toMatchObject({ changed: true });
+    expect(page()).toContain(DEEP_BLOCKS.i18n);
+  });
+
+  it("a library widget with the same id takes the place of a deep custom widget", async () => {
+    await pageWith("widgets");
+    writeFileSync(library(), JSON.stringify([{ id: "mine", title: "Library", code: "return 3" }]));
+    expect((await writer.write({})).page).toBe("updated");
+    expect(readBlock(page(), "widgets")).toEqual([
+      { id: "mine", title: "Library", code: "return 3", span: 1 },
+    ]);
+    expect((await writer.edit({})).changed).toBe(false);
+  });
+
+  it.each(["layout", "widgets"] as const)(
+    "a new layout keeps the added languages with a deep %s block",
+    async (block) => {
+      await pageWith(block);
+      setBlock("i18n", '{"de":{"na":"k. A."}}');
+      expect((await writer.write({ layout: "preset" })).page).toBe("replaced");
+      expect(readBlock(page(), "i18n")).toEqual({ de: { na: "k. A." } });
+    },
+  );
+
+  it("a new layout keeps the library and leaves out a deep custom widget", async () => {
+    await pageWith("widgets", true);
+    const before = readFileSync(library(), "utf8");
+    expect((await writer.write({ layout: "preset" })).page).toBe("replaced");
+    expect(readBlock(page(), "widgets")).toEqual([
+      { id: "other", title: "O", code: "return 2", span: 1 },
+    ]);
+    expect(readFileSync(library(), "utf8")).toBe(before);
+  });
+
+  it("new settings drop a deep refresh record and still write the page", async () => {
+    await writer.write({});
+    setBlock("refresh", `{"x":${DEEP}}`);
+    expect((await writer.write({ settings: { title: "Mine" } })).page).toBe("replaced");
+    expect(readBlock(page(), "refresh")).toBeNull();
+  });
 });
