@@ -13,11 +13,12 @@ Then answer in chat, in this order, short:
 
 - **Summary**: date, name, distance, time, pace, average HR, and the training effect with its label.
 - **Plan against execution**: when the run followed a planned workout, a table with one row per
-  lap whose step has a target (not OPEN): the step, its target (pace, HR or cadence, low to high),
-  what the lap did, and hit or miss. A lap's `step` is the `stepIndex` of its plan step. Match by
-  it, not in order: auto-lap splits a long step into several laps, and each rep of a repeat is its
-  own lap with the same `step`. Leave out the laps without a `step`. When no step has a target, say
-  so in one line. Without a planned workout, say so in one line.
+  lap that has a `step`: the step, its target (pace, HR or cadence, low to high), what the lap did,
+  and hit or miss. A lap's `step` is the `stepIndex` of its plan step. Match by it, not in order:
+  auto-lap splits a long step into several laps, and each rep of a repeat is its own lap with the
+  same `step`. For a step with an OPEN target, show its planned time or distance (open when it ends
+  with the lap button) and what the lap did, with no hit or miss. Leave out the laps without a
+  `step`. Without a planned workout, say so in one line.
 - **Reps**: for intervals, each active lap of 20 m and 8 s or more, with its pace, HR and running
   form (ground contact `gctMs`, vertical ratio `vertRatioPct`, when the laps have them). A shorter
   lap is not a rep: for example an open step of the workout that ends when you press lap. Also the
