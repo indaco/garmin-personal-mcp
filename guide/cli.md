@@ -1,6 +1,6 @@
 # Commands
 
-The server is also a command for a terminal. Without a command, it starts the MCP server on stdin
+The server is also a command for a terminal. Without arguments, it starts the MCP server on stdin
 and stdout, as your MCP client starts it. With a command, it does one task, prints the result and
 stops. It does not start the MCP server.
 
@@ -138,4 +138,5 @@ each system.
 | `0`  | the command worked                                                                         |
 | `1`  | the command failed, and the error is on stderr. `refresh` also gives 1 when a page failed. |
 
-A word that is not a command starts the MCP server.
+A word or a flag that is not a command prints the error and the help on stderr and gives 1. It does
+not start the MCP server.

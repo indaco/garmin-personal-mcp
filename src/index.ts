@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
-import { cli, COMMANDS } from "./cli";
+import { cli } from "./cli";
 import { loadConfig } from "./config";
 import { AutoRefresh } from "./schedule";
 import { createParts, createServer } from "./server";
 
-const [command = "", ...args] = process.argv.slice(2);
+const [command, ...args] = process.argv.slice(2);
 
-if (COMMANDS.includes(command)) {
+if (command !== undefined) {
   const config = loadConfig();
   const r = await cli(command, args, new AutoRefresh(config), () => createParts(config).writer);
   if (r.stdout) process.stdout.write(`${r.stdout}\n`);

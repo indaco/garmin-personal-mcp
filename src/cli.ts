@@ -7,8 +7,8 @@ import type { DashboardWriter } from "./dashboard-page";
 import { LOG_DIR } from "./log";
 import { type AutoRefresh, cronOf, type LastRun, refreshPages, type Status } from "./schedule";
 
-/** The commands for a terminal or a scheduler; any other start is the MCP server. */
-export const COMMANDS = ["info", "refresh", "schedule", "--version", "-v", "--help", "-h"];
+/** The commands for a terminal or a scheduler. Only a start without arguments is the MCP server. */
+const COMMANDS = ["info", "refresh", "schedule", "--version", "-v", "--help", "-h"];
 
 export const HELP = `Usage: garmin-personal-mcp [command]
 
@@ -36,9 +36,13 @@ export interface CliResult {
   stderr?: string;
 }
 
+/** A wrong command or flag: the error and the help, on stderr. */
+const usage = (error: string): CliResult => ({ code: 1, stderr: `${error}\n\n${HELP}` });
+
 /**
  * Runs `--version` (`-v`), `--help` (`-h`), `info`, `refresh [page.html | --auto]` or
  * `schedule [daily|weekdays|weekly <day>] [HH:MM] | "<cron>" | off`, each with an optional page.
+ * An unknown command or flag gives the help on stderr and exit code 1.
  * Not MCP, so the result may go to stdout.
  */
 export async function cli(
@@ -49,6 +53,11 @@ export async function cli(
   sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms)),
   config: Config = loadConfig(),
 ): Promise<CliResult> {
+  if (!COMMANDS.includes(command)) return usage(`Unknown command: ${command}`);
+  const flag = args.find(
+    (a, i) => a.startsWith("-") && !(command === "refresh" && i === 0 && a === "--auto"),
+  );
+  if (flag) return usage(`Unknown flag: ${flag}`);
   if (command === "--version" || command === "-v") return { code: 0, stdout: version };
   if (command === "--help" || command === "-h") return { code: 0, stdout: HELP };
   if (command === "info") {

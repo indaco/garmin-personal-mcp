@@ -72,6 +72,42 @@ describe("cli", () => {
     expect(HELP).toMatch(/^Usage: garmin-personal-mcp/);
   });
 
+  it.each(["foo", "--foo", "-x", ""])(
+    "prints the help on stderr for command '%s'",
+    async (word) => {
+      const f = fakes();
+      const write = vi.fn(f.writer);
+      expect(await cli(word, [], f.auto, write)).toEqual({
+        code: 1,
+        stderr: `Unknown command: ${word}\n\n${HELP}`,
+      });
+      expect(f.auto.status).not.toHaveBeenCalled();
+      expect(f.auto.set).not.toHaveBeenCalled();
+      expect(write).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["refresh", ["--foo"]],
+    ["refresh", ["--auto", "--foo"]],
+    ["refresh", ["a.html", "--auto"]],
+    ["schedule", ["--foo"]],
+    ["schedule", ["off", "--foo"]],
+    ["info", ["--auto"]],
+    ["--version", ["--foo"]],
+  ])("prints the help on stderr for %s %j", async (command, args) => {
+    const f = fakes();
+    const write = vi.fn(f.writer);
+    expect(await cli(command, args, f.auto, write)).toEqual({
+      code: 1,
+      stderr: `Unknown flag: ${args.at(-1)}\n\n${HELP}`,
+    });
+    // a wrong flag must not stop the schedule: `schedule off --foo` once stopped all of it
+    expect(f.auto.off).not.toHaveBeenCalled();
+    expect(f.auto.set).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+  });
+
   it("refreshes one page, or the scheduled pages, and exits with 1 when one fails", async () => {
     const f = fakes();
     const one = await cli("refresh", ["a.html"], f.auto, f.writer);
@@ -331,6 +367,15 @@ describe("the entry point", () => {
       const s = await start([flag]);
       expect(s.serveStdio).not.toHaveBeenCalled();
       expect(s.run).toHaveBeenCalledWith(flag, [], expect.anything(), expect.any(Function));
+    },
+  );
+
+  it.each(["foo", "--foo", ""])(
+    "gives '%s' to the command line, not to the server",
+    async (word) => {
+      const s = await start([word]);
+      expect(s.serveStdio).not.toHaveBeenCalled();
+      expect(s.run).toHaveBeenCalledWith(word, [], expect.anything(), expect.any(Function));
     },
   );
 
