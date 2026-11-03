@@ -365,8 +365,9 @@ const readIfThere = (f) => (existsSync(f) ? readFileSync(f, "utf8") : "");
 
 if (WINDOWS && process.env.E2E_SECOND_USER) {
   const other = "garminE2e";
-  // no password in a log: it goes to net and to PowerShell, and it lives as long as this run
-  const password = `${randomBytes(12).toString("base64url")}aA1!`;
+  // no password in a log: it goes to net and to PowerShell, and it lives as long as this run.
+  // At most 14 characters: for a longer one, net asks for a confirmation
+  const password = `aA1!${randomBytes(6).toString("base64url")}`;
   const base = mkdtempSync(join(`${process.env.SystemDrive}\\`, "garmin-e2e-"));
   const USERS = "*S-1-5-32-545";
   let script = 0;
