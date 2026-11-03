@@ -72,40 +72,109 @@ describe("cli", () => {
     expect(HELP).toMatch(/^Usage: garmin-personal-mcp/);
   });
 
-  it.each(["foo", "--foo", "-x", ""])(
-    "prints the help on stderr for command '%s'",
-    async (word) => {
-      const f = fakes();
-      const write = vi.fn(f.writer);
-      expect(await cli(word, [], f.auto, write)).toEqual({
-        code: 1,
-        stderr: `Unknown command: ${word}\n\n${HELP}`,
-      });
-      expect(f.auto.status).not.toHaveBeenCalled();
-      expect(f.auto.set).not.toHaveBeenCalled();
-      expect(write).not.toHaveBeenCalled();
-    },
-  );
+  it.each([
+    "foo",
+    "--foo",
+    "-x",
+    "-",
+    "--",
+    "",
+    " ",
+    // a command is exact: no other case, no value, no extra space
+    "INFO",
+    "--HELP",
+    "-V",
+    "-help",
+    "--help=1",
+    "--version=1",
+    " info",
+    // COMMANDS is a list, so a name that every object has is not a command
+    "constructor",
+    "__proto__",
+  ])("prints the help on stderr for command '%s'", async (word) => {
+    const f = fakes();
+    const write = vi.fn(f.writer);
+    expect(await cli(word, [], f.auto, write)).toEqual({
+      code: 1,
+      stderr: `Unknown command: ${word}\n\n${HELP}`,
+    });
+    expect(f.auto.status).not.toHaveBeenCalled();
+    expect(f.auto.set).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("gives the wrong command, not its arguments, in the error", async () => {
+    const f = fakes();
+    expect(await cli("foo", ["--bar", "a.html"], f.auto, f.writer)).toEqual({
+      code: 1,
+      stderr: `Unknown command: foo\n\n${HELP}`,
+    });
+  });
 
   it.each([
-    ["refresh", ["--foo"]],
-    ["refresh", ["--auto", "--foo"]],
-    ["refresh", ["a.html", "--auto"]],
-    ["schedule", ["--foo"]],
-    ["schedule", ["off", "--foo"]],
-    ["info", ["--auto"]],
-    ["--version", ["--foo"]],
-  ])("prints the help on stderr for %s %j", async (command, args) => {
+    ["refresh", ["--foo"], "--foo"],
+    ["refresh", ["-x"], "-x"],
+    ["refresh", ["-"], "-"],
+    ["refresh", ["--"], "--"],
+    // --auto is exact, it comes first and only refresh has it
+    ["refresh", ["--AUTO"], "--AUTO"],
+    ["refresh", ["--auto=1"], "--auto=1"],
+    ["refresh", ["-auto"], "-auto"],
+    ["refresh", ["--auto", "--foo"], "--foo"],
+    ["refresh", ["--auto", "--auto"], "--auto"],
+    ["refresh", ["a.html", "--auto"], "--auto"],
+    ["schedule", ["--auto"], "--auto"],
+    ["info", ["--auto"], "--auto"],
+    // the help of a command does not exist yet, and a flag never reaches the command
+    ["refresh", ["--help"], "--help"],
+    ["schedule", ["-h"], "-h"],
+    ["info", ["--version"], "--version"],
+    ["--help", ["--foo"], "--foo"],
+    ["-h", ["-x"], "-x"],
+    ["--version", ["--foo"], "--foo"],
+    ["-v", ["-x"], "-x"],
+    // a word before the flag does not hide it
+    ["schedule", ["--foo"], "--foo"],
+    ["schedule", ["off", "--foo"], "--foo"],
+    ["schedule", ["off", "a.html", "--foo"], "--foo"],
+    ["schedule", ["weekly", "--day", "monday"], "--day"],
+    // several flags: the first one is in the error
+    ["refresh", ["--foo", "--bar"], "--foo"],
+    ["schedule", ["off", "--page", "a.html", "--foo"], "--page"],
+    // a path or a cron expression that starts with a dash reads as a flag
+    ["refresh", ["-old.html"], "-old.html"],
+    ["schedule", ["-old.html"], "-old.html"],
+    ["schedule", ["-1 * * * *"], "-1 * * * *"],
+  ])("prints the help on stderr for %s %j", async (command, args, flag) => {
     const f = fakes();
     const write = vi.fn(f.writer);
     expect(await cli(command, args, f.auto, write)).toEqual({
       code: 1,
-      stderr: `Unknown flag: ${args.at(-1)}\n\n${HELP}`,
+      stderr: `Unknown flag: ${flag}\n\n${HELP}`,
     });
     // a wrong flag must not stop the schedule: `schedule off --foo` once stopped all of it
     expect(f.auto.off).not.toHaveBeenCalled();
     expect(f.auto.set).not.toHaveBeenCalled();
+    expect(f.auto.status).not.toHaveBeenCalled();
+    expect(f.auto.pages).not.toHaveBeenCalled();
     expect(write).not.toHaveBeenCalled();
+  });
+
+  it("does not read a dash inside a word as a flag", async () => {
+    const f = fakes();
+    expect(await cli("refresh", ["./-old.html"], f.auto, f.writer)).toMatchObject({ code: 0 });
+    expect(await cli("refresh", ["my-page.html"], f.auto, f.writer)).toMatchObject({ code: 0 });
+    expect(f.written).toEqual(["./-old.html", "my-page.html"]);
+    await cli("schedule", ["*/5 * * * 1-5"], f.auto, f.writer);
+    expect(f.auto.set).toHaveBeenLastCalledWith({ cron: "*/5 * * * 1-5", path: undefined });
+    await cli("schedule", ["daily", "my-page.html"], f.auto, f.writer);
+    expect(f.auto.set).toHaveBeenLastCalledWith({ cron: "0 7 * * *", path: "my-page.html" });
+  });
+
+  it("stops the whole schedule only with a plain off", async () => {
+    const f = fakes();
+    expect(await cli("schedule", ["off"], f.auto, f.writer)).toMatchObject({ code: 0 });
+    expect(f.auto.off).toHaveBeenCalledWith(undefined);
   });
 
   it("refreshes one page, or the scheduled pages, and exits with 1 when one fails", async () => {
@@ -378,6 +447,37 @@ describe("the entry point", () => {
       expect(s.run).toHaveBeenCalledWith(word, [], expect.anything(), expect.any(Function));
     },
   );
+
+  it("gives the words after a wrong command to the command line too", async () => {
+    const s = await start(["foo", "bar", "--baz"]);
+    expect(s.serveStdio).not.toHaveBeenCalled();
+    expect(s.run).toHaveBeenCalledWith(
+      "foo",
+      ["bar", "--baz"],
+      expect.anything(),
+      expect.any(Function),
+    );
+  });
+
+  // no mock of the command line: an MCP client that passes a wrong argument gets nothing on stdout
+  it.each([
+    [["foo"], "Unknown command: foo"],
+    [["--foo"], "Unknown command: --foo"],
+    [[""], "Unknown command: "],
+    [["info", "--foo"], "Unknown flag: --foo"],
+    [["schedule", "off", "--foo"], "Unknown flag: --foo"],
+  ])("writes the help only on stderr and exits with 1 for %j", async (args, error) => {
+    const serveStdio = vi.fn();
+    vi.doMock("@modelcontextprotocol/server/stdio", () => ({ serveStdio }));
+    const stdout = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    process.argv = ["node", "index.js", ...args];
+    await import("../src/index");
+    expect(serveStdio).not.toHaveBeenCalled();
+    expect(stdout).not.toHaveBeenCalled();
+    expect(stderr).toHaveBeenCalledWith(`${error}\n\n${HELP}\n`);
+    expect(process.exitCode).toBe(1);
+  });
 
   it("runs a command: its output, its errors and its exit code", async () => {
     const s = await start(["schedule", "daily"]);
