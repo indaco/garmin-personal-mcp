@@ -435,6 +435,26 @@ In Claude Code, add `--env GARMIN_DATA_DIR=/path/to/garmin-data` to `claude mcp 
 [The data folder](guide/tools.md#the-data-folder) lists the files that the server keeps and its
 log.
 
+## Commands
+
+The server is also a command for a terminal. A command does one task and stops: it does not start
+the MCP server.
+
+| Command                                  | What it does                                                                     |
+| ---------------------------------------- | -------------------------------------------------------------------------------- |
+| `info`                                   | shows the version, the settings and where the files are. It never shows the key. |
+| `refresh [page.html]`                    | updates a dashboard page one time                                                |
+| `schedule [daily\|weekdays\|weekly ...]` | shows, sets or stops the automatic update of a page                              |
+| `--version`, `-v`                        | shows the version                                                                |
+| `--help`, `-h`                           | lists the commands                                                               |
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest info
+```
+
+A command reads the environment variables of your terminal, not of your MCP client configuration.
+[Commands](guide/cli.md) has each command, its output and its exit codes.
+
 ## Security
 
 The server is read-only. It sends the API key only to the Garmin token endpoint, and it never logs
@@ -459,6 +479,7 @@ does not endorse this project, and the project has no affiliation with Garmin.
 | Claude Desktop does not find `npx` | GUI apps do not read your shell profile. Use the absolute path of `npx` (`which npx`) as the `command`.                              |
 | Changes have no effect             | The client keeps the old server process. Restart the client: a new Claude Code session, or quit and start Claude Desktop again.      |
 | Which version runs                 | `npx -y @indaco/garmin-personal-mcp@latest --version` (or `-v`) prints the version and stops. `--help` (or `-h`) lists the commands. |
+| Where the files are                | `npx -y @indaco/garmin-personal-mcp@latest info` shows the key file, the data folder and the logs. See [Commands](guide/cli.md).     |
 
 [Problems and solutions](guide/troubleshooting.md) has more problems, the log files, and commands
 that test the key and the server.

@@ -37,7 +37,7 @@ import {
   withCronLine,
 } from "../src/schedule";
 
-vi.mock("../src/log", () => ({ log: vi.fn() }));
+vi.mock("../src/log", () => ({ LOG_DIR: ".cache/garmin-personal-mcp", log: vi.fn() }));
 
 const job: Job = {
   program: "/opt/node/bin/npx",

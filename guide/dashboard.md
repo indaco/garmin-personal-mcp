@@ -135,6 +135,9 @@ update is every day at 07:00. All the pages that update automatically use the sa
   reply says when the job cannot start.
 - Each update writes one line to `~/.cache/garmin-personal-mcp/refresh.log`.
 
+You can also set, show and stop the schedule from a terminal, with the
+[`schedule` command](cli.md#schedule).
+
 ## Show the dashboard in the chat
 
 In Claude Desktop, the dashboard can open inside the chat. The page has the same boards, charts and
@@ -181,24 +184,6 @@ The page in the chat is an MCP App. An MCP server gives this page to the client,
 shows it in the chat. Other clients that show MCP Apps can also work, but they are not tested. The
 ChatGPT chat and Claude on the web show MCP Apps too, but they cannot start a server on your
 computer.
-
-### From a terminal
-
-```bash
-npx -y @indaco/garmin-personal-mcp@latest schedule daily 07:00
-npx -y @indaco/garmin-personal-mcp@latest schedule weekdays 06:30
-npx -y @indaco/garmin-personal-mcp@latest schedule weekly monday 08:00 garmin-dashboard-coach.html
-npx -y @indaco/garmin-personal-mcp@latest schedule "0 18 * * 1,4"  # a cron expression
-npx -y @indaco/garmin-personal-mcp@latest schedule              # show the schedule
-npx -y @indaco/garmin-personal-mcp@latest schedule off          # stop all
-npx -y @indaco/garmin-personal-mcp@latest schedule off garmin-dashboard-coach.html
-npx -y @indaco/garmin-personal-mcp@latest refresh               # update now, once
-```
-
-A cron expression has 5 fields in local time: minute, hour, day of the month, month and weekday
-(0 is Sunday), with numbers, lists (`1,4`), ranges (`1-5`) and steps (`*/6`). A file name ends in
-`.html`. A relative path is in the data folder. `refresh` with a file name
-updates that page.
 
 ## Boards and widgets
 

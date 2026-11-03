@@ -5,9 +5,12 @@ import { dirname, join } from "node:path";
 /** Past this size the log moves to `<file>.1`, replacing the one before, and a new log starts. */
 const MAX_BYTES = 1_000_000;
 
+/** The folder of the server log and the refresh log, relative to the home folder. */
+export const LOG_DIR = ".cache/garmin-personal-mcp";
+
 // stdio transport: stdout carries MCP messages only, so the log goes to a file.
 export function log(level: "INFO" | "WARN", message: string): void {
-  const file = join(homedir(), ".cache/garmin-personal-mcp/garmin-personal-mcp.log");
+  const file = join(homedir(), LOG_DIR, "garmin-personal-mcp.log");
   try {
     mkdirSync(dirname(file), { recursive: true });
     if ((statSync(file, { throwIfNoEntry: false })?.size ?? 0) > MAX_BYTES) {

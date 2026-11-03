@@ -1,15 +1,21 @@
+import { existsSync, readdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { version } from "../package.json";
+import { type Config, loadConfig } from "./config";
 import type { DashboardWriter } from "./dashboard-page";
+import { LOG_DIR } from "./log";
 import { type AutoRefresh, cronOf, type LastRun, refreshPages, type Status } from "./schedule";
 
 /** The commands for a terminal or a scheduler; any other start is the MCP server. */
-export const COMMANDS = ["refresh", "schedule", "--version", "-v", "--help", "-h"];
+export const COMMANDS = ["info", "refresh", "schedule", "--version", "-v", "--help", "-h"];
 
 export const HELP = `Usage: garmin-personal-mcp [command]
 
 Without a command, the MCP server starts on stdin and stdout.
 
 Commands:
+  info                                show the version, the settings and where the files are
   refresh [page.html]                 update a dashboard page
                                       (default: <data-dir>/garmin-dashboard.html)
   refresh --auto                      update the pages that have a schedule
@@ -31,7 +37,7 @@ export interface CliResult {
 }
 
 /**
- * Runs `--version` (`-v`), `--help` (`-h`), `refresh [page.html | --auto]` or
+ * Runs `--version` (`-v`), `--help` (`-h`), `info`, `refresh [page.html | --auto]` or
  * `schedule [daily|weekdays|weekly <day>] [HH:MM] | "<cron>" | off`, each with an optional page.
  * Not MCP, so the result may go to stdout.
  */
@@ -41,9 +47,18 @@ export async function cli(
   auto: Pick<AutoRefresh, "pages" | "status" | "set" | "off" | "saveRun" | "missed">,
   writer: () => Pick<DashboardWriter, "write">,
   sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms)),
+  config: Config = loadConfig(),
 ): Promise<CliResult> {
   if (command === "--version" || command === "-v") return { code: 0, stdout: version };
   if (command === "--help" || command === "-h") return { code: 0, stdout: HELP };
+  if (command === "info") {
+    // a damaged auto-refresh.json must not stop info: the Schedule line shows the error
+    const schedule = await auto.status().then(
+      (s) => summary(s).split("\n")[0],
+      (e: Error) => `cannot read it: ${e.message}`,
+    );
+    return { code: 0, stdout: info(config, schedule) };
+  }
   try {
     if (command === "refresh") {
       const scheduled = args[0] === "--auto";
@@ -83,6 +98,49 @@ export async function cli(
   } catch (e) {
     return { code: 1, stderr: `${command} failed: ${(e as Error).message}` };
   }
+}
+
+/** The files in the data folder that `info` checks. guide/tools.md tells what each file has. */
+const DATA_FILES = ["exercises.json", "dashboard-cache.json", "widgets.json", "auto-refresh.json"];
+
+const found = (path: string) => `${path} (${existsSync(path) ? "found" : "missing"})`;
+
+/** The names of the files in `dir` that end in `ext`. The list is empty when `dir` is missing. */
+function files(dir: string, ext: string): string[] {
+  try {
+    return readdirSync(dir).filter((f) => f.toLowerCase().endsWith(ext));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The text of `info`: the version, the settings and where the files are. It says where the API key
+ * comes from, but it never shows the key. It does not connect to the network.
+ */
+export function info(
+  config: Config,
+  schedule: string,
+  env: NodeJS.ProcessEnv = process.env,
+  home = homedir(),
+): string {
+  const { dataDir } = config;
+  const pages = files(dataDir, ".html").toSorted();
+  const logs = join(home, LOG_DIR);
+  return [
+    `garmin-personal-mcp ${version}`,
+    `Node.js:      ${process.version} on ${process.platform}`,
+    `API host:     ${config.baseUrl}`,
+    `API key:      ${env.GARMIN_PERSONAL_API_KEY?.trim() ? "from GARMIN_PERSONAL_API_KEY" : "from the key file"}`,
+    `Key file:     ${found(config.apiKeyFile)}`,
+    `Data folder:  ${found(dataDir)}`,
+    `  .FIT files: ${files(join(dataDir, "fit"), ".fit").length}`,
+    `  pages:      ${pages.join(", ") || "none"}`,
+    ...DATA_FILES.map((f) => `  ${f}: ${existsSync(join(dataDir, f)) ? "found" : "missing"}`),
+    `Server log:   ${join(logs, "garmin-personal-mcp.log")}`,
+    `Refresh log:  ${join(logs, "refresh.log")}`,
+    `Schedule:     ${schedule}`,
+  ].join("\n");
 }
 
 function lastLine(last: LastRun): string {

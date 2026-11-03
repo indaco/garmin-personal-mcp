@@ -8,7 +8,7 @@ import * as z from "zod/v4";
 import { name } from "../package.json";
 import type { Config } from "./config";
 import { type DashboardWriter, pageTarget, patchDue } from "./dashboard-page";
-import { log } from "./log";
+import { LOG_DIR, log } from "./log";
 import { MODEL_ONLY, writeAtomically } from "./tools";
 
 /**
@@ -426,7 +426,7 @@ export class AutoRefresh {
     return join(this.config.dataDir, "auto-refresh-task.xml");
   }
   get #log() {
-    return join(this.home, ".cache/garmin-personal-mcp/refresh.log");
+    return join(this.home, LOG_DIR, "refresh.log");
   }
   get #scheduler() {
     return { darwin: "launchd", linux: "cron", win32: "Task Scheduler" }[this.platform as string];

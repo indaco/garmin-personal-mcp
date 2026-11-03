@@ -1,6 +1,9 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { version } from "../package.json";
-import { cli, HELP, RETRY_MS, summary } from "../src/cli";
+import { cli, HELP, info, RETRY_MS, summary } from "../src/cli";
 import type { LastRun, Status } from "../src/schedule";
 
 const on: Status = {
@@ -202,6 +205,57 @@ describe("cli", () => {
     expect(f.auto.set).not.toHaveBeenCalled();
   });
 
+  it("shows the settings and the files, never the API key", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "garmin-info-"));
+    const data = join(dir, "data");
+    mkdirSync(join(data, "fit"), { recursive: true });
+    writeFileSync(join(data, "fit", "1.fit"), "");
+    writeFileSync(join(data, "fit", "2.FIT"), "");
+    writeFileSync(join(data, "fit", "notes.txt"), "");
+    writeFileSync(join(data, "garmin-dashboard.html"), "");
+    writeFileSync(join(data, "Coach.HTML"), "");
+    writeFileSync(join(data, "widgets.json"), "[]");
+    const config = { baseUrl: "https://api.test", apiKeyFile: join(dir, "api-key"), dataDir: data };
+    const text = info(config, "off", { GARMIN_PERSONAL_API_KEY: "s3cret-key" }, dir);
+    expect(text).not.toContain("s3cret-key");
+    expect(text).toMatch(new RegExp(`^garmin-personal-mcp ${version}\\n`));
+    expect(text).toContain(`\nNode.js:      ${process.version} on ${process.platform}\n`);
+    expect(text).toContain("API host:     https://api.test");
+    expect(text).toContain("API key:      from GARMIN_PERSONAL_API_KEY");
+    expect(text).toContain(`Key file:     ${join(dir, "api-key")} (missing)`);
+    expect(text).toContain(`Data folder:  ${data} (found)`);
+    expect(text).toContain("  .FIT files: 2");
+    expect(text).toContain("  pages:      Coach.HTML, garmin-dashboard.html\n");
+    expect(text).toContain("  widgets.json: found\n  auto-refresh.json: missing");
+    expect(text).toContain(
+      `Server log:   ${join(dir, ".cache/garmin-personal-mcp/garmin-personal-mcp.log")}`,
+    );
+    expect(text).toContain(`Refresh log:  ${join(dir, ".cache/garmin-personal-mcp/refresh.log")}`);
+    expect(text).toMatch(/Schedule:     off$/);
+
+    writeFileSync(join(dir, "api-key"), "k");
+    const noData = { ...config, dataDir: join(dir, "none") };
+    // a key of only spaces is no key, as in the API client: the key file is used
+    const other = info(noData, "off", { GARMIN_PERSONAL_API_KEY: " \n" }, dir);
+    expect(other).toContain("API key:      from the key file");
+    expect(other).toContain(`Key file:     ${join(dir, "api-key")} (found)`);
+    expect(other).toContain(`Data folder:  ${join(dir, "none")} (missing)`);
+    expect(other).toContain("  .FIT files: 0\n  pages:      none");
+  });
+
+  it("runs info with the first line of the schedule, or the error when it cannot read the schedule", async () => {
+    const f = fakes();
+    const config = { baseUrl: "b", apiKeyFile: "/no/key", dataDir: "/no/data" };
+    const r = await cli("info", [], f.auto, f.writer, undefined, config);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toMatch(/Schedule:     Automatic refresh "0 7 \* \* 1" with launchd/);
+    f.auto.status.mockRejectedValueOnce(new Error("bad JSON"));
+    const bad = await cli("info", [], f.auto, f.writer, undefined, config);
+    expect(bad).toMatchObject({ code: 0 });
+    expect(bad.stdout).toMatch(/Schedule:     cannot read it: bad JSON$/);
+    expect(HELP).toContain("  info ");
+  });
+
   it("says when the job is missing from the scheduler", () => {
     expect(summary(on)).toBe(
       [
@@ -271,11 +325,14 @@ describe("the entry point", () => {
     expect(s.stdout).not.toHaveBeenCalled();
   });
 
-  it.each(["--version", "-v", "--help", "-h"])("runs %s without the server", async (flag) => {
-    const s = await start([flag]);
-    expect(s.serveStdio).not.toHaveBeenCalled();
-    expect(s.run).toHaveBeenCalledWith(flag, [], expect.anything(), expect.any(Function));
-  });
+  it.each(["--version", "-v", "--help", "-h", "info"])(
+    "runs %s without the server",
+    async (flag) => {
+      const s = await start([flag]);
+      expect(s.serveStdio).not.toHaveBeenCalled();
+      expect(s.run).toHaveBeenCalledWith(flag, [], expect.anything(), expect.any(Function));
+    },
+  );
 
   it("runs a command: its output, its errors and its exit code", async () => {
     const s = await start(["schedule", "daily"]);
