@@ -100,9 +100,9 @@ before you run the prompt:
 - Claude Code: start a new session.
 - Claude Desktop: quit and start the client again.
 
-A client configuration with a fixed version, for example `@indaco/garmin-personal-mcp@0.8.1`, keeps
-that version. Change it to `@indaco/garmin-personal-mcp@latest`, then restart the client. The
-terminal command with `@latest` always uses the latest release.
+A client configuration with a fixed version after the package name, for example `@0.8.1`, keeps that
+version. Change the version to `@latest`, then restart the client. The terminal command with
+`@latest` always uses the latest release.
 
 ## Update the dashboard on a schedule
 
