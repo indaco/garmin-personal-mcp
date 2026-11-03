@@ -11,6 +11,7 @@ import {
   olderThan,
   pageCode,
   withData,
+  UnwritableBlockError,
   writeBlock,
 } from "../src/dashboard-page";
 import { digest } from "../src/digest";
@@ -1675,5 +1676,35 @@ describe("writeDashboard refresh record", () => {
     expect(Object.keys((await writer.view({})).blocks).toSorted()).toEqual(
       ["data", "i18n", "languages", "layout", "settings", "widgets"].toSorted(),
     );
+  });
+});
+
+describe("writeBlock", () => {
+  const empty = "/* garmin-layout:start */null/* garmin-layout:end */";
+
+  it("escapes < and *, so a value cannot close the script or a block", () => {
+    const value = { a: "</script>/**/" };
+    const out = writeBlock(empty, "layout", value);
+    expect(out).not.toContain("<");
+    expect(
+      out.slice("/* garmin-layout:start */".length, -"/* garmin-layout:end */".length),
+    ).not.toContain("*");
+    expect(readBlock(out, "layout")).toEqual(value);
+  });
+
+  it("names the block of a value too deep to write back", () => {
+    const deep = JSON.parse("[".repeat(200_000) + "]".repeat(200_000)) as unknown;
+    let err: unknown;
+    try {
+      writeBlock(empty, "layout", deep);
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(UnwritableBlockError);
+    expect((err as UnwritableBlockError).block).toBe("layout");
+    expect((err as Error).message).toBe(
+      "The garmin-layout block of the page is too deeply nested to write back",
+    );
+    expect((err as Error).cause).toBeInstanceOf(RangeError);
   });
 });

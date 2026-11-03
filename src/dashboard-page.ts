@@ -179,6 +179,25 @@ export interface EditResult {
   englishTexts?: typeof en;
 }
 
+/** A block value that JSON.stringify cannot write: JSON.parse reads any depth, JSON.stringify overflows the stack. */
+export class UnwritableBlockError extends Error {
+  readonly block: Block;
+
+  constructor(block: Block, options: ErrorOptions) {
+    super(`The garmin-${block} block of the page is too deeply nested to write back`, options);
+    this.block = block;
+  }
+}
+
+/** The JSON text of a block value. A depth check before the write fails at one depth, so the real write is caught. */
+function jsonOf(block: Block, value: unknown, space?: number): string {
+  try {
+    return JSON.stringify(value, null, space);
+  } catch (e) {
+    throw new UnwritableBlockError(block, { cause: e });
+  }
+}
+
 /** The JSON value of a block; undefined when the page has no such block. */
 export function readBlock(page: string, block: Block): unknown {
   const m = marker(block).exec(page);
@@ -194,9 +213,10 @@ export function readBlock(page: string, block: Block): unknown {
  * The page with the block set to `value`. `<` is written as \u003c, so no value can close the script,
  * and `*` as \u002a, so no value can hold marker text (a marker needs a slash next to an asterisk)
  * and end its block early. A `/` stays as it is: the data has many (`5:07/km`), and `*` is rare.
+ * Throws `UnwritableBlockError` for a value too deep to write.
  */
 export function writeBlock(page: string, block: Block, value: unknown): string {
-  const json = JSON.stringify(value).replaceAll("<", "\\u003c").replaceAll("*", "\\u002a");
+  const json = jsonOf(block, value).replaceAll("<", "\\u003c").replaceAll("*", "\\u002a");
   return page.replace(
     marker(block),
     () => `/* garmin-${block}:start */${json}/* garmin-${block}:end */`,
@@ -307,12 +327,12 @@ const VERSION = /^\d+\.\d+\.\d+$/;
 export const olderThan = (a: string, b: string): boolean =>
   VERSION.test(a) && VERSION.test(b) && a.localeCompare(b, "en", { numeric: true }) < 0;
 
-/** The `i18n` block of `old`; {} when it cannot be read: a new layout is the way out of a broken page. */
-function addedLanguages(old: string): unknown {
+/** `next` with the `i18n` block of `old`; {} when it cannot be read or written: a new layout is the way out of a broken page. */
+function carryLanguages(next: string, old: string): string {
   try {
-    return readBlock(old, "i18n") ?? {};
+    return writeBlock(next, "i18n", readBlock(old, "i18n") ?? {});
   } catch {
-    return {};
+    return writeBlock(next, "i18n", {});
   }
 }
 
@@ -517,7 +537,7 @@ export class DashboardWriter {
   write(options: WriteOptions): Promise<WriteResult> {
     const run = this.#queue.then(() => this.#write(options));
     this.#queue = run.catch(() => {});
-    return run;
+    return run.catch(this.#unwritable(options.path));
   }
 
   /** What a write would show, and the activities of each board, so the user can choose the sports; writes nothing. */
@@ -593,7 +613,7 @@ export class DashboardWriter {
       };
     });
     this.#queue = run.catch(() => {});
-    return run;
+    return run.catch(this.#unwritable(options.path));
   }
 
   async #write(options: WriteOptions, again = false): Promise<WriteResult> {
@@ -645,7 +665,7 @@ export class DashboardWriter {
       });
       // a new layout starts the boards again; the languages that the user added stay
       if (old !== undefined && oldCode?.from === "template") {
-        next = writeBlock(next, "i18n", addedLanguages(old));
+        next = carryLanguages(next, old);
       }
       kind = old === undefined ? "created" : "replaced";
     } else if (
@@ -703,7 +723,15 @@ export class DashboardWriter {
     if (page !== undefined && marker("settings").test(next)) {
       next = writeBlock(next, "settings", Object.keys(own).length > 0 ? own : null);
     }
-    if (page === undefined) next = await this.#withLibrary(next, old);
+    if (page === undefined) {
+      try {
+        next = await this.#withLibrary(next, old);
+      } catch (e) {
+        // a new layout is the way out: widgets of the old page that cannot be written do not start the library
+        if (!layout || !(e instanceof UnwritableBlockError)) throw e;
+        next = await this.#withLibrary(next, undefined);
+      }
+    }
     next = withData(next, raw, own, notes, await this.schedule.due(target));
 
     // another process (a scheduled refresh, a second client) can write the page while this one waits for Garmin
@@ -748,7 +776,7 @@ export class DashboardWriter {
   edit(options: EditOptions): Promise<EditResult> {
     const run = this.#queue.then(() => this.#edit(options));
     this.#queue = run.catch(() => {});
-    return run;
+    return run.catch(this.#unwritable(options.path));
   }
 
   async #edit(o: EditOptions): Promise<EditResult> {
@@ -854,9 +882,7 @@ export class DashboardWriter {
       o.widgetTexts !== undefined ||
       o.languages !== undefined ||
       o.removeLanguages !== undefined;
-    if (o.widgets !== undefined || o.forgetWidgets !== undefined || o.widgetTexts !== undefined) {
-      await this.#saveLibrary(library);
-    }
+    // the page is built before the library is saved: a block that cannot be written back changes no file
     if (changed) {
       if (layoutChanged) layout = { ...layout, rev: newRev() };
       page = writeBlock(page, "layout", layout);
@@ -864,8 +890,11 @@ export class DashboardWriter {
       if (o.languages !== undefined || o.removeLanguages !== undefined) {
         page = writeBlock(page, "i18n", texts);
       }
-      await writeAtomically(target, page);
     }
+    if (o.widgets !== undefined || o.forgetWidgets !== undefined || o.widgetTexts !== undefined) {
+      await this.#saveLibrary(library);
+    }
+    if (changed) await writeAtomically(target, page);
     return {
       path: target,
       changed,
@@ -917,11 +946,22 @@ export class DashboardWriter {
     }
   }
 
-  #saveLibrary(widgets: CustomWidget[]): Promise<void> {
-    return writeAtomically(
+  async #saveLibrary(widgets: CustomWidget[]): Promise<void> {
+    await writeAtomically(
       resolve(this.dataDir, LIBRARY_FILE),
-      `${JSON.stringify(widgets, null, 2)}\n`,
+      `${jsonOf("widgets", widgets, 2)}\n`,
     );
+  }
+
+  /** Names the page file in the error of a block that cannot be written back; other errors stay as they are. */
+  #unwritable(path: string | undefined): (e: unknown) => never {
+    return (e) => {
+      if (!(e instanceof UnwritableBlockError)) throw e;
+      throw new Error(
+        `${e.message} in ${this.#target(path)}: correct the block in the file, or give writeDashboard a new layout`,
+        { cause: e },
+      );
+    };
   }
 
   /** The page with the library in its widgets block; `old` is the page that it replaces, to start the library. */

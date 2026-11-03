@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -322,8 +322,36 @@ const libraryFile = () => join(dir, "widgets.json");
 const library = () => JSON.parse(readFileSync(libraryFile(), "utf8")) as { id: string }[];
 const ids = (p: string) => (readBlock(p, "widgets") as { id: string }[]).map((w) => w.id);
 const coach = () => readFileSync(join(dir, "coach.html"), "utf8");
+/** Gives the page a custom widget too deep to write back: JSON.stringify overflows the stack. */
+const deepWidgets = () =>
+  writeFileSync(
+    file,
+    page().replace(
+      /(garmin-widgets:start \*\/).*?(\/\* garmin-widgets:end)/s,
+      (_, a: string, b: string) =>
+        `${a}[{"id":"mine","title":"T","code":"x","x":${"[".repeat(200_000)}${"]".repeat(200_000)}}]${b}`,
+    ),
+  );
 
 describe("widget library", () => {
+  it("does not start the library from a widgets block too deep to write back", async () => {
+    deepWidgets();
+    await expect(writer.edit({})).rejects.toThrow(
+      `The garmin-widgets block of the page is too deeply nested to write back in ${file}: correct the block in the file, or give writeDashboard a new layout`,
+    );
+    expect(existsSync(libraryFile())).toBe(false);
+  });
+
+  it("keeps the library as it is when the page cannot take the change", async () => {
+    await writer.edit({ widgets: [widget] });
+    const before = readFileSync(libraryFile(), "utf8");
+    deepWidgets();
+    await expect(
+      writer.edit({ widgets: [{ ...widget, id: "second", title: "Second" }] }),
+    ).rejects.toThrow("garmin-widgets block");
+    expect(readFileSync(libraryFile(), "utf8")).toBe(before);
+  });
+
   it("saves a new custom widget in the library", async () => {
     const r = await writer.edit({ widgets: [widget] });
     expect(library()).toEqual([{ ...widget, span: 1 }]);
