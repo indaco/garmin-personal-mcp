@@ -17,8 +17,9 @@ The guide tells how to use garmin-personal-mcp after the
 
 ## The dashboard
 
-- [The training dashboard](dashboard.md): make and update the page, update it on a schedule, show
-  it in the chat, boards, layout, themes, units and page settings.
+- [The training dashboard](dashboard.md): make and update the page, update the page code after a
+  release, update it on a schedule, show it in the chat, boards, layout, themes, units and page
+  settings.
 - [Widget catalogue](widgets.md): every built-in widget, with what it shows and how it calculates.
 - [Custom widgets](custom-widgets.md): make a widget from your own idea.
 - [Languages](languages.md): the built-in languages, and how to add a language.

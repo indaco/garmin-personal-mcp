@@ -67,8 +67,7 @@ you remove later stays removed. The assistant tells you which widgets the update
 The scheduled refresh does the same, without the message.
 
 When the server has other page code than your page, the update writes the page code of the server.
-This also happens with an older server, and in a scheduled refresh. It keeps your layout, custom widgets, languages and page settings, and it keeps the old page as a
-`.bak` file. The assistant tells you which server version wrote the page before and which one wrote it now.
+This also happens with an older server. See [Update the page code after a release](#update-the-page-code-after-a-release).
 
 After an update that writes new page code, the page shows a note on the board, one time in each
 browser. The note gives the server version, the preset widgets that the update added to the boards that you edited, and a link to the
@@ -78,6 +77,32 @@ The first update sends approximately 35 requests to Garmin. Later updates use th
 send approximately 8.
 
 Reload the page in the browser to see the new data.
+
+## Update the page code after a release
+
+A release can change the page code, for example to add widgets or icons, or to correct a problem.
+The next update of your page writes the new page code. Use one of these procedures:
+
+- **Prompt**: run `training-dashboard-update`. The assistant tells you that the page has new page
+  code. It also tells you which server version wrote the page before.
+- **Terminal**: run `npx -y @indaco/garmin-personal-mcp@latest refresh`. See
+  [`refresh`](cli.md#refresh).
+- **Schedule**: the [scheduled refresh](#update-the-dashboard-on-a-schedule) does the same update.
+  It does not show a message.
+
+The update compares the page code of your page with the page code of the server. When they are
+different, the update writes the page code of the server. Your layout, custom widgets, languages
+and page settings stay. The old page stays as a `.bak` file.
+
+The client keeps the server process that it started. Thus, after a release, restart the client
+before you run the prompt:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit and start the client again.
+
+A client configuration with a fixed version, for example `@indaco/garmin-personal-mcp@0.8.1`, keeps
+that version. Change it to `@indaco/garmin-personal-mcp@latest`, then restart the client. The
+terminal command with `@latest` always uses the latest release.
 
 ## Update the dashboard on a schedule
 
