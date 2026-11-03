@@ -118,7 +118,8 @@ ok      Schedule: Automatic refresh "0 7 * * *" with launchd, next: 2026-11-04 0
 - `Schedule` fails when the job is missing from the system scheduler, or when the last run could not
   update a page.
 
-`doctor` runs on macOS, Linux and Windows. The Windows steps are not tested.
+`doctor` runs on macOS, Linux and Windows, and CI tests it on each one. On Windows, CI does not test
+a folder that you cannot write in.
 
 ## setup
 
@@ -144,7 +145,8 @@ At the end, it tells how to connect your MCP client.
 - When `GARMIN_PERSONAL_API_KEY` is set, it has priority over the file. `setup` tells you. When you
   set `GARMIN_API_KEY_FILE` in the terminal, set it in your MCP client too.
 
-`setup` runs on macOS, Linux and Windows. The Windows steps are not tested.
+`setup` runs on macOS, Linux and Windows, and CI tests it on each one. On Windows, CI reads the
+access of the key file, but a second user does not try to read it.
 
 ## refresh
 

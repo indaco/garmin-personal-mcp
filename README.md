@@ -109,7 +109,8 @@ You do not use a terminal? Follow the
 npx -y @indaco/garmin-personal-mcp@latest setup
 ```
 
-`setup` runs on macOS, Linux and Windows. The Windows steps are not tested.
+`setup` runs on macOS, Linux and Windows, and CI tests it on each one. On Windows, CI reads the
+access of the key file, but a second user does not try to read it.
 
 You can also give the key in `GARMIN_PERSONAL_API_KEY`, in the `env` block of the client
 configuration ([example](guide/setup-claude-desktop.md#4-add-the-server-to-the-configuration-file)).
