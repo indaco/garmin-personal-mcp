@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The changelog is generated and managed by [sley](https://github.com/indaco/sley).
 
+## v0.9.0 - 2026-11-03
+
+### 🚀 Enhancements
+
+- **cli:** add info command and document the terminal commands ([4d2fcd0](https://github.com/indaco/garmin-personal-mcp/commit/4d2fcd0)) ([#176](https://github.com/indaco/garmin-personal-mcp/pull/176))
+- **dashboard:** add icons for other sports ([6655d87](https://github.com/indaco/garmin-personal-mcp/commit/6655d87)) ([#174](https://github.com/indaco/garmin-personal-mcp/pull/174))
+
+### 🩹 Fixes
+
+- **dashboard:** show a sport tab only when the data has its activities ([7473163](https://github.com/indaco/garmin-personal-mcp/commit/7473163)) ([#173](https://github.com/indaco/garmin-personal-mcp/pull/173))
+
+### ❤️ Contributors
+
+- [@indaco](https://github.com/indaco)
+
 ## v0.8.1 - 2026-11-03
 
 ### 🩹 Fixes
