@@ -139,7 +139,8 @@ jobs:
 
       - name: End-to-end test
         shell: bash
-        run: E2E_PTY="$RUNNER_TEMP/pty/node_modules/node-pty" pnpm test:e2e
+        # E2E_SECOND_USER makes a local account on Windows: a runner is thrown away after the job
+        run: E2E_SECOND_USER=1 E2E_PTY="$RUNNER_TEMP/pty/node_modules/node-pty" pnpm test:e2e
 
   # the dashboard page in headless Chromium, once: the page does not depend on the Node version
   page:

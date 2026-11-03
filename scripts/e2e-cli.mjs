@@ -6,9 +6,13 @@
 //
 // E2E_PTY is the path of node-pty, for the checks in a real terminal. CI sets it. Without it, these
 // checks show SKIP: node-pty has a native part, so it is not a dev dependency of the project.
+// E2E_SECOND_USER makes a local account on Windows for the checks as another user. Only CI sets it:
+// never set it on your own computer.
 import { spawn, spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import {
   chmodSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -266,9 +270,9 @@ if (WINDOWS) {
     r.all,
   );
 
-  // a mode stops nobody as root, and an ACL did not stop the administrator of the Windows runner
+  // a mode stops nobody as root. On Windows, the checks as a second user test this
   if (WINDOWS || process.getuid?.() === 0) {
-    console.log("SKIP  doctor: fails on a folder without the right to write (administrator)");
+    console.log("SKIP  doctor: fails on a folder without the right to write (as an administrator)");
   } else {
     const data = join(home, "data");
     mkdirSync(data);
@@ -349,6 +353,130 @@ if (WINDOWS) {
     JSON.parse(line).id === 1 && line.trim().split("\n").length === 1,
     line,
   );
+}
+
+// ---- on Windows, as a second user who is not an administrator
+const icacls = (...args) => {
+  const r = spawnSync("icacls", args, { encoding: "utf8" });
+  if (r.status !== 0) throw new Error(`icacls ${args.join(" ")}: ${r.stdout}${r.stderr}`);
+};
+
+const readIfThere = (f) => (existsSync(f) ? readFileSync(f, "utf8") : "");
+
+if (WINDOWS && process.env.E2E_SECOND_USER) {
+  const other = "garminE2e";
+  // no password in a log: it goes to net and to PowerShell, and it lives as long as this run
+  const password = `${randomBytes(12).toString("base64url")}aA1!`;
+  const base = mkdtempSync(join(`${process.env.SystemDrive}\\`, "garmin-e2e-"));
+  const USERS = "*S-1-5-32-545";
+  let script = 0;
+
+  /** Runs the lines of a .cmd file as the second user: it has its own environment, so the file sets it. */
+  const asOther = (lines) =>
+    new Promise((done, fail) => {
+      const file = join(base, `run-${++script}.cmd`);
+      writeFileSync(file, ["@echo off", ...lines, "exit /b %errorlevel%", ""].join("\r\n"));
+      const stdout = `${file}.out`;
+      const stderr = `${file}.err`;
+      const ps = [
+        "$password = ConvertTo-SecureString $env:E2E_PASSWORD -AsPlainText -Force",
+        `$credential = New-Object System.Management.Automation.PSCredential('.\\${other}', $password)`,
+        `$p = Start-Process -FilePath cmd.exe -ArgumentList '/c', '"${file}"' -Credential $credential -WorkingDirectory '${base}' -RedirectStandardOutput '${stdout}' -RedirectStandardError '${stderr}' -PassThru`,
+        "$handle = $p.Handle",
+        "$p.WaitForExit()",
+        "exit $p.ExitCode",
+      ].join("; ");
+      const p = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", ps], {
+        env: { ...process.env, E2E_PASSWORD: password },
+      });
+      let launcher = "";
+      p.stdout.on("data", (d) => (launcher += d));
+      p.stderr.on("data", (d) => (launcher += d));
+      const timer = setTimeout(() => {
+        p.kill();
+        fail(new Error(`timeout as the second user: ${lines.join(" | ")}`));
+      }, TIMEOUT_MS);
+      p.on("close", (code) => {
+        clearTimeout(timer);
+        const out = readIfThere(stdout) + readIfThere(stderr);
+        done({ code, out, details: `exit ${code}\n${out}${launcher}` });
+      });
+    });
+
+  try {
+    const added = spawnSync("net", ["user", other, password, "/add"], { encoding: "utf8" });
+    if (added.status !== 0) throw new Error(`net user: ${added.stderr}`);
+    // the second user can read everything here, unless a test closes it
+    icacls(base, "/grant", `${USERS}:(OI)(CI)(RX)`);
+    cpSync(resolve("dist"), join(base, "dist"), { recursive: true });
+
+    // these two controls prove that the commands really run as a user without administrator rights
+    let r = await asOther(["whoami"]);
+    check(
+      "second user: runs as that user",
+      r.code === 0 && r.out.toLowerCase().includes(other.toLowerCase()),
+      r.details,
+    );
+    r = await asOther(["net session"]);
+    check("second user: is not an administrator", r.code !== 0, r.details);
+
+    const { env } = newHome();
+    const keys = join(base, "keys");
+    mkdirSync(keys);
+    const keyFile = join(keys, "api-key");
+    const open = join(keys, "open-file");
+    writeFileSync(open, "open text");
+    const saved = await run(["setup"], { ...env, GARMIN_API_KEY_FILE: keyFile }, `${KEY}\n`);
+    check("second user: setup saves in the shared folder", saved.code === 0, saved.all);
+
+    r = await asOther([`type "${open}"`]);
+    check(
+      "second user: reads another file in the same folder",
+      r.code === 0 && r.out.includes("open text"),
+      r.details,
+    );
+    r = await asOther([`type "${keyFile}"`]);
+    check("second user: cannot read the key file", r.code !== 0 && !r.out.includes(KEY), r.details);
+
+    // doctor as this user, in a folder with the right to write and in one with an ACL that denies it
+    const home = join(base, "other-home");
+    const writable = join(base, "writable");
+    const denied = join(base, "denied");
+    for (const dir of [home, writable, denied]) {
+      mkdirSync(dir);
+      icacls(dir, "/grant", `${other}:(OI)(CI)(M)`);
+    }
+    icacls(denied, "/deny", `${other}:(OI)(CI)(WD,AD)`);
+    const doctorIn = (data) =>
+      asOther([
+        `set "HOME=${home}"`,
+        `set "USERPROFILE=${home}"`,
+        `set "GARMIN_BASE_URL=${env.GARMIN_BASE_URL}"`,
+        `set "GARMIN_PERSONAL_API_KEY=${KEY}"`,
+        `set "GARMIN_DATA_DIR=${data}"`,
+        `"${process.execPath}" "${join(base, "dist", "index.js")}" doctor`,
+      ]);
+    r = await doctorIn(writable);
+    check(
+      "second user: doctor passes in a folder with the right to write",
+      r.code === 0 && r.out.includes("All checks passed."),
+      r.details,
+    );
+    r = await doctorIn(denied);
+    check(
+      "second user: doctor fails on a folder where an ACL denies writing",
+      r.code === 1 && /failed {2}Data folder: cannot write in/.test(r.out),
+      r.details,
+    );
+    check("second user: doctor does not show the key", !r.out.includes(KEY), r.details);
+    const left = readdirSync(denied);
+    check("second user: doctor leaves nothing in that folder", left.length === 0, left.join(", "));
+  } catch (e) {
+    check("second user: the checks ran to their end", false, e.message.replaceAll(password, "***"));
+  } finally {
+    spawnSync("net", ["user", other, "/delete"]);
+    rmSync(base, { recursive: true, force: true, maxRetries: 3 });
+  }
 }
 
 // ---- setup in a real terminal
