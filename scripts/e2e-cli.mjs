@@ -110,6 +110,43 @@ function denyWrite(dir) {
   return () => spawnSync("icacls", [dir, "/remove:d", USER]);
 }
 
+// TEMPORARY-DIAGNOSTIC
+if (WINDOWS) {
+  const { renameSync } = await import("node:fs");
+  const sh = (label, cmd, args) => {
+    const r = spawnSync(cmd, args, { encoding: "utf8" });
+    console.log(`DIAG ${label}: status=${r.status}\n${r.stdout}${r.stderr}`);
+  };
+  sh("whoami /priv", "whoami", ["/priv"]);
+  sh("whoami /groups", "whoami", ["/groups"]);
+  sh("root", "icacls", [root]);
+  const dir = join(root, "diag", "keys");
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  sh("dir made with mode 700", "icacls", [dir]);
+  const plain = join(root, "diag", "plain");
+  mkdirSync(plain);
+  sh("dir made without a mode", "icacls", [plain]);
+  const f = join(dir, "probe");
+  writeFileSync(f, "", { mode: 0o600, flag: "wx" });
+  sh("file created", "icacls", [f]);
+  sh("limit", "icacls", [f, "/inheritance:r", "/grant:r", `${USER}:F`]);
+  sh("after limit", "icacls", [f]);
+  writeFileSync(f, "x");
+  sh("after second write", "icacls", [f]);
+  const g = join(dir, "probe2");
+  renameSync(f, g);
+  sh("after rename", "icacls", [g]);
+  sh("deny", "icacls", [plain, "/deny", `${USER}:(OI)(CI)(WD,AD)`]);
+  sh("after deny", "icacls", [plain]);
+  try {
+    const made = mkdtempSync(join(plain, ".probe-"));
+    console.log(`DIAG mkdtemp worked under deny: ${made}`);
+  } catch (e) {
+    console.log(`DIAG mkdtemp failed under deny: ${e.message}`);
+  }
+  sh("remove deny", "icacls", [plain, "/remove:d", USER]);
+}
+
 // ---- setup, with the key on a pipe
 {
   const { home, env, keyFile } = newHome();

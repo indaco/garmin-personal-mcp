@@ -38,7 +38,7 @@
     "@modelcontextprotocol/ext-apps": "^2.0.4",
     "@modelcontextprotocol/server": "^2.4.0",
     "@types/node": "^26.6.6",
-    "@vitest/coverage-v8": "^5.0.5",
+    "@vitest/coverage-v8": "^5.1.0",
     "axe-core": "^4.14.0",
     "chart.js": "^4.6.1",
     "fflate": "^0.8.3",
@@ -47,7 +47,7 @@
     "playwright-core": "^1.64.1",
     "tsdown": "^0.23.4",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.5",
+    "vitest": "^5.1.0",
     "zod": "^4.6.7"
   },
   "engines": {
