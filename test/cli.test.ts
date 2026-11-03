@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { version } from "../package.json";
-import { cli, COMMAND_HELP, HELP, hideHome, info, RETRY_MS, summary } from "../src/cli";
+import { cli, COMMAND_HELP, doctor, HELP, hideHome, info, RETRY_MS, summary } from "../src/cli";
 import type { LastRun, Status } from "../src/schedule";
 
 const on: Status = {
@@ -125,6 +125,8 @@ describe("cli", () => {
     ["refresh", ["a.html", "--auto"], "--auto"],
     ["schedule", ["--auto"], "--auto"],
     ["info", ["--auto"], "--auto"],
+    ["doctor", ["--auto"], "--auto"],
+    ["doctor", ["--foo"], "--foo"],
     // the help flag of a command is exact
     ["refresh", ["--HELP"], "--HELP"],
     ["schedule", ["-H"], "-H"],
@@ -166,7 +168,7 @@ describe("cli", () => {
     expect(write).not.toHaveBeenCalled();
   });
 
-  it.each(["info", "refresh", "schedule"])("prints the help of %s", async (command) => {
+  it.each(["info", "doctor", "refresh", "schedule"])("prints the help of %s", async (command) => {
     const f = fakes();
     const write = vi.fn(f.writer);
     const help = COMMAND_HELP[command];
@@ -183,7 +185,7 @@ describe("cli", () => {
     for (const word of ["daily", "weekdays", "weekly <day>", '"<cron>"', "off", "07:00", "Monday"])
       expect(COMMAND_HELP.schedule).toContain(word);
     // only the three commands have a help: the others are flags without arguments
-    expect(Object.keys(COMMAND_HELP)).toEqual(["info", "refresh", "schedule"]);
+    expect(Object.keys(COMMAND_HELP)).toEqual(["info", "doctor", "refresh", "schedule"]);
   });
 
   it("tells in the main help how to get the help of a command", () => {
@@ -524,6 +526,323 @@ async function start(
   return { serveStdio, run, stdout, stderr };
 }
 
+/** Garmin answers the token request with this status and body. */
+function garmin(status = 200, body = `{"access_token":"t0ken"}`) {
+  const fetch = vi.fn(async () => new Response(body, { status }));
+  vi.stubGlobal("fetch", fetch);
+  return fetch;
+}
+
+const off = () => ({ ...fakes().auto, status: vi.fn(async () => ({ scheduled: false })) });
+
+describe("doctor", () => {
+  const KEY = "s3cret-key";
+
+  /** A home folder with a good key file and a data folder. */
+  function setUp(mode = 0o600) {
+    const home = mkdtempSync(join(tmpdir(), "garmin-doctor-"));
+    const dataDir = join(home, "data");
+    mkdirSync(dataDir);
+    const apiKeyFile = join(home, "api-key");
+    writeFileSync(apiKeyFile, KEY);
+    chmodSync(apiKeyFile, mode);
+    return { home, config: { baseUrl: "https://api.test", apiKeyFile, dataDir } };
+  }
+
+  const skipIfNoMode = it.skipIf(process.platform === "win32" || process.getuid?.() === 0);
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("passes all the checks, with the key in the request only", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    const fetch = garmin();
+    const { home, config } = setUp();
+    const r = await doctor(config, off(), "linux", home);
+    expect(r.code).toBe(0);
+    expect(r.stdout!.split("\n")).toEqual([
+      `ok      Key file: ${join("~", "api-key")}`,
+      "ok      API key: Garmin accepts it (from the key file)",
+      `ok      Data folder: ${join("~", "data")}`,
+      `ok      Log folder: ${join("~", ".cache/garmin-personal-mcp")} is missing, the server makes it when it needs it`,
+      "ok      Schedule: off",
+      "All checks passed.",
+    ]);
+    expect(fetch).toHaveBeenCalledOnce();
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(
+      "https://api.test/personalapitoken-service/personal-api/personal-api-key/token",
+    );
+    expect(init.method).toBe("POST");
+    expect(init.headers).toMatchObject({ Authorization: `ApiKey ${KEY}` });
+    expect(r.stdout).not.toContain(KEY);
+    expect(r.stdout).not.toContain("t0ken");
+    expect(r.stdout).not.toContain(home);
+  });
+
+  it("runs from the command line and gives the exit code of the checks", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    garmin(401);
+    const { config } = setUp();
+    const r = await cli("doctor", [], off(), fakes().writer, undefined, config);
+    expect(r.code).toBe(1);
+    expect(r.stdout).toMatch(/1 check failed\.$/);
+    expect(r.stderr).toBeUndefined();
+  });
+
+  it.each([
+    [401, "the personal API key is incorrect, expired or revoked"],
+    [403, "the personal API key is incorrect, expired or revoked"],
+    [503, "did not answer correctly"],
+  ])("fails with the reason and no key when Garmin answers %i", async (status, reason) => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    // a server can echo the request
+    garmin(status, `bad key ${KEY}`);
+    const { home, config } = setUp();
+    const r = await doctor(config, off(), "linux", home);
+    expect(r.code).toBe(1);
+    expect(r.stdout).toMatch(/^failed {2}API key: Token request failed: HTTP \d+/m);
+    expect(r.stdout).toContain(reason);
+    expect(r.stdout).not.toContain(KEY);
+    expect(r.stdout).not.toContain(home);
+  });
+
+  it("fails on a network error, without the key that a fetch error can quote", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError(`bad header ApiKey ${KEY}`)));
+    const { home, config } = setUp();
+    const r = await doctor(config, off(), "linux", home);
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain("failed  API key: Network error obtaining token: bad header");
+    expect(r.stdout).not.toContain(KEY);
+  });
+
+  it("fails without a key, and does not call Garmin", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    const fetch = garmin();
+    const { home, config } = setUp();
+    const none = { ...config, apiKeyFile: join(home, "no-key") };
+    const r = await doctor(none, off(), "linux", home);
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain(`failed  Key file: ${join("~", "no-key")} is missing.`);
+    expect(r.stdout).toContain("failed  API key: No API key");
+    expect(r.stdout).toMatch(/2 checks failed\.$/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("fails on an empty key file and on a file with more than the key", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    garmin();
+    const { home, config } = setUp();
+    writeFileSync(config.apiKeyFile, "  \n");
+    expect((await doctor(config, off(), "linux", home)).stdout).toContain(
+      "failed  API key: API key file is empty",
+    );
+    writeFileSync(config.apiKeyFile, `${KEY}\nmore text`);
+    const r = await doctor(config, off(), "linux", home);
+    expect(r.stdout).toContain("failed  API key: The API key file has more than the key");
+    expect(r.stdout).not.toContain(KEY);
+  });
+
+  it("tests the key of the environment, and needs no key file for it", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "env-key");
+    const fetch = garmin();
+    const { home, config } = setUp();
+    const none = { ...config, apiKeyFile: join(home, "no-key") };
+    const r = await doctor(none, off(), "linux", home);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain(
+      `ok      Key file: ${join("~", "no-key")} is missing, the key comes from GARMIN_PERSONAL_API_KEY`,
+    );
+    expect(r.stdout).toContain("ok      API key: Garmin accepts it (from GARMIN_PERSONAL_API_KEY)");
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.headers).toMatchObject({ Authorization: "ApiKey env-key" });
+    expect(r.stdout).not.toContain("env-key");
+  });
+
+  it("needs the key file for a schedule, also with a key in the environment", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "env-key");
+    garmin();
+    const { home, config } = setUp();
+    const none = { ...config, apiKeyFile: join(home, "no-key") };
+    const r = await doctor(none, fakes().auto, "linux", home);
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain("the automatic update reads only the key file");
+  });
+
+  skipIfNoMode.each([0o644, 0o640, 0o604, 0o666])(
+    "fails on a key file with mode %o, with the command that fixes it",
+    async (mode) => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+      garmin();
+      const { home, config } = setUp(mode);
+      const r = await doctor(config, off(), "linux", home);
+      expect(r.code).toBe(1);
+      expect(r.stdout).toContain(
+        `failed  Key file: other users can read it. Run: chmod 600 ${join("~", "api-key")}`,
+      );
+    },
+  );
+
+  skipIfNoMode.each([0o600, 0o400])("accepts a key file with mode %o", async (mode) => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    garmin();
+    const { home, config } = setUp(mode);
+    expect((await doctor(config, off(), "linux", home)).code).toBe(0);
+  });
+
+  skipIfNoMode.each([
+    ["my keys/api-key", "~/'my keys/api-key'"],
+    ["it's/api-key", "~/'it'\\''s/api-key'"],
+  ])("quotes the path %s in the chmod command", async (name, arg) => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    garmin();
+    const { home, config } = setUp();
+    const apiKeyFile = join(home, name);
+    mkdirSync(join(apiKeyFile, ".."), { recursive: true });
+    writeFileSync(apiKeyFile, KEY, { mode: 0o644 });
+    chmodSync(apiKeyFile, 0o644);
+    const r = await doctor({ ...config, apiKeyFile }, off(), "linux", home);
+    expect(r.stdout).toContain(`Run: chmod 600 ${arg}`);
+  });
+
+  skipIfNoMode("quotes a path outside the home folder in the chmod command", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    garmin();
+    const { config } = setUp();
+    const apiKeyFile = join(mkdtempSync(join(tmpdir(), "garmin other-")), "api-key");
+    writeFileSync(apiKeyFile, KEY);
+    chmodSync(apiKeyFile, 0o644);
+    const home = mkdtempSync(join(tmpdir(), "garmin-home-"));
+    const r = await doctor({ ...config, apiKeyFile }, off(), "linux", home);
+    expect(r.stdout).toContain(`chmod 600 '${apiKeyFile}'`);
+  });
+
+  it("does not check the mode of the key file on Windows, and gives no chmod", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    garmin();
+    const { home, config } = setUp(0o644);
+    const r = await doctor(config, off(), "win32", home);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain(
+      `ok      Key file: ${join("~", "api-key")} (who can read it is not checked on Windows)`,
+    );
+    expect(r.stdout).not.toContain("chmod");
+  });
+
+  it("fails on a key file that it cannot look at", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    garmin();
+    const { home, config } = setUp();
+    const bad = { ...config, apiKeyFile: `${config.apiKeyFile}\0` };
+    const r = await doctor(bad, off(), "linux", home);
+    expect(r.code).toBe(1);
+    expect(r.stdout).toMatch(/^failed {2}Key file: cannot read it: /m);
+  });
+
+  it("does not make a missing folder and leaves nothing in a folder that it tests", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    garmin();
+    const { home, config } = setUp();
+    const dataDir = join(home, "a", "b", "data");
+    const r = await doctor({ ...config, dataDir }, off(), "linux", home);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain(
+      `ok      Data folder: ${join("~", "a", "b", "data")} is missing, the server makes it when it needs it`,
+    );
+    expect(existsSync(join(home, "a"))).toBe(false);
+    expect(readdirSync(home).toSorted()).toEqual(["api-key", "data"]);
+    expect(readdirSync(config.dataDir)).toEqual([]);
+  });
+
+  it("fails on a folder under a file", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    garmin();
+    const { home, config } = setUp();
+    const dataDir = join(config.apiKeyFile, "data");
+    const r = await doctor({ ...config, dataDir }, off(), "linux", home);
+    expect(r.code).toBe(1);
+    expect(r.stdout).toMatch(/^failed {2}Data folder: cannot write in .*api-key: /m);
+  });
+
+  skipIfNoMode("fails on a folder that it cannot write in, and on the log folder", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    garmin();
+    const { home, config } = setUp();
+    chmodSync(config.dataDir, 0o500);
+    const logs = join(home, ".cache");
+    mkdirSync(logs);
+    chmodSync(logs, 0o500);
+    const r = await doctor(config, off(), "linux", home);
+    chmodSync(config.dataDir, 0o700);
+    chmodSync(logs, 0o700);
+    expect(r.code).toBe(1);
+    expect(r.stdout).toMatch(/^failed {2}Data folder: cannot write in ~\/data: /m);
+    expect(r.stdout).toMatch(/^failed {2}Log folder: cannot write in ~\/\.cache: /m);
+    expect(r.stdout).toMatch(/2 checks failed\.$/);
+  });
+
+  it("shows a schedule that works", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    garmin();
+    const { home, config } = setUp();
+    const r = await doctor(config, fakes().auto, "linux", home);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('ok      Schedule: Automatic refresh "0 7 * * 1" with launchd');
+  });
+
+  it("fails when the job is missing from the scheduler", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    garmin();
+    const { home, config } = setUp();
+    const auto = { ...fakes().auto, status: vi.fn(async () => ({ ...on, installed: false })) };
+    const r = await doctor(config, auto, "linux", home);
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain(
+      "failed  Schedule: the job is missing from launchd. Set the schedule again.",
+    );
+  });
+
+  it("fails when the last run could not update a page", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    garmin();
+    const { home, config } = setUp();
+    const last = {
+      at: "2026-11-02T07:00:00Z",
+      failed: [{ path: join(home, "a.html"), error: "gone" }],
+    };
+    const auto = { ...fakes().auto, status: vi.fn(async () => ({ ...on, last })) };
+    const r = await doctor(config, auto, "linux", home);
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain(
+      `failed  Schedule: the last run (2026-11-02T07:00:00Z) could not update ${join("~", "a.html")}: gone`,
+    );
+  });
+
+  it("accepts a last run that updated every page", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    garmin();
+    const { home, config } = setUp();
+    const last = { at: "2026-11-02T07:00:00Z", failed: [] };
+    const auto = { ...fakes().auto, status: vi.fn(async () => ({ ...on, last })) };
+    expect((await doctor(config, auto, "linux", home)).code).toBe(0);
+  });
+
+  it("fails on a damaged schedule file and still does the other checks", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    garmin();
+    const { home, config } = setUp();
+    const auto = { ...fakes().auto, status: vi.fn().mockRejectedValue(new Error("bad JSON")) };
+    const r = await doctor(config, auto, "linux", home);
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain("failed  Schedule: cannot read it: bad JSON");
+    expect(r.stdout).toContain("ok      API key:");
+    expect(r.stdout).toMatch(/1 check failed\.$/);
+  });
+});
+
 describe("the entry point", () => {
   const argv = process.argv;
   afterEach(() => {
@@ -543,7 +862,7 @@ describe("the entry point", () => {
     expect(s.stdout).not.toHaveBeenCalled();
   });
 
-  it.each(["--version", "-v", "--help", "-h", "info"])(
+  it.each(["--version", "-v", "--help", "-h", "info", "doctor"])(
     "runs %s without the server",
     async (flag) => {
       const s = await start([flag]);

@@ -6,6 +6,7 @@ stops. It does not start the MCP server.
 
 - [Run a command](#run-a-command)
 - [info](#info)
+- [doctor](#doctor)
 - [refresh](#refresh)
 - [schedule](#schedule)
 - [--version and --help](#--version-and---help)
@@ -41,6 +42,7 @@ Without a command, the MCP server starts on stdin and stdout.
 
 Commands:
   info                                show the version, the settings and where the files are
+  doctor                              test the API key, the folders and the schedule
   refresh [page.html]                 update a dashboard page
                                       (default: <data-dir>/garmin-dashboard.html)
   refresh --auto                      update the pages that have a schedule
@@ -90,6 +92,31 @@ Schedule:     Automatic refresh "0 7 * * *" with launchd, next: 2026-11-04 07:00
 - A file or a folder that is missing is not an error. The server makes them when it needs them.
 - `info` does not connect to the network. To test the key, see
   [Test the key](troubleshooting.md#test-the-key).
+
+## doctor
+
+`doctor` tests the setup and tells how to fix what fails:
+
+```text
+ok      Key file: ~/.config/garmin-mcp/api-key
+failed  API key: Token request failed: HTTP 401 (...) - the personal API key is incorrect, expired or revoked. ...
+ok      Data folder: ~/workspace/garmin-data
+ok      Log folder: ~/.cache/garmin-personal-mcp
+ok      Schedule: Automatic refresh "0 7 * * *" with launchd, next: 2026-11-04 07:00, ...
+1 check failed.
+```
+
+- `Key file` is missing without a problem only when `GARMIN_PERSONAL_API_KEY` is set and no schedule
+  is on, because the automatic update reads only the key file. On macOS and Linux, other users must
+  not be able to read the file. On Windows, `doctor` does not check this.
+- `API key` sends the key to Garmin in a token request. This is the only network call. `doctor`
+  never shows the key or the token.
+- `Data folder` and `Log folder` make a test folder and remove it. A missing folder is not an error
+  when the server can make it.
+- `Schedule` fails when the job is missing from the system scheduler, or when the last run could not
+  update a page.
+
+`doctor` runs on macOS, Linux and Windows. The Windows steps are not tested.
 
 ## refresh
 
@@ -143,10 +170,10 @@ npx -y @indaco/garmin-personal-mcp@latest schedule --help
 
 ## Exit codes
 
-| Code | Meaning                                                                                    |
-| ---- | ------------------------------------------------------------------------------------------ |
-| `0`  | the command worked                                                                         |
-| `1`  | the command failed, and the error is on stderr. `refresh` also gives 1 when a page failed. |
+| Code | Meaning                                                                                                                                                     |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`  | the command worked                                                                                                                                          |
+| `1`  | the command failed, and the error is on stderr. `refresh` also gives 1 when a page failed. `doctor` gives 1 when a check failed, with the checks on stdout. |
 
 A word or a flag that is not a command prints the error and the help on stderr and gives 1. It does
 not start the MCP server.

@@ -16,12 +16,12 @@
 
 ## Test the key
 
-This command shows only the HTTP status. `200` means that the key is correct:
+`doctor` tests the key with a token request to Garmin, and tests the key file, the folders and the
+schedule. It shows the result, never the key. It works on each system, and with the key from the key
+file or from `GARMIN_PERSONAL_API_KEY`. See [doctor](cli.md#doctor).
 
 ```bash
-curl -s -o /dev/null -w '%{http_code}\n' -X POST \
-  'https://personal.connectapi.garmin.com/personalapitoken-service/personal-api/personal-api-key/token' \
-  -H "Authorization: ApiKey $(cat ~/.config/garmin-mcp/api-key)"
+npx -y @indaco/garmin-personal-mcp@latest doctor
 ```
 
 ## Test the server

@@ -446,6 +446,7 @@ the MCP server.
 | Command                                  | What it does                                                                     |
 | ---------------------------------------- | -------------------------------------------------------------------------------- |
 | `info`                                   | shows the version, the settings and where the files are. It never shows the key. |
+| `doctor`                                 | tests the API key, the folders and the schedule. It never shows the key.         |
 | `refresh [page.html]`                    | updates a dashboard page one time                                                |
 | `schedule [daily\|weekdays\|weekly ...]` | shows, sets or stops the automatic update of a page                              |
 | `--version`, `-v`                        | shows the version                                                                |

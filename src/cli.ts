@@ -1,14 +1,15 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { version } from "../package.json";
+import { GarminApiClient } from "./api-client";
 import { type Config, loadConfig } from "./config";
 import type { DashboardWriter } from "./dashboard-page";
 import { LOG_DIR } from "./log";
 import { type AutoRefresh, cronOf, type LastRun, refreshPages, type Status } from "./schedule";
 
 /** The commands for a terminal or a scheduler. Only a start without arguments is the MCP server. */
-const COMMANDS = ["info", "refresh", "schedule", "--version", "-v", "--help", "-h"];
+const COMMANDS = ["info", "doctor", "refresh", "schedule", "--version", "-v", "--help", "-h"];
 
 export const HELP = `Usage: garmin-personal-mcp [command]
 
@@ -16,6 +17,7 @@ Without a command, the MCP server starts on stdin and stdout.
 
 Commands:
   info                                show the version, the settings and where the files are
+  doctor                              test the API key, the folders and the schedule
   refresh [page.html]                 update a dashboard page
                                       (default: <data-dir>/garmin-dashboard.html)
   refresh --auto                      update the pages that have a schedule
@@ -35,6 +37,14 @@ export const COMMAND_HELP: Partial<Record<string, string>> = {
 
 Show the version, the settings and where the files are.
 It never shows the API key, and it does not connect to the network.
+
+Flags:
+  -h, --help  show this help`,
+  doctor: `Usage: garmin-personal-mcp doctor
+
+Test the setup, and tell how to fix what fails. It tests the key file, the API key with
+a token request to Garmin, the data folder, the log folder and the schedule.
+It never shows the key. The exit code is 1 when a check fails.
 
 Flags:
   -h, --help  show this help`,
@@ -108,6 +118,7 @@ export async function cli(
   if (flag) return usage(`Unknown flag: ${flag}`);
   if (command === "--version" || command === "-v") return { code: 0, stdout: version };
   if (command === "--help" || command === "-h") return { code: 0, stdout: HELP };
+  if (command === "doctor") return doctor(config, auto);
   if (command === "info") {
     // a damaged auto-refresh.json must not stop info: the Schedule line shows the error
     const schedule = await auto.status().then(
@@ -185,6 +196,9 @@ function files(dir: string, ext: string): string[] {
   }
 }
 
+const keySource = (env: NodeJS.ProcessEnv) =>
+  env.GARMIN_PERSONAL_API_KEY?.trim() ? "from GARMIN_PERSONAL_API_KEY" : "from the key file";
+
 /**
  * The text of `info`: the version, the settings and where the files are, with `~` for the home
  * folder. It says where the API key comes from, but it never shows the key. It does not connect to
@@ -203,7 +217,7 @@ export function info(
     `garmin-personal-mcp ${version}`,
     `Node.js:      ${process.version} on ${process.platform}`,
     `API host:     ${config.baseUrl}`,
-    `API key:      ${env.GARMIN_PERSONAL_API_KEY?.trim() ? "from GARMIN_PERSONAL_API_KEY" : "from the key file"}`,
+    `API key:      ${keySource(env)}`,
     `Key file:     ${found(config.apiKeyFile)}`,
     `Data folder:  ${found(dataDir)}`,
     `  .FIT files: ${files(join(dataDir, "fit"), ".fit").length}`,
@@ -214,6 +228,128 @@ export function info(
     `Schedule:     ${schedule}`,
   ].join("\n");
   return hideHome(text, home);
+}
+
+interface Check {
+  ok: boolean;
+  name: string;
+  text: string;
+}
+
+/** A path for a POSIX shell. `~/` stays outside the quotes, or the shell does not expand it. */
+function shellArg(path: string): string {
+  if (/^[\w./~-]+$/.test(path)) return path;
+  const tilde = path.startsWith("~/") ? "~/" : "";
+  return `${tilde}'${path.slice(tilde.length).replaceAll("'", `'\\''`)}'`;
+}
+
+/** The key file: it is there when it is needed, and on macOS and Linux only the user can read it. */
+function keyFileCheck(
+  file: string,
+  scheduled: boolean,
+  platform: NodeJS.Platform,
+  home: string,
+): Check {
+  const name = "Key file";
+  let mode: number | undefined;
+  try {
+    mode = statSync(file, { throwIfNoEntry: false })?.mode;
+  } catch (e) {
+    return { ok: false, name, text: `cannot read it: ${(e as Error).message}` };
+  }
+  if (mode === undefined) {
+    if (scheduled) {
+      return {
+        ok: false,
+        name,
+        text: `${file} is missing: the automatic update reads only the key file. Create it (see "Create a personal API key" in the README).`,
+      };
+    }
+    return process.env.GARMIN_PERSONAL_API_KEY?.trim()
+      ? { ok: true, name, text: `${file} is missing, the key comes from GARMIN_PERSONAL_API_KEY` }
+      : {
+          ok: false,
+          name,
+          text: `${file} is missing. Create it (see "Create a personal API key" in the README).`,
+        };
+  }
+  // Windows has no modes: a stat gives the same one to each file, whoever can read it
+  if (platform === "win32") {
+    return { ok: true, name, text: `${file} (who can read it is not checked on Windows)` };
+  }
+  if ((mode & 0o077) === 0) return { ok: true, name, text: file };
+  const fix = `chmod 600 ${shellArg(hideHome(file, home))}`;
+  return { ok: false, name, text: `other users can read it. Run: ${fix}` };
+}
+
+/**
+ * Makes and removes a folder in `dir`, or in the nearest parent that exists: only a real write gives
+ * the answer on each system, because Windows gives access by ACLs that fs.access does not read.
+ */
+function folderCheck(name: string, dir: string): Check {
+  let existing = dir;
+  while (!existsSync(existing) && dirname(existing) !== existing) existing = dirname(existing);
+  try {
+    rmSync(mkdtempSync(join(existing, ".garmin-doctor-")), { recursive: true });
+  } catch (e) {
+    return { ok: false, name, text: `cannot write in ${existing}: ${(e as Error).message}` };
+  }
+  const text = existing === dir ? dir : `${dir} is missing, the server makes it when it needs it`;
+  return { ok: true, name, text };
+}
+
+function scheduleCheck(status: Status | Error): Check {
+  const name = "Schedule";
+  if (status instanceof Error) {
+    return { ok: false, name, text: `cannot read it: ${status.message}` };
+  }
+  if (!status.scheduled) return { ok: true, name, text: "off" };
+  if (status.installed === false) {
+    const text = `the job is missing from ${status.scheduler}. Set the schedule again.`;
+    return { ok: false, name, text };
+  }
+  const failed = status.last?.failed ?? [];
+  if (failed.length > 0) {
+    const pages = failed.map((f) => `${f.path}: ${f.error}`).join(", ");
+    const text = `the last run (${status.last!.at}) could not update ${pages}`;
+    return { ok: false, name, text };
+  }
+  return { ok: true, name, text: summary(status).split("\n")[0] };
+}
+
+/**
+ * The text of `doctor`: each check with `ok` or `failed`, and the fix. It never shows the key.
+ * The exit code is 1 when a check fails. It runs on macOS, Linux and Windows.
+ */
+export async function doctor(
+  config: Config,
+  auto: Pick<AutoRefresh, "status">,
+  platform: NodeJS.Platform = process.platform,
+  home = homedir(),
+): Promise<CliResult> {
+  const status = await auto.status().catch((e: Error) => e);
+  const scheduled = !(status instanceof Error) && status.scheduled;
+  const apiKey: Check = await new GarminApiClient(config).testKey().then(
+    () => ({
+      ok: true,
+      name: "API key",
+      text: `Garmin accepts it (${keySource(process.env)})`,
+    }),
+    (e: Error) => ({ ok: false, name: "API key", text: e.message }),
+  );
+  const checks = [
+    keyFileCheck(config.apiKeyFile, scheduled, platform, home),
+    apiKey,
+    folderCheck("Data folder", config.dataDir),
+    folderCheck("Log folder", join(home, LOG_DIR)),
+    scheduleCheck(status),
+  ];
+  const failed = checks.filter((c) => !c.ok).length;
+  const lines = checks.map((c) => `${c.ok ? "ok    " : "failed"}  ${c.name}: ${c.text}`);
+  lines.push(
+    failed === 0 ? "All checks passed." : `${failed} ${failed === 1 ? "check" : "checks"} failed.`,
+  );
+  return { code: failed === 0 ? 0 : 1, stdout: hideHome(lines.join("\n"), home) };
 }
 
 function lastLine(last: LastRun): string {

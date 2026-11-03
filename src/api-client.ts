@@ -32,6 +32,11 @@ export class GarminApiClient {
 
   constructor(private readonly config: Config) {}
 
+  /** Asks Garmin for a token with the key. It throws the reason, without the key, on a failure. */
+  async testKey(): Promise<void> {
+    await this.#requestToken();
+  }
+
   /** GET a JSON resource. `path` must start with "/" (e.g. "/hrv-service/hrv/2026-10-25"). */
   async getJson(path: string, query: Record<string, string | undefined> = {}): Promise<unknown> {
     const body = await this.#get(path, query, "application/json");
