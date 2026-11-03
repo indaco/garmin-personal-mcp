@@ -129,12 +129,13 @@ jobs:
       # not a dev dependency: it has a native part, and only this job needs it
       - name: Install node-pty
         shell: bash
-        run: npm install --prefix "$RUNNER_TEMP/pty" --no-audit --no-fund node-pty@1.1.0
+        run: npm install --prefix "$RUNNER_TEMP/pty" --no-audit --no-fund node-pty@latest
 
-      # node-pty 1.1.0 installs this file without the execute bit: posix_spawnp failed
+      # node-pty 1.1.0 installs this file without the execute bit: posix_spawnp failed.
+      # find does not fail when a later version has no such file
       - name: Make the helper of node-pty executable
         if: runner.os == 'macOS'
-        run: chmod +x "$RUNNER_TEMP"/pty/node_modules/node-pty/prebuilds/darwin-*/spawn-helper
+        run: find "$RUNNER_TEMP/pty/node_modules/node-pty" -name spawn-helper -exec chmod +x {} +
 
       - name: End-to-end test
         shell: bash
