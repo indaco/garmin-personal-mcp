@@ -260,6 +260,19 @@ describe("the page", () => {
     ]);
   });
 
+  it("has no tab for a sport without activities, and opens All for an old link to its tab", async () => {
+    const runs = data.activities.filter((a: { sport?: string }) => a.sport === "running");
+    const file = pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: runs } });
+    const { page, errors } = await open(browser, file, { hash: "#cycling" });
+    expect(await tabs(page)).toEqual([
+      ["all", String(runs.length)],
+      ["recovery", undefined],
+      ["running", String(runs.length)],
+    ]);
+    expect(await page.getAttribute("[data-tab=all]", "aria-selected")).toBe("true");
+    expect(errors).toEqual([]);
+  });
+
   it("shows the units of the Garmin profile, and metric without them", async () => {
     const us = await shownUnits("statute_us");
     expect(us).toMatch(/\d mi\b/);

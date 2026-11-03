@@ -214,9 +214,8 @@ Battery. Each type board shows one sport. The board of an activity is its
 sport in the Garmin FIT SDK. Garmin sends that sport as a number with each activity. The server
 gives it the SDK name, for example `running` or `racket`.
 
-The All, Recovery, Run, Strength, Walk, Bike and Racket sports tabs are always there. The Hike, Swim and Other
-tabs show only when you have activities of that sport. [Page settings](#page-settings) can keep
-fewer sport tabs, and remove the Recovery tab.
+The All and Recovery tabs are always there. A sport tab shows only when you have activities of that
+sport. [Page settings](#page-settings) can keep fewer sport tabs, and remove the Recovery tab.
 
 | Tab           | Board key          | Activities                                       |
 | ------------- | ------------------ | ------------------------------------------------ |

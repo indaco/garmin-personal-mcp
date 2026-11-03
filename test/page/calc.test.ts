@@ -13,6 +13,7 @@ import {
   seconds,
   sessionSeconds,
   sportOf,
+  tabsFor,
   timedDistance,
   weeksOf,
 } from "../../src/page/calc";
@@ -223,6 +224,20 @@ describe("boards in tab order", () => {
         { type: "running", sport: "running" },
       ]),
     ).toEqual(["running", "rowing", "generic"]);
+  });
+
+  it("has a tab only for the sports with activities, or that the settings name", () => {
+    const acts = [
+      { type: "running", sport: "running" },
+      { type: "boxing", sport: "boxing" },
+    ];
+    expect(tabsFor(acts, {})).toEqual(["all", "recovery", "running", "boxing"]);
+    expect(tabsFor(acts, { sports: ["cycling", "boxing"], exclude: ["recovery"] })).toEqual([
+      "all",
+      "cycling",
+      "boxing",
+    ]);
+    expect(tabsFor([], {})).toEqual(["all", "recovery"]);
   });
 });
 

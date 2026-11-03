@@ -40,6 +40,7 @@ const data = {
       id: 1,
       name: "Run </script><script>alert(1)</script>",
       type: "running",
+      sport: "running",
       start: "2026-10-25 07:00:00",
       km: 10,
       duration: "50:00",
@@ -1377,10 +1378,16 @@ describe("writeDashboard new preset widgets", () => {
         boards: { [name]: swim },
         seen: { [name]: swim.map((i) => i.widget) },
       });
-    // no swimming in the data and not a fixed tab: no tab
+    // no swimming in the data: no tab
     setLayout(layout("swimming"));
     expect(await writer.write({})).not.toHaveProperty("addedWidgets");
-    // a fixed tab shows without data
+    // a ride in the data gives the cycling tab
+    const ride = { ...data.activities[0], type: "cycling", sport: "cycling" };
+    writer = new DashboardWriter(
+      async () => JSON.stringify({ ...data, activities: [ride] }),
+      dir,
+      async () => templateText,
+    );
     const cycling = preset("cycling").filter((i) => i.widget !== "bikeDetails");
     setLayout(
       edited({

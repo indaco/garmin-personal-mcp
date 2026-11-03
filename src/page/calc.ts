@@ -72,18 +72,16 @@ export function boardOrder(present: ReadonlySet<string>): string[] {
   return [...GROUPS.slice(0, -1), ...others, "generic"];
 }
 
-/** Boards that always have a tab, with data or without. */
-const ALWAYS: readonly string[] = ["running", "strengthTraining", "walking", "cycling", "racket"];
-
-/** The tabs of a page, in order: the page script and the server both use this rule. */
+/**
+ * The tabs of a page, in order: the page script and the server both use this rule. A sport has a tab
+ * when the data has its activities, or when the `sports` setting names it.
+ */
 export function tabsFor(acts: Activity[], s: { sports?: string[]; exclude?: string[] }): string[] {
   const present = new Set(acts.map(groupOf));
   return [
     "all",
     ...(s.exclude?.includes("recovery") ? [] : ["recovery"]),
-    ...boardOrder(present).filter((g) =>
-      s.sports ? s.sports.includes(g) : ALWAYS.includes(g) || present.has(g),
-    ),
+    ...boardOrder(present).filter((g) => (s.sports ? s.sports.includes(g) : present.has(g))),
   ];
 }
 
