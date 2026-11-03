@@ -449,7 +449,7 @@ the MCP server.
 | `refresh [page.html]`                    | updates a dashboard page one time                                                |
 | `schedule [daily\|weekdays\|weekly ...]` | shows, sets or stops the automatic update of a page                              |
 | `--version`, `-v`                        | shows the version                                                                |
-| `--help`, `-h`                           | lists the commands                                                               |
+| `--help`, `-h`                           | lists the commands. After a command, it shows the help of that command.          |
 
 ```bash
 npx -y @indaco/garmin-personal-mcp@latest info

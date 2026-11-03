@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { version } from "../package.json";
-import { cli, HELP, info, RETRY_MS, summary } from "../src/cli";
+import { cli, COMMAND_HELP, HELP, info, RETRY_MS, summary } from "../src/cli";
 import type { LastRun, Status } from "../src/schedule";
 
 const on: Status = {
@@ -125,13 +125,19 @@ describe("cli", () => {
     ["refresh", ["a.html", "--auto"], "--auto"],
     ["schedule", ["--auto"], "--auto"],
     ["info", ["--auto"], "--auto"],
-    // the help of a command does not exist yet, and a flag never reaches the command
-    ["refresh", ["--help"], "--help"],
-    ["schedule", ["-h"], "-h"],
+    // the help flag of a command is exact
+    ["refresh", ["--HELP"], "--HELP"],
+    ["schedule", ["-H"], "-H"],
+    ["info", ["--help=1"], "--help=1"],
+    ["info", ["-help"], "-help"],
+    // a flag never reaches the command, and --help and --version have no help of their own
     ["info", ["--version"], "--version"],
     ["--help", ["--foo"], "--foo"],
+    ["--help", ["--help"], "--help"],
     ["-h", ["-x"], "-x"],
     ["--version", ["--foo"], "--foo"],
+    ["--version", ["--help"], "--help"],
+    ["-v", ["-h"], "-h"],
     ["-v", ["-x"], "-x"],
     // a word before the flag does not hide it
     ["schedule", ["--foo"], "--foo"],
@@ -157,6 +163,59 @@ describe("cli", () => {
     expect(f.auto.set).not.toHaveBeenCalled();
     expect(f.auto.status).not.toHaveBeenCalled();
     expect(f.auto.pages).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it.each(["info", "refresh", "schedule"])("prints the help of %s", async (command) => {
+    const f = fakes();
+    const write = vi.fn(f.writer);
+    const help = COMMAND_HELP[command];
+    expect(help).toMatch(new RegExp(`^Usage: garmin-personal-mcp ${command}\\b`));
+    for (const flag of ["--help", "-h"])
+      expect(await cli(command, [flag], f.auto, write)).toEqual({ code: 0, stdout: help });
+    expect(f.auto.status).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("tells each form and default of a command in its help", () => {
+    expect(COMMAND_HELP.refresh).toContain("refresh --auto");
+    expect(COMMAND_HELP.refresh).toContain("garmin-dashboard.html");
+    for (const word of ["daily", "weekdays", "weekly <day>", '"<cron>"', "off", "07:00", "Monday"])
+      expect(COMMAND_HELP.schedule).toContain(word);
+    // only the three commands have a help: the others are flags without arguments
+    expect(Object.keys(COMMAND_HELP)).toEqual(["info", "refresh", "schedule"]);
+  });
+
+  it("tells in the main help how to get the help of a command", () => {
+    expect(HELP).toContain("<command> --help");
+  });
+
+  // a help request must not do the task: `schedule off --help` must not stop the schedule
+  it.each([
+    ["schedule", ["off", "--help"]],
+    ["schedule", ["off", "a.html", "-h"]],
+    ["schedule", ["daily", "07:00", "--help"]],
+    ["schedule", ["--help", "off"]],
+    ["refresh", ["--auto", "--help"]],
+    ["refresh", ["a.html", "-h"]],
+    ["refresh", ["-h", "a.html"]],
+    // the help wins over a wrong flag, on both sides
+    ["refresh", ["--foo", "--help"]],
+    ["info", ["--help", "--foo"]],
+    ["info", ["word", "-h"]],
+  ])("prints only the help for %s %j", async (command, args) => {
+    const f = fakes();
+    const write = vi.fn(f.writer);
+    expect(await cli(command, args, f.auto, write)).toEqual({
+      code: 0,
+      stdout: COMMAND_HELP[command],
+    });
+    expect(f.auto.off).not.toHaveBeenCalled();
+    expect(f.auto.set).not.toHaveBeenCalled();
+    expect(f.auto.status).not.toHaveBeenCalled();
+    expect(f.auto.missed).not.toHaveBeenCalled();
+    expect(f.auto.pages).not.toHaveBeenCalled();
+    expect(f.auto.saveRun).not.toHaveBeenCalled();
     expect(write).not.toHaveBeenCalled();
   });
 
@@ -478,6 +537,22 @@ describe("the entry point", () => {
     expect(stderr).toHaveBeenCalledWith(`${error}\n\n${HELP}\n`);
     expect(process.exitCode).toBe(1);
   });
+
+  it.each(["info", "refresh", "schedule"])(
+    "writes the help of %s on stdout and exits with 0",
+    async (command) => {
+      const serveStdio = vi.fn();
+      vi.doMock("@modelcontextprotocol/server/stdio", () => ({ serveStdio }));
+      const stdout = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+      const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+      process.argv = ["node", "index.js", command, "--help"];
+      await import("../src/index");
+      expect(serveStdio).not.toHaveBeenCalled();
+      expect(stdout).toHaveBeenCalledWith(`${COMMAND_HELP[command]}\n`);
+      expect(stderr).not.toHaveBeenCalled();
+      expect(process.exitCode).toBe(0);
+    },
+  );
 
   it("runs a command: its output, its errors and its exit code", async () => {
     const s = await start(["schedule", "daily"]);

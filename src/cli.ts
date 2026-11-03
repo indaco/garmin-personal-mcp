@@ -25,7 +25,53 @@ Commands:
   schedule "<cron>" [page.html]       the same, with a cron expression
   schedule off [page.html]            stop the automatic update
   -v, --version                       show the version
-  -h, --help                          show this help`;
+  -h, --help                          show this help
+
+Run garmin-personal-mcp <command> --help to see the help of a command.`;
+
+/** The help of each command that takes arguments or flags: `<command> --help`. */
+export const COMMAND_HELP: Partial<Record<string, string>> = {
+  info: `Usage: garmin-personal-mcp info
+
+Show the version, the settings and where the files are.
+It never shows the API key, and it does not connect to the network.
+
+Flags:
+  -h, --help  show this help`,
+  refresh: `Usage: garmin-personal-mcp refresh [page.html]
+       garmin-personal-mcp refresh --auto
+
+Update a dashboard page with new data, one time. The layout, the custom widgets,
+the languages and the page settings stay.
+
+Arguments:
+  page.html   the page to update. A relative path is in the data folder.
+              (default: <data-dir>/garmin-dashboard.html)
+
+Flags:
+  --auto      update the pages that have a schedule, only when a run time was missed.
+              The job of the automatic update runs it.
+  -h, --help  show this help`,
+  schedule: `Usage: garmin-personal-mcp schedule
+       garmin-personal-mcp schedule [daily|weekdays|weekly <day>] [HH:MM] [page.html]
+       garmin-personal-mcp schedule "<cron>" [page.html]
+       garmin-personal-mcp schedule off [page.html]
+
+Show, set or stop the automatic update of a dashboard page. Without arguments, it shows
+the schedule. All the pages that update automatically use the same schedule.
+
+Arguments:
+  daily, weekdays, weekly <day>
+              when to update. Without a day, weekly uses Monday.
+  HH:MM       the time. (default: 07:00)
+  "<cron>"    a cron expression of 5 fields in local time, in quotes
+  off         stop the automatic update of the page. Without a page, stop all.
+  page.html   the page. It must exist. A relative path is in the data folder.
+              (default: <data-dir>/garmin-dashboard.html)
+
+Flags:
+  -h, --help  show this help`,
+};
 
 /** The waits before `refresh --auto` tries a page again after a network error: 3.5 minutes in all. */
 export const RETRY_MS = [30_000, 60_000, 120_000];
@@ -42,8 +88,8 @@ const usage = (error: string): CliResult => ({ code: 1, stderr: `${error}\n\n${H
 /**
  * Runs `--version` (`-v`), `--help` (`-h`), `info`, `refresh [page.html | --auto]` or
  * `schedule [daily|weekdays|weekly <day>] [HH:MM] | "<cron>" | off`, each with an optional page.
- * An unknown command or flag gives the help on stderr and exit code 1.
- * Not MCP, so the result may go to stdout.
+ * `--help` (`-h`) after a command gives its help and does not do its task. An unknown command or
+ * flag gives the main help on stderr and exit code 1. Not MCP, so the result may go to stdout.
  */
 export async function cli(
   command: string,
@@ -54,6 +100,8 @@ export async function cli(
   config: Config = loadConfig(),
 ): Promise<CliResult> {
   if (!COMMANDS.includes(command)) return usage(`Unknown command: ${command}`);
+  const help = COMMAND_HELP[command];
+  if (help && (args.includes("--help") || args.includes("-h"))) return { code: 0, stdout: help };
   const flag = args.find(
     (a, i) => a.startsWith("-") && !(command === "refresh" && i === 0 && a === "--auto"),
   );

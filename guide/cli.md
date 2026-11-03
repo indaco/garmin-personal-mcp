@@ -51,6 +51,8 @@ Commands:
   schedule off [page.html]            stop the automatic update
   -v, --version                       show the version
   -h, --help                          show this help
+
+Run garmin-personal-mcp <command> --help to see the help of a command.
 ```
 
 ## info
@@ -130,6 +132,13 @@ each system.
 ## --version and --help
 
 `--version` (or `-v`) prints the version. `--help` (or `-h`) prints the list above.
+
+After a command, `--help` (or `-h`) prints the help of that command. The command does not do its
+task, so `schedule off --help` does not stop the schedule:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest schedule --help
+```
 
 ## Exit codes
 
