@@ -25,6 +25,7 @@
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage",
     "test:page": "vitest run --config vitest.page.config.ts",
+    "test:e2e": "node scripts/e2e-cli.mjs",
     "guide": "UPDATE_DOCS=1 vitest run test/docs.test.ts",
     "demo": "node scripts/demo-gif.mjs",
     "lint": "oxlint --deny-warnings && oxfmt --check",

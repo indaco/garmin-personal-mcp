@@ -24,6 +24,7 @@ pnpm build:site          # the website in dist-site/, after the build
 pnpm build:all           # both builds, and the demo GIF when its inputs changed (needs ImageMagick)
 pnpm demo                # record assets/dashboard.gif again, from the data of the website demo
 pnpm test:page           # the dashboard page and the website in headless Chromium, after both builds
+pnpm test:e2e            # the built commands on this system, with a fake Garmin, after the build
 pnpm guide               # write the generated parts of guide/
 ```
 
@@ -66,5 +67,6 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 ## Before you finish
 
 Run `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm build`. After a change to `src/page/` or
-`site/`, also run `pnpm build:site` and `pnpm test:page`. A running client keeps the old server
+`site/`, also run `pnpm build:site` and `pnpm test:page`. After a change to `src/cli.ts`, also run
+`pnpm test:e2e`. A running client keeps the old server
 process: start a new session to see a changed tool or prompt.
