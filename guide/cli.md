@@ -133,8 +133,9 @@ At the end, it tells how to connect your MCP client.
 
 - The key stays hidden when you paste it. You can also give it on stdin. `setup` does not take the
   key as an argument, because your shell keeps its arguments in the history.
-- Only you can read the file: mode 600 on macOS and Linux, an ACL with `icacls` on Windows. When
-  `icacls` fails, the key is saved and the output gives the command to run.
+- Only you can read the file: mode 600 on macOS and Linux, an ACL with `icacls` on Windows. As on
+  each system, an administrator of the computer can still read it. When `icacls` fails, the key is
+  saved and the output gives the command to run.
 - When the key file exists, `setup` stops before it asks for the key. Garmin shows a key only one
   time, so `--force` loses the old key.
 - When Garmin refuses the key (HTTP 401 or 403), the key is not saved and an old key stays.

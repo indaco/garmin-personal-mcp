@@ -86,65 +86,28 @@ function run(args, env, input = "") {
   });
 }
 
-/** Whether only this user can read the file, as the system tells it. */
+/**
+ * Whether only this user can read the file, as the system tells it. On Windows, as on the root of
+ * the other systems, the system account and the administrators can always read it.
+ */
 function onlyUser(file) {
   if (!WINDOWS) {
     const mode = statSync(file).mode & 0o777;
     return { ok: mode === 0o600, details: `mode ${mode.toString(8)}` };
   }
   const { stdout } = spawnSync("icacls", [file], { encoding: "utf8" });
-  // one entry, for this user, with full access, and nothing that comes from the folder
-  const entries = stdout.split(":(").length - 1;
-  const ok =
-    entries === 1 && stdout.toLowerCase().includes(USER.toLowerCase()) && stdout.includes(":(F)");
-  return { ok, details: stdout };
-}
-
-/** Takes the right to write in a folder from this user, and gives the function that gives it back. */
-function denyWrite(dir) {
-  if (!WINDOWS) {
-    chmodSync(dir, 0o500);
-    return () => chmodSync(dir, 0o700);
-  }
-  spawnSync("icacls", [dir, "/deny", `${USER}:(OI)(CI)(WD,AD)`]);
-  return () => spawnSync("icacls", [dir, "/remove:d", USER]);
-}
-
-// TEMPORARY-DIAGNOSTIC
-if (WINDOWS) {
-  const { renameSync } = await import("node:fs");
-  const sh = (label, cmd, args) => {
-    const r = spawnSync(cmd, args, { encoding: "utf8" });
-    console.log(`DIAG ${label}: status=${r.status}\n${r.stdout}${r.stderr}`);
-  };
-  sh("whoami /priv", "whoami", ["/priv"]);
-  sh("whoami /groups", "whoami", ["/groups"]);
-  sh("root", "icacls", [root]);
-  const dir = join(root, "diag", "keys");
-  mkdirSync(dir, { recursive: true, mode: 0o700 });
-  sh("dir made with mode 700", "icacls", [dir]);
-  const plain = join(root, "diag", "plain");
-  mkdirSync(plain);
-  sh("dir made without a mode", "icacls", [plain]);
-  const f = join(dir, "probe");
-  writeFileSync(f, "", { mode: 0o600, flag: "wx" });
-  sh("file created", "icacls", [f]);
-  sh("limit", "icacls", [f, "/inheritance:r", "/grant:r", `${USER}:F`]);
-  sh("after limit", "icacls", [f]);
-  writeFileSync(f, "x");
-  sh("after second write", "icacls", [f]);
-  const g = join(dir, "probe2");
-  renameSync(f, g);
-  sh("after rename", "icacls", [g]);
-  sh("deny", "icacls", [plain, "/deny", `${USER}:(OI)(CI)(WD,AD)`]);
-  sh("after deny", "icacls", [plain]);
-  try {
-    const made = mkdtempSync(join(plain, ".probe-"));
-    console.log(`DIAG mkdtemp worked under deny: ${made}`);
-  } catch (e) {
-    console.log(`DIAG mkdtemp failed under deny: ${e.message}`);
-  }
-  sh("remove deny", "icacls", [plain, "/remove:d", USER]);
+  const names = stdout
+    .replace(file, "")
+    .split("\n")
+    .map((line) => /^\s*(.+?):\(/.exec(line)?.[1])
+    .filter(Boolean)
+    .map((name) => name.toLowerCase());
+  const user = names.filter((name) => name.split("\\").at(-1) === USER.toLowerCase());
+  const others = names.filter(
+    (name) =>
+      !user.includes(name) && !["nt authority\\system", "builtin\\administrators"].includes(name),
+  );
+  return { ok: user.length > 0 && others.length === 0, details: stdout };
 }
 
 // ---- setup, with the key on a pipe
@@ -213,6 +176,25 @@ if (WINDOWS) {
   );
 }
 
+// ---- setup in a folder that gives access to all users: a new file there takes that access
+if (WINDOWS) {
+  const { env, keyFile } = newHome();
+  const dir = dirname(keyFile);
+  mkdirSync(dir, { recursive: true });
+  spawnSync("icacls", [dir, "/grant", "*S-1-5-32-545:(OI)(CI)(R)"]);
+  const other = join(dir, "other-file");
+  writeFileSync(other, "");
+  const before = onlyUser(other);
+  check("setup: another file in a shared folder is open to all users", !before.ok, before.details);
+  const r = await run(["setup"], env, `${KEY}\n`);
+  const after = onlyUser(keyFile);
+  check(
+    "setup: closes the key file in a shared folder",
+    r.code === 0 && after.ok,
+    `${after.details}\n${r.all}`,
+  );
+}
+
 // ---- setup with no folder that it can make
 {
   const { home, env } = newHome();
@@ -276,13 +258,23 @@ if (WINDOWS) {
     chmodSync(keyFile, 0o600);
   }
 
-  // as root, a mode stops nothing
-  if (process.getuid?.() !== 0) {
+  writeFileSync(join(home, "a-file"), "");
+  r = await run(["doctor"], { ...env, GARMIN_DATA_DIR: join(home, "a-file", "data") });
+  check(
+    "doctor: fails on a folder under a file",
+    r.code === 1 && /failed {2}Data folder: cannot write in/.test(r.stdout),
+    r.all,
+  );
+
+  // a mode stops nobody as root, and an ACL did not stop the administrator of the Windows runner
+  if (WINDOWS || process.getuid?.() === 0) {
+    console.log("SKIP  doctor: fails on a folder without the right to write (administrator)");
+  } else {
     const data = join(home, "data");
     mkdirSync(data);
-    const undo = denyWrite(data);
+    chmodSync(data, 0o500);
     r = await run(["doctor"], { ...env, GARMIN_DATA_DIR: data });
-    undo();
+    chmodSync(data, 0o700);
     check(
       "doctor: fails on a folder without the right to write",
       r.code === 1 && /failed {2}Data folder: cannot write in/.test(r.stdout),
@@ -290,8 +282,6 @@ if (WINDOWS) {
     );
     const left = readdirSync(data);
     check("doctor: leaves nothing in a folder that it tests", left.length === 0, left.join(", "));
-  } else {
-    console.log("SKIP  doctor: fails on a folder without the right to write (root)");
   }
 }
 
