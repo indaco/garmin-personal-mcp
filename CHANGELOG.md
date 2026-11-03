@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The changelog is generated and managed by [sley](https://github.com/indaco/sley).
 
+## v0.8.1 - 2026-11-03
+
+### 🩹 Fixes
+
+- **dashboard:** name the page block that is too deep to write back, and keep a new layout as a way out ([bacae28](https://github.com/indaco/garmin-personal-mcp/commit/bacae28)) ([#171](https://github.com/indaco/garmin-personal-mcp/pull/171))
+- **prompts:** match run-review laps to planned steps by step index ([b589553](https://github.com/indaco/garmin-personal-mcp/commit/b589553)) ([#170](https://github.com/indaco/garmin-personal-mcp/pull/170))
+
+### 📖 Documentation
+
+- **guide:** add a step-by-step setup in Claude Desktop, without a terminal ([8b028ae](https://github.com/indaco/garmin-personal-mcp/commit/8b028ae)) ([#169](https://github.com/indaco/garmin-personal-mcp/pull/169))
+
+### ❤️ Contributors
+
+- [@indaco](https://github.com/indaco)
+
 ## v0.8.0 - 2026-11-02
 
 ### 🚀 Enhancements
