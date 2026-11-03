@@ -482,7 +482,7 @@ describe("run numbers of the laps", () => {
       lap(1, "6:00", "6:00/km", 130, "warmup"),
       lap(0.4, "1:36", "4:00/km", 170, "active", 2),
       lap(0.4, "1:38", "4:05/km", 172, "active", 2),
-      // the watch adds a lap of a few metres between steps: not a rep
+      // an open step that ends when you press lap gives a lap of a few metres: not a rep
       lap(0.01, "0:04", undefined, 150, "active", 3),
       lap(0.4, "1:40", "4:10/km", 175, "active", 2),
       lap(1, "4:30", "4:30/km", 168, "active", 4),

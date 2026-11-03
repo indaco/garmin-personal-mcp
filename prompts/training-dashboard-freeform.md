@@ -267,9 +267,10 @@ charts ("one session so far"). Trends start at 2 sessions.
    contact, vertical ratio, stride and power. For a run whose laps mark a warm-up, rest or
    cool-down, use only its work laps (intensity `active` or `interval`) of 20 m and 8 s or more.
    Take pace, HR, cadence, power and running form (`gctMs`, `vertRatioPct`, `strideCm` of each lap)
-   from those laps. A shorter lap is a lap that the watch adds between steps. Show the reps and the
-   fade: the pace of the last rep against the first of the same workout step (`step`, the step with
-   the most reps), only when those reps have the same distance or time (within 15%).
+   from those laps. A shorter lap is not a rep: for example an open step of the workout that ends
+   when you press lap. Show the reps and the fade: the pace of the last rep against the first of the
+   same workout step (`step`, the step with the most reps), only when those reps have the same
+   distance or time (within 15%).
 
 **Walk** adds pace and avg HR for each week, and steps, cadence and body battery change for each
 walk. It also adds daily steps against the goal, with floors (last 14 days). **Hike** adds

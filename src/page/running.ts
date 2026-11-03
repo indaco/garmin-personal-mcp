@@ -113,8 +113,8 @@ const WORK = new Set(["active", "interval"]);
 /** The other parts of a structured workout. A free run has only work laps: its auto laps are "active" or "interval". */
 const OTHER = new Set(["warmup", "cooldown", "rest", "recovery"]);
 /**
- * Shorter work laps are not reps: the watch adds one of a few metres and seconds between the steps of a
- * workout, and its distance is rounded to 10 m, so the time counts too.
+ * Shorter work laps are not reps: an open step of the workout (it ends when you press lap) gives a lap of
+ * a few metres and seconds, and its distance is rounded to 10 m, so the time counts too.
  */
 const MIN_REP_KM = 0.02;
 const MIN_REP_SEC = 8;

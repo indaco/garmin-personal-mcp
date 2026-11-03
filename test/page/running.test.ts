@@ -155,7 +155,7 @@ describe("work laps of a structured workout", () => {
     expect(w?.fade).toBeCloseTo(5, 6);
   });
 
-  it("leaves out a work lap under 20 m: the watch adds one between the steps of a workout", () => {
+  it("leaves out a work lap under 20 m: an open step that ends when you press lap", () => {
     const w = workOf([
       step("warmup", 1, "6:00", 130),
       step("active", 0.01, "0:04", 120),
@@ -206,7 +206,7 @@ describe("work laps of a structured workout", () => {
       step("warmup", 1, "6:00"),
       stepRep(2, "0:30"),
       stepRep(2, "0:31"),
-      // the watch adds a lap of a few metres between steps: not a rep
+      // an open step that ends when you press lap gives a lap of a few metres: not a rep
       { ...step("active", 0.01, "0:04"), step: 3 },
       stepRep(2, "0:32"),
       stepRep(4, "0:40"),
