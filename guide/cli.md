@@ -64,23 +64,24 @@ garmin-personal-mcp 0.8.1
 Node.js:      v22.12.0 on darwin
 API host:     https://personal.connectapi.garmin.com
 API key:      from the key file
-Key file:     /Users/you/.config/garmin-mcp/api-key (found)
-Data folder:  /Users/you/workspace/garmin-data (found)
+Key file:     ~/.config/garmin-mcp/api-key (found)
+Data folder:  ~/workspace/garmin-data (found)
   .FIT files: 42
   pages:      garmin-dashboard-coach.html, garmin-dashboard.html
   exercises.json: found
   dashboard-cache.json: found
   widgets.json: missing
   auto-refresh.json: found
-Server log:   /Users/you/.cache/garmin-personal-mcp/garmin-personal-mcp.log
-Refresh log:  /Users/you/.cache/garmin-personal-mcp/refresh.log
+Server log:   ~/.cache/garmin-personal-mcp/garmin-personal-mcp.log
+Refresh log:  ~/.cache/garmin-personal-mcp/refresh.log
 Schedule:     Automatic refresh "0 7 * * *" with launchd, next: 2026-11-04 07:00, ...
 ```
 
 - `API key` says where the key comes from. When `GARMIN_PERSONAL_API_KEY` is set, the key comes
   from the variable. When it is not set, the key comes from the key file.
-- `info` never reads or shows the key. The output has the paths of your files, with your user
-  name. Remove them before you share the output.
+- `info` never reads or shows the key. It shows your home folder as `~` (your user folder on
+  Windows), so that you can share the output without your user name. A path outside the home
+  folder stays as it is.
 - `info` always shows `Key file`, because the automatic update reads the key only from that file.
 - `pages` are the `.html` files in the data folder. [The data folder](tools.md#the-data-folder)
   tells what each file has.

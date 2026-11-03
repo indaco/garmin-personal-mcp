@@ -157,6 +157,20 @@ export async function cli(
   }
 }
 
+/**
+ * The text with `~` for the home folder, so that it can be shared without the user name. A path on
+ * Windows has either slash and no case. A folder that only looks like the home folder stays.
+ */
+export function hideHome(text: string, home = homedir()): string {
+  const root = home.replace(/[/\\]+$/, "");
+  if (/^([a-z]:)?$/i.test(root)) return text;
+  const path = root.replace(/[.*+?^${}()|[\]\\/]/g, (c) =>
+    c === "/" || c === "\\" ? "[/\\\\]" : `\\${c}`,
+  );
+  const flags = /^([a-z]:|[/\\]{2})/i.test(root) ? "gi" : "g";
+  return text.replace(new RegExp(`(?<![^\\s'"(])${path}(?=$|[/\\\\\\s'")])`, flags), "~");
+}
+
 /** The files in the data folder that `info` checks. guide/tools.md tells what each file has. */
 const DATA_FILES = ["exercises.json", "dashboard-cache.json", "widgets.json", "auto-refresh.json"];
 
@@ -172,8 +186,9 @@ function files(dir: string, ext: string): string[] {
 }
 
 /**
- * The text of `info`: the version, the settings and where the files are. It says where the API key
- * comes from, but it never shows the key. It does not connect to the network.
+ * The text of `info`: the version, the settings and where the files are, with `~` for the home
+ * folder. It says where the API key comes from, but it never shows the key. It does not connect to
+ * the network.
  */
 export function info(
   config: Config,
@@ -184,7 +199,7 @@ export function info(
   const { dataDir } = config;
   const pages = files(dataDir, ".html").toSorted();
   const logs = join(home, LOG_DIR);
-  return [
+  const text = [
     `garmin-personal-mcp ${version}`,
     `Node.js:      ${process.version} on ${process.platform}`,
     `API host:     ${config.baseUrl}`,
@@ -198,6 +213,7 @@ export function info(
     `Refresh log:  ${join(logs, "refresh.log")}`,
     `Schedule:     ${schedule}`,
   ].join("\n");
+  return hideHome(text, home);
 }
 
 function lastLine(last: LastRun): string {

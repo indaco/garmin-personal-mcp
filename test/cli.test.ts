@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { version } from "../package.json";
-import { cli, COMMAND_HELP, HELP, info, RETRY_MS, summary } from "../src/cli";
+import { cli, COMMAND_HELP, HELP, hideHome, info, RETRY_MS, summary } from "../src/cli";
 import type { LastRun, Status } from "../src/schedule";
 
 const on: Status = {
@@ -386,15 +386,16 @@ describe("cli", () => {
     expect(text).toContain(`\nNode.js:      ${process.version} on ${process.platform}\n`);
     expect(text).toContain("API host:     https://api.test");
     expect(text).toContain("API key:      from GARMIN_PERSONAL_API_KEY");
-    expect(text).toContain(`Key file:     ${join(dir, "api-key")} (missing)`);
-    expect(text).toContain(`Data folder:  ${data} (found)`);
+    expect(text).toContain(`Key file:     ${join("~", "api-key")} (missing)`);
+    expect(text).toContain(`Data folder:  ${join("~", "data")} (found)`);
     expect(text).toContain("  .FIT files: 2");
     expect(text).toContain("  pages:      Coach.HTML, garmin-dashboard.html\n");
     expect(text).toContain("  widgets.json: found\n  auto-refresh.json: missing");
     expect(text).toContain(
-      `Server log:   ${join(dir, ".cache/garmin-personal-mcp/garmin-personal-mcp.log")}`,
+      `Server log:   ${join("~", ".cache/garmin-personal-mcp/garmin-personal-mcp.log")}`,
     );
-    expect(text).toContain(`Refresh log:  ${join(dir, ".cache/garmin-personal-mcp/refresh.log")}`);
+    expect(text).toContain(`Refresh log:  ${join("~", ".cache/garmin-personal-mcp/refresh.log")}`);
+    expect(text).not.toContain(dir);
     expect(text).toMatch(/Schedule:     off$/);
 
     writeFileSync(join(dir, "api-key"), "k");
@@ -402,9 +403,62 @@ describe("cli", () => {
     // a key of only spaces is no key, as in the API client: the key file is used
     const other = info(noData, "off", { GARMIN_PERSONAL_API_KEY: " \n" }, dir);
     expect(other).toContain("API key:      from the key file");
-    expect(other).toContain(`Key file:     ${join(dir, "api-key")} (found)`);
-    expect(other).toContain(`Data folder:  ${join(dir, "none")} (missing)`);
+    expect(other).toContain(`Key file:     ${join("~", "api-key")} (found)`);
+    expect(other).toContain(`Data folder:  ${join("~", "none")} (missing)`);
     expect(other).toContain("  .FIT files: 0\n  pages:      none");
+  });
+
+  it("hides the home folder in the schedule error of info, and keeps a path outside it", () => {
+    const home = mkdtempSync(join(tmpdir(), "garmin-info-"));
+    const outside = mkdtempSync(join(tmpdir(), "garmin-data-"));
+    const config = {
+      baseUrl: "https://api.test",
+      apiKeyFile: join(outside, "k"),
+      dataDir: outside,
+    };
+    const text = info(config, `cannot read it: open '${join(home, "a.json")}'`, {}, home);
+    expect(text).toContain(`cannot read it: open '${join("~", "a.json")}'`);
+    expect(text).toContain(`Key file:     ${join(outside, "k")} (missing)`);
+    expect(text).toContain(`Data folder:  ${outside} (found)`);
+  });
+
+  it.each([
+    ["/home/you", "/home/you", "~"],
+    ["/home/you/a.html", "/home/you", "~/a.html"],
+    ["/home/you/", "/home/you/", "~/"],
+    ["/home/you/a", "/home/you/", "~/a"],
+    ["Key: /home/you/a (found)", "/home/you", "Key: ~/a (found)"],
+    ["open '/home/you/a'", "/home/you", "open '~/a'"],
+    ['open "/home/you/a"', "/home/you", 'open "~/a"'],
+    ["(/home/you/a)", "/home/you", "(~/a)"],
+    ["/home/you/a, /home/you/b", "/home/you", "~/a, ~/b"],
+    ["C:\\Users\\you\\a", "C:\\Users\\you", "~\\a"],
+    ["/home/my name/a", "/home/my name", "~/a"],
+    // Windows: either slash, no case, a drive or a network folder
+    ["C:/Users/you/a", "C:\\Users\\you", "~/a"],
+    ["C:\\Users\\you\\a", "C:/Users/you", "~\\a"],
+    ["c:\\users\\YOU\\a", "C:\\Users\\you", "~\\a"],
+    ["open 'C:\\Users\\you\\a'", "C:\\Users\\you", "open '~\\a'"],
+    ["\\\\server\\Home\\you\\a", "\\\\server\\home\\you", "~\\a"],
+    ["C:\\Users\\you2\\a", "C:\\Users\\you", "C:\\Users\\you2\\a"],
+    ["D:\\Users\\you\\a", "C:\\Users\\you", "D:\\Users\\you\\a"],
+    // POSIX keeps the case
+    ["/home/YOU/a", "/home/you", "/home/YOU/a"],
+    // the characters of a regular expression in the home folder are plain characters
+    ["/home/a.b+c/d", "/home/a.b+c", "~/d"],
+    ["/home/axb+c/d", "/home/a.b+c", "/home/axb+c/d"],
+    ["/home/$&/d", "/home/$&", "~/d"],
+    // another folder that only looks like the home folder stays as it is
+    ["/home/you2/a", "/home/you", "/home/you2/a"],
+    ["/home/you.old", "/home/you", "/home/you.old"],
+    ["/mnt/backup/home/you/a", "/home/you", "/mnt/backup/home/you/a"],
+    ["https://x/home/you/a", "/home/you", "https://x/home/you/a"],
+    // a home folder that is the root or empty hides nothing
+    ["/etc/a", "/", "/etc/a"],
+    ["/etc/a", "", "/etc/a"],
+    ["C:\\a", "C:\\", "C:\\a"],
+  ])("hideHome of %j with home %j gives %j", (text, home, expected) => {
+    expect(hideHome(text, home)).toBe(expected);
   });
 
   it("runs info with the first line of the schedule, or the error when it cannot read the schedule", async () => {
