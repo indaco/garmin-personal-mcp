@@ -3,6 +3,11 @@
 The guide tells how to use garmin-personal-mcp after the
 [quick start](../README.md#quick-start). Each page is about one topic.
 
+## Start
+
+- [Step-by-step setup in Claude Desktop](setup-claude-desktop.md): connect the server without a
+  terminal, and see your training dashboard.
+
 ## Your data
 
 - [Tools](tools.md): each tool, its Garmin endpoints, and the data that the Personal API does not

@@ -90,8 +90,12 @@ assistant chooses the tools and can combine their data. Some examples:
 
 ## Quick start
 
-You need Node.js 22 or later (`node --version` shows the version) and a Garmin Connect account
-with access to the [Personal API](https://developer.garmin.com/gc-developer-program/personal/).
+You need [Node.js](https://nodejs.org) 22 or later (`node --version` shows the version) and a
+Garmin Connect account with access to the
+[Personal API](https://developer.garmin.com/gc-developer-program/personal/).
+
+You do not use a terminal? Follow the
+[step-by-step setup in Claude Desktop](guide/setup-claude-desktop.md).
 
 ### 1. Create a personal API key
 
@@ -105,14 +109,21 @@ nano ~/.config/garmin-mcp/api-key      # paste the key and save
 chmod 600 ~/.config/garmin-mcp/api-key
 ```
 
-You can also give the key in the environment variable `GARMIN_PERSONAL_API_KEY`. The
+On Windows, make the folder `.config\garmin-mcp` in your user folder. Save the key there with
+Notepad, in the file `api-key`. Select the type _All files_, so that Notepad does not add `.txt`.
+These Windows steps are not tested.
+
+You can also give the key in `GARMIN_PERSONAL_API_KEY`, in the `env` block of the client
+configuration ([example](guide/setup-claude-desktop.md#4-add-the-server-to-the-configuration-file)).
+Claude Desktop does not read your shell profile. The
 [automatic dashboard refresh](guide/dashboard.md#update-the-dashboard-on-a-schedule)
 reads only the key file.
 
 ### 2. Connect your client
 
 **Claude Desktop**: select Settings → Developer → _Edit Config_. Add a top-level `mcpServers` key
-next to the keys that the file has, not in `preferences`:
+next to the keys that the file has, not in `preferences`
+([example](guide/setup-claude-desktop.md#4-add-the-server-to-the-configuration-file)):
 
 ```json
 {
@@ -125,7 +136,8 @@ next to the keys that the file has, not in `preferences`:
 }
 ```
 
-Then quit Claude Desktop **fully**, including the tray icon, and start it again.
+Then quit Claude Desktop **fully**, including the tray icon, and start it again. Settings →
+Developer shows garmin-personal.
 
 **Claude Code**: this command adds the server to all your projects:
 
@@ -136,14 +148,8 @@ claude mcp list          # garmin-personal: ... ✔ Connected
 
 Use `--scope project` to write a `.mcp.json` file that you can share in the current repository.
 
-**Codex**: this command adds the server:
-
-```bash
-codex mcp add garmin-personal -- npx -y @indaco/garmin-personal-mcp@latest
-```
-
-You can also add it to `~/.codex/config.toml`. The first `npx` download can take longer than the
-default start time, so set a longer one:
+**Codex**: add this table to `~/.codex/config.toml`. The first `npx` download can take longer than
+the default start time, so the table sets a longer one:
 
 ```toml
 [mcp_servers.garmin-personal]
@@ -162,8 +168,9 @@ show MCP prompts. In these clients, ask for the dashboard in your own words. The
 
 ### 3. Ask your assistant
 
-Ask "list my last 5 activities". The first time that a garmin-personal tool asks for permission, answer
-**Allow always** in Claude Desktop. In Claude Code, use `/permissions` and add `mcp__garmin-personal`.
+Start a new chat (Claude Desktop) or a new session (Claude Code). Ask "list my last 5 activities".
+The first time that a garmin-personal tool asks for permission, answer **Allow always** in Claude
+Desktop. In Claude Code, use `/permissions` and add `mcp__garmin-personal`.
 
 ## Tools
 

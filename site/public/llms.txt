@@ -7,6 +7,7 @@ The server is read-only: it writes nothing back to Garmin. Laps and strength set
 ## Docs
 
 - [README](https://github.com/indaco/garmin-personal-mcp/blob/main/README.md): quick start, client setup, what you can ask, the tools and the dashboard prompts
+- [Setup in Claude Desktop](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/setup-claude-desktop.md): step-by-step setup for a reader who does not use a terminal, with the key in the client configuration, and the first dashboard
 - [Guide](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/README.md): the index of the guide pages
 - [How it works](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/how-it-works.md): transport, authentication with the API key, laps and sets from the .FIT files, the automatic update and the dashboard cache
 - [Tools](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/tools.md): every tool, its endpoints, and the data that the Personal API does not have

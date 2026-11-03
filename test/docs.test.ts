@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { GROUPS } from "../src/page/calc";
@@ -90,5 +91,37 @@ describe("guide", () => {
 
   it("lists every text", () => {
     check("guide/languages.md", between("guide/languages.md", "keys", keysPart()));
+  });
+});
+
+/** The garmin-personal server of each json block in a Markdown file. */
+const servers = (file: string) =>
+  [...readFileSync(file, "utf8").matchAll(/```json\n([\s\S]*?)```/g)]
+    .filter((m) => m[1].includes('"mcpServers"'))
+    .map((m) => JSON.parse(m[1]).mcpServers["garmin-personal"]);
+
+describe("setup steps", () => {
+  const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+
+  it("names the package of package.json in the setup docs", () => {
+    // release notes may name a pinned version, so only the docs that a reader follows
+    const files = execFileSync("git", ["ls-files", "README.md", "CONTRIBUTING.md", "guide/*.md"], {
+      encoding: "utf8",
+    }).split("\n");
+    for (const file of files.filter(Boolean))
+      for (const [name] of readFileSync(file, "utf8").matchAll(
+        /@indaco\/garmin-personal-mcp@[\w.^~-]+/g,
+      ))
+        expect(name, file).toBe(`${pkg.name}@latest`);
+  });
+
+  it("gives the step-by-step page the server of the README, with the key in env", () => {
+    const [readme] = servers("README.md");
+    const guide = servers("guide/setup-claude-desktop.md");
+    expect(guide).toHaveLength(2);
+    for (const { env, ...server } of guide) {
+      expect(server).toEqual(readme);
+      expect(Object.keys(env)).toEqual(["GARMIN_PERSONAL_API_KEY"]);
+    }
   });
 });
