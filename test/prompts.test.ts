@@ -458,6 +458,23 @@ describe("coach prompts", () => {
     expect(text).not.toContain("The halves split at half the distance");
   });
 
+  it("run-review matches the laps to the planned steps by step index, not in order", async () => {
+    const text = (await render("run-review")).replace(/\s+/g, " ");
+    const plan = text.slice(
+      text.indexOf("- **Plan against execution**"),
+      text.indexOf("- **Reps**"),
+    );
+    // auto-lap splits one step into several laps, so the order of the laps is not the order of the steps
+    expect(plan).toBe(
+      "- **Plan against execution**: when the run followed a planned workout, a table with one row per " +
+        "lap whose step has a target (not OPEN): the step, its target (pace, HR or cadence, low to high), " +
+        "what the lap did, and hit or miss. A lap's `step` is the `stepIndex` of its plan step. Match by " +
+        "it, not in order: auto-lap splits a long step into several laps, and each rep of a repeat is its " +
+        "own lap with the same `step`. Leave out the laps without a `step`. When no step has a target, say " +
+        "so in one line. Without a planned workout, say so in one line. ",
+    );
+  });
+
   it("reviews a run by id, by name, or the latest run", async () => {
     const byId = await render("run-review", { activity: " 21000000123 " });
     expect(byId).toContain("`activityId` = 21000000123.");
