@@ -152,7 +152,7 @@ update is every day at 07:00. All the pages that update automatically use the sa
 - The server adds one job to the scheduler of your computer: launchd on macOS, your crontab on
   Linux, and Task Scheduler on Windows. The job reads the API key from the key file
   (`GARMIN_API_KEY_FILE`), never from your MCP client configuration. Save the key in that file
-  first.
+  first, with [`setup`](cli.md#setup).
 - The job runs the server as you installed it. A server that `npx` or `pnpm dlx` starts schedules
   the latest release through `npx`. The server also looks for the folders of `bunx` and `yarn dlx`
   (not tested). A server installed with `npm install -g` schedules that copy. After you change the

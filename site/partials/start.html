@@ -23,11 +23,9 @@
             Open
             <a href="https://connect.garmin.com/app/settings/personalApiToken">the API key page</a>
             in Garmin Connect web, select <i>Create Key</i> and choose the expiry. Garmin shows the
-            key only one time. Save it in a file that only you can read:
+            key only one time. This command tests it and saves it in a file that only you can read:
           </p>
-          <pre><code>mkdir -p ~/.config/garmin-mcp
-nano ~/.config/garmin-mcp/api-key
-chmod 600 ~/.config/garmin-mcp/api-key</code></pre>
+          <pre><code>npx -y @indaco/garmin-personal-mcp@latest setup</code></pre>
           <p>You can also give the key in <code>GARMIN_PERSONAL_API_KEY</code>.</p>
         </div>
         <div class="step">

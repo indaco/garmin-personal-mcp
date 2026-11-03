@@ -74,6 +74,11 @@ Then:
 
 Copy and paste the text. Do not type it: TextEdit can change straight quotes to curly quotes.
 
+This file keeps your key as plain text, and the
+[automatic dashboard update](dashboard.md#update-the-dashboard-on-a-schedule) cannot read it there.
+If you can use a terminal, run `npx -y @indaco/garmin-personal-mcp@latest setup` and leave out the
+`env` line. See [setup](cli.md#setup).
+
 ## 5. Restart Claude Desktop
 
 Quit Claude Desktop fully, then start it again. To close the window is not sufficient. On macOS,

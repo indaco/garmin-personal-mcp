@@ -28,8 +28,9 @@ The guide tells how to use garmin-personal-mcp after the
 
 ## Help
 
-- [Commands](cli.md): the commands for a terminal. `info` shows the settings and where the files
-  are. `refresh` and `schedule` update a dashboard page.
+- [Commands](cli.md): the commands for a terminal. `setup` saves the API key. `doctor` tests the
+  setup. `info` shows the settings and where the files are. `refresh` and `schedule` update a
+  dashboard page.
 - [Problems and solutions](troubleshooting.md): the common problems, the log files, and commands
   that test the key and the server.
 - [Security](../SECURITY.md): how the server protects your data, and how to report a

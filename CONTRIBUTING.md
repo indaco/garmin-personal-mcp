@@ -108,7 +108,7 @@ Where each part of the server and the page is.
 | File                                 | Content                                                                              |
 | ------------------------------------ | ------------------------------------------------------------------------------------ |
 | `src/index.ts`                       | the entry point: the stdio server, or a command of `src/cli.ts`                      |
-| `src/cli.ts`                         | the `info`, `doctor`, `refresh` and `schedule` commands                              |
+| `src/cli.ts`                         | the `info`, `doctor`, `setup`, `refresh` and `schedule` commands                     |
 | `src/server.ts`                      | the MCP server with its tools and prompts                                            |
 | `src/api-client.ts`                  | HTTP, the token and the retries                                                      |
 | `src/tools.ts`, `src/fit.ts`         | the tools and the .FIT decoder                                                       |
@@ -170,7 +170,8 @@ file does not match the bundle.
 
 - **stdout carries only MCP messages.** The client reads JSON-RPC from stdout. Do not use
   `console.log` in `src/`. Use `log()` from `src/log.ts`, which writes to the log file. Only the
-  `info`, `refresh` and `schedule` commands, which are not MCP, write their result to stdout.
+  `info`, `doctor`, `setup`, `refresh` and `schedule` commands, which are not MCP, write their result
+  to stdout.
 - **The API key and the access token stay secret.** Do not write them to the log, to an error
   message or to a tool result. The tests check this.
 - **The token goes only to the Personal API host.** `garminGet` accepts only a relative path. Keep

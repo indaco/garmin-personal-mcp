@@ -1,9 +1,30 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { PassThrough } from "node:stream";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { version } from "../package.json";
-import { cli, COMMAND_HELP, doctor, HELP, hideHome, info, RETRY_MS, summary } from "../src/cli";
+import {
+  cli,
+  COMMAND_HELP,
+  doctor,
+  HELP,
+  hideHome,
+  info,
+  promptKey,
+  RETRY_MS,
+  setup,
+  summary,
+} from "../src/cli";
 import type { LastRun, Status } from "../src/schedule";
 
 const on: Status = {
@@ -127,6 +148,16 @@ describe("cli", () => {
     ["info", ["--auto"], "--auto"],
     ["doctor", ["--auto"], "--auto"],
     ["doctor", ["--foo"], "--foo"],
+    ["doctor", ["--force"], "--force"],
+    // --force is exact, it comes first and only setup has it
+    ["setup", ["--foo"], "--foo"],
+    ["setup", ["--FORCE"], "--FORCE"],
+    ["setup", ["-f"], "-f"],
+    ["setup", ["--force", "--force"], "--force"],
+    ["setup", ["word", "--force"], "--force"],
+    ["setup", ["--auto"], "--auto"],
+    ["refresh", ["--force"], "--force"],
+    ["schedule", ["--force"], "--force"],
     // the help flag of a command is exact
     ["refresh", ["--HELP"], "--HELP"],
     ["schedule", ["-H"], "-H"],
@@ -168,16 +199,19 @@ describe("cli", () => {
     expect(write).not.toHaveBeenCalled();
   });
 
-  it.each(["info", "doctor", "refresh", "schedule"])("prints the help of %s", async (command) => {
-    const f = fakes();
-    const write = vi.fn(f.writer);
-    const help = COMMAND_HELP[command];
-    expect(help).toMatch(new RegExp(`^Usage: garmin-personal-mcp ${command}\\b`));
-    for (const flag of ["--help", "-h"])
-      expect(await cli(command, [flag], f.auto, write)).toEqual({ code: 0, stdout: help });
-    expect(f.auto.status).not.toHaveBeenCalled();
-    expect(write).not.toHaveBeenCalled();
-  });
+  it.each(["info", "doctor", "setup", "refresh", "schedule"])(
+    "prints the help of %s",
+    async (command) => {
+      const f = fakes();
+      const write = vi.fn(f.writer);
+      const help = COMMAND_HELP[command];
+      expect(help).toMatch(new RegExp(`^Usage: garmin-personal-mcp ${command}\\b`));
+      for (const flag of ["--help", "-h"])
+        expect(await cli(command, [flag], f.auto, write)).toEqual({ code: 0, stdout: help });
+      expect(f.auto.status).not.toHaveBeenCalled();
+      expect(write).not.toHaveBeenCalled();
+    },
+  );
 
   it("tells each form and default of a command in its help", () => {
     expect(COMMAND_HELP.refresh).toContain("refresh --auto");
@@ -185,11 +219,19 @@ describe("cli", () => {
     for (const word of ["daily", "weekdays", "weekly <day>", '"<cron>"', "off", "07:00", "Monday"])
       expect(COMMAND_HELP.schedule).toContain(word);
     // only the three commands have a help: the others are flags without arguments
-    expect(Object.keys(COMMAND_HELP)).toEqual(["info", "doctor", "refresh", "schedule"]);
+    expect(Object.keys(COMMAND_HELP)).toEqual(["info", "doctor", "setup", "refresh", "schedule"]);
   });
 
   it("tells in the main help how to get the help of a command", () => {
     expect(HELP).toContain("<command> --help");
+  });
+
+  it.each(Object.keys(COMMAND_HELP))("lists %s in the main help", (command) => {
+    expect(HELP).toMatch(new RegExp(`^  ${command}\\b`, "m"));
+  });
+
+  it("has the main help in the guide", () => {
+    expect(readFileSync(new URL("../guide/cli.md", import.meta.url), "utf8")).toContain(HELP);
   });
 
   // a help request must not do the task: `schedule off --help` must not stop the schedule
@@ -626,7 +668,9 @@ describe("doctor", () => {
     const none = { ...config, apiKeyFile: join(home, "no-key") };
     const r = await doctor(none, off(), "linux", home);
     expect(r.code).toBe(1);
-    expect(r.stdout).toContain(`failed  Key file: ${join("~", "no-key")} is missing.`);
+    expect(r.stdout).toContain(
+      `failed  Key file: ${join("~", "no-key")} is missing. Run: npx -y @indaco/garmin-personal-mcp@latest setup`,
+    );
     expect(r.stdout).toContain("failed  API key: No API key");
     expect(r.stdout).toMatch(/2 checks failed\.$/);
     expect(fetch).not.toHaveBeenCalled();
@@ -669,7 +713,9 @@ describe("doctor", () => {
     const none = { ...config, apiKeyFile: join(home, "no-key") };
     const r = await doctor(none, fakes().auto, "linux", home);
     expect(r.code).toBe(1);
-    expect(r.stdout).toContain("the automatic update reads only the key file");
+    expect(r.stdout).toContain(
+      "the automatic update reads only the key file. Run: npx -y @indaco/garmin-personal-mcp@latest setup",
+    );
   });
 
   skipIfNoMode.each([0o644, 0o640, 0o604, 0o666])(
@@ -843,6 +889,419 @@ describe("doctor", () => {
   });
 });
 
+const never = () =>
+  vi.fn(async (): Promise<string> => {
+    throw new Error("must not ask");
+  });
+const noExec = () =>
+  vi.fn(async () => {
+    throw new Error("must not run");
+  });
+const icacls = (code = 0) => vi.fn(async () => ({ code, stdout: "", stderr: "" }));
+
+const answer = (key: string) => vi.fn(async () => key);
+
+function newHome() {
+  const home = mkdtempSync(join(tmpdir(), "garmin-setup-"));
+  const apiKeyFile = join(home, ".config", "garmin-mcp", "api-key");
+  const config = { baseUrl: "https://api.test", apiKeyFile, dataDir: join(home, "data") };
+  return { home, apiKeyFile, config };
+}
+
+describe("setup", () => {
+  const KEY = "s3cret-key";
+
+  const skipIfNoMode = it.skipIf(process.platform === "win32" || process.getuid?.() === 0);
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  beforeEach(() => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    vi.stubEnv("GARMIN_API_KEY_FILE", "");
+  });
+
+  it("tests the key, saves it and tells how to connect the client", async () => {
+    const fetch = garmin();
+    const { home, apiKeyFile, config } = newHome();
+    const r = await setup([], config, answer(KEY), "linux", noExec(), home);
+    expect(r.code).toBe(0);
+    expect(r.stderr).toBeUndefined();
+    expect(readFileSync(apiKeyFile, "utf8")).toBe(`${KEY}\n`);
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.headers).toMatchObject({ Authorization: `ApiKey ${KEY}` });
+    expect(r.stdout).toContain(
+      `The key works. It is saved in ${join("~", ".config", "garmin-mcp", "api-key")}, and only you can read it.`,
+    );
+    expect(r.stdout).toContain("command: npx");
+    expect(r.stdout).toContain("args:    -y @indaco/garmin-personal-mcp@latest");
+    expect(r.stdout).toContain(
+      "https://github.com/indaco/garmin-personal-mcp#2-connect-your-client",
+    );
+    expect(r.stdout).toContain("@latest doctor");
+    expect(r.stdout).not.toContain(KEY);
+    expect(r.stdout).not.toContain(home);
+    expect(readdirSync(join(home, ".config", "garmin-mcp"))).toEqual(["api-key"]);
+  });
+
+  skipIfNoMode("makes a key file and a folder that only the user can read", async () => {
+    garmin();
+    const { home, apiKeyFile, config } = newHome();
+    const umask = process.umask(0);
+    try {
+      await setup([], config, answer(KEY), "linux", noExec(), home);
+    } finally {
+      process.umask(umask);
+    }
+    expect(statSync(apiKeyFile).mode & 0o777).toBe(0o600);
+    expect(statSync(join(home, ".config", "garmin-mcp")).mode & 0o777).toBe(0o700);
+  });
+
+  it.each([[`  ${KEY}  `], [`${KEY}\r`], [`﻿${KEY}`], [`\t${KEY}\n`]])(
+    "saves only the key from %j",
+    async (input) => {
+      garmin();
+      const { home, apiKeyFile, config } = newHome();
+      expect((await setup([], config, answer(input), "linux", noExec(), home)).code).toBe(0);
+      expect(readFileSync(apiKeyFile, "utf8")).toBe(`${KEY}\n`);
+    },
+  );
+
+  it.each(["", "   ", "\r", "﻿"])("saves nothing without a key: %j", async (input) => {
+    const fetch = garmin();
+    const { home, apiKeyFile, config } = newHome();
+    const r = await setup([], config, answer(input), "linux", noExec(), home);
+    expect(r).toEqual({ code: 1, stderr: "No key given. Nothing changed." });
+    expect(existsSync(apiKeyFile)).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(["two words", "a\nb", "a\tb", "ключ", "a\u0000b"])(
+    "refuses %j without a request, and does not repeat it",
+    async (input) => {
+      const fetch = garmin();
+      const { home, apiKeyFile, config } = newHome();
+      const r = await setup([], config, answer(input), "linux", noExec(), home);
+      expect(r.code).toBe(1);
+      expect(r.stderr).toContain("spaces, line breaks or other characters");
+      expect(r.stderr).toContain("The key is not saved.");
+      expect(r.stderr).not.toContain(input);
+      expect(existsSync(apiKeyFile)).toBe(false);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([401, 403])("does not save a key that Garmin refuses with %i", async (status) => {
+    // a server can echo the request
+    garmin(status, `bad ${KEY}`);
+    const { home, apiKeyFile, config } = newHome();
+    const r = await setup([], config, answer(KEY), "linux", noExec(), home);
+    expect(r.code).toBe(1);
+    expect(r.stdout).toBeUndefined();
+    expect(r.stderr).toContain("the personal API key is incorrect, expired or revoked");
+    expect(r.stderr).toContain("and run setup again");
+    expect(r.stderr).toContain("The key is not saved.");
+    expect(r.stderr).not.toContain(KEY);
+    expect(existsSync(apiKeyFile)).toBe(false);
+  });
+
+  it("keeps the old key when Garmin refuses the new one", async () => {
+    garmin(401);
+    const { home, apiKeyFile, config } = newHome();
+    mkdirSync(join(apiKeyFile, ".."), { recursive: true });
+    writeFileSync(apiKeyFile, "old-key");
+    const r = await setup(["--force"], config, answer(KEY), "linux", noExec(), home);
+    expect(r.code).toBe(1);
+    expect(readFileSync(apiKeyFile, "utf8")).toBe("old-key");
+  });
+
+  // Garmin shows a key only one time: an answer that says nothing about the key must not lose it
+  it.each([
+    ["a network error", () => vi.fn().mockRejectedValue(new TypeError(`no route ApiKey ${KEY}`))],
+    ["an error of Garmin", () => vi.fn(async () => new Response(`down ${KEY}`, { status: 503 }))],
+    ["an empty answer", () => vi.fn(async () => new Response("", { status: 200 }))],
+  ])("saves the key after %s, says that it is not tested and gives 1", async (_name, fetch) => {
+    vi.stubGlobal("fetch", fetch());
+    const { home, apiKeyFile, config } = newHome();
+    const r = await setup([], config, answer(KEY), "linux", noExec(), home);
+    expect(r.code).toBe(1);
+    expect(r.stdout).toBeUndefined();
+    expect(readFileSync(apiKeyFile, "utf8")).toBe(`${KEY}\n`);
+    expect(r.stderr).toContain("The key is saved");
+    expect(r.stderr).toContain("but it is not tested, and only you can read it.");
+    expect(r.stderr).toContain("@latest doctor");
+    expect(r.stderr).not.toContain(KEY);
+    expect(r.stderr).not.toContain(home);
+  });
+
+  it("does not ask and changes nothing when the key file exists", async () => {
+    const fetch = garmin();
+    const { home, apiKeyFile, config } = newHome();
+    mkdirSync(join(apiKeyFile, ".."), { recursive: true });
+    writeFileSync(apiKeyFile, "old-key");
+    const ask = never();
+    const r = await setup([], config, ask, "linux", noExec(), home);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain(`${join("~", ".config", "garmin-mcp", "api-key")} exists`);
+    expect(r.stderr).toContain("--force");
+    expect(ask).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(readFileSync(apiKeyFile, "utf8")).toBe("old-key");
+  });
+
+  skipIfNoMode(
+    "replaces the key with --force and closes a file that others could read",
+    async () => {
+      garmin();
+      const { home, apiKeyFile, config } = newHome();
+      mkdirSync(join(apiKeyFile, ".."), { recursive: true });
+      writeFileSync(apiKeyFile, "old-key");
+      chmodSync(apiKeyFile, 0o644);
+      const r = await setup(["--force"], config, answer(KEY), "linux", noExec(), home);
+      expect(r.code).toBe(0);
+      expect(readFileSync(apiKeyFile, "utf8")).toBe(`${KEY}\n`);
+      expect(statSync(apiKeyFile).mode & 0o777).toBe(0o600);
+    },
+  );
+
+  it.each([[[KEY]], [["--force", KEY]], [["a", "b"]]])(
+    "does not read the key from the arguments %j, and does not repeat them",
+    async (args) => {
+      const fetch = garmin();
+      const { home, apiKeyFile, config } = newHome();
+      const ask = never();
+      const r = await setup(args, config, ask, "linux", noExec(), home);
+      expect(r.code).toBe(1);
+      expect(r.stderr).toContain("does not take the key as an argument");
+      expect(r.stderr).toContain("shell history");
+      expect(r.stderr).not.toContain(args.at(-1));
+      expect(ask).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+      expect(existsSync(apiKeyFile)).toBe(false);
+    },
+  );
+
+  it("tests the new key, not the key of the environment, and warns about its priority", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "env-key");
+    const fetch = garmin();
+    const { home, config } = newHome();
+    const r = await setup([], config, answer(KEY), "linux", noExec(), home);
+    expect(r.code).toBe(0);
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.headers).toMatchObject({ Authorization: `ApiKey ${KEY}` });
+    expect(r.stdout).toContain(
+      "GARMIN_PERSONAL_API_KEY is set, and it has priority over this file",
+    );
+    expect(r.stdout).not.toContain("env-key");
+  });
+
+  it("says that the client needs a key file from the environment too", async () => {
+    garmin();
+    const { home, config } = newHome();
+    const plain = await setup([], config, answer(KEY), "linux", noExec(), home);
+    expect(plain.stdout).not.toContain("GARMIN_API_KEY_FILE");
+    const again = newHome();
+    vi.stubEnv("GARMIN_API_KEY_FILE", again.apiKeyFile);
+    const r = await setup([], again.config, answer(KEY), "linux", noExec(), again.home);
+    expect(r.stdout).toContain("Set GARMIN_API_KEY_FILE in your MCP client too");
+  });
+
+  it("saves in a path with spaces and quotes", async () => {
+    garmin();
+    const { home, config } = newHome();
+    const apiKeyFile = join(home, "my keys", "it's", "api key");
+    const r = await setup([], { ...config, apiKeyFile }, answer(KEY), "linux", noExec(), home);
+    expect(r.code).toBe(0);
+    expect(readFileSync(apiKeyFile, "utf8")).toBe(`${KEY}\n`);
+  });
+
+  it("gives the reason and leaves no key behind when it cannot save", async () => {
+    garmin();
+    const { home, config } = newHome();
+    // the folder of the key file is a file
+    writeFileSync(join(home, "file"), "");
+    const under = { ...config, apiKeyFile: join(home, "file", "api-key") };
+    const r = await setup([], under, answer(KEY), "linux", noExec(), home);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toMatch(/^Cannot save the key in ~.file.api-key: /);
+    expect(r.stderr).not.toContain(KEY);
+    expect(r.stderr).not.toContain(home);
+  });
+
+  it("removes the temporary file when the last step fails", async () => {
+    garmin();
+    const { home, config } = newHome();
+    // the key file is a folder that has a file, so the rename fails with --force
+    const apiKeyFile = join(home, "api-key");
+    mkdirSync(apiKeyFile);
+    writeFileSync(join(apiKeyFile, "x"), "");
+    const r = await setup(
+      ["--force"],
+      { ...config, apiKeyFile },
+      answer(KEY),
+      "linux",
+      noExec(),
+      home,
+    );
+    expect(r.code).toBe(1);
+    expect(r.stderr).toMatch(/^Cannot save the key in /);
+    expect(r.stderr).not.toContain(KEY);
+    expect(readdirSync(home)).toEqual(["api-key"]);
+  });
+
+  describe("on Windows", () => {
+    it("limits the file to the user with icacls before the key is in it", async () => {
+      garmin();
+      const { home, apiKeyFile, config } = newHome();
+      let during: string | undefined;
+      const exec = vi.fn(async (_cmd: string, args: string[]) => {
+        during = readFileSync(args[0], "utf8");
+        return { code: 0, stdout: "", stderr: "" };
+      });
+      const r = await setup([], config, answer(KEY), "win32", exec, home);
+      expect(r.code).toBe(0);
+      expect(exec).toHaveBeenCalledOnce();
+      const [cmd, args] = exec.mock.calls[0];
+      expect(cmd).toBe("icacls");
+      expect(args).toEqual([
+        expect.stringContaining("api-key."),
+        "/inheritance:r",
+        "/grant:r",
+        `${userInfo().username}:F`,
+      ]);
+      expect(during).toBe("");
+      expect(readFileSync(apiKeyFile, "utf8")).toBe(`${KEY}\n`);
+      expect(r.stdout).toContain("and only you can read it.");
+      expect(r.stdout).not.toContain("chmod");
+    });
+
+    it.each([
+      ["a failed command", icacls(5)],
+      ["a missing command", vi.fn().mockRejectedValue(new Error("spawn icacls ENOENT"))],
+    ])("saves the key after %s, and tells how to limit the file", async (_name, exec) => {
+      garmin();
+      const { home, apiKeyFile, config } = newHome();
+      const r = await setup([], config, answer(KEY), "win32", exec, home);
+      expect(r.code).toBe(0);
+      expect(readFileSync(apiKeyFile, "utf8")).toBe(`${KEY}\n`);
+      expect(r.stdout).not.toContain("only you can read it");
+      expect(r.stdout).toContain("Other users may be able to read it");
+      // the real path: icacls does not read `~`
+      expect(r.stdout).toContain(`icacls "${apiKeyFile}"`);
+      expect(r.stdout).toContain(`/inheritance:r /grant:r "${userInfo().username}:F"`);
+    });
+
+    it("does not run icacls on macOS or Linux", async () => {
+      garmin();
+      const { home, config } = newHome();
+      const exec = noExec();
+      await setup([], config, answer(KEY), "darwin", exec, home);
+      expect(exec).not.toHaveBeenCalled();
+    });
+  });
+
+  it("runs from the command line: it stops on a key in the arguments and on a key file", async () => {
+    const { apiKeyFile, config } = newHome();
+    const f = fakes();
+    const arg = await cli("setup", ["a-key"], f.auto, f.writer, undefined, config);
+    expect(arg.stderr).toContain("does not take the key as an argument");
+    mkdirSync(join(apiKeyFile, ".."), { recursive: true });
+    writeFileSync(apiKeyFile, "old-key");
+    const exists = await cli("setup", [], f.auto, f.writer, undefined, config);
+    expect(exists.stderr).toContain("exists");
+  });
+
+  it("takes --force from the command line", async () => {
+    const { config } = newHome();
+    const f = fakes();
+    // the flag passes, so setup stops on the word after it and not on an unknown flag
+    const r = await cli("setup", ["--force", "a-key"], f.auto, f.writer, undefined, config);
+    expect(r.stderr).toContain("does not take the key as an argument");
+  });
+
+  it("prints the help without asking for the key", async () => {
+    const { config } = newHome();
+    const f = fakes();
+    expect(await cli("setup", ["--force", "--help"], f.auto, f.writer, undefined, config)).toEqual({
+      code: 0,
+      stdout: COMMAND_HELP.setup,
+    });
+  });
+});
+
+/** The input and all that the prompt writes. `tty` makes it read as a terminal does. */
+function streams(tty = false) {
+  const input = new PassThrough() as PassThrough & { isTTY?: boolean };
+  if (tty) input.isTTY = true;
+  const output = new PassThrough();
+  let written = "";
+  output.on("data", (d) => (written += d));
+  return { input, output, written: () => written };
+}
+
+describe("promptKey", () => {
+  it.each([
+    ["a line", "k3y\n", "k3y"],
+    ["Windows line endings", "k3y\r\n", "k3y"],
+    ["no line ending", "k3y", "k3y"],
+    ["more lines", "k3y\nother\n", "k3y"],
+    ["no text", "", ""],
+    ["an empty line", "\n", ""],
+  ])("reads the first line from a pipe: %s", async (_name, text, key) => {
+    const s = streams();
+    const read = promptKey(s.input, s.output);
+    s.input.end(text);
+    expect(await read).toBe(key);
+    expect(s.written()).toContain("Paste the personal API key");
+    expect(s.written()).not.toContain("k3y");
+    expect(s.written()).toMatch(/\n$/);
+  });
+
+  it("stops the echo of a terminal before the prompt, because a paste can come at once", async () => {
+    const s = streams(true);
+    const order: string[] = [];
+    Object.assign(s.input, {
+      setRawMode: (raw: boolean) => order.push(`raw ${raw} after ${s.written().length} characters`),
+    });
+    s.output.on("data", () => order.push("prompt"));
+    const read = promptKey(s.input, s.output);
+    s.input.write("k3y\r");
+    await read;
+    expect(order[0]).toBe("raw true after 0 characters");
+    expect(order).toContain("prompt");
+    // the terminal shows what you type again after the prompt
+    expect(order.some((step) => step.startsWith("raw false"))).toBe(true);
+  });
+
+  it("does not show the key in a terminal", async () => {
+    const s = streams(true);
+    const read = promptKey(s.input, s.output);
+    s.input.write("k3y\r");
+    expect(await read).toBe("k3y");
+    expect(s.written()).not.toContain("k3y");
+  });
+
+  it("removes a character with backspace in a terminal", async () => {
+    const s = streams(true);
+    const read = promptKey(s.input, s.output);
+    s.input.write("k3yy\x7f\r");
+    expect(await read).toBe("k3y");
+  });
+
+  it.each([
+    ["Ctrl-C", "abc\x03"],
+    ["Ctrl-D", "\x04"],
+  ])("gives no key after %s in a terminal", async (_name, keys) => {
+    const s = streams(true);
+    const read = promptKey(s.input, s.output);
+    s.input.write(keys);
+    expect(await read).toBe("");
+    expect(s.written()).not.toContain("abc");
+  });
+});
+
 describe("the entry point", () => {
   const argv = process.argv;
   afterEach(() => {
@@ -862,7 +1321,7 @@ describe("the entry point", () => {
     expect(s.stdout).not.toHaveBeenCalled();
   });
 
-  it.each(["--version", "-v", "--help", "-h", "info", "doctor"])(
+  it.each(["--version", "-v", "--help", "-h", "info", "doctor", "setup"])(
     "runs %s without the server",
     async (flag) => {
       const s = await start([flag]);

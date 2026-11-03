@@ -1,15 +1,42 @@
 import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
-import { homedir } from "node:os";
+import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { homedir, userInfo } from "node:os";
 import { dirname, join } from "node:path";
+import { createInterface } from "node:readline";
+import { Writable } from "node:stream";
 import { version } from "../package.json";
-import { GarminApiClient } from "./api-client";
+import { GarminApiClient, KEY_PAGE_URL, KeyRefusedError } from "./api-client";
 import { type Config, loadConfig } from "./config";
 import type { DashboardWriter } from "./dashboard-page";
 import { LOG_DIR } from "./log";
-import { type AutoRefresh, cronOf, type LastRun, refreshPages, type Status } from "./schedule";
+import {
+  type AutoRefresh,
+  cronOf,
+  type LastRun,
+  refreshPages,
+  type Run,
+  run,
+  type Status,
+} from "./schedule";
 
 /** The commands for a terminal or a scheduler. Only a start without arguments is the MCP server. */
-const COMMANDS = ["info", "doctor", "refresh", "schedule", "--version", "-v", "--help", "-h"];
+const COMMANDS = [
+  "info",
+  "doctor",
+  "setup",
+  "refresh",
+  "schedule",
+  "--version",
+  "-v",
+  "--help",
+  "-h",
+];
+
+/** The flag that a command takes, as its first argument. */
+const FLAGS: Partial<Record<string, string>> = { refresh: "--auto", setup: "--force" };
+
+/** Commands in the form that works on each system, without an install. */
+const NPX = "npx -y @indaco/garmin-personal-mcp@latest";
 
 export const HELP = `Usage: garmin-personal-mcp [command]
 
@@ -18,6 +45,7 @@ Without a command, the MCP server starts on stdin and stdout.
 Commands:
   info                                show the version, the settings and where the files are
   doctor                              test the API key, the folders and the schedule
+  setup [--force]                     test the API key and save it in the key file
   refresh [page.html]                 update a dashboard page
                                       (default: <data-dir>/garmin-dashboard.html)
   refresh --auto                      update the pages that have a schedule
@@ -47,6 +75,17 @@ a token request to Garmin, the data folder, the log folder and the schedule.
 It never shows the key. The exit code is 1 when a check fails.
 
 Flags:
+  -h, --help  show this help`,
+  setup: `Usage: garmin-personal-mcp setup [--force]
+
+Test a personal API key with Garmin and save it in the key file, so that only you can read it.
+Paste the key at the prompt, or give it on stdin. The key stays hidden, and an argument
+cannot be the key, because a shell keeps its arguments in the history.
+
+Create a key at ${KEY_PAGE_URL}
+
+Flags:
+  --force     replace the key file. Garmin shows a key only one time, so the old key is lost.
   -h, --help  show this help`,
   refresh: `Usage: garmin-personal-mcp refresh [page.html]
        garmin-personal-mcp refresh --auto
@@ -112,13 +151,12 @@ export async function cli(
   if (!COMMANDS.includes(command)) return usage(`Unknown command: ${command}`);
   const help = COMMAND_HELP[command];
   if (help && (args.includes("--help") || args.includes("-h"))) return { code: 0, stdout: help };
-  const flag = args.find(
-    (a, i) => a.startsWith("-") && !(command === "refresh" && i === 0 && a === "--auto"),
-  );
+  const flag = args.find((a, i) => a.startsWith("-") && !(i === 0 && a === FLAGS[command]));
   if (flag) return usage(`Unknown flag: ${flag}`);
   if (command === "--version" || command === "-v") return { code: 0, stdout: version };
   if (command === "--help" || command === "-h") return { code: 0, stdout: HELP };
   if (command === "doctor") return doctor(config, auto);
+  if (command === "setup") return setup(args, config);
   if (command === "info") {
     // a damaged auto-refresh.json must not stop info: the Schedule line shows the error
     const schedule = await auto.status().then(
@@ -262,7 +300,7 @@ function keyFileCheck(
       return {
         ok: false,
         name,
-        text: `${file} is missing: the automatic update reads only the key file. Create it (see "Create a personal API key" in the README).`,
+        text: `${file} is missing: the automatic update reads only the key file. Run: ${NPX} setup`,
       };
     }
     return process.env.GARMIN_PERSONAL_API_KEY?.trim()
@@ -270,7 +308,7 @@ function keyFileCheck(
       : {
           ok: false,
           name,
-          text: `${file} is missing. Create it (see "Create a personal API key" in the README).`,
+          text: `${file} is missing. Run: ${NPX} setup`,
         };
   }
   // Windows has no modes: a stat gives the same one to each file, whoever can read it
@@ -350,6 +388,143 @@ export async function doctor(
     failed === 0 ? "All checks passed." : `${failed} ${failed === 1 ? "check" : "checks"} failed.`,
   );
   return { code: failed === 0 ? 0 : 1, stdout: hideHome(lines.join("\n"), home) };
+}
+
+/**
+ * Asks for the key and gives the first line. The key is not on the screen: readline stops the echo
+ * of the terminal, its own output goes nowhere, and only the prompt goes to `output`. Ctrl-C and
+ * Ctrl-D close readline, so they give an empty line.
+ */
+export function promptKey(
+  input: NodeJS.ReadableStream & { isTTY?: boolean } = process.stdin,
+  output: NodeJS.WritableStream = process.stderr,
+): Promise<string> {
+  const hidden = new Writable({ write: (_chunk, _encoding, done) => done() });
+  const rl = createInterface({ input, output: hidden, terminal: Boolean(input.isTTY) });
+  // after createInterface: it stops the echo of the terminal, and a paste can come at once
+  output.write(`Create a key at ${KEY_PAGE_URL}\nPaste the personal API key (it stays hidden): `);
+  return new Promise((resolve) => {
+    let line = "";
+    rl.once("line", (text) => {
+      line = text;
+      rl.close();
+    });
+    rl.once("close", () => {
+      output.write("\n");
+      resolve(line);
+    });
+  });
+}
+
+/** Windows has no modes: only an ACL keeps other users out of a file. */
+async function limitToUser(file: string, exec: Run): Promise<boolean> {
+  const grant = `${userInfo().username}:F`;
+  const r = await exec("icacls", [file, "/inheritance:r", "/grant:r", grant]).catch(
+    () => undefined,
+  );
+  return r?.code === 0;
+}
+
+/**
+ * Saves the key, and tells whether only the user can read it. The file is limited before the key
+ * goes in, and the rename makes a replaced key appear whole or not at all.
+ */
+async function saveKey(
+  file: string,
+  key: string,
+  platform: NodeJS.Platform,
+  exec: Run,
+): Promise<boolean> {
+  await mkdir(dirname(file), { recursive: true, mode: 0o700 });
+  const temp = `${file}.${process.pid}.tmp`;
+  try {
+    await writeFile(temp, "", { mode: 0o600, flag: "wx" });
+    const limited = platform !== "win32" || (await limitToUser(temp, exec));
+    await writeFile(temp, `${key}\n`);
+    await rename(temp, file);
+    return limited;
+  } catch (e) {
+    await rm(temp, { force: true });
+    throw e;
+  }
+}
+
+/**
+ * Tests a key and saves it in the key file. A key that Garmin refuses is not saved. Any other failed
+ * test saves it, because Garmin shows a key only one time. It runs on macOS, Linux and Windows.
+ */
+export async function setup(
+  args: string[],
+  config: Config,
+  readKey: () => Promise<string> = promptKey,
+  platform: NodeJS.Platform = process.platform,
+  exec: Run = run,
+  home = homedir(),
+): Promise<CliResult> {
+  const file = config.apiKeyFile;
+  const shown = hideHome(file, home);
+  if (args.length > (args[0] === "--force" ? 1 : 0)) {
+    return {
+      code: 1,
+      stderr:
+        "setup does not take the key as an argument: your shell history keeps it. Run setup without it and paste the key at the prompt. If it was your key, remove it from the history.",
+    };
+  }
+  if (args[0] !== "--force" && existsSync(file)) {
+    return {
+      code: 1,
+      stderr: `${shown} exists. To test its key, run doctor. To replace it, run setup --force: Garmin shows a key only one time, so the old key is lost.`,
+    };
+  }
+  const key = (await readKey()).trim();
+  if (!key) return { code: 1, stderr: "No key given. Nothing changed." };
+  let untested: string | undefined;
+  try {
+    await new GarminApiClient(config, key).testKey();
+  } catch (e) {
+    if (e instanceof KeyRefusedError) {
+      return { code: 1, stderr: `${e.message}\nThe key is not saved.` };
+    }
+    untested = (e as Error).message;
+  }
+  let limited: boolean;
+  try {
+    limited = await saveKey(file, key, platform, exec);
+  } catch (e) {
+    const reason = hideHome((e as Error).message, home);
+    return { code: 1, stderr: `Cannot save the key in ${shown}: ${reason}` };
+  }
+  // the real path: icacls does not read `~`, and this text is not for sharing
+  const access = limited
+    ? ", and only you can read it."
+    : `. Other users may be able to read it. To limit it, run: icacls "${file}" /inheritance:r /grant:r "${userInfo().username}:F"`;
+  if (untested !== undefined) {
+    return {
+      code: 1,
+      stderr: `${hideHome(untested, home)}\nThe key is saved in ${shown}, but it is not tested${access}\nTo test it later, run: ${NPX} doctor`,
+    };
+  }
+  const env = process.env;
+  return {
+    code: 0,
+    stdout: [
+      `The key works. It is saved in ${shown}${access}`,
+      ...(env.GARMIN_PERSONAL_API_KEY?.trim()
+        ? [
+            "GARMIN_PERSONAL_API_KEY is set, and it has priority over this file. Remove it to use this key.",
+          ]
+        : []),
+      ...(env.GARMIN_API_KEY_FILE
+        ? ["Set GARMIN_API_KEY_FILE in your MCP client too, or the server does not find this file."]
+        : []),
+      "",
+      "Now add the server to your MCP client:",
+      "  command: npx",
+      "  args:    -y @indaco/garmin-personal-mcp@latest",
+      "The steps for each client: https://github.com/indaco/garmin-personal-mcp#2-connect-your-client",
+      `To test the setup, run: ${NPX} doctor`,
+    ].join("\n"),
+  };
 }
 
 function lastLine(last: LastRun): string {

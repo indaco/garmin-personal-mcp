@@ -495,7 +495,7 @@ export class AutoRefresh {
     if (!existsSync(this.config.apiKeyFile)) {
       // the job must never hold the key, so it reads the key file
       throw new Error(
-        `Save the API key in ${this.config.apiKeyFile} first: a scheduled job cannot read the key from your MCP client`,
+        `Save the API key in ${this.config.apiKeyFile} first, with the setup command: a scheduled job cannot read the key from your MCP client`,
       );
     }
     const page = pageTarget(this.config.dataDir, o.path);

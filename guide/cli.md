@@ -7,6 +7,7 @@ stops. It does not start the MCP server.
 - [Run a command](#run-a-command)
 - [info](#info)
 - [doctor](#doctor)
+- [setup](#setup)
 - [refresh](#refresh)
 - [schedule](#schedule)
 - [--version and --help](#--version-and---help)
@@ -43,6 +44,7 @@ Without a command, the MCP server starts on stdin and stdout.
 Commands:
   info                                show the version, the settings and where the files are
   doctor                              test the API key, the folders and the schedule
+  setup [--force]                     test the API key and save it in the key file
   refresh [page.html]                 update a dashboard page
                                       (default: <data-dir>/garmin-dashboard.html)
   refresh --auto                      update the pages that have a schedule
@@ -118,6 +120,31 @@ ok      Schedule: Automatic refresh "0 7 * * *" with launchd, next: 2026-11-04 0
 
 `doctor` runs on macOS, Linux and Windows. The Windows steps are not tested.
 
+## setup
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest setup          # a new key file
+npx -y @indaco/garmin-personal-mcp@latest setup --force  # replace the key in the key file
+```
+
+`setup` asks for the key, tests it with Garmin and saves it in the key file (default
+`~/.config/garmin-mcp/api-key`, or `GARMIN_API_KEY_FILE`). It makes the folder when it is missing.
+At the end, it tells how to connect your MCP client.
+
+- The key stays hidden when you paste it. You can also give it on stdin. `setup` does not take the
+  key as an argument, because your shell keeps its arguments in the history.
+- Only you can read the file: mode 600 on macOS and Linux, an ACL with `icacls` on Windows. When
+  `icacls` fails, the key is saved and the output gives the command to run.
+- When the key file exists, `setup` stops before it asks for the key. Garmin shows a key only one
+  time, so `--force` loses the old key.
+- When Garmin refuses the key (HTTP 401 or 403), the key is not saved and an old key stays.
+- When the test fails for another reason, such as no network, the key is saved so that you do not
+  lose it. The exit code is 1. Run [`doctor`](#doctor) later to test it.
+- When `GARMIN_PERSONAL_API_KEY` is set, it has priority over the file. `setup` tells you. When you
+  set `GARMIN_API_KEY_FILE` in the terminal, set it in your MCP client too.
+
+`setup` runs on macOS, Linux and Windows. The Windows steps are not tested.
+
 ## refresh
 
 ```bash
@@ -170,10 +197,10 @@ npx -y @indaco/garmin-personal-mcp@latest schedule --help
 
 ## Exit codes
 
-| Code | Meaning                                                                                                                                                     |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0`  | the command worked                                                                                                                                          |
-| `1`  | the command failed, and the error is on stderr. `refresh` also gives 1 when a page failed. `doctor` gives 1 when a check failed, with the checks on stdout. |
+| Code | Meaning                                                                                                                                                                                                              |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`  | the command worked                                                                                                                                                                                                   |
+| `1`  | the command failed, and the error is on stderr. `refresh` also gives 1 when a page failed. `doctor` gives 1 when a check failed, with the checks on stdout. `setup` gives 1 when the key is not saved or not tested. |
 
 A word or a flag that is not a command prints the error and the help on stderr and gives 1. It does
 not start the MCP server.

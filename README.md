@@ -101,17 +101,15 @@ You do not use a terminal? Follow the
 
 1. Open Garmin Connect web at <https://connect.garmin.com/app/settings/personalApiToken>.
 2. Select _Create Key_, accept the terms, select the expiry (1 year at most) and select _Create_.
-3. Garmin shows the key **only one time**. Save it in a file that only you can read:
+3. Garmin shows the key **only one time**. Save it with the `setup` command. Paste the key at the
+   prompt: it stays hidden. `setup` tests the key with Garmin and saves it in a file that only you
+   can read (default `~/.config/garmin-mcp/api-key`, in your user folder on Windows):
 
 ```bash
-mkdir -p ~/.config/garmin-mcp
-nano ~/.config/garmin-mcp/api-key      # paste the key and save
-chmod 600 ~/.config/garmin-mcp/api-key
+npx -y @indaco/garmin-personal-mcp@latest setup
 ```
 
-On Windows, make the folder `.config\garmin-mcp` in your user folder. Save the key there with
-Notepad, in the file `api-key`. Select the type _All files_, so that Notepad does not add `.txt`.
-These Windows steps are not tested.
+`setup` runs on macOS, Linux and Windows. The Windows steps are not tested.
 
 You can also give the key in `GARMIN_PERSONAL_API_KEY`, in the `env` block of the client
 configuration ([example](guide/setup-claude-desktop.md#4-add-the-server-to-the-configuration-file)).
@@ -447,6 +445,7 @@ the MCP server.
 | ---------------------------------------- | -------------------------------------------------------------------------------- |
 | `info`                                   | shows the version, the settings and where the files are. It never shows the key. |
 | `doctor`                                 | tests the API key, the folders and the schedule. It never shows the key.         |
+| `setup [--force]`                        | tests the API key and saves it in a file that only you can read                  |
 | `refresh [page.html]`                    | updates a dashboard page one time                                                |
 | `schedule [daily\|weekdays\|weekly ...]` | shows, sets or stops the automatic update of a page                              |
 | `--version`, `-v`                        | shows the version                                                                |

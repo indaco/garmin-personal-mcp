@@ -20,6 +20,10 @@
 - **Dashboard in the chat**: each tool tells the client that only the assistant can call it (MCP
   Apps visibility `model`). A client that obeys this rule does not let the page in the chat, or a
   custom widget in it, call a tool.
+- **Key file**: `setup` reads the key from a hidden prompt or from stdin, never from an argument,
+  because a shell keeps its arguments in the history. It saves the file so that only you can read
+  it: mode 600 on macOS and Linux, an ACL with `icacls` on Windows. When `icacls` fails, the key is
+  saved and the output gives the command to run.
 - **Local data**: the data folder has your .FIT files. A .FIT file can have your GPS track, so
   keep the data folder private. `.gitignore` excludes `api-key`, `*.fit` and `*.zip` files.
 - **Paths**: `garminGet` accepts only a relative API path. It refuses a full URL and `..`, so
@@ -55,5 +59,7 @@ examples of problems in scope:
 
 - the key or the token goes to a log, to stdout, to a tool result or to a host other than Garmin
 - a tool argument makes the server send the token to a different host
-- the server reads or writes a file other than the key file, the log and the files in the data folder
+- the server reads or writes a file other than the key file, the log and the files in the data folder.
+  `doctor` also makes and removes an empty test folder, in the data and log folders or in their
+  nearest parent that exists
 - the server sends a request that changes data in Garmin Connect

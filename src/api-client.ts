@@ -4,7 +4,7 @@ import { log } from "./log";
 
 const TOKEN_PATH = "/personalapitoken-service/personal-api/personal-api-key/token";
 /** Where the user creates a new personal API key. */
-const KEY_PAGE_URL = "https://connect.garmin.com/app/settings/personalApiToken";
+export const KEY_PAGE_URL = "https://connect.garmin.com/app/settings/personalApiToken";
 const EXERCISE_CATALOGUE_URL = "https://connect.garmin.com/web-data/exercises/Exercises.json";
 /** Re-obtain the token a bit before the documented 24h validity. */
 const DEFAULT_TOKEN_TTL_MS = 23 * 3600_000;
@@ -13,8 +13,14 @@ export class GarminApiError extends Error {
   override name = "GarminApiError";
 }
 
+/** Garmin refuses the key, or it cannot be a key: another key is necessary. */
+export class KeyRefusedError extends GarminApiError {
+  override name = "KeyRefusedError";
+}
+
 /** The key, and where it comes from: the fix for a refused key is different for each source. */
 type ApiKey =
+  | { readonly key: string; readonly from: "given" }
   | { readonly key: string; readonly from: "env" }
   | { readonly key: string; readonly from: "file"; readonly file: string };
 
@@ -30,7 +36,11 @@ export class GarminApiClient {
   #expiresAt = 0;
   #pending: Promise<string> | undefined;
 
-  constructor(private readonly config: Config) {}
+  /** `givenKey` is a key to use before it is saved; without it, the environment or the key file. */
+  constructor(
+    private readonly config: Config,
+    private readonly givenKey?: string,
+  ) {}
 
   /** Asks Garmin for a token with the key. It throws the reason, without the key, on a failure. */
   async testKey(): Promise<void> {
@@ -158,11 +168,11 @@ export class GarminApiClient {
     const contentType = resp.headers.get("Content-Type") ?? "none";
     if (!resp.ok) {
       // the assistant shows this text to the user: it must tell how to recover
-      const fix =
-        resp.status === 401 || resp.status === 403
-          ? `the personal API key is incorrect, expired or revoked. ${replaceKey(source)}`
-          : "the Garmin token service did not answer correctly. Try again later.";
-      throw new GarminApiError(
+      const refused = resp.status === 401 || resp.status === 403;
+      const fix = refused
+        ? `the personal API key is incorrect, expired or revoked. ${replaceKey(source)}`
+        : "the Garmin token service did not answer correctly. Try again later.";
+      throw new (refused ? KeyRefusedError : GarminApiError)(
         `Token request failed: HTTP ${resp.status} (Content-Type: ${contentType}, body: ` +
           `${this.#preview(text, apiKey)}) - ${fix}`,
       );
@@ -226,6 +236,14 @@ export class GarminApiClient {
   }
 
   async #apiKey(): Promise<ApiKey> {
+    if (this.givenKey !== undefined) {
+      if (!isHeaderSafe(this.givenKey)) {
+        throw new KeyRefusedError(
+          "The key has spaces, line breaks or other characters that a key cannot have",
+        );
+      }
+      return { key: this.givenKey, from: "given" };
+    }
     const env = process.env.GARMIN_PERSONAL_API_KEY?.trim();
     if (env) {
       if (!isHeaderSafe(env)) {
@@ -260,6 +278,8 @@ export class GarminApiClient {
  */
 function replaceKey(source: ApiKey): string {
   switch (source.from) {
+    case "given":
+      return `Create a new key at ${KEY_PAGE_URL} and run setup again.`;
     case "file":
       return `Create a new key at ${KEY_PAGE_URL} and save it in ${source.file}: the next call uses it, no restart is necessary.`;
     case "env":
