@@ -2141,6 +2141,9 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     ]);
     expect(await page.textContent("[data-tab=alpineSkiing] span")).toBe("Alpine skiing");
     expect(await page.textContent("[data-tab=generic] span")).toBe("Other");
+    // a sport of an icon family has that icon, not the generic one of Other
+    const d = (tab: string) => page.getAttribute(`[data-tab=${tab}] path`, "d");
+    expect(await d("alpineSkiing")).not.toBe(await d("generic"));
   });
 
   it("gives a new sport the board of the Other tab", async () => {
