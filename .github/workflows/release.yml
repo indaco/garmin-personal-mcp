@@ -1,6 +1,6 @@
 name: Release
 
-# Release from an up-to-date main: sley bump auto && sley changelog merge && sley tag create --push
+# Release steps: CONTRIBUTING.md. A push of a tag vX.Y.Z starts this workflow.
 on:
   push:
     tags: ["v*"]
@@ -67,6 +67,8 @@ jobs:
     name: Build package
     needs: tag-validate
     runs-on: ubuntu-24.04
+    outputs:
+      sha256: ${{ steps.pack.outputs.sha256 }}
     permissions:
       contents: read
     steps:
@@ -117,10 +119,12 @@ jobs:
           '
 
       - name: Pack
+        id: pack
         # npm pack does not create the destination folder
         run: |
           mkdir -p out
           npm pack --pack-destination out
+          echo "sha256=$(sha256sum out/*.tgz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -129,8 +133,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # The check job of ci.yml, without the Codecov upload: a release publishes only what CI passes.
-  # Keep the two in step.
+  # The check job of ci.yml, without the Codecov upload. Keep the two in step.
   check:
     name: Check (Node ${{ matrix.node }})
     needs: tag-validate
@@ -183,10 +186,66 @@ jobs:
           test "$(printf '%s\n' "$out" | wc -l)" -eq 1
           printf '%s' "$out" | node -e 'JSON.parse(require("fs").readFileSync(0, "utf8"))'
 
-  # It can publish, so it runs no third-party action, no dependency install and no repo script.
+  # The os job of ci.yml: the built commands on each system. A published version cannot be replaced.
+  # Keep the two in step.
+  os:
+    name: ${{ matrix.os }} (Node ${{ matrix.node }})
+    needs: tag-validate
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-latest is the newest LTS. Here the latest images are the point: the commands must
+        # work on the systems that users have now
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [22, 26]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      # a release builds from scratch: no cache in a job of the release
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # the check job has the tests on Linux
+      - name: Test
+        if: runner.os != 'Linux'
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      # not a dev dependency: it has a native part, and only this job needs it. An exact version,
+      # because its install script runs on each CI and release run
+      - name: Install node-pty
+        shell: bash
+        run: npm install --prefix "$RUNNER_TEMP/pty" --no-audit --no-fund node-pty@1.1.0
+
+      # node-pty 1.1.0 installs this file without the execute bit: posix_spawnp failed.
+      # find does not fail when a later version has no such file
+      - name: Make the helper of node-pty executable
+        if: runner.os == 'macOS'
+        run: find "$RUNNER_TEMP/pty/node_modules/node-pty" -name spawn-helper -exec chmod +x {} +
+
+      - name: End-to-end test
+        shell: bash
+        # E2E_SECOND_USER makes a local account on Windows: a runner is thrown away after the job
+        run: E2E_SECOND_USER=1 E2E_PTY="$RUNNER_TEMP/pty/node_modules/node-pty" pnpm test:e2e
+
+  # After every job of ci.yml passes. It can publish, so it runs no third-party action, no dependency install and no repo script.
   publish:
     name: Publish to npm
-    needs: [build, check]
+    needs: [build, check, os]
     runs-on: ubuntu-24.04
     environment:
       name: Release
@@ -225,11 +284,15 @@ jobs:
 
       - name: Publish
         if: steps.exists.outputs.published != 'true'
+        env:
+          SHA256: ${{ needs.build.outputs.sha256 }}
         run: |
           set -euo pipefail
           shopt -s nullglob
           files=(out/*.tgz)
           [ "${#files[@]}" -eq 1 ] || { echo "::error::expected one tarball, got ${#files[@]}"; exit 1; }
+          # another job of this run runs third-party code: publish only the tarball of the build job
+          echo "${SHA256:?}  ${files[0]}" | sha256sum -c -
           # without ./ npm reads out/<name>.tgz as a GitHub user/repo
           npm publish "./${files[0]}" --access public
 
@@ -257,9 +320,9 @@ jobs:
             echo "::error::missing or empty changelog at $notes"
             exit 1
           fi
-          # edit when the release exists, so that a re-run is safe
+          # edit when the release exists, so that a re-run is safe; only a new release becomes Latest
           if gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            gh release edit "$TAG_NAME" --title "$TAG_NAME" --latest --notes-file "$notes"
+            gh release edit "$TAG_NAME" --title "$TAG_NAME" --notes-file "$notes"
           else
             gh release create "$TAG_NAME" --verify-tag --title "$TAG_NAME" --latest --notes-file "$notes"
           fi

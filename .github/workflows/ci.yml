@@ -126,10 +126,11 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # not a dev dependency: it has a native part, and only this job needs it
+      # not a dev dependency: it has a native part, and only this job needs it. An exact version,
+      # because its install script runs on each CI and release run
       - name: Install node-pty
         shell: bash
-        run: npm install --prefix "$RUNNER_TEMP/pty" --no-audit --no-fund node-pty@latest
+        run: npm install --prefix "$RUNNER_TEMP/pty" --no-audit --no-fund node-pty@1.1.0
 
       # node-pty 1.1.0 installs this file without the execute bit: posix_spawnp failed.
       # find does not fail when a later version has no such file
