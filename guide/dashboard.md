@@ -71,7 +71,7 @@ This also happens with an older server. See [Update the page code after a releas
 
 After an update that writes new page code, the page shows a note on the board, one time in each
 browser. The note gives the server version, the preset widgets that the update added to the boards that you edited, and a link to the
-release notes. An update to an older version with other page code does not show the note and removes the record. Select **Close** to hide it. The dashboard in the chat does not show the note.
+[What's new](https://garmin-personal-mcp.indaco.dev/whats-new.html) page of the website. An update to an older version with other page code does not show the note and removes the record. Select **Close** to hide it. The dashboard in the chat does not show the note.
 
 The first update sends approximately 35 requests to Garmin. Later updates use the local cache and
 send approximately 8.

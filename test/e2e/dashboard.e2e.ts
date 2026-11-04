@@ -2740,7 +2740,8 @@ describe("new in this version", () => {
     expect(text).toContain("This page now uses version 0.7.0 of garmin-personal-mcp.");
     expect(text).toContain("New widgets on your boards:");
     expect(await page.innerText(`${note} li`)).toBe("Run: Workout trend");
-    expect(await page.getAttribute(`${note} a`, "href")).toMatch(/\/releases$/);
+    const { url } = JSON.parse(readFileSync("site/site.json", "utf8"));
+    expect(await page.getAttribute(`${note} a`, "href")).toBe(`${url}whats-new.html`);
     expect(await page.$(`${note} button[class~=btn]`)).not.toBeNull();
     expect(errors).toEqual([]);
   });
