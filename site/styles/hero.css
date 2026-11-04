@@ -251,6 +251,7 @@ section.block {
   flex-direction: column;
   gap: 16px;
   margin-bottom: 48px;
+  & h1,
   & h2 {
     font-weight: 300;
     font-size: clamp(38px, 4.2vw, 60px);

@@ -126,7 +126,7 @@ Where each part of the server and the page is.
 | `scripts/demo-gif.mjs`               | records `assets/dashboard.gif` and `assets/dashboard-chat.webp` from the demo data   |
 | `scripts/demo-stamp.mjs`             | the hash of the inputs of the demo images, in `assets/dashboard.gif.sha256`          |
 | `site/`                              | the project website: template, partials, styles, script and public files             |
-| `scripts/build-site.mjs`             | writes `dist-site/`: the website, with its facts from the code and README            |
+| `scripts/build-site.mjs`             | writes `dist-site/`: the website, with facts from code, README and `.changes/`       |
 
 ## Before you submit
 
@@ -222,14 +222,16 @@ catalogue has every key and every placeholder of English.
 Release from an up-to-date `main` with a clean tree.
 
 1. Run `pnpm lint && pnpm test`.
-2. Run `sley bump auto && sley changelog merge`. In `.changes/<TAG>.md`, paste the
-   [upgrade text](#upgrade-text) above the first `###` heading. If you want highlights, put them
-   above that text.
+2. Run `sley bump auto && sley changelog merge`. In `.changes/<TAG>.md`, write the
+   [highlights](#highlights) and paste the [upgrade text](#upgrade-text) below them, above the first
+   changelog heading. A test fails without them.
 3. Branch protection blocks a push to `main`, so open a PR. Create a branch, commit `.version`,
    `package.json`, `CHANGELOG.md` and `.changes/` as `chore(release): vX.Y.Z`, push it and open
    the PR with the same title: the squash merge uses the title as the commit message.
 4. After the merge, switch to `main` and pull. The tag must point to the release commit on `main`.
 5. Run `sley tag create --push`.
+6. Deploy the website. No workflow does this, and the What's new page shows only the releases of the
+   last deploy.
 
 The first version, 0.1.0, was published by hand. Its notes in `.changes/v0.1.0.md` are written by
 hand, because `sley bump` writes the notes file and 0.1.0 needs no bump.
@@ -241,6 +243,23 @@ publishing and skips a version that is already on npm. It creates the GitHub Rel
 If `tag-validate` fails, nothing was published. Delete the tag (`git push --delete origin <TAG>`,
 `git tag -d <TAG>`), fix the problem and tag again. After a publish, a version cannot be replaced.
 Fix forward with a new patch version, and use `npm deprecate` for a bad one.
+
+### Highlights
+
+The website shows the highlights on its What's new page, for readers who do not use GitHub. Write
+for these readers: tell what they can do now, not how the code changed.
+
+```markdown
+### Highlights
+
+One line that gives the themes of the release.
+
+- **A bold lead-in.** What the reader can do now.
+```
+
+The page shows the text from `### Highlights` to the next heading or `---`. It accepts paragraphs,
+`- ` bullets, `**bold**`, `` `code` `` and `[links](https://...)`. Other Markdown stops the build of
+the website.
 
 ### Upgrade text
 
@@ -268,6 +287,8 @@ This command updates `garmin-dashboard.html`. For another page, add its file nam
 The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
 
 If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
 ````
 
 ## License

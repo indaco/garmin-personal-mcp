@@ -5,7 +5,10 @@
   .head,
   .dash .head,
   .shot,
-  .facts {
+  .facts,
+  .update,
+  .release-head,
+  .release-text {
     grid-column: 1 / -1;
   }
   .sportfield {
@@ -23,6 +26,9 @@
   }
   .tools {
     columns: 1;
+  }
+  .release-text {
+    margin-top: 12px;
   }
 }
 @media (max-width: 720px) {

@@ -49,13 +49,14 @@ afterAll(async () => {
 /** The site in a new context; `errors` collects the page errors. */
 async function site(
   options: BrowserContextOptions = {},
+  path = "",
 ): Promise<{ page: Page; errors: string[] }> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ...options });
   const page = await context.newPage();
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   // "load", not "networkidle": the web fonts come from Google and may be slow
-  await page.goto(base, { waitUntil: "load" });
+  await page.goto(`${base}${path}`, { waitUntil: "load" });
   return { page, errors };
 }
 
@@ -110,6 +111,78 @@ describe("site accessibility", () => {
         width,
         width,
       ]);
+    }
+  });
+});
+
+describe("what's new page", () => {
+  const WHATS_NEW = "whats-new.html";
+
+  for (const colorScheme of ["light", "dark"] as const) {
+    it(`has no WCAG 2.2 AA problem in ${colorScheme} mode, on a desktop and on a phone with the menu open`, async () => {
+      const { page, errors } = await site({ colorScheme }, WHATS_NEW);
+      expect(await problems(page)).toEqual([]);
+      await page.setViewportSize({ width: 390, height: 844 });
+      expect(await problems(page)).toEqual([]);
+      await page.click("#menu");
+      expect(await problems(page)).toEqual([]);
+      expect(errors).toEqual([]);
+    });
+  }
+
+  it("does not scroll sideways from a small phone to a desktop", async () => {
+    const { page } = await site({}, WHATS_NEW);
+    for (const width of [320, 375, 390, 430, 768, 1000, 1100, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      expect([width, await page.evaluate(() => document.documentElement.scrollWidth)]).toEqual([
+        width,
+        width,
+      ]);
+    }
+  });
+
+  it("keeps the header links on one line where the menu button is not shown", async () => {
+    const { page } = await site();
+    for (const width of [901, 1000, 1100, 1101]) {
+      await page.setViewportSize({ width, height: 900 });
+      if (await page.isVisible("#menu")) continue;
+      const tops = await page.$$eval("#site-nav a", (as) =>
+        as.map((a) => Math.round(a.getBoundingClientRect().top)),
+      );
+      expect([width, new Set(tops).size]).toEqual([width, 1]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+    }
+  });
+
+  it("opens a section of the home page from the header, and comes back from the home page", async () => {
+    const { page, errors } = await site({}, WHATS_NEW);
+    await page.click('#site-nav a[href="index.html#tools"]');
+    await page.waitForURL(/index\.html#tools$/);
+    expect(await page.isVisible("#tools")).toBe(true);
+    await page.click('#site-nav a[href="whats-new.html"]');
+    await page.waitForURL(/whats-new\.html$/);
+    expect(await page.isVisible("#update")).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  it("stops a link to a release below the header that stays at the top", async () => {
+    const { page } = await site({}, WHATS_NEW);
+    const id = await page.$eval("article", (a) => a.id);
+    await page.goto(`${base}${WHATS_NEW}#${id}`, { waitUntil: "load" });
+    await expect.poll(() => topOf(page, id)).toBeGreaterThan(0);
+    const bar = await page.$eval(".site-bar", (b) => b.getBoundingClientRect().bottom);
+    expect(await topOf(page, id)).toBeGreaterThanOrEqual(Math.floor(bar));
+  });
+
+  it("opens each link out of the site in a new tab, and says so", async () => {
+    const { page } = await site({}, WHATS_NEW);
+    const links = await page.$$eval("main a[href^='http']", (as) =>
+      as.map((a) => [a.getAttribute("target"), a.getAttribute("rel"), a.textContent?.trim()]),
+    );
+    expect(links.length).toBeGreaterThan(2);
+    for (const [target, rel, text] of links) {
+      expect([text, target, rel]).toEqual([text, "_blank", "noopener"]);
+      expect(text).toMatch(/\(opens in a new tab\)$/);
     }
   });
 });
@@ -172,7 +245,7 @@ describe("site header", () => {
     const { page } = await site({ viewport: { width: 390, height: 844 } });
     await page.click("#menu");
     expect(await page.getAttribute("#menu", "aria-expanded")).toBe("true");
-    expect(await page.$$eval("#site-nav a", (links) => links.length)).toBe(7);
+    expect(await page.$$eval("#site-nav a", (links) => links.length)).toBe(8);
     await page.keyboard.press("Escape");
     expect(await page.isVisible("#site-nav")).toBe(false);
     expect(await focused(page)).toBe("menu");
