@@ -19,12 +19,6 @@ stops. It does not start the MCP server.
 npx -y @indaco/garmin-personal-mcp@latest <command>
 ```
 
-After `npm install -g @indaco/garmin-personal-mcp`, the command is shorter:
-
-```bash
-garmin-personal-mcp <command>
-```
-
 A command reads the same environment variables as the server (see
 [Configuration](../README.md#configuration)). It reads them from your terminal, not from your MCP
 client configuration. When your client configuration sets `GARMIN_DATA_DIR` or another variable,
@@ -154,8 +148,10 @@ npx -y @indaco/garmin-personal-mcp@latest refresh garmin-dashboard-coach.html  #
 ```
 
 `refresh` updates a dashboard page with new data, one time, as `training-dashboard-update` does. It
-keeps the layout, the custom widgets, the languages and the page settings. A relative path is in
-the data folder. It needs the API key, from `GARMIN_PERSONAL_API_KEY` or from the key file.
+keeps the layout, the custom widgets, the languages and the page settings. It removes the coach
+notes, because old notes do not agree with the new data. To get new notes, run the
+`training-dashboard-update` prompt. A relative path is in the data folder. It needs the API key,
+from `GARMIN_PERSONAL_API_KEY` or from the key file.
 
 The job of the automatic update runs `refresh --auto`. It updates the pages that have a schedule,
 only when a run time was missed. Do not run it yourself.

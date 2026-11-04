@@ -659,7 +659,8 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
     "getActivity",
     {
       _meta: MODEL_ONLY,
-      description: "Get the full detail of one activity (summary, metadata, splits/laps) as JSON.",
+      description:
+        "Get the full detail of one activity (summary, metadata and segments by type) as JSON.",
       inputSchema: z.object({ activityId }),
     },
     async (a) => text(await tools.getActivity(a.activityId)),

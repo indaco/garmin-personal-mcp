@@ -68,8 +68,9 @@ other widgets work. A widget with a syntax error shows the error the same way.
 ## Safety
 
 A custom widget runs in your page, as the built-in widgets do. It can read the data of the page and
-draw in its tile. The assistant writes it only when you ask, and the server stores it only in your
-page. Read the code in the page file if you want to see it.
+draw in its tile. The assistant writes it only when you ask, and the server stores it in your
+page and in your widget library (`widgets.json`). Each page from the template gets the library,
+also a page that you share. Read the code in the page file if you want to see it.
 
 ## The widget API
 

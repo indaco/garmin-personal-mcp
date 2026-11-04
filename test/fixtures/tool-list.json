@@ -193,7 +193,7 @@
   },
   {
     "name": "getActivity",
-    "description": "Get the full detail of one activity (summary, metadata, splits/laps) as JSON.",
+    "description": "Get the full detail of one activity (summary, metadata and segments by type) as JSON.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
