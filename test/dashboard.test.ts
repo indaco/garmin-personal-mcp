@@ -23,7 +23,9 @@ import {
 } from "../src/dashboard";
 import { filterData } from "../src/dashboard-page";
 import { addDays } from "../src/dates";
-import { groupOf } from "../src/page/calc";
+import { digest } from "../src/digest";
+import { groupOf, weeksOf } from "../src/page/calc";
+import { periodWindow } from "../src/page/metrics";
 import { GarminTools, writeAtomically } from "../src/tools";
 import { fitFile } from "./fit-file";
 
@@ -285,6 +287,33 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe("the period", () => {
+  it.each([
+    ["Monday", new Date(2026, 9, 26, 12)],
+    ["Wednesday", new Date(2026, 9, 28, 12)],
+    ["Sunday", new Date(2026, 10, 1, 12)],
+  ])("starts on a Monday when today is a %s", async (_day, now) => {
+    vi.setSystemTime(now);
+    const out = JSON.parse(await dashboard.getDashboardData(2));
+    expect(out).toMatchObject({
+      start: "2026-10-12",
+      prevEnd: "2026-10-11",
+      prevStart: "2026-09-21",
+    });
+  });
+
+  it("splits the activities at the Monday and has no partial week", async () => {
+    vi.setSystemTime(new Date(2026, 9, 28, 12));
+    garminActivities = [activity(1, "2026-10-12"), activity(2, "2026-10-11")];
+    const out = JSON.parse(await dashboard.getDashboardData(2));
+    expect(out.activities.map((a: { id: number }) => a.id)).toEqual([1]);
+    expect(out.previousActivities.map((a: { id: number }) => a.id)).toEqual([2]);
+    const weeks = weeksOf(out.start, out.end);
+    expect(periodWindow(weeks[0], weeks.at(-1)!, out.prevStart).partial).toBe(false);
+    expect(Object.values(digest(out).weekly).some((w) => w.partial)).toBe(false);
+  });
 });
 
 describe("jsonByLines", () => {

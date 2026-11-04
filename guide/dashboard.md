@@ -252,7 +252,7 @@ in the order of their keys. Other is always the last tab.
 [The widget catalogue](widgets.md) lists every widget, with what it shows and how it calculates.
 
 Above the boards is **the week window**: the last 4, 8 or 12 weeks, all the weeks, or a first and a
-last week. Every widget about training follows the window. The widgets about today do not follow it:
+last week. The page has whole weeks: its data starts on the Monday of its first week. Every widget about training follows the window. The widgets about today do not follow it:
 readiness, fitness age and the 14-day recovery widgets. On a phone the window folds into one control,
 for example **Weeks: Last 12**, and the header stays at the top while you scroll.
 
