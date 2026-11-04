@@ -76,8 +76,15 @@ Copy and paste the text. Do not type it: TextEdit can change straight quotes to 
 
 This file keeps your key as plain text, and the
 [automatic dashboard update](dashboard.md#update-the-dashboard-on-a-schedule) cannot read it there.
-If you can use a terminal, run `npx -y @indaco/garmin-personal-mcp@latest setup` and leave out the
-`env` line. See [setup](cli.md#setup).
+If you can use a terminal, keep the key in a file that only you can read
+([setup](cli.md#setup)):
+
+1. Open Terminal (macOS) or Command Prompt (Windows).
+2. Run `npx -y @indaco/garmin-personal-mcp@latest setup`.
+3. Paste the key at the prompt. The key stays hidden, so you see nothing when you paste it.
+4. In the configuration file, remove the `env` line. Also remove the comma at the end of the `args`
+   line.
+5. Save the file.
 
 ## 5. Restart Claude Desktop
 
@@ -114,8 +121,10 @@ For a page for your coach, select the prompt _dashboard-setup_. The
 
 ## Limits of this setup
 
-- The key is in the configuration file. The
-  [automatic dashboard update](dashboard.md#update-the-dashboard-on-a-schedule) reads only the key
-  file. To use the automatic update, do step 1 of the [quick start](../README.md#quick-start).
-- When the key expires, create a new key. Replace the old key in the file and restart Claude
-  Desktop.
+- The [automatic dashboard update](dashboard.md#update-the-dashboard-on-a-schedule) reads only the
+  key file, not the configuration file. To use it, do the terminal steps at the end of
+  [step 4](#4-add-the-server-to-the-configuration-file), then restart Claude Desktop. A key in the
+  `env` line has priority over the key file, so remove that line.
+- When the key expires, create a new key. If the key is in the configuration file, replace it there
+  and restart Claude Desktop. If the key is in the key file, run
+  `npx -y @indaco/garmin-personal-mcp@latest setup --force`. You do not restart.
