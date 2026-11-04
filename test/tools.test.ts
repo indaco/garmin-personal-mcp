@@ -1,9 +1,14 @@
 import {
+  chmodSync,
   existsSync,
+  lstatSync,
+  mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   statSync,
+  symlinkSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
@@ -19,7 +24,7 @@ import { GarminApiError, type GarminApiClient } from "../src/api-client";
 import { registerDashboard, type GarminDashboard } from "../src/dashboard";
 import { registerDashboardWriter, type DashboardWriter } from "../src/dashboard-page";
 import { createServer } from "../src/server";
-import { firstArray, GarminTools, registerTools, summarize } from "../src/tools";
+import { firstArray, GarminTools, registerTools, summarize, writeAtomically } from "../src/tools";
 import { log } from "../src/log";
 import { fitFile } from "./fit-file";
 import toolList from "./fixtures/tool-list.json";
@@ -1316,5 +1321,169 @@ describe("MCP tools", () => {
         { uri, mimeType: "text/html;profile=mcp-app", text: "<html>page</html>" },
       ]);
     });
+  });
+});
+
+/** The permission bits of a file. */
+const mode = (f: string) => statSync(f).mode & 0o7777;
+
+describe("writeAtomically", () => {
+  const win = process.platform === "win32";
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "garmin-atomic-"));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it.skipIf(win)("keeps the mode of an existing file", async () => {
+    const f = join(dir, "a.html");
+    writeFileSync(f, "old");
+    chmodSync(f, 0o600);
+    await writeAtomically(f, "new");
+    expect(mode(f)).toBe(0o600);
+    expect(readFileSync(f, "utf8")).toBe("new");
+  });
+
+  it.skipIf(win)("keeps a mode that the umask would change", async () => {
+    const f = join(dir, "a.html");
+    writeFileSync(f, "old");
+    chmodSync(f, 0o664);
+    await writeAtomically(f, "new");
+    expect(mode(f)).toBe(0o664);
+  });
+
+  it.skipIf(win)("writes through a link", async () => {
+    const real = join(dir, "real.html");
+    const link = join(dir, "page.html");
+    writeFileSync(real, "old");
+    symlinkSync(real, link);
+    await writeAtomically(link, "new");
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(readFileSync(real, "utf8")).toBe("new");
+  });
+
+  it.skipIf(win)("puts the temp file next to the real file", async () => {
+    const a = join(dir, "a");
+    const b = join(dir, "b");
+    mkdirSync(a);
+    mkdirSync(b);
+    writeFileSync(join(b, "real.html"), "old");
+    symlinkSync(join(b, "real.html"), join(a, "page.html"));
+    await writeAtomically(join(a, "page.html"), "new");
+    expect(readdirSync(a)).toEqual(["page.html"]);
+    expect(lstatSync(join(a, "page.html")).isSymbolicLink()).toBe(true);
+    expect(readdirSync(b)).toEqual(["real.html"]);
+    expect(readFileSync(join(b, "real.html"), "utf8")).toBe("new");
+  });
+
+  it.skipIf(win)("writes through a link in a read-only folder", async () => {
+    const a = join(dir, "a");
+    const b = join(dir, "b");
+    mkdirSync(a);
+    mkdirSync(b);
+    writeFileSync(join(b, "real.html"), "old");
+    symlinkSync(join(b, "real.html"), join(a, "page.html"));
+    chmodSync(a, 0o555);
+    try {
+      await writeAtomically(join(a, "page.html"), "new");
+    } finally {
+      chmodSync(a, 0o755);
+    }
+    expect(readFileSync(join(b, "real.html"), "utf8")).toBe("new");
+  });
+
+  it("gives a new file the default mode, and makes a missing parent folder", async () => {
+    const plain = join(dir, "plain.html");
+    writeFileSync(plain, "");
+    const f = join(dir, "sub", "deeper", "new.html");
+    await writeAtomically(f, "new");
+    expect(readFileSync(f, "utf8")).toBe("new");
+    if (!win) expect(mode(f)).toBe(mode(plain));
+  });
+
+  it("leaves no temp file when the rename fails", async () => {
+    // a folder with a file in it cannot be replaced by a file
+    const target = join(dir, "a.html");
+    mkdirSync(target);
+    writeFileSync(join(target, "x"), "");
+    await expect(writeAtomically(target, "data")).rejects.toThrow();
+    expect(readdirSync(dir)).toEqual(["a.html"]);
+    expect(readdirSync(target)).toEqual(["x"]);
+  });
+
+  it.skipIf(win)("follows a chain of links", async () => {
+    const real = join(dir, "real.html");
+    writeFileSync(real, "old");
+    symlinkSync(real, join(dir, "b.html"));
+    symlinkSync(join(dir, "b.html"), join(dir, "a.html"));
+    await writeAtomically(join(dir, "a.html"), "new");
+    expect(lstatSync(join(dir, "a.html")).isSymbolicLink()).toBe(true);
+    expect(lstatSync(join(dir, "b.html")).isSymbolicLink()).toBe(true);
+    expect(readFileSync(real, "utf8")).toBe("new");
+  });
+
+  it.skipIf(win)("replaces a dangling link with a file, as before", async () => {
+    const link = join(dir, "page.html");
+    symlinkSync(join(dir, "missing.html"), link);
+    await writeAtomically(link, "new");
+    expect(lstatSync(link).isSymbolicLink()).toBe(false);
+    expect(readFileSync(link, "utf8")).toBe("new");
+    expect(existsSync(join(dir, "missing.html"))).toBe(false);
+  });
+
+  it.skipIf(win)("writes into a folder that is a link", async () => {
+    const real = join(dir, "real");
+    mkdirSync(real);
+    const page = join(real, "page.html");
+    writeFileSync(page, "old");
+    chmodSync(page, 0o600);
+    symlinkSync(real, join(dir, "linked"));
+    await writeAtomically(join(dir, "linked", "page.html"), "new");
+    expect(lstatSync(join(dir, "linked")).isSymbolicLink()).toBe(true);
+    expect(readFileSync(page, "utf8")).toBe("new");
+    expect(mode(page)).toBe(0o600);
+    expect(readdirSync(real)).toEqual(["page.html"]);
+  });
+
+  it.skipIf(win)("keeps a read-only mode", async () => {
+    const f = join(dir, "a.html");
+    writeFileSync(f, "old");
+    chmodSync(f, 0o400);
+    await writeAtomically(f, "new");
+    expect(mode(f)).toBe(0o400);
+    expect(readFileSync(f, "utf8")).toBe("new");
+  });
+
+  it.skipIf(win)("does not keep setuid", async () => {
+    const f = join(dir, "a.html");
+    writeFileSync(f, "old");
+    chmodSync(f, 0o4755);
+    await writeAtomically(f, "new");
+    expect(mode(f)).toBe(0o755);
+  });
+
+  it.skipIf(win)("on Windows, only writeFile sets the mode", async () => {
+    const original = Object.getOwnPropertyDescriptor(process, "platform") as PropertyDescriptor;
+    Object.defineProperty(process, "platform", { ...original, value: "win32" });
+    try {
+      const secret = join(dir, "private.html");
+      writeFileSync(secret, "old");
+      chmodSync(secret, 0o600);
+      await writeAtomically(secret, "new");
+      expect(mode(secret)).toBe(0o600);
+
+      const wide = join(dir, "wide.html");
+      writeFileSync(wide, "old");
+      chmodSync(wide, 0o666);
+      await writeAtomically(wide, "new");
+      const other = join(dir, "other.html");
+      writeFileSync(other, "", { mode: 0o666 });
+      // the umask applies, because chmod did not run
+      expect(mode(wide)).toBe(mode(other));
+    } finally {
+      Object.defineProperty(process, "platform", original);
+    }
   });
 });
