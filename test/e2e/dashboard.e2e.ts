@@ -228,6 +228,33 @@ async function cyclingAscent(activities: unknown[]): Promise<{ text: string | nu
   return { text, page };
 }
 
+/** A ride on a trainer, with a distance or without. */
+const indoorRide = (n: number, start: string, km?: number) => ({
+  id: 800 + n,
+  name: "Ride",
+  type: "indoor_cycling",
+  sport: "cycling",
+  duration: "45:00",
+  start: `${start} 09:00:00`,
+  ...(km === undefined ? {} : { km }),
+});
+/** The value and the number of lines under it of the "Distance" tile of the cycling board. */
+async function distanceTile(activities: unknown[]) {
+  const { page, errors } = await open(
+    browser,
+    pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }),
+    { hash: "#cycling" },
+  );
+  expect(errors).toEqual([]);
+  const tile = page.locator("[data-id=typeKpis] .kpi", {
+    has: page.locator(".kpi-label", { hasText: "Distance" }),
+  });
+  return {
+    value: await tile.locator(".kpi-value").textContent(),
+    sub: await tile.locator(".kpi-sub").count(),
+  };
+}
+
 describe("the page", () => {
   it("keeps the template small", () => {
     // minified, with only the Chart.js parts the page uses: Chart.js is most of it, and the page
@@ -1495,7 +1522,7 @@ describe("type boards", () => {
     });
     // week A: no ascent data; week B: a real 0 m; week C: 120 m and one ride without data
     const weekA = [ride(1, "2026-10-06"), ride(2, "2026-10-08")];
-    const weekB = [ride(3, "2026-10-13", 0), ride(4, "2026-10-15", 0)];
+    const weekB = [ride(3, "2026-10-13", 0), indoorRide(4, "2026-10-15", 0)];
     const weekC = [ride(5, "2026-10-20", 120), ride(6, "2026-10-22")];
     expect((await cyclingAscent(weekA)).text).toBe("n/a");
     expect((await cyclingAscent(weekB)).text).toBe("0 m");
@@ -1504,6 +1531,73 @@ describe("type boards", () => {
     // 13 weeks: no ride in the first 9 and the 13th; A is a gap, B a real 0, C the known 120
     const bars = await chartDataset(all.page, "bikeDetails", "Weekly ascent");
     expect(bars.data).toEqual([...Array.from({ length: 10 }, () => null), 0, 120, null]);
+  });
+
+  it("shows n/a for the cycling distance without a distance, and keeps a real km", async () => {
+    // no ride has a distance: n/a and no "vs 4 weeks" line
+    expect(await distanceTile([indoorRide(1, "2026-10-20")])).toEqual({ value: "n/a", sub: 0 });
+    // a real distance, with its line
+    expect(await distanceTile([indoorRide(2, "2026-10-20", 12)])).toEqual({
+      value: "12.0 km",
+      sub: 1,
+    });
+    // one ride with and one without: the known km, and the line
+    expect(
+      await distanceTile([indoorRide(3, "2026-10-20", 12), indoorRide(4, "2026-10-21")]),
+    ).toEqual({
+      value: "12.0 km",
+      sub: 1,
+    });
+  });
+
+  it("shows n/a in the racket table for no zone time, and a real 0 for easy zones only", async () => {
+    const base = data.activities.find((a: Record<string, unknown>) => a.type === "paddelball");
+    const padel = (n: number, extra: Record<string, unknown>) => ({
+      ...without(base, ["hrZonesSec", "avgHR"]),
+      id: 700 + n,
+      start: `2026-10-2${n} 20:00:00`,
+      ...extra,
+    });
+    const rows = [
+      padel(1, { hrZonesSec: [0, 0, 0, 0, 0] }),
+      padel(2, { hrZonesSec: [600, 0, 600, 600, 600] }),
+      padel(3, { hrZonesSec: [600, 0, 0, 0, 0] }),
+      padel(4, {}),
+    ];
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: rows } }),
+      { hash: "#racket" },
+    );
+    const cells = await page.$$eval("[data-id=racketDetails] tbody tr", (r) =>
+      r.map((x) => `${x.children[6].textContent}|${x.children[7].textContent}`),
+    );
+    expect(errors).toEqual([]);
+    // the order of the rows does not matter here
+    expect(cells.toSorted()).toEqual(["0 min|0%", "30 min|50%", "n/a|n/a", "n/a|n/a"]);
+  });
+
+  it("observes the tab bar once, however often the page is drawn again", async () => {
+    const { page, errors } = await open(browser, pageFile(), {
+      init: `(() => {
+        const Native = window.ResizeObserver;
+        const live = new Set();
+        window.tabBars = () =>
+          [...live].flatMap((o) => [...o.els]).filter((el) => el.matches('[role="tablist"]')).length;
+        window.ResizeObserver = class extends Native {
+          els = new Set();
+          observe(el) { this.els.add(el); live.add(this); super.observe(el); }
+          disconnect() { live.delete(this); super.disconnect(); }
+        };
+      })();`,
+    });
+    for (const tab of ["running", "strengthTraining", "cycling"]) {
+      await page.click(`[data-tab=${tab}]`);
+    }
+    expect(
+      await page.evaluate(() => (window as unknown as { tabBars: () => number }).tabBars()),
+    ).toBe(1);
+    expect(errors).toEqual([]);
   });
 
   it("shows the grit and flow of mountain-bike rides, ride after ride", async () => {

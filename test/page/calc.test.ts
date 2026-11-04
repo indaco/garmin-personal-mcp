@@ -8,6 +8,7 @@ import {
   groupsIn,
   isIndoor,
   isLate,
+  isRunning,
   mondayOf,
   named,
   seconds,
@@ -275,5 +276,23 @@ describe("late automatic refresh", () => {
     expect(isLate(undefined, at(600))).toBe(false);
     expect(isLate("", at(600))).toBe(false);
     expect(isLate("tomorrow", at(600))).toBe(false);
+  });
+});
+
+describe("isRunning", () => {
+  it("finds a run by its board, and falls back to the type key without a sport", () => {
+    expect(isRunning({ type: "virtual_run", sport: "running" })).toBe(true);
+    expect(isRunning({ type: "treadmill_running" })).toBe(true);
+    expect(isRunning({ type: "x_running", sport: null } as never)).toBe(true);
+    expect(isRunning({ type: "x_running", sport: "" })).toBe(true);
+    expect(isRunning({ type: "x_running", sport: 5 } as never)).toBe(true);
+    expect(isRunning({ type: "running", sport: "cycling" })).toBe(false);
+    expect(isRunning({ type: "cycling", sport: "cycling" })).toBe(false);
+    expect(isRunning({})).toBe(false);
+  });
+
+  it("does not throw on a type or sport that is not a text", () => {
+    expect(isRunning({ type: 5 } as never)).toBe(false);
+    expect(isRunning({ type: 5, sport: 5 } as never)).toBe(false);
   });
 });

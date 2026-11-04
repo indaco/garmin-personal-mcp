@@ -55,6 +55,8 @@ register({
     const vs = (now: number, before: number) =>
       h("span", {}, delta(ctx, calc.change(now, before / 4)), " ", t("kpi.vs4w"));
     const hasDistance = ctx.type !== "all" && DISTANCE.has(ctx.type);
+    // rides without a distance give n/a, not 0 km
+    const known = acts.some((a) => typeof a.km === "number");
     // rides without ascent data give n/a, not flat riding
     const climbs = acts.map((a) => a.ascentM).filter((v): v is number => typeof v === "number");
     const ascent = climbs.length > 0 ? climbs.reduce((s, v) => s + v, 0) : undefined;
@@ -65,7 +67,8 @@ register({
         fmt.hours(sum.seconds),
         t("tk.avg", { v: fmt.hours(sum.seconds / sum.sessions) }),
       ),
-      hasDistance && kpi(t("tk.distance"), fmt.dist(sum.km), vs(week.km, base.km)),
+      hasDistance &&
+        kpi(t("tk.distance"), known ? fmt.dist(sum.km) : fmt.na, known && vs(week.km, base.km)),
       hasDistance &&
         timed.km > 0 &&
         (ctx.type === "cycling"
