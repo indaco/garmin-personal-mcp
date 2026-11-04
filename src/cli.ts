@@ -1,5 +1,5 @@
 import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
-import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
@@ -71,7 +71,8 @@ Flags:
   doctor: `Usage: garmin-personal-mcp doctor
 
 Test the setup, and tell how to fix what fails. It tests the key file, the API key with
-a token request to Garmin, the data folder, the log folder and the schedule.
+a token request to Garmin, the data folder, the log folder and the schedule. With a schedule
+and a key in the environment, it also tests the key in the key file.
 It never shows the key. The exit code is 1 when a check fails.
 
 Flags:
@@ -369,6 +370,17 @@ function scheduleCheck(status: Status | Error): Check {
   return { ok: true, name, text: summary(status).split("\n")[0] };
 }
 
+/** The job reads only the key file: with another key in the environment, the test of the API key says nothing about it. */
+async function scheduleKeyCheck(config: Config): Promise<Check> {
+  const name = "Key of the schedule";
+  const key = (await readFile(config.apiKeyFile, "utf8").catch(() => "")).trim();
+  if (!key) return { ok: false, name, text: `${config.apiKeyFile} has no key` };
+  return new GarminApiClient(config, key).testKey().then(
+    () => ({ ok: true, name, text: "Garmin accepts the key in the key file" }),
+    (e: Error) => ({ ok: false, name, text: e.message }),
+  );
+}
+
 /**
  * The text of `doctor`: each check with `ok` or `failed`, and the fix. It never shows the key.
  * The exit code is 1 when a check fails. It runs on macOS, Linux and Windows.
@@ -392,6 +404,9 @@ export async function doctor(
   const checks = [
     keyFileCheck(config.apiKeyFile, scheduled, platform, home),
     apiKey,
+    ...(scheduled && process.env.GARMIN_PERSONAL_API_KEY?.trim() && existsSync(config.apiKeyFile)
+      ? [await scheduleKeyCheck(config)]
+      : []),
     folderCheck("Data folder", config.dataDir),
     folderCheck("Log folder", join(home, LOG_DIR)),
     scheduleCheck(status),
@@ -500,6 +515,13 @@ export async function setup(
       return { code: 1, stderr: `${e.message}\nThe key is not saved.` };
     }
     untested = (e as Error).message;
+  }
+  // shortcut: a file made in the milliseconds between this check and the rename is still replaced; link() would close it
+  if (args[0] !== "--force" && existsSync(file)) {
+    return {
+      code: 1,
+      stderr: `${shown} appeared while setup ran, and it stays as it is. The new key is not saved. To replace the file, run setup --force.`,
+    };
   }
   let limited: boolean;
   try {

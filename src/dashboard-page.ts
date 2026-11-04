@@ -446,7 +446,8 @@ export function withData(
 
 /**
  * Sets (or with undefined removes) `due` in the data of a saved page, with no Garmin call: for a
- * schedule that changes or stops. A missing or foreign file is left as it is.
+ * schedule that changes or stops. A missing or foreign file is left as it is. A page that cannot be
+ * written is left as it is.
  */
 export async function patchDue(path: string, due: string | undefined): Promise<void> {
   let page: string | undefined;
@@ -460,7 +461,12 @@ export async function patchDue(path: string, due: string | undefined): Promise<v
   if (page === undefined || data === null || typeof data !== "object") return;
   const { due: was, ...rest } = data as Json;
   if (was === due) return;
-  await writeAtomically(path, writeBlock(page, "data", due ? { ...rest, due } : rest));
+  // best-effort: a stale due clears at the page's next write, and a page must never stop a schedule from changing
+  try {
+    await writeAtomically(path, writeBlock(page, "data", due ? { ...rest, due } : rest));
+  } catch (e) {
+    log("WARN", `Cannot update the next refresh time of ${path}: ${(e as Error).message}`);
+  }
 }
 
 /** Settings that the page can use; throws with what is wrong. */

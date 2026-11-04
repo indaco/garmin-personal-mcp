@@ -25,6 +25,7 @@ import {
   setup,
   summary,
 } from "../src/cli";
+import type { Config } from "../src/config";
 import type { LastRun, Status } from "../src/schedule";
 
 const on: Status = {
@@ -708,6 +709,9 @@ function garmin(status = 200, body = `{"access_token":"t0ken"}`) {
 
 const off = () => ({ ...fakes().auto, status: vi.fn(async () => ({ scheduled: false })) });
 
+const run = (config: Config, home: string, auto = fakes().auto) =>
+  doctor(config, auto, process.platform, home);
+
 describe("doctor", () => {
   const KEY = "s3cret-key";
 
@@ -847,6 +851,151 @@ describe("doctor", () => {
     expect(r.stdout).toContain(
       "the automatic update reads only the key file. Run: npx -y @indaco/garmin-personal-mcp@latest setup",
     );
+  });
+
+  describe("the key of the schedule", () => {
+    const ENV = "env-key-ok";
+    const BAD = "file-key-refused";
+    const GOOD = "file-key-ok";
+    const LINE = /^(ok {4}|failed {2})Key of the schedule:/m;
+    const accepted = new Set<string>();
+
+    /** Garmin accepts the keys in `accepted` and refuses the others. */
+    function stubGarmin() {
+      const fetch = vi.fn(async (_url: string, init: RequestInit) => {
+        const key = (init.headers as Record<string, string>).Authorization.replace("ApiKey ", "");
+        return accepted.has(key)
+          ? new Response(`{"access_token":"t0ken"}`)
+          : new Response(`bad key ${key}`, { status: 401 });
+      });
+      vi.stubGlobal("fetch", fetch);
+      return fetch;
+    }
+    const keysOf = (r: { stdout?: string }) =>
+      [ENV, BAD, GOOD].filter((k) => r.stdout!.includes(k));
+
+    beforeEach(() => {
+      accepted.clear();
+      accepted.add(ENV);
+    });
+
+    it("fails when the key file is refused, though the key in the environment works", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", ENV);
+      const fetch = stubGarmin();
+      const { home, config } = setUp();
+      writeFileSync(config.apiKeyFile, BAD);
+      const r = await run(config, home);
+      expect(r.code).toBe(1);
+      expect(r.stdout).toMatch(/^failed {2}Key of the schedule: Token request failed: HTTP 401/m);
+      expect(r.stdout).toMatch(/^1 check failed\.$/m);
+      expect(keysOf(r)).toEqual([]);
+      expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("passes when both keys work", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", ENV);
+      accepted.add(GOOD);
+      stubGarmin();
+      const { home, config } = setUp();
+      writeFileSync(config.apiKeyFile, GOOD);
+      const r = await run(config, home);
+      expect(r.stdout).toContain(
+        "ok      Key of the schedule: Garmin accepts the key in the key file",
+      );
+      expect(r.stdout).not.toContain("failed  Key of the schedule");
+      expect(keysOf(r)).toEqual([]);
+    });
+
+    it("is not tested when no schedule is on", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", ENV);
+      const fetch = stubGarmin();
+      const { home, config } = setUp();
+      writeFileSync(config.apiKeyFile, BAD);
+      const r = await run(config, home, off());
+      expect(r.stdout).not.toMatch(LINE);
+      expect(r.code).toBe(0);
+      expect(fetch).toHaveBeenCalledOnce();
+    });
+
+    it("is not tested without a key in the environment: the API key check did it", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+      accepted.add(GOOD);
+      const fetch = stubGarmin();
+      const { home, config } = setUp();
+      writeFileSync(config.apiKeyFile, GOOD);
+      const r = await run(config, home);
+      expect(r.stdout).not.toMatch(LINE);
+      expect(fetch).toHaveBeenCalledOnce();
+    });
+
+    it("is not tested when the key file is missing: the key file check says so", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", ENV);
+      const fetch = stubGarmin();
+      const { home, config } = setUp();
+      const none = { ...config, apiKeyFile: join(home, "no-key") };
+      const r = await run(none, home);
+      expect(r.stdout).not.toMatch(LINE);
+      expect(fetch).toHaveBeenCalledOnce();
+    });
+
+    it("fails on an empty key file, and shows its path with ~", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", ENV);
+      const fetch = stubGarmin();
+      const { home, config } = setUp();
+      writeFileSync(config.apiKeyFile, " \n");
+      const r = await run(config, home);
+      expect(r.stdout).toContain(`failed  Key of the schedule: ${join("~", "api-key")} has no key`);
+      expect(r.stdout).not.toContain(home);
+      expect(fetch).toHaveBeenCalledOnce();
+    });
+
+    it("fails on a key file that cannot be read", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", ENV);
+      const fetch = stubGarmin();
+      const { home, config } = setUp();
+      const asFolder = { ...config, apiKeyFile: join(home, "folder") };
+      mkdirSync(asFolder.apiKeyFile);
+      const r = await run(asFolder, home);
+      expect(r.stdout).toContain(`failed  Key of the schedule: ${join("~", "folder")} has no key`);
+      expect(fetch).toHaveBeenCalledOnce();
+    });
+
+    it("does not count a key of only spaces in the environment", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", "   ");
+      accepted.add(GOOD);
+      const fetch = stubGarmin();
+      const { home, config } = setUp();
+      writeFileSync(config.apiKeyFile, GOOD);
+      const r = await run(config, home);
+      expect(r.stdout).not.toMatch(LINE);
+      expect(fetch).toHaveBeenCalledOnce();
+    });
+
+    it("fails on a key file with a space inside, without a request for it or the key", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", ENV);
+      const fetch = stubGarmin();
+      const { home, config } = setUp();
+      writeFileSync(config.apiKeyFile, "file-key bad");
+      const r = await run(config, home);
+      expect(r.stdout).toMatch(/^failed {2}Key of the schedule: The key has spaces/m);
+      expect(r.stdout).not.toContain("file-key");
+      expect(fetch).toHaveBeenCalledOnce();
+    });
+
+    it("fails on a network error for the key file, without the key", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", ENV);
+      const fetch = vi.fn(async (_url: string, init: RequestInit) => {
+        const key = (init.headers as Record<string, string>).Authorization;
+        if (key.endsWith(BAD)) throw new TypeError(`bad header ${key}`);
+        return new Response(`{"access_token":"t0ken"}`);
+      });
+      vi.stubGlobal("fetch", fetch);
+      const { home, config } = setUp();
+      writeFileSync(config.apiKeyFile, BAD);
+      const r = await run(config, home);
+      expect(r.stdout).toContain("failed  Key of the schedule: Network error obtaining token");
+      expect(keysOf(r)).toEqual([]);
+    });
   });
 
   skipIfNoMode.each([0o644, 0o640, 0o604, 0o666])(
@@ -1088,6 +1237,61 @@ describe("setup", () => {
     }
     expect(statSync(apiKeyFile).mode & 0o777).toBe(0o600);
     expect(statSync(join(home, ".config", "garmin-mcp")).mode & 0o777).toBe(0o700);
+  });
+
+  describe("a key file that appears while setup waits at the prompt", () => {
+    const FIRST = "first-key-text";
+    const NEWER = "newer-fake-key";
+    /** A prompt that makes the key file, as a second terminal does, then answers with the new key. */
+    const racing = (file: string) =>
+      vi.fn(async () => {
+        mkdirSync(dirname(file), { recursive: true });
+        writeFileSync(file, FIRST);
+        return NEWER;
+      });
+
+    it("stays as it is, and the new key is not saved", async () => {
+      garmin();
+      const { home, apiKeyFile, config } = newHome();
+      const r = await setup([], config, racing(apiKeyFile), "linux", noExec(), home);
+      expect(r.code).toBe(1);
+      expect(readFileSync(apiKeyFile, "utf8")).toBe(FIRST);
+      expect(r.stderr).toContain("appeared while setup ran");
+      expect(r.stderr).toContain("The new key is not saved.");
+      expect(r.stderr).toContain("setup --force");
+      expect(r.stderr).not.toContain(FIRST);
+      expect(r.stderr).not.toContain(NEWER);
+      expect(readdirSync(dirname(apiKeyFile))).toEqual(["api-key"]);
+    });
+
+    it("is replaced with --force", async () => {
+      garmin();
+      const { home, apiKeyFile, config } = newHome();
+      const r = await setup(["--force"], config, racing(apiKeyFile), "linux", noExec(), home);
+      expect(r.code).toBe(0);
+      expect(readFileSync(apiKeyFile, "utf8")).toBe(`${NEWER}\n`);
+    });
+
+    it("stays as it is when Garmin refuses the new key", async () => {
+      garmin(401, "bad");
+      const { home, apiKeyFile, config } = newHome();
+      const r = await setup([], config, racing(apiKeyFile), "linux", noExec(), home);
+      expect(r.code).toBe(1);
+      expect(r.stderr).toContain("The key is not saved.");
+      expect(r.stderr).not.toContain("appeared");
+      expect(readFileSync(apiKeyFile, "utf8")).toBe(FIRST);
+    });
+
+    it("stays as it is on a network error in the test of the key, and leaves no temporary file", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
+      const { home, apiKeyFile, config } = newHome();
+      const r = await setup([], config, racing(apiKeyFile), "linux", noExec(), home);
+      expect(r.code).toBe(1);
+      expect(r.stderr).toContain("The new key is not saved.");
+      expect(r.stderr).not.toContain(NEWER);
+      expect(readFileSync(apiKeyFile, "utf8")).toBe(FIRST);
+      expect(readdirSync(dirname(apiKeyFile))).toEqual(["api-key"]);
+    });
   });
 
   it.each([[`  ${KEY}  `], [`${KEY}\r`], [`﻿${KEY}`], [`\t${KEY}\n`]])(

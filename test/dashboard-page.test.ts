@@ -26,9 +26,12 @@ import {
   writeBlock,
 } from "../src/dashboard-page";
 import { digest } from "../src/digest";
+import { log } from "../src/log";
 import { preset } from "../src/page/presets";
 import { DASHBOARD_VERSION } from "../src/prompts";
 import { version as serverVersion } from "../package.json";
+
+vi.mock("../src/log", () => ({ LOG_DIR: ".cache/garmin-personal-mcp", log: vi.fn() }));
 
 const ID_A = "aaaaaaaaaaaaaaaa";
 const ID_B = "bbbbbbbbbbbbbbbb";
@@ -378,6 +381,27 @@ describe("writeDashboard", () => {
       expect([name, readFileSync(f, "utf8")]).toEqual([name, text]);
     }
   });
+
+  // root ignores the mode of a folder
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "patchDue leaves a page that cannot be written as it is, and logs a warning",
+    async () => {
+      const ro = join(dir, "ro");
+      mkdirSync(ro);
+      const f = join(ro, "page.html");
+      const text = dataPage('{"weeks":4}');
+      writeFileSync(f, text);
+      vi.mocked(log).mockClear();
+      chmodSync(ro, 0o500);
+      try {
+        await expect(patchDue(f, "2026-11-02T06:00:00.000Z")).resolves.toBeUndefined();
+      } finally {
+        chmodSync(ro, 0o700);
+      }
+      expect(readFileSync(f, "utf8")).toBe(text);
+      expect(vi.mocked(log)).toHaveBeenCalledWith("WARN", expect.stringContaining(f));
+    },
+  );
 
   it("writes the slashes of the data as they are, so paces cost no extra bytes", async () => {
     const paced = { ...data, activities: [{ ...data.activities[0], pace: "5:07/km" }] };
