@@ -468,6 +468,28 @@ describe("AutoRefresh", () => {
     expect(crontab).toBe("15 3 * * * backup.sh\n");
   });
 
+  onPosix(
+    "gives the error of crontab when it refuses a long crontab without reading it",
+    async () => {
+      // the real run, with a crontab that exits before it reads: a user who may not use cron
+      const bin = join(dir, "fake-bin");
+      mkdirSync(bin);
+      writeFileSync(join(dir, "long-crontab"), `# ${"x".repeat(4 * 1024 * 1024)}\n`);
+      writeFileSync(
+        join(bin, "crontab"),
+        `#!/bin/sh\n[ "$1" = "-l" ] && exec cat "${join(dir, "long-crontab")}"\necho "not allowed" >&2\nexit 1\n`,
+        { mode: 0o755 },
+      );
+      vi.stubEnv("PATH", `${bin}:${process.env.PATH}`);
+      try {
+        const a = new AutoRefresh(config, "linux", join(dir, "home"), run, nodeBin(), NPX_ENTRY);
+        await expect(a.set({})).rejects.toThrow("crontab failed (1): not allowed");
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    },
+  );
+
   it("says the job cannot start when its node is gone", async () => {
     const bin = nodeBin();
     const a = new AutoRefresh(config, "linux", join(dir, "home"), exec, bin, NPX_ENTRY);
@@ -1008,6 +1030,9 @@ it("refreshPages saves the refresh record of an upgraded page", async () => {
   rmSync(dir, { recursive: true });
 });
 
+// more than a pipe holds, so the write is still open when the command ends
+const UNREAD = "x".repeat(4 * 1024 * 1024);
+
 describe("run", () => {
   it("passes the input and gives the exit code, stdout and stderr, without a shell", async () => {
     const code =
@@ -1022,6 +1047,40 @@ describe("run", () => {
     expect((await run(process.execPath, ["-e", "process.kill(process.pid, 'SIGTERM')"])).code).toBe(
       1,
     );
+  });
+
+  // without the error handler of run these end in "Unhandled Errors: write EPIPE", which fails the run
+  it("gives the exit code and the output of a command that exits before it reads the input", async () => {
+    const code = "process.stdout.write('o'); process.stderr.write('e'); process.exitCode = 3";
+    expect(await run(process.execPath, ["-e", code], UNREAD)).toEqual({
+      code: 3,
+      stdout: "o",
+      stderr: "e",
+    });
+  });
+
+  it("gives the exit code of a command that reads a part of the input and exits", async () => {
+    const code = "process.stdin.once('data', () => process.exit(5))";
+    expect((await run(process.execPath, ["-e", code], UNREAD)).code).toBe(5);
+  });
+
+  it("waits for a command that closes its input and goes on", async () => {
+    const code =
+      "process.stdin.destroy(); setTimeout(() => { process.stdout.write('late'); process.exitCode = 4 }, 300)";
+    expect(await run(process.execPath, ["-e", code], UNREAD)).toEqual({
+      code: 4,
+      stdout: "late",
+      stderr: "",
+    });
+  });
+
+  it("counts a command killed by a signal before it reads the input as a failure", async () => {
+    const code = "process.kill(process.pid, 'SIGTERM')";
+    expect((await run(process.execPath, ["-e", code], UNREAD)).code).toBe(1);
+  });
+
+  it("rejects a command that does not exist, also with an input", async () => {
+    await expect(run("garmin-no-such-command", [], "input")).rejects.toThrow(/ENOENT/);
   });
 
   it("rejects a command that does not exist", async () => {
