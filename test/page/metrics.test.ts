@@ -151,6 +151,16 @@ describe("load", () => {
     expect(ramp([100, 110, 0, 50])).toEqual([null, 10, -100, null]);
   });
 
+  it.each([
+    ["a gap and the value after it", [100, null, 50], [null, null, null]],
+    ["a gap first", [null, 100, 110], [null, null, 10]],
+    ["the rise before a gap", [100, 200, null], [null, 100, null]],
+    ["only gaps", [null, null], [null, null]],
+    ["no values", [], []],
+  ])("gives no ramp for %s", (_name, values, expected) => {
+    expect(ramp(values)).toEqual(expected);
+  });
+
   it("gives monotony and strain of a week (Foster)", () => {
     const m = monotony([10, 10, 10, 10, 10, 10, 10]);
     // no variation: monotony has no value

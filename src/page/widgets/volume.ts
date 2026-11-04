@@ -145,7 +145,7 @@ register({
     const { t, fmt, calc } = ctx;
     const max = maxHR(ctx);
     const acts = ctx.allActivities;
-    const load = calc.weekly(acts, ctx.weeks, (a) => calc.loadOf(a, max)?.value ?? 0);
+    const load = calc.weeklyKnown(acts, ctx.weeks, (a) => calc.loadOf(a, max)?.value);
     const ramp = calc.ramp(load);
     const open =
       new Date(`${ctx.data.end}T00:00:00Z`).getUTCDay() !== 0 &&

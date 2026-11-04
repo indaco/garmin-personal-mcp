@@ -1194,6 +1194,23 @@ async function lastWeeks(page: Page, widget: string, label: string) {
   return { bars: bars.slice(-5), avg: avg.slice(-5) };
 }
 
+// the last 5 weeks start on 09-28, 10-05, 10-12, 10-19 and 10-26 (the last one is in progress)
+const loadSafety = async (rides: object[]) => {
+  const { page, errors } = await open(
+    browser,
+    pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: rides } }),
+  );
+  const last5 = async (label: string) =>
+    ((await chartDataset(page, "loadSafety", label)).data as (number | null)[]).slice(-5);
+  const flagged = (await kpiTexts(page, "loadSafety"))["Weeks above +10%"][0];
+  expect(errors).toEqual([]);
+  return {
+    bars: await last5("Weekly load"),
+    ramp: await last5("Change vs week before (%)"),
+    flagged,
+  };
+};
+
 describe("overview widgets", () => {
   it("shows a tooltip on every chart", async () => {
     const { page, errors } = await open(browser, pageFile());
@@ -1432,6 +1449,56 @@ describe("overview widgets", () => {
       const { bars } = await lastWeeks(page, "typeWeekly", "Bike");
       expect(bars).toEqual([30, null, 10, 0, 0]);
       expect(errors).toEqual([]);
+    });
+  });
+
+  describe("a week without a load in the Load safety chart", () => {
+    it("leaves a gap in the bars for sessions without a load, and an empty week is 0", async () => {
+      const { bars } = await loadSafety([
+        bikeRide("2026-09-29", { trainingLoad: 50 }),
+        bikeRide("2026-10-06"),
+        bikeRide("2026-10-13", { trainingLoad: 40 }),
+      ]);
+      expect(bars).toEqual([50, null, 40, 0, 0]);
+    });
+
+    it("has no ramp for the gap and none for the week after it", async () => {
+      const { ramp } = await loadSafety([
+        bikeRide("2026-09-29", { trainingLoad: 50 }),
+        bikeRide("2026-10-06"),
+        bikeRide("2026-10-13", { trainingLoad: 40 }),
+        bikeRide("2026-10-20", { trainingLoad: 40 }),
+      ]);
+      // week 10-05 is the gap and 10-12 comes after it: neither has a ramp, and none is -100;
+      // 10-19 is 40 against 40; the week in progress has none
+      expect(ramp).toEqual([null, null, null, 0, null]);
+    });
+
+    it("flags the same weeks with a gap as without", async () => {
+      const gap = await loadSafety([
+        bikeRide("2026-09-29", { trainingLoad: 20 }),
+        bikeRide("2026-10-06", { trainingLoad: 100 }),
+        bikeRide("2026-10-13"),
+        bikeRide("2026-10-20", { trainingLoad: 100 }),
+      ]);
+      expect(gap.bars).toEqual([20, 100, null, 100, 0]);
+      expect(gap.ramp).toEqual([null, 400, null, null, null]);
+      // only the rise from 20 to 100 is flagged, not the week after the gap
+      expect(gap.flagged).toBe("1");
+      const zero = await loadSafety([
+        bikeRide("2026-09-29", { trainingLoad: 20 }),
+        bikeRide("2026-10-06", { trainingLoad: 100 }),
+        bikeRide("2026-10-20", { trainingLoad: 100 }),
+      ]);
+      expect(zero.bars).toEqual([20, 100, 0, 100, 0]);
+      expect(zero.ramp).toEqual([null, 400, -100, null, null]);
+      expect(zero.flagged).toBe("1");
+    });
+
+    it("keeps -100% for an empty week after a load: that drop is real", async () => {
+      const { bars, ramp } = await loadSafety([bikeRide("2026-10-13", { trainingLoad: 40 })]);
+      expect(bars).toEqual([0, 0, 40, 0, 0]);
+      expect(ramp).toEqual([null, null, null, -100, null]);
     });
   });
 

@@ -68,9 +68,12 @@ export function loadRatio(acts: Activity[], day: string, maxHR?: number, dataSta
   return { acute, chronic, ratio: chronic > 0 ? acute / chronic : null };
 }
 
-/** The change in % of each value against the one before; null for the first and after a 0. */
-export function ramp(values: number[]): (number | null)[] {
-  return values.map((v, i) => (i > 0 && values[i - 1] > 0 ? change(v, values[i - 1]) : null));
+/** The change in % of each value against the one before; null for the first, after a 0, and for a gap and the value after it. */
+export function ramp(values: (number | null)[]): (number | null)[] {
+  return values.map((v, i) => {
+    const before = i > 0 ? values[i - 1] : null;
+    return v !== null && before !== null && before > 0 ? change(v, before) : null;
+  });
 }
 
 /** Foster's monotony (mean / SD of the daily loads) and strain (week load x monotony) of 7 days. */
