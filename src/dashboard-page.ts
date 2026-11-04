@@ -26,6 +26,7 @@ import { DATA_ITEMS, type Settings } from "./page/settings";
 import { THEMES } from "./page/theme";
 import { WIDGET_API } from "./page/widget-api";
 import { version } from "../package.json";
+import { log } from "./log";
 import { DASHBOARD_VERSION } from "./prompts";
 import { MODEL_ONLY, writeAtomically } from "./tools";
 
@@ -106,6 +107,8 @@ interface WriteResultBase {
   missingWidgetTexts?: Record<string, string[]>;
   /** The preset widgets that this write gave to edited boards and that the page shows, board -> widget ids. */
   addedWidgets?: Record<string, string[]>;
+  /** Library entries that the server cannot use; they stay in widgets.json and the update goes on without them. */
+  skippedWidgets?: { id: string; problem: string }[];
 }
 
 /**
@@ -177,6 +180,8 @@ export interface EditResult {
   }[];
   widgetApi: string;
   englishTexts?: typeof en;
+  /** Library entries that the server cannot use; they stay in widgets.json and the update goes on without them. */
+  skippedWidgets?: { id: string; problem: string }[];
 }
 
 /** A block value that JSON.stringify cannot write: JSON.parse reads any depth, JSON.stringify overflows the stack. */
@@ -523,6 +528,8 @@ export class DashboardWriter {
   #last: { weeks: number; workouts: boolean; at: number; json: string } | undefined;
   /** The last page of a build (a write that made or kept the .bak): a replace of it within REUSE_MS keeps the .bak. */
   #wrote: { target: string; page: string; at: number } | undefined;
+  /** The library entries that the last read of the library could not use. They stay in the file when it is saved. */
+  #skipped: SkippedWidget[] = [];
 
   constructor(
     private readonly getData: (weeks?: number, workouts?: boolean) => Promise<string>,
@@ -617,6 +624,7 @@ export class DashboardWriter {
   }
 
   async #write(options: WriteOptions, again = false): Promise<WriteResult> {
+    this.#skipped = []; // not every write reads the library
     const { weeks, notes = [], layout, page, path, settings, onlyExisting } = options;
     if (layout && page) {
       throw new Error(
@@ -772,6 +780,7 @@ export class DashboardWriter {
         ? { missingProfileLanguage: raw.locale as string }
         : {}),
       ...(page === undefined ? withMissing(widgetGaps(next, pageLanguages(next, own))) : {}),
+      ...this.#skippedReport(),
     };
   }
 
@@ -818,6 +827,7 @@ export class DashboardWriter {
     }
     for (const w of o.widgets ?? []) {
       const clean = checkWidget(w);
+      this.#skipped = this.#skipped.filter((s) => s.id !== clean.id);
       widgets = [...widgets.filter((x) => x.id !== clean.id), clean];
       library = [...library.filter((x) => x.id !== clean.id), clean];
     }
@@ -834,8 +844,11 @@ export class DashboardWriter {
     }
     const forget = new Set(o.forgetWidgets);
     library = library.filter((x) => !forget.has(x.id));
+    this.#skipped = this.#skipped.filter((s) => !forget.has(s.id));
     for (const id of [...(o.removeWidgets ?? []), ...forget]) {
       widgets = widgets.filter((x) => x.id !== id);
+      // a built-in widget of the same id stays on its boards: only the custom widget goes
+      if (CATALOGUE.some((c) => c.id === id)) continue;
       for (const [board, list] of Object.entries(layout.boards)) {
         if (list.some((i) => i.widget === id)) {
           layout = withBoard(
@@ -922,6 +935,7 @@ export class DashboardWriter {
       })),
       widgetApi: WIDGET_API,
       ...(o.englishTexts ? { englishTexts: en } : {}),
+      ...this.#skippedReport(),
     };
   }
 
@@ -936,24 +950,38 @@ export class DashboardWriter {
       text = await readFile(file, "utf8");
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-      if (seed.length > 0) await this.#saveLibrary(seed);
-      return seed;
+      // these entries are in the page, not in the file, so saving must not add them
+      this.#skipped = [];
+      const { bad } = sortWidgets(seed);
+      // the entries as they are: a page block that cannot be written back must still refuse the write
+      const good = seed.filter((w) => !bad.some((b) => b.raw === w));
+      if (good.length > 0) await this.#saveLibrary(good);
+      return good;
     }
     // an unreadable library stops the call: writing over it would lose the user's widgets
+    let list: unknown;
     try {
-      const list: unknown = JSON.parse(text);
+      list = JSON.parse(text);
       if (!Array.isArray(list)) throw new Error("not a list of widgets");
-      return list.map((w: CustomWidget) => checkWidget(w));
     } catch (e) {
       throw new Error(`${file}: ${(e as Error).message}; correct or delete the file`, { cause: e });
     }
+    const { good, bad } = sortWidgets(list);
+    this.#skipped = bad;
+    return good;
   }
 
   async #saveLibrary(widgets: CustomWidget[]): Promise<void> {
     await writeAtomically(
       resolve(this.dataDir, LIBRARY_FILE),
-      `${jsonOf("widgets", widgets, 2)}\n`,
+      `${jsonOf("widgets", [...widgets, ...this.#skipped.map((s) => s.raw)], 2)}\n`,
     );
+  }
+
+  #skippedReport() {
+    return this.#skipped.length > 0
+      ? { skippedWidgets: this.#skipped.map(({ id, problem }) => ({ id, problem })) }
+      : {};
   }
 
   /** Names the page file in the error of a block that cannot be written back; other errors stay as they are. */
@@ -1022,6 +1050,31 @@ const merged = (own: CustomWidget[], library: CustomWidget[]) => [
   ...own.filter((w) => !library.some((l) => l.id === w.id)),
   ...library,
 ];
+
+/** A library entry that the server cannot use. It stays in the file, for the user to correct or forget. */
+interface SkippedWidget {
+  raw: unknown;
+  id: string;
+  problem: string;
+}
+
+/** The entries that can run, and the others. A bad entry must not stop the updates of a page; each goes to the log. */
+function sortWidgets(list: unknown[]): { good: CustomWidget[]; bad: SkippedWidget[] } {
+  const good: CustomWidget[] = [];
+  const bad: SkippedWidget[] = [];
+  for (const raw of list) {
+    try {
+      good.push(checkWidget(raw as CustomWidget));
+    } catch (e) {
+      const value = (raw as { id?: unknown } | null)?.id;
+      const id = typeof value === "string" ? value : "(no id)";
+      const problem = (e as Error).message;
+      log("WARN", `Skipped widget ${id}: ${problem}`);
+      bad.push({ raw, id, problem });
+    }
+  }
+  return { good, bad };
+}
 
 /** A custom widget that the page can run; throws with what is wrong. */
 function checkWidget(w: CustomWidget): CustomWidget {

@@ -11,6 +11,8 @@ tools of the `garmin-personal` MCP server. Answer in my language.
    If the reply of this first call has `addedWidgets` (board -> widget ids), tell me which widgets
    the update added to which board. Give the ids as the reply gives them: do not make up a title.
    The reply of step 3 does not have them. Without `addedWidgets`, say nothing about added widgets.
+   If the reply has `skippedWidgets`, tell me the id and the problem of each one. The update went
+   on without them. To remove one, use `editDashboard` with `forgetWidgets`.
 2. Write at most 5 coach notes from the digest of the reply. Each note names a specific number of the
    digest. Training suggestions only, no medical advice. Plain text, in my language.
 3. Call `writeDashboard` again with the same `weeks`{{pathArgument}} and the `notes`.

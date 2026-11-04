@@ -52,6 +52,10 @@ does not send it anywhere.
 - A widget removed from one page (`removeWidgets`) stays in the library. A forgotten widget
   (`forgetWidgets`) leaves the library and this page; other pages keep their copy until you remove
   it there.
+- An entry that the server cannot use, for example because a new release has a built-in widget
+  with the same id, stays in the file. The updates go on without it. The update tells you its id
+  and the problem. Give the widget another id with `editDashboard`, or remove it with
+  `forgetWidgets`.
 
 Widgets that you made before the library existed join it at the first update. When a page has a
 widget that is not in the library, the page keeps it.
