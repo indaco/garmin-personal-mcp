@@ -117,73 +117,73 @@ describe("cli", () => {
     const write = vi.fn(f.writer);
     expect(await cli(word, [], f.auto, write)).toEqual({
       code: 1,
-      stderr: `Unknown command: ${word}\n\n${HELP}`,
+      stderr: `Unknown command\n\n${HELP}`,
     });
     expect(f.auto.status).not.toHaveBeenCalled();
     expect(f.auto.set).not.toHaveBeenCalled();
     expect(write).not.toHaveBeenCalled();
   });
 
-  it("gives the wrong command, not its arguments, in the error", async () => {
+  it("gives no word of the wrong command in the error", async () => {
     const f = fakes();
     expect(await cli("foo", ["--bar", "a.html"], f.auto, f.writer)).toEqual({
       code: 1,
-      stderr: `Unknown command: foo\n\n${HELP}`,
+      stderr: `Unknown command\n\n${HELP}`,
     });
   });
 
   it.each([
-    ["refresh", ["--foo"], "--foo"],
-    ["refresh", ["-x"], "-x"],
-    ["refresh", ["-"], "-"],
-    ["refresh", ["--"], "--"],
+    ["refresh", ["--foo"]],
+    ["refresh", ["-x"]],
+    ["refresh", ["-"]],
+    ["refresh", ["--"]],
     // --auto is exact, it comes first and only refresh has it
-    ["refresh", ["--AUTO"], "--AUTO"],
-    ["refresh", ["--auto=1"], "--auto=1"],
-    ["refresh", ["-auto"], "-auto"],
-    ["refresh", ["--auto", "--foo"], "--foo"],
-    ["refresh", ["--auto", "--auto"], "--auto"],
-    ["refresh", ["a.html", "--auto"], "--auto"],
-    ["schedule", ["--auto"], "--auto"],
-    ["info", ["--auto"], "--auto"],
-    ["doctor", ["--auto"], "--auto"],
-    ["doctor", ["--foo"], "--foo"],
-    ["doctor", ["--force"], "--force"],
+    ["refresh", ["--AUTO"]],
+    ["refresh", ["--auto=1"]],
+    ["refresh", ["-auto"]],
+    ["refresh", ["--auto", "--foo"]],
+    ["refresh", ["--auto", "--auto"]],
+    ["refresh", ["a.html", "--auto"]],
+    ["schedule", ["--auto"]],
+    ["info", ["--auto"]],
+    ["doctor", ["--auto"]],
+    ["doctor", ["--foo"]],
+    ["doctor", ["--force"]],
     // --force is exact, it comes first and only setup has it
-    ["refresh", ["--force"], "--force"],
-    ["schedule", ["--force"], "--force"],
+    ["refresh", ["--force"]],
+    ["schedule", ["--force"]],
     // the help flag of a command is exact
-    ["refresh", ["--HELP"], "--HELP"],
-    ["schedule", ["-H"], "-H"],
-    ["info", ["--help=1"], "--help=1"],
-    ["info", ["-help"], "-help"],
+    ["refresh", ["--HELP"]],
+    ["schedule", ["-H"]],
+    ["info", ["--help=1"]],
+    ["info", ["-help"]],
     // a flag never reaches the command, and --help and --version have no help of their own
-    ["info", ["--version"], "--version"],
-    ["--help", ["--foo"], "--foo"],
-    ["--help", ["--help"], "--help"],
-    ["-h", ["-x"], "-x"],
-    ["--version", ["--foo"], "--foo"],
-    ["--version", ["--help"], "--help"],
-    ["-v", ["-h"], "-h"],
-    ["-v", ["-x"], "-x"],
+    ["info", ["--version"]],
+    ["--help", ["--foo"]],
+    ["--help", ["--help"]],
+    ["-h", ["-x"]],
+    ["--version", ["--foo"]],
+    ["--version", ["--help"]],
+    ["-v", ["-h"]],
+    ["-v", ["-x"]],
     // a word before the flag does not hide it
-    ["schedule", ["--foo"], "--foo"],
-    ["schedule", ["off", "--foo"], "--foo"],
-    ["schedule", ["off", "a.html", "--foo"], "--foo"],
-    ["schedule", ["weekly", "--day", "monday"], "--day"],
-    // several flags: the first one is in the error
-    ["refresh", ["--foo", "--bar"], "--foo"],
-    ["schedule", ["off", "--page", "a.html", "--foo"], "--page"],
+    ["schedule", ["--foo"]],
+    ["schedule", ["off", "--foo"]],
+    ["schedule", ["off", "a.html", "--foo"]],
+    ["schedule", ["weekly", "--day", "monday"]],
+    // several flags: the first one is refused
+    ["refresh", ["--foo", "--bar"]],
+    ["schedule", ["off", "--page", "a.html", "--foo"]],
     // a path or a cron expression that starts with a dash reads as a flag
-    ["refresh", ["-old.html"], "-old.html"],
-    ["schedule", ["-old.html"], "-old.html"],
-    ["schedule", ["-1 * * * *"], "-1 * * * *"],
-  ])("prints the help on stderr for %s %j", async (command, args, flag) => {
+    ["refresh", ["-old.html"]],
+    ["schedule", ["-old.html"]],
+    ["schedule", ["-1 * * * *"]],
+  ])("prints the help on stderr for %s %j", async (command, args) => {
     const f = fakes();
     const write = vi.fn(f.writer);
     expect(await cli(command, args, f.auto, write)).toEqual({
       code: 1,
-      stderr: `Unknown flag: ${flag}\n\n${HELP}`,
+      stderr: `Unknown flag\n\n${HELP}`,
     });
     // a wrong flag must not stop the schedule: `schedule off --foo` once stopped all of it
     expect(f.auto.off).not.toHaveBeenCalled();
@@ -274,6 +274,48 @@ describe("cli", () => {
     expect(r.stderr).not.toContain("not-a-real-key");
     expect(readFileSync(apiKeyFile, "utf8")).toBe("old-fake-key\n");
   });
+
+  it.each([
+    ["the command", "not-a-real-key", []],
+    ["a command that starts with a dash", "--not-a-real-key", []],
+    ["a flag of info", "info", ["--key=not-a-real-key"]],
+    ["a flag of doctor", "doctor", ["-not-a-real-key"]],
+    ["a flag of refresh", "refresh", ["--key=not-a-real-key"]],
+    ["a flag of schedule", "schedule", ["--key=not-a-real-key"]],
+    ["a flag after a page", "refresh", ["a.html", "--key=not-a-real-key"]],
+    ["the page of refresh", "refresh", ["not-a-real-key"]],
+    ["a word after a page of refresh", "refresh", ["a.html", "not-a-real-key"]],
+    ["the schedule", "schedule", ["not-a-real-key"]],
+    ["a word after schedule off", "schedule", ["off", "not-a-real-key"]],
+  ])("does not print %s, which can be the key", async (_name, command, args) => {
+    const f = fakes();
+    const write = vi.fn(f.writer);
+    const r = await cli(command, args, f.auto, write);
+    expect(r.code).toBe(1);
+    expect(`${r.stdout}${r.stderr}`).not.toContain("not-a-real-key");
+    expect(write).not.toHaveBeenCalled();
+    expect(f.auto.set).not.toHaveBeenCalled();
+    expect(f.auto.off).not.toHaveBeenCalled();
+    expect(f.auto.missed).not.toHaveBeenCalled();
+  });
+
+  it("refuses a page of refresh that is not an .html file, before any work", async () => {
+    const f = fakes();
+    const write = vi.fn(f.writer);
+    expect(await cli("refresh", ["coach"], f.auto, write)).toEqual({
+      code: 1,
+      stderr: `refresh takes one page, a file that ends in .html, or --auto\n\n${HELP}`,
+    });
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it.each([["a.html"], ["A.HTML"], ["./-old.html"], ["~/pages/a.html"], [""]])(
+    "still refreshes the page %j",
+    async (page) => {
+      const f = fakes();
+      expect((await cli("refresh", [page], f.auto, f.writer)).code).toBe(0);
+    },
+  );
 
   it("keeps the working forms of schedule off and refresh", async () => {
     const f = fakes();
@@ -1441,11 +1483,11 @@ describe("the entry point", () => {
 
   // no mock of the command line: an MCP client that passes a wrong argument gets nothing on stdout
   it.each([
-    [["foo"], "Unknown command: foo"],
-    [["--foo"], "Unknown command: --foo"],
-    [[""], "Unknown command: "],
-    [["info", "--foo"], "Unknown flag: --foo"],
-    [["schedule", "off", "--foo"], "Unknown flag: --foo"],
+    [["foo"], "Unknown command"],
+    [["--foo"], "Unknown command"],
+    [[""], "Unknown command"],
+    [["info", "--foo"], "Unknown flag"],
+    [["schedule", "off", "--foo"], "Unknown flag"],
   ])("writes the help only on stderr and exits with 1 for %j", async (args, error) => {
     const serveStdio = vi.fn();
     vi.doMock("@modelcontextprotocol/server/stdio", () => ({ serveStdio }));

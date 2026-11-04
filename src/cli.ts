@@ -148,15 +148,16 @@ export async function cli(
   sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms)),
   config: Config = loadConfig(),
 ): Promise<CliResult> {
-  if (!COMMANDS.includes(command)) return usage(`Unknown command: ${command}`);
+  // the word can be the key, typed in the wrong place: an error never prints it
+  if (!COMMANDS.includes(command)) return usage("Unknown command");
   const help = COMMAND_HELP[command];
   if (help && (args.includes("--help") || args.includes("-h"))) return { code: 0, stdout: help };
-  // an argument of setup can be the key: setup refuses it without printing it
+  // setup has its own refusal
   const flag =
     command === "setup"
       ? undefined
       : args.find((a, i) => a.startsWith("-") && !(i === 0 && a === FLAGS[command]));
-  if (flag) return usage(`Unknown flag: ${flag}`);
+  if (flag) return usage("Unknown flag");
   if (command === "--version" || command === "-v") return { code: 0, stdout: version };
   if (command === "--help" || command === "-h") return { code: 0, stdout: HELP };
   if (command === "doctor") return doctor(config, auto);
@@ -171,7 +172,11 @@ export async function cli(
   }
   try {
     if (command === "refresh") {
-      if (args.length > 1) return usage("refresh takes one page, or --auto");
+      if (args.length > 1)
+        return usage("refresh takes one page, a file that ends in .html, or --auto");
+      if (args[0] && args[0] !== "--auto" && !/\.html$/i.test(args[0])) {
+        return usage("refresh takes one page, a file that ends in .html, or --auto");
+      }
       const scheduled = args[0] === "--auto";
       const at = new Date().toISOString();
       // the job starts at the run times and at login: nothing to do when no run time was missed
