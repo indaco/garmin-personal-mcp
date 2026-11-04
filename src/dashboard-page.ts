@@ -159,6 +159,8 @@ export interface EditOptions {
 export interface EditResult {
   path: string;
   changed: boolean;
+  /** The old page, kept when a whole layout replaced the boards. */
+  backup?: string;
   layout: Layout;
   customWidgets: {
     id: string;
@@ -758,11 +760,7 @@ export class DashboardWriter {
         throw new Error(`${target} changed twice while it was being updated: run the update again`);
       return this.#write(options, true);
     }
-    // the second write of a build (notes, a typed title) must not overwrite the page from before the build
-    const sameBuild =
-      this.#wrote?.target === target &&
-      this.#wrote.page === old &&
-      Date.now() - this.#wrote.at < REUSE_MS;
+    const sameBuild = old !== undefined && this.#inBuild(target, old);
     let backup: string | undefined;
     if (old !== undefined && kind !== "updated" && !sameBuild) {
       backup = `${target}.bak`;
@@ -795,6 +793,15 @@ export class DashboardWriter {
     const run = this.#queue.then(() => this.#edit(options));
     this.#queue = run.catch(() => {});
     return run.catch(this.#unwritable(options.path));
+  }
+
+  /** The second write of a build (notes, a typed title, a new layout) must not overwrite the page from before the build. */
+  #inBuild(target: string, old: string): boolean {
+    return (
+      this.#wrote?.target === target &&
+      this.#wrote.page === old &&
+      Date.now() - this.#wrote.at < REUSE_MS
+    );
   }
 
   async #edit(o: EditOptions): Promise<EditResult> {
@@ -913,6 +920,12 @@ export class DashboardWriter {
         page = writeBlock(page, "i18n", texts);
       }
     }
+    // before the library is saved: a copy that fails changes no file
+    let backup: string | undefined;
+    if (o.layout !== undefined && !this.#inBuild(target, old)) {
+      backup = `${target}.bak`;
+      await copyFile(target, backup);
+    }
     if (o.widgets !== undefined || o.forgetWidgets !== undefined || o.widgetTexts !== undefined) {
       await this.#saveLibrary(library);
     }
@@ -920,6 +933,7 @@ export class DashboardWriter {
     return {
       path: target,
       changed,
+      ...(backup ? { backup } : {}),
       layout,
       customWidgets: widgets.map((w) => ({
         id: w.id,

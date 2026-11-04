@@ -734,6 +734,17 @@ describe("edit mode", () => {
     expect(await tiles(page)).toEqual(ALL_PRESET);
   });
 
+  it("shows no unsaved changes when Reset runs on an unedited board", async () => {
+    const listed = { rev: "r1", base: "preset", boards: { cycling: [] }, seen: { cycling: [] } };
+    for (const layout of [null, listed]) {
+      const { page, errors } = await open(browser, pageFile({ layout }));
+      await startEdit(page);
+      await page.click("text=Reset board");
+      expect(await page.innerText(".edit-bar")).not.toContain("Unsaved changes");
+      expect(errors).toEqual([]);
+    }
+  });
+
   it("keeps a browser edit after a reload, until the page gets a new layout", async () => {
     const file = pageFile({ layout: two });
     const { page } = await open(browser, file);

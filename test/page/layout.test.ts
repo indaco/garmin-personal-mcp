@@ -466,7 +466,7 @@ describe("withPresetWidgets", () => {
     const r = run({ run: [inst("a"), inst("b"), inst("c"), inst("d")] }, { run: ["a", "old"] });
     expect(r.added).toEqual({});
     expect(r.changed).toBe(true);
-    expect(r.layout.seen).toEqual({ run: WANT });
+    expect(r.layout.seen).toEqual({ run: [...WANT, "old"] });
   });
 
   it("reports no change when the record is equal and nothing is new", () => {
@@ -521,5 +521,121 @@ describe("withPresetWidgets", () => {
   it("uses the generic list for an unknown board name", () => {
     const r = run({ zzz: [] });
     expect(idsOf(r, "zzz")).toEqual(["g"]);
+  });
+});
+
+const of =
+  (...names: string[]) =>
+  (board: string): Instance[] =>
+    board === "run" ? names.map((widget) => ({ id: widget, widget, span: 1 as Span })) : [];
+const none = (): string[] => [];
+const P1 = of("a", "b");
+const P2 = of("a", "b", "w");
+const onBoard = (r: { layout: Layout }) => ids(r.layout.boards.run ?? []);
+
+describe("withPresetWidgets across releases", () => {
+  it("keeps a removed widget removed when an older server writes the page between two newer ones", () => {
+    const start = layout({
+      boards: { run: [inst("a"), inst("b")] },
+      seen: { run: ["a", "b", "w"] },
+    });
+    const older = withPresetWidgets(start, P1, none);
+    expect(older.changed).toBe(false);
+    const newer = withPresetWidgets(older.layout, P2, none);
+    expect(onBoard(newer)).toEqual(["a", "b"]);
+    expect(newer.added).toEqual({});
+    expect(newer.changed).toBe(false);
+  });
+
+  it("keeps a removed widget removed when a preset shrinks and grows again", () => {
+    const start = layout({
+      boards: { run: [inst("a"), inst("b")] },
+      seen: { run: ["a", "b", "w"] },
+    });
+    const small = withPresetWidgets(start, of("a"), none);
+    expect(small.layout.seen).toEqual({ run: ["a", "b", "w"] });
+    const grown = withPresetWidgets(small.layout, P2, none);
+    expect(onBoard(grown)).toEqual(["a", "b"]);
+    expect(grown.added).toEqual({});
+  });
+
+  it("puts the current names first, then the earlier ones", () => {
+    const r = withPresetWidgets(
+      layout({ boards: { run: [inst("a")] }, seen: { run: ["z", "a"] } }),
+      of("a", "b"),
+      none,
+    );
+    expect(r.layout.seen).toEqual({ run: ["a", "b", "z"] });
+  });
+
+  it("is idempotent, also after a run with an older preset", () => {
+    const first = withPresetWidgets(layout({ boards: { run: [inst("a")] } }), P2, none);
+    const again = withPresetWidgets(first.layout, P2, none);
+    expect(again.changed).toBe(false);
+    expect(again.layout).toEqual(first.layout);
+    const older = withPresetWidgets(first.layout, P1, none);
+    expect(older.changed).toBe(false);
+    expect(older.layout).toEqual(first.layout);
+    const back = withPresetWidgets(older.layout, P2, none);
+    expect(back.changed).toBe(false);
+    expect(back.layout).toEqual(first.layout);
+  });
+
+  it("keeps a baseline widget of a board without a record in the record", () => {
+    const r = withPresetWidgets(layout({ boards: { run: [inst("a")] } }), of("a"), () => ["x"]);
+    expect(r.layout.seen).toEqual({ run: ["a", "x"] });
+    const later = withPresetWidgets(r.layout, of("a", "x"), none);
+    expect(onBoard(later)).toEqual(["a"]);
+    expect(later.added).toEqual({});
+  });
+
+  it("cuts an old record of 40 names to 32 and keeps the current names", () => {
+    const old = Array.from({ length: 40 }, (_, i) => `n${i}`);
+    const r = withPresetWidgets(
+      layout({ boards: { run: [] }, seen: { run: old } }),
+      of("a", "b", "c"),
+      none,
+    );
+    const rec = r.layout.seen?.run ?? [];
+    expect(rec).toHaveLength(32);
+    expect(rec.slice(0, 3)).toEqual(["a", "b", "c"]);
+    expect(rec[3]).toBe("n0");
+  });
+
+  it("does not report a change for an older preset that is a subset of the record", () => {
+    const r = withPresetWidgets(
+      layout({ boards: { run: [inst("a"), inst("b")] }, seen: { run: ["a", "b", "w"] } }),
+      P1,
+      none,
+    );
+    expect(r.changed).toBe(false);
+    expect(r.layout.seen).toEqual({ run: ["a", "b", "w"] });
+  });
+
+  it("is stable when the preset order changes", () => {
+    const l = layout({ boards: { run: [inst("a"), inst("b")] }, seen: { run: ["a", "b"] } });
+    const first = withPresetWidgets(l, of("b", "a"), none);
+    expect(first.changed).toBe(false);
+    expect(withPresetWidgets(first.layout, of("b", "a"), none).layout).toEqual(first.layout);
+  });
+
+  it("leaves no seen key when no board is listed, so Reset changes nothing", () => {
+    const a = withPresetWidgets(
+      parseLayout({ rev: "r", base: "preset", boards: {} }),
+      preset,
+      () => [],
+    ).layout;
+    expect(a).not.toHaveProperty("seen");
+    expect(JSON.stringify(resetBoard(a, "running", preset))).toBe(JSON.stringify(a));
+  });
+
+  it("keeps the other boards when Reset runs on an unlisted board", () => {
+    const a = withPresetWidgets(
+      parseLayout({ rev: "r", base: "preset", boards: { cycling: [] }, seen: { cycling: [] } }),
+      preset,
+      () => [],
+    ).layout;
+    expect(a.seen).toHaveProperty("cycling");
+    expect(JSON.stringify(resetBoard(a, "running", preset))).toBe(JSON.stringify(a));
   });
 });
