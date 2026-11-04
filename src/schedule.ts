@@ -102,6 +102,8 @@ export const run: Run = (cmd, args, input) =>
     p.stderr.on("data", (d) => (stderr += d));
     p.on("error", fail);
     p.on("close", (code) => ok({ code: code ?? 1, stdout, stderr }));
+    // a command can exit before it reads the input (EPIPE): its exit code tells the result
+    p.stdin.on("error", () => {});
     p.stdin.end(input ?? "");
   });
 
