@@ -887,6 +887,7 @@ describe("doctor", () => {
       const r = await run(config, home);
       expect(r.code).toBe(1);
       expect(r.stdout).toMatch(/^failed {2}Key of the schedule: Token request failed: HTTP 401/m);
+      expect(r.stdout).toMatch(/^failed {2}Key of the schedule: .*and run setup --force\.$/m);
       expect(r.stdout).toMatch(/^1 check failed\.$/m);
       expect(keysOf(r)).toEqual([]);
       expect(fetch).toHaveBeenCalledTimes(2);
@@ -1336,7 +1337,8 @@ describe("setup", () => {
     expect(r.code).toBe(1);
     expect(r.stdout).toBeUndefined();
     expect(r.stderr).toContain("the personal API key is incorrect, expired or revoked");
-    expect(r.stderr).toContain("and run setup again");
+    expect(r.stderr).toContain("and run setup --force.");
+    expect(r.stderr).not.toContain("setup again");
     expect(r.stderr).toContain("The key is not saved.");
     expect(r.stderr).not.toContain(KEY);
     expect(existsSync(apiKeyFile)).toBe(false);
@@ -1350,6 +1352,7 @@ describe("setup", () => {
     const r = await setup(["--force"], config, answer(KEY), "linux", noExec(), home);
     expect(r.code).toBe(1);
     expect(readFileSync(apiKeyFile, "utf8")).toBe("old-key");
+    expect(r.stderr).toContain("and run setup --force.");
   });
 
   // Garmin shows a key only one time: an answer that says nothing about the key must not lose it
