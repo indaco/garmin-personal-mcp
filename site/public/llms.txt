@@ -13,6 +13,7 @@ The server is read-only: it writes nothing back to Garmin. Laps and strength set
 - [Tools](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/tools.md): every tool, its endpoints, and the data that the Personal API does not have
 - [Dashboard](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md): make and update the page, show it in the chat, boards and widgets, themes, languages and page settings
 - [Troubleshooting](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/troubleshooting.md): problems and their solutions
+- [What's new]({{url}}whats-new.html): the highlights of each release, and how to update
 
 ## Optional
 

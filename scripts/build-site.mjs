@@ -1,7 +1,7 @@
-// Writes dist-site/: the project website as one page, with its files and the demo dashboard.
-// The page comes from site/index.html, its partials, its styles and the bundled site script. The facts
-// come from the files that own them (package.json, the README, the theme list), so the site cannot
-// drift from the code. `pnpm build:site`, after `pnpm build` for the demo. dist-site/ is what a
+// Writes dist-site/: the project website, with its files and the demo dashboard. The pages come from
+// site/index.html and site/whats-new.html, their partials, the styles and the bundled site script. The
+// facts come from the files that own them (package.json, the README, the theme list, .changes/), so the
+// site cannot drift from the code. `pnpm build:site`, after `pnpm build` for the demo. dist-site/ is what a
 // server needs; `--preview <file>` also writes the page for a claude.ai preview, outside of it.
 import { execFileSync } from "node:child_process";
 import {
@@ -29,6 +29,7 @@ const STYLES = [
   "dashboard",
   "start",
   "tools",
+  "whats-new",
   "promise",
   "footer",
   "responsive",
@@ -49,6 +50,84 @@ function section(readme, heading) {
   const level = heading.match(/^#+/)[0];
   const end = lines.findIndex((l, i) => i > start && new RegExp(`^${level} `).test(l));
   return lines.slice(start + 1, end < 0 ? undefined : end);
+}
+
+const NEW_TAB = '<span class="sr-only"> (opens in a new tab)</span>';
+
+/** One line of Highlights as HTML. Text that is not converted stops the build: no raw Markdown on the page. */
+function inline(text, file) {
+  const codes = [];
+  const html = escapeHtml(text)
+    // code first: its text is not Markdown
+    .replace(/`([^`]+)`/g, (_, code) => `\0${codes.push(code) - 1}\0`)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\[([^\]]+)\]\(([^)]*)\)/g, (_, label, url) => {
+      // \0 marks code: its text must not reach the attribute
+      if (!/^https:\/\/[^\s"\0]+$/.test(url))
+        throw new Error(`${file}: the link "${url}" is not https`);
+      return `<a href="${url}" target="_blank" rel="noopener">${label}${NEW_TAB}</a>`;
+    });
+  if (/\*\*|`|\]\(/.test(html)) throw new Error(`${file}: open Markdown in "${text}"`);
+  return html.replace(/\0(\d+)\0/g, (_, i) => `<code>${codes[i]}</code>`);
+}
+
+/** The Highlights as HTML: paragraphs and one level of "- " bullets, nothing else. */
+function highlightsHtml(lines, file) {
+  const html = [];
+  let paragraph = [];
+  let items = [];
+  const close = () => {
+    if (paragraph.length) html.push(`<p>${inline(paragraph.join(" "), file)}</p>`);
+    if (items.length)
+      html.push(`<ul>${items.map((i) => `<li>${inline(i, file)}</li>`).join("")}</ul>`);
+    paragraph = [];
+    items = [];
+  };
+  for (const line of lines) {
+    if (!line) close();
+    else if (line.startsWith("- ")) {
+      if (paragraph.length) close();
+      items.push(line.slice(2));
+    } else if (/^(\s|>|\||\d+\.|\* )/.test(line)) {
+      throw new Error(`${file}: the Highlights cannot have the line "${line}"`);
+    } else {
+      if (items.length) close();
+      paragraph.push(line);
+    }
+  }
+  close();
+  if (!html.length) throw new Error(`${file}: the Highlights have no text`);
+  return html.join("");
+}
+
+/** The releases with Highlights in .changes/, the newest first. */
+export function releases(root, repository) {
+  return readdirSync(`${root}/.changes`)
+    .filter((file) => /^v\d+\.\d+\.\d+\.md$/.test(file))
+    .flatMap((file) => {
+      const lines = read(`${root}/.changes/${file}`).split("\n");
+      const start = lines.indexOf("### Highlights");
+      if (start < 0) return [];
+      const [, version, date] =
+        lines.find((l) => l.startsWith("## "))?.match(/^## v(\S+) - (\d{4}-\d{2}-\d{2})$/) ?? [];
+      if (file !== `v${version}.md`)
+        throw new Error(`${file}: the first heading must be "## v<version> - <date>" of this file`);
+      const rest = lines.slice(start + 1);
+      // #### Upgrading comes next: the Highlights stop at a heading of any level
+      const end = rest.findIndex((l) => /^#{1,6} /.test(l) || l === "---");
+      return {
+        version,
+        id: `v${version.replaceAll(".", "-")}`,
+        date,
+        dateText: new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", {
+          dateStyle: "long",
+          timeZone: "UTC",
+        }),
+        url: `${repository}/releases/tag/v${version}`,
+        html: highlightsHtml(end < 0 ? rest : rest.slice(0, end), file),
+      };
+    })
+    .toSorted((a, b) => b.version.localeCompare(a.version, "en", { numeric: true }));
 }
 
 /** The facts of the site, from the files that own them. */
@@ -83,6 +162,7 @@ export function facts(root = ".") {
     .map((l) => l.match(/^- [^:]+: "(.+)"$/)?.[1])
     .filter(Boolean);
   const node = pkg.engines.node.match(/\d+/)[0];
+  const repository = pkg.repository.url.replace(/^git\+/, "").replace(/\.git$/, "");
   return {
     pkg,
     site,
@@ -93,7 +173,8 @@ export function facts(root = ".") {
     questions,
     package: `${pkg.name}@latest`,
     node: `Node.js ${node} or later`,
-    repository: pkg.repository.url.replace(/^git\+/, "").replace(/\.git$/, ""),
+    repository,
+    releases: releases(root, repository),
   };
 }
 
@@ -155,6 +236,10 @@ function jsonLd(f) {
 /** The {{name}} values of the partials and the public text files. */
 export function values(f) {
   return {
+    // the home page; renderWhatsNew gives its own values
+    home: "",
+    title: "garmin-personal-mcp",
+    canonical: f.site.url,
     url: f.site.url,
     description: escapeHtml(f.site.description),
     version: f.pkg.version,
@@ -172,6 +257,12 @@ export function values(f) {
     coachPrompts: promptRows(f.coachPrompts),
     themeCount: String(f.themes.length),
     themeGroups: themeGroups(f.themes),
+    releases: f.releases
+      .map(
+        (r) =>
+          `<article id="${r.id}"><div class="release-head"><h2>v${r.version}</h2><time datetime="${r.date}">${r.dateText}</time></div><div class="release-text">${r.html}<p><a href="${r.url}" target="_blank" rel="noopener">All changes in v${r.version}${NEW_TAB}</a></p></div></article>`,
+      )
+      .join("\n"),
   };
 }
 
@@ -190,24 +281,39 @@ function fill(text, vals) {
   });
 }
 
-/** The page: the template with its partials, styles and script, and the facts filled in. */
-export function render({ root = ".", script = "", preview = false } = {}) {
-  const vals = values(facts(root));
+/** A page: the template with its partials, styles and script, and the facts filled in. */
+function build(template, root, script, vals) {
   const css =
     `@layer site {\n${STYLES.map((n) => read(`${root}/site/styles/${n}.css`)).join("\n")}}\n` +
     read(`${root}/site/styles/hidden.css`);
   if (/<\/(style|script)/i.test(css + script))
     throw new Error("the styles or the script contain a closing tag");
-  let page = read(`${root}/site/index.html`)
+  const page = read(`${root}/site/${template}`)
     .replace(/<!--include (\w+)-->/g, (_, name) => read(`${root}/site/partials/${name}.html`))
     .replace("<!--style-->", () => `<style>\n${css}</style>`)
     .replace("<!--script-->", () => `<script>\n${script}</script>`);
-  page = fill(page, vals);
+  return fill(page, vals);
+}
+
+/** The home page. */
+export function render({ root = ".", script = "", preview = false } = {}) {
+  const page = build("index.html", root, script, values(facts(root)));
   if (!preview) return page;
   // the claude.ai preview adds its own document around the page: only the head content and the body
   const head = page.match(/<meta name="viewport"[^>]*>\s*([\s\S]*?)<\/head>/)[1];
   const body = page.match(/<body>([\s\S]*)<\/body>/)[1];
   return `<meta name="claude:viewport-fit-sides" content="cover" />\n${head}${body}`;
+}
+
+/** The What's new page. It is next to the home page, so only its links to the sections change. */
+export function renderWhatsNew({ root = ".", script = "" } = {}) {
+  const vals = values(facts(root));
+  return build("whats-new.html", root, script, {
+    ...vals,
+    home: "index.html",
+    title: "What's new - garmin-personal-mcp",
+    canonical: `${vals.url}whats-new.html`,
+  });
 }
 
 function main() {
@@ -219,6 +325,7 @@ function main() {
   rmSync(scriptDir, { recursive: true });
   mkdirSync(`${OUT}/demo`, { recursive: true });
   writeFileSync(`${OUT}/index.html`, render({ script }));
+  writeFileSync(`${OUT}/whats-new.html`, renderWhatsNew({ script }));
   const { preview } = parseArgs({ options: { preview: { type: "string" } } }).values;
   if (preview) writeFileSync(preview, render({ script, preview: true }));
   const vals = values(facts());
@@ -241,7 +348,7 @@ function main() {
   execFileSync("node", ["scripts/demo-dashboard.mjs"], { stdio: "ignore" });
   rmSync(`${OUT}/demo/demo-data.json`);
   console.log(
-    `${OUT}/ written: index.html, the public files and demo/${preview ? `; ${preview}` : ""}`,
+    `${OUT}/ written: index.html, whats-new.html, the public files and demo/${preview ? `; ${preview}` : ""}`,
   );
 }
 

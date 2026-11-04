@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!--include head-->
+    <!--style-->
+  </head>
+  <body>
+    <a class="skip" href="#top">Skip to content</a>
+    <!--include icons-->
+    <!--include header-->
+    <main id="top">
+      <section class="block" aria-labelledby="new-h">
+        <div class="wrap bands">
+          <div class="grid">
+            <div class="head">
+              <h1 id="new-h">what's new.</h1>
+              <p>What each new version of garmin-personal-mcp adds and corrects.</p>
+            </div>
+            <!--include update-->
+            <div class="releases">
+              {{releases}}
+              <p class="releases-note">
+                <a href="{{repository}}/releases" target="_blank" rel="noopener"
+                  >All versions and their full lists of changes<span class="sr-only">
+                    (opens in a new tab)</span
+                  ></a
+                >
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <!--include footer-->
+    <p class="sr-only" role="status" id="copy-status"></p>
+    <!--script-->
+  </body>
+</html>

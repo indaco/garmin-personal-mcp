@@ -3,6 +3,14 @@ export interface Entry {
   name: string;
   text: string;
 }
+export interface Release {
+  version: string;
+  id: string;
+  date: string;
+  dateText: string;
+  url: string;
+  html: string;
+}
 export interface Facts {
   pkg: { name: string; license: string; version: string };
   site: { url: string; description: string };
@@ -14,8 +22,11 @@ export interface Facts {
   package: string;
   node: string;
   repository: string;
+  releases: Release[];
 }
 export function facts(root?: string): Facts;
 export function themeGroups(themes: { group: string }[]): string;
 export function values(f: Facts): Record<string, string>;
+export function releases(root: string, repository: string): Release[];
 export function render(options?: { root?: string; script?: string; preview?: boolean }): string;
+export function renderWhatsNew(options?: { root?: string; script?: string }): string;
