@@ -471,6 +471,15 @@ describe("a library entry that cannot be used", () => {
     expect(saved).toContainEqual(bad);
   });
 
+  it("does not bring old bad entries back into a new library file", async () => {
+    put([good, bad]);
+    expect((await writer.edit({})).skippedWidgets).toEqual([skipped]);
+    unlinkSync(libraryFile());
+    const r = await writer.edit({ widgets: [another] });
+    expect(r).not.toHaveProperty("skippedWidgets");
+    expect(raw()).not.toContainEqual(bad);
+  });
+
   it("drops the entry when it is forgotten", async () => {
     put([good, bad]);
     await writer.write({});

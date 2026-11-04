@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir, userInfo } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { version } from "../package.json";
@@ -213,16 +213,19 @@ describe("cli", () => {
     expect(existsSync(apiKeyFile)).toBe(false);
   });
 
-  it.each([[["off", "coach"]], [["off", "coach.htm"]], [["off", "a.html", "b.html"]]])(
-    "schedule %j refuses a page it cannot use",
-    async (args) => {
-      const f = fakes();
-      const r = await cli("schedule", args, f.auto, f.writer);
-      expect(r.code).toBe(1);
-      expect(r.stderr).toMatch(/^schedule off takes one page/);
-      expect(f.auto.off).not.toHaveBeenCalled();
-    },
-  );
+  it.each([
+    [["off", "coach"]],
+    [["off", "coach.htm"]],
+    [["off", "a.html", "b.html"]],
+    [["off", "coach.html", "extra"]],
+    [["off", ""]],
+  ])("schedule %j refuses a page it cannot use", async (args) => {
+    const f = fakes();
+    const r = await cli("schedule", args, f.auto, f.writer);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toMatch(/^schedule off takes one page/);
+    expect(f.auto.off).not.toHaveBeenCalled();
+  });
 
   it.each([[["a.html", "b.html"]], [["--auto", "x.html"]]])(
     "refresh %j refuses more than one argument",
@@ -234,8 +237,43 @@ describe("cli", () => {
       expect(r.stderr).toMatch(/^refresh takes one page/);
       expect(write).not.toHaveBeenCalled();
       expect(f.auto.saveRun).not.toHaveBeenCalled();
+      expect(f.auto.missed).not.toHaveBeenCalled();
     },
   );
+
+  it("takes a page with a capital extension in schedule off", async () => {
+    const f = fakes();
+    expect((await cli("schedule", ["off", "COACH.HTML"], f.auto, f.writer)).code).toBe(0);
+    expect(f.auto.off).toHaveBeenCalledWith("COACH.HTML");
+  });
+
+  it.each(["--help", "-h"])("prints the help of setup for %s and never the key", async (flag) => {
+    const { config } = newHome();
+    const f = fakes();
+    const r = await cli(
+      "setup",
+      ["--key=not-a-real-key", flag],
+      f.auto,
+      f.writer,
+      undefined,
+      config,
+    );
+    expect(r).toEqual({ code: 0, stdout: COMMAND_HELP.setup });
+    expect(`${r.stdout}${r.stderr}`).not.toContain("not-a-real-key");
+  });
+
+  it("refuses a key argument with --force and keeps the key file", async () => {
+    const { apiKeyFile, config } = newHome();
+    mkdirSync(dirname(apiKeyFile), { recursive: true });
+    writeFileSync(apiKeyFile, "old-fake-key\n");
+    const f = fakes();
+    const args = ["--force", "--key=not-a-real-key"];
+    const r = await cli("setup", args, f.auto, f.writer, undefined, config);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("setup does not take the key as an argument");
+    expect(r.stderr).not.toContain("not-a-real-key");
+    expect(readFileSync(apiKeyFile, "utf8")).toBe("old-fake-key\n");
+  });
 
   it("keeps the working forms of schedule off and refresh", async () => {
     const f = fakes();

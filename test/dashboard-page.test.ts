@@ -871,6 +871,58 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
       expect(readBlock(page(), "settings")).toEqual({ workouts: true });
     });
 
+    it("applies the new settings in a scheduled refresh", async () => {
+      await writer.write({ page: own });
+      await writer.write({ settings: { exclude: ["names"] } });
+      const r = await later(() => writer.write({ onlyExisting: true }));
+      expect(r.settings).toEqual({ exclude: ["names"] });
+      expect(page()).not.toContain("Anna");
+    });
+
+    it("keeps an excluded recovery and a sport filter at the next update", async () => {
+      await writer.write({ page: own });
+      await writer.write({ settings: { exclude: ["recovery"], sports: ["running"] } });
+      await later(() => writer.write({}));
+      const d = readBlock(page(), "data") as Full;
+      expect(d.recovery).toEqual([]);
+      expect(JSON.stringify(d.activities)).not.toContain("Ride");
+    });
+
+    it("replaces the old settings with the new ones, it does not merge", async () => {
+      await writer.write({ page: own });
+      await writer.write({ settings: { exclude: ["names"] } });
+      await writer.write({ settings: { workouts: true } });
+      expect(page()).toContain(
+        '/* garmin-settings:start */{"workouts":true}/* garmin-settings:end */',
+      );
+    });
+
+    it("repairs an unreadable block with empty settings", async () => {
+      await writer.write({ page: own });
+      writeFileSync(
+        file,
+        page().replace(
+          "/* garmin-settings:start */null/* garmin-settings:end */",
+          "/* garmin-settings:start */{bad/* garmin-settings:end */",
+        ),
+      );
+      await later(() => writer.write({ settings: {} }));
+      expect(readBlock(page(), "settings")).toBeNull();
+    });
+
+    it("accepts empty settings on a page with no settings block, and refuses real ones", async () => {
+      const bare =
+        "<html><script>const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>";
+      await writer.write({ page: bare });
+      await writer.write({ settings: {} });
+      expect(page()).not.toContain("garmin-settings");
+      const before = page();
+      await expect(writer.write({ settings: { exclude: ["names"] } })).rejects.toThrow(
+        "this page has no garmin-settings block",
+      );
+      expect(page()).toBe(before);
+    });
+
     it("does not change the block of a write without settings", async () => {
       await writer.write({ page: own, settings: { exclude: ["names"] } });
       await later(() => writer.write({ notes: ["n"] }));
