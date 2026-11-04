@@ -222,7 +222,9 @@ catalogue has every key and every placeholder of English.
 Release from an up-to-date `main` with a clean tree.
 
 1. Run `pnpm lint && pnpm test`.
-2. Run `sley bump auto && sley changelog merge`. Edit `.changes/<TAG>.md` if you want highlights.
+2. Run `sley bump auto && sley changelog merge`. In `.changes/<TAG>.md`, paste the
+   [upgrade text](#upgrade-text) above the first `###` heading. If you want highlights, put them
+   above that text.
 3. Branch protection blocks a push to `main`, so open a PR. Create a branch, commit `.version`,
    `package.json`, `CHANGELOG.md` and `.changes/` as `chore(release): vX.Y.Z`, push it and open
    the PR with the same title: the squash merge uses the title as the commit message.
@@ -239,6 +241,34 @@ publishing and skips a version that is already on npm. It creates the GitHub Rel
 If `tag-validate` fails, nothing was published. Delete the tag (`git push --delete origin <TAG>`,
 `git tag -d <TAG>`), fix the problem and tag again. After a publish, a version cannot be replaced.
 Fix forward with a new patch version, and use `npm deprecate` for a bad one.
+
+### Upgrade text
+
+Each release note has this text. It goes in `.changes/<TAG>.md`, not only on GitHub, because a new
+run of the Release workflow replaces the GitHub text with that file.
+
+````markdown
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+````
 
 ## License
 
