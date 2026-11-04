@@ -14,7 +14,7 @@ tool for questions with choices, use it: "No" (default) and "Yes, compare them a
 that a yes adds a Workout trend section, and that the page then downloads the laps of the last 8
 runs of each workout, once: this build takes longer. On a yes:
 
-- Put this line first in the first script of the page:
+- Put this line first in the first inline script of the page:
   `window.GARMIN_SETTINGS = /* garmin-settings:start */null/* garmin-settings:end */;`
 - In the first `writeDashboard` call that writes the page, give `settings` = { "workouts": true }.
   The page keeps it, so its updates load the laps too.
@@ -148,9 +148,18 @@ indoor. All other keys are outdoor.
 
 ## 3. Build the dashboard
 
-Write the page as one self-contained HTML file: Chart.js from cdnjs, everything else inline, and no
-calls to Garmin. Do not put data into the code. The page reads it from this line, which the server
-fills:
+Write the page as one HTML file, with everything inline except Chart.js. It has no calls to Garmin.
+
+Load Chart.js with exactly this tag. It fixes the version and the content of the script:
+
+`<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.6.1/chart.umd.min.js" integrity="sha512-vMRyUfXe50uUhhDC+fk6UYBA/1VPj+I7Jn+wK0A3+wSVeUgT9OCz/xoF2M8KFvrmUOlb4Anv0FQUw8NafuzYPw==" crossorigin="anonymous"></script>`
+
+Put this tag first in `<head>`, exactly as it is. It blocks requests from the page:
+
+`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">`
+
+Do not load anything else from the web. Do not put data into the code. The page reads it from this
+line, which the server fills:
 
 `const DATA = /* garmin-data:start */null/* garmin-data:end */;`
 
