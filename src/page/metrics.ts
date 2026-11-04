@@ -173,6 +173,19 @@ export function weekly(
   return out;
 }
 
+/** As `weekly`, for a value that a session can lack: a week of sessions without it is null (a gap), and a week without sessions is 0. */
+export function weeklyKnown(
+  acts: Activity[],
+  weeks: string[],
+  value: (a: Activity) => number | undefined,
+): (number | null)[] {
+  const sessions = weekly(acts, weeks, () => 1);
+  const lacking = weekly(acts, weeks, (a) => (value(a) === undefined ? 1 : 0));
+  return weekly(acts, weeks, (a) => value(a) ?? 0).map((sum, i) =>
+    sessions[i] > 0 && lacking[i] === sessions[i] ? null : sum,
+  );
+}
+
 /** Estimated 1RM (Epley), only for sets of 1 to 12 reps. */
 export function epley(kg: number, reps: number): number | undefined {
   return reps >= 1 && reps <= 12 && kg > 0 ? kg * (1 + reps / 30) : undefined;

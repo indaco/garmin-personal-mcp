@@ -1177,6 +1177,23 @@ describe("chart legends", () => {
   });
 });
 
+/** An indoor ride on a day; `extra` adds fields. */
+const bikeRide = (start: string, extra: object = {}) => ({
+  id: Number(start.replace(/\D/g, "")),
+  name: "Indoor ride",
+  type: "cycling",
+  sport: "cycling",
+  start: `${start} 07:00:00`,
+  duration: "30:00",
+  ...extra,
+});
+/** The dataset of `label` for the last 5 weeks, and the 4-week average line. */
+async function lastWeeks(page: Page, widget: string, label: string) {
+  const bars = (await chartDataset(page, widget, label)).data as (number | null)[];
+  const avg = (await chartDataset(page, widget, "4-week average")).data as (number | null)[];
+  return { bars: bars.slice(-5), avg: avg.slice(-5) };
+}
+
 describe("overview widgets", () => {
   it("shows a tooltip on every chart", async () => {
     const { page, errors } = await open(browser, pageFile());
@@ -1369,6 +1386,53 @@ describe("overview widgets", () => {
     expect(await axis()).toBe("h");
     await page.click("[data-id=weeklyVolume] .picker >> text=Distance");
     expect(await axis()).toBe("km");
+  });
+
+  describe("a week without a distance or a load in the weekly charts", () => {
+    // indoor rides: week -5 has a distance and a load, week -4 has neither, week -3 has both, then two empty weeks
+    const rides = [
+      bikeRide("2026-09-29", { km: 30, trainingLoad: 50 }),
+      bikeRide("2026-10-06"),
+      bikeRide("2026-10-07"),
+      bikeRide("2026-10-13", { km: 10, trainingLoad: 40 }),
+    ];
+    const weeklyPage = (tab = "") =>
+      open(browser, pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: rides } }), {
+        hash: tab,
+      });
+    it("leaves a gap on Distance, and the average line skips it", async () => {
+      const { page, errors } = await weeklyPage();
+      await page.click("[data-id=weeklyVolume] .picker >> text=Distance");
+      const { bars, avg } = await lastWeeks(page, "weeklyVolume", "Bike");
+      expect(bars).toEqual([30, null, 10, 0, 0]);
+      // the mean of the known weeks of the last 4: a gap is not a 0, an empty week is
+      expect(avg[1]).toBe(10);
+      expect(avg[2]).toBeCloseTo(40 / 3, 5);
+      expect(avg[3]).toBeCloseTo(40 / 3, 5);
+      expect(avg[4]).toBeCloseTo(10 / 3, 5);
+      expect(errors).toEqual([]);
+    });
+
+    it("counts the time of every week", async () => {
+      const { page } = await weeklyPage();
+      const { bars } = await lastWeeks(page, "weeklyVolume", "Bike");
+      expect(bars).toEqual([0.5, 1, 0.5, 0, 0]);
+    });
+
+    it("leaves a gap on Load for sessions without a load or a heart rate", async () => {
+      const { page } = await weeklyPage();
+      await page.click("[data-id=weeklyVolume] .picker >> text=Load");
+      const { bars } = await lastWeeks(page, "weeklyVolume", "Bike");
+      expect(bars).toEqual([50, null, 40, 0, 0]);
+    });
+
+    it("leaves the same gap in Each week on the Cycling board", async () => {
+      const { page, errors } = await weeklyPage("#cycling");
+      await page.click("[data-id=typeWeekly] .picker >> text=Distance");
+      const { bars } = await lastWeeks(page, "typeWeekly", "Bike");
+      expect(bars).toEqual([30, null, 10, 0, 0]);
+      expect(errors).toEqual([]);
+    });
   });
 
   it("shows the widgets in Italian", async () => {
