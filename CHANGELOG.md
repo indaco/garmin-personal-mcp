@@ -4,7 +4,85 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The changelog is generated and managed by [sley](https://github.com/indaco/sley).
 
+## v0.10.1 - 2026-11-04
+
+### Highlights
+
+This release makes new versions easier to follow and corrects two setup problems.
+
+- **Read what is new without GitHub.** The note on your updated dashboard now opens the [What's new](https://garmin-personal-mcp.indaco.dev/whats-new.html) page, which also tells how to update.
+- **Keep your key in a file in Claude Desktop.** The guide now gives correct steps, so your configuration file stays valid.
+- **See why a schedule fails.** On Linux, when `crontab` refuses a long crontab, the setup of a scheduled refresh now shows the error and does not crash.
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
+
+### 🩹 Fixes
+
+- **schedule:** do not crash when a command exits before it reads its input ([6aeb3f1](https://github.com/indaco/garmin-personal-mcp/commit/6aeb3f1)) ([#190](https://github.com/indaco/garmin-personal-mcp/pull/190))
+
+### 📖 Documentation
+
+- **site:** add a What's new page ([05012bb](https://github.com/indaco/garmin-personal-mcp/commit/05012bb)) ([#189](https://github.com/indaco/garmin-personal-mcp/pull/189))
+- tell users what each release gives them and how to upgrade ([ce22e47](https://github.com/indaco/garmin-personal-mcp/commit/ce22e47)) ([#188](https://github.com/indaco/garmin-personal-mcp/pull/188))
+- **guide:** fix the key file steps in the Claude Desktop setup ([a74825b](https://github.com/indaco/garmin-personal-mcp/commit/a74825b)) ([#187](https://github.com/indaco/garmin-personal-mcp/pull/187))
+
+### ❤️ Contributors
+
+- [@indaco](https://github.com/indaco)
+
 ## v0.10.0 - 2026-11-03
+
+### Highlights
+
+This release lets you save your API key, test your setup and get help for each command in the terminal, on macOS, Linux and Windows.
+
+- **Save your API key with one command.** `setup` tests the key with Garmin and saves it in a file that only you can read.
+- **Find and correct problems.** `doctor` tests your setup and tells how to correct a failure. `doctor` and `info` do not show your API key or your user name, so you can share their output.
+- **Get help.** Add `--help` to a command to see how to use it. A wrong command or flag now shows an error and the help, and the server does not start.
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
 
 ### 🚀 Enhancements
 
@@ -31,6 +109,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## v0.9.0 - 2026-11-03
 
+### Highlights
+
+The new `info` command shows the version, the settings and where your files are, and it does not connect to the network. A sport now gets a dashboard tab only when the page has its activities, and more sports have a matching icon.
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
+
 ### 🚀 Enhancements
 
 - **cli:** add info command and document the terminal commands ([4d2fcd0](https://github.com/indaco/garmin-personal-mcp/commit/4d2fcd0)) ([#176](https://github.com/indaco/garmin-personal-mcp/pull/176))
@@ -45,6 +150,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - [@indaco](https://github.com/indaco)
 
 ## v0.8.1 - 2026-11-03
+
+### Highlights
+
+`run-review` now compares each lap with the correct planned step. A page block that a hand edit made too deep now gives an error with the remedy. A new guide shows the setup in Claude Desktop without a terminal.
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
 
 ### 🩹 Fixes
 
@@ -61,6 +193,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## v0.8.0 - 2026-11-02
 
+### Highlights
+
+The Bike board now shows grit and flow for mountain-bike rides, the vertical speed of each ride and the weekly easy and hard time. A dashboard update with many activities no longer fails.
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
+
 ### 🚀 Enhancements
 
 - **dashboard:** coach analyses for rides on the Bike board ([5843f89](https://github.com/indaco/garmin-personal-mcp/commit/5843f89)) ([#167](https://github.com/indaco/garmin-personal-mcp/pull/167))
@@ -74,6 +233,38 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - [@indaco](https://github.com/indaco)
 
 ## v0.7.0 - 2026-11-02
+
+### Highlights
+
+This release adds a daily training verdict, gives the same numbers in the chat and on the page, and tells you what an update adds.
+
+- **A verdict for today.** Use the `train-today` prompt to get a readiness verdict with its inputs and a short coach note.
+- **The same numbers everywhere.** Your assistant now quotes the numbers of the server for long runs, race predictions, splits, HR drift, rep fade, top sets and estimated 1RM.
+- **New widgets on your boards.** A board that you edited now gets each new preset widget one time, and a widget that you removed stays removed. The page and your assistant tell you what an update added.
+- **Fewer problems.** An expired API key now gives the steps to replace it. A rebuild keeps your added languages, and an update keeps edits that you make in the chat at the same time.
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
 
 ### 🚀 Enhancements
 
@@ -105,6 +296,37 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - [@indaco](https://github.com/indaco)
 
 ## v0.6.0 - 2026-10-31
+
+### Highlights
+
+This release shows the dashboard in the chat and makes automatic updates and page data more reliable.
+
+- **Dashboard in the chat.** Ask your assistant to show the dashboard inside the chat. Claude Desktop is the tested client, and terminal clients get a text reply.
+- **No hidden missed updates.** A page now shows a note when its automatic update is over 1 hour late. On macOS and Windows, an update that the computer missed runs later. A failed crontab read no longer replaces your crontab.
+- **Correct numbers.** A missing value now shows n/a or a gap, not 0. A page with fewer than 28 days of data shows n/a for the load ratio.
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
 
 ### 🚀 Enhancements
 
@@ -138,6 +360,37 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## v0.5.0 - 2026-10-30
 
+### Highlights
+
+This release adds coach analyses for running and strength training, and prompts that review your sessions.
+
+- **Running.** The dashboard shows HR drift, the weekly 5 km and 10 km pace, fitness, fatigue and form. `run-review` judges one run, and `race-readiness` judges your readiness for a race.
+- **Strength.** The Strength board shows which lifts do not improve. `strength-review` compares the sets that you did with the plan.
+- **Better answers in the chat.** Your assistant now reads the totals from the server and gets much shorter sleep data. Tool results do not contain your Garmin user ID or name.
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
+
 ### 🚀 Enhancements
 
 - compact getSleep and no Garmin user ids in tool results ([a347c81](https://github.com/indaco/garmin-personal-mcp/commit/a347c81)) ([#130](https://github.com/indaco/garmin-personal-mcp/pull/130))
@@ -166,6 +419,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## v0.4.0 - 2026-10-29
 
+### Highlights
+
+The dashboard has two new themes, Munich and Munich dark, and the project has a website. When you rebuild a page that updates automatically, your assistant now tells you the schedule and the next run.
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
+
 ### 🚀 Enhancements
 
 - add the project website and its build ([830c4e5](https://github.com/indaco/garmin-personal-mcp/commit/830c4e5)) ([#117](https://github.com/indaco/garmin-personal-mcp/pull/117))
@@ -189,6 +469,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## v0.3.2 - 2026-10-29
 
+### Highlights
+
+When you rebuild a dashboard, your assistant now tells you the saved settings and asks if you want to keep them.
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
+
 ### 🩹 Fixes
 
 - ask to keep the saved settings when the dashboard is rebuilt ([930fe59](https://github.com/indaco/garmin-personal-mcp/commit/930fe59)) ([#108](https://github.com/indaco/garmin-personal-mcp/pull/108))
@@ -203,6 +510,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## v0.3.1 - 2026-10-29
 
+### Highlights
+
+`--version` and `--help` now show their text in the terminal, and the server does not start.
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
+
 ### 🩹 Fixes
 
 - print the version and the help without starting the server ([71698c8](https://github.com/indaco/garmin-personal-mcp/commit/71698c8)) ([#106](https://github.com/indaco/garmin-personal-mcp/pull/106))
@@ -212,6 +546,37 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - [@indaco](https://github.com/indaco)
 
 ## v0.3.0 - 2026-10-29
+
+### Highlights
+
+This release updates your dashboard on a schedule and gives you more control of what each page shows.
+
+- **Automatic updates.** Set a schedule, and the dashboard updates without your assistant and without tokens.
+- **Filter by activity name.** See only the sessions of a training plan, on the dashboard or in the chat.
+- **Your own page.** Each page gets your custom widgets, in the languages of the page. You can also set the title and the headline of a preset or blank page.
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
 
 ### 🚀 Enhancements
 
@@ -231,6 +596,36 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## v0.2.0 - 2026-10-29
 
+### Highlights
+
+This release shows the dashboard in your language and units, and gives your assistant more Garmin data.
+
+- **Your language and units.** The dashboard now uses the units and the language of your Garmin profile. German, French, Spanish and Portuguese are new.
+- **More data.** Ask your assistant about your weight, your Body Battery and the planned workout of an activity.
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
+
 ### 🚀 Enhancements
 
 - dashboard languages from the Garmin profile, and four more languages ([51a3b23](https://github.com/indaco/garmin-personal-mcp/commit/51a3b23)) ([#93](https://github.com/indaco/garmin-personal-mcp/pull/93))
@@ -247,6 +642,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - [@indaco](https://github.com/indaco)
 
 ## v0.1.1 - 2026-10-28
+
+### Highlights
+
+The README now tells how to connect Codex and other stdio MCP clients. The dashboard page and the prompts say "your assistant" in place of Claude.
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
 
 ### 🩹 Fixes
 
