@@ -720,7 +720,10 @@ export class DashboardWriter {
     }
     if (page === undefined && next !== old) next = styled(next, own);
     // a page that Claude wrote keeps its settings in its block too, so its updates filter the same way
-    if (page !== undefined && marker("settings").test(next)) {
+    if (
+      (page !== undefined || (asked !== undefined && pageCode(next).from === "assistant")) &&
+      marker("settings").test(next)
+    ) {
       next = writeBlock(next, "settings", Object.keys(own).length > 0 ? own : null);
     }
     if (page === undefined) {

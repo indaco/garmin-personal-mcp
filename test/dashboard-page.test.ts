@@ -96,6 +96,15 @@ function racingWriter(json: unknown, during: () => unknown) {
   );
   return { w, calls };
 }
+/** Runs `run` 20 minutes later, past the reuse window of the page. */
+const later = async <T>(run: () => Promise<T>) => {
+  vi.useFakeTimers({ now: Date.now() + 20 * 60_000, toFake: ["Date"] });
+  try {
+    return await run();
+  } finally {
+    vi.useRealTimers();
+  }
+};
 /** The page without its data block: what an update must keep. */
 const code = (s: string) =>
   s.replace(/\/\* garmin-data:start \*\/[\s\S]*?\/\* garmin-data:end \*\//, "");
@@ -822,6 +831,53 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
     // new settings without any setting: the block is empty again
     await writer.write({ page: own, settings: {} });
     expect(page()).toContain("/* garmin-settings:start */null/* garmin-settings:end */");
+  });
+
+  describe("new settings on a page that Claude wrote", () => {
+    const own = `<html><script>window.GARMIN_SETTINGS = /* garmin-settings:start */null/* garmin-settings:end */;
+const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
+
+    it("saves new settings without a page on a page that the assistant wrote", async () => {
+      await writer.write({ page: own });
+      await writer.write({ settings: { exclude: ["names"] } });
+      expect(page()).toContain('{"exclude":["names"]}');
+      const r = await later(() => writer.write({}));
+      expect(r.settings).toEqual({ exclude: ["names"] });
+      const d = readBlock(page(), "data") as Full;
+      for (const a of d.activities) expect(a).not.toHaveProperty("name");
+      expect(page()).not.toContain("Anna");
+    });
+
+    it("empty settings clear the block", async () => {
+      await writer.write({ page: own });
+      await writer.write({ settings: { exclude: ["names"] } });
+      await writer.write({ settings: {} });
+      expect(page()).toContain("/* garmin-settings:start */null/* garmin-settings:end */");
+    });
+
+    it("repairs an unreadable block of such a page", async () => {
+      await writer.write({ page: own });
+      writeFileSync(
+        file,
+        page().replace(
+          "/* garmin-settings:start */null/* garmin-settings:end */",
+          "/* garmin-settings:start */{bad/* garmin-settings:end */",
+        ),
+      );
+      await later(async () => {
+        await expect(writer.write({})).rejects.toThrow();
+        await writer.write({ settings: { workouts: true } });
+      });
+      expect(readBlock(page(), "settings")).toEqual({ workouts: true });
+    });
+
+    it("does not change the block of a write without settings", async () => {
+      await writer.write({ page: own, settings: { exclude: ["names"] } });
+      await later(() => writer.write({ notes: ["n"] }));
+      expect(page()).toContain(
+        '/* garmin-settings:start */{"exclude":["names"]}/* garmin-settings:end */',
+      );
+    });
   });
 
   it("leaves out of the page and of the digest the data and the sports that the settings exclude", async () => {
