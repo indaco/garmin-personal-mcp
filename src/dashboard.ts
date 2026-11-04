@@ -441,10 +441,20 @@ function activitiesBetween(cache: Json, from: string, to: string): Json[] {
     });
 }
 
-/** The fields the period comparison needs. */
+/** The fields that the period comparison, the boards and the load of a previous session need. */
 function compact(a: Json): Json {
   const o: Json = {};
-  for (const f of ["id", "start", "type", "km", "duration", "elapsed", "trainingLoad"]) {
+  for (const f of [
+    "id",
+    "start",
+    "type",
+    "sport",
+    "km",
+    "duration",
+    "elapsed",
+    "avgHR",
+    "trainingLoad",
+  ]) {
     copy(a, o, f, f);
   }
   return o;
