@@ -12,14 +12,15 @@ declare global {
   interface Window {
     showApp(
       html: string,
-      structuredContent: Record<string, unknown>,
+      structuredContent: Record<string, unknown> | null,
       modes?: ("inline" | "fullscreen")[],
+      failure?: string,
     ): Promise<HostLog>;
     hostLog: HostLog;
   }
 }
 
-window.showApp = async (html, structuredContent, modes) => {
+window.showApp = async (html, structuredContent, modes, failure) => {
   const log: HostLog = { sizes: [], links: [], modes: [] };
   window.hostLog = log;
   const frame = document.createElement("iframe");
@@ -45,8 +46,15 @@ window.showApp = async (html, structuredContent, modes) => {
     log.modes.push(mode);
     return { mode: mode !== "pip" && modes?.includes(mode) ? mode : "inline" };
   };
-  bridge.oninitialized = () =>
-    void bridge.sendToolResult({ content: [{ type: "text", text: "{}" }], structuredContent });
+  bridge.oninitialized = () => {
+    // a failed result first, when asked; then the data, unless the call only fails
+    if (failure !== undefined) {
+      void bridge.sendToolResult({ isError: true, content: [{ type: "text", text: failure }] });
+    }
+    if (structuredContent) {
+      void bridge.sendToolResult({ content: [{ type: "text", text: "{}" }], structuredContent });
+    }
+  };
   frame.srcdoc = html;
   await bridge.connect(new PostMessageTransport(frame.contentWindow!, frame.contentWindow!));
   return log;

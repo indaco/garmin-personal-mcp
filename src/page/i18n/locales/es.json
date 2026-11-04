@@ -184,6 +184,7 @@
   "board.empty": "Esta pestaña no tiene widgets.",
   "board.emptyEdit": "Esta pestaña no tiene widgets: usa “Añadir widget” para poner alguno.",
   "widget.failed": "Este widget falló: {message}",
+  "chat.failed": "No se pudo abrir el panel.",
   "widget.unknown": "Widget desconocido: {id}",
   "empty.window": "No hay sesiones en las semanas elegidas.",
   "w.coachNotes": "Notas del entrenador",

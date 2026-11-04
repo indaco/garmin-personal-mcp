@@ -184,6 +184,7 @@
   "board.empty": "Ce tableau n'a aucun widget.",
   "board.emptyEdit": "Ce tableau n'a aucun widget : utilise « Ajouter un widget » pour en mettre.",
   "widget.failed": "Ce widget a échoué : {message}",
+  "chat.failed": "Le tableau de bord n'a pas pu s'ouvrir.",
   "widget.unknown": "Widget inconnu : {id}",
   "empty.window": "Aucune séance dans les semaines choisies.",
   "w.coachNotes": "Notes du coach",

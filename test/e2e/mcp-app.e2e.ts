@@ -43,9 +43,15 @@ async function viewBlocks() {
 }
 
 /** The page shown by the test host, as a host shows the showDashboard resource. */
-async function showInHost(html: string, blocks: ViewBlocks, modes?: ("inline" | "fullscreen")[]) {
+async function openHost(
+  html: string,
+  blocks: ViewBlocks | null,
+  modes?: ("inline" | "fullscreen")[],
+  failure?: string,
+  locale?: string,
+) {
   const page = await (
-    await browser.newContext({ viewport: { width: 1280, height: 900 } })
+    await browser.newContext({ viewport: { width: 1280, height: 900 }, locale })
   ).newPage();
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
@@ -54,14 +60,20 @@ async function showInHost(html: string, blocks: ViewBlocks, modes?: ("inline" | 
   });
   await page.setContent("<!doctype html><body></body>");
   await page.addScriptTag({ content: host });
-  await page.evaluate(([h, b, m]) => window.showApp(h, { ...b }, m), [
+  await page.evaluate(([h, b, m, f]) => window.showApp(h, b && { ...b }, m, f), [
     html,
     blocks,
     modes,
+    failure,
   ] as const);
-  const frame = page.frames()[1];
-  await frame.waitForSelector(".tile");
-  return { page, frame, errors };
+  return { page, frame: page.frames()[1], errors };
+}
+
+/** As openHost, once the dashboard is drawn. */
+async function showInHost(html: string, blocks: ViewBlocks, modes?: ("inline" | "fullscreen")[]) {
+  const opened = await openHost(html, blocks, modes);
+  await opened.frame.waitForSelector(".tile");
+  return opened;
 }
 
 it("shows the dashboard in a host frame from the showDashboard blocks", async () => {
@@ -149,5 +161,40 @@ it("shows no note about the last refresh in the chat", async () => {
   });
   const { frame, errors } = await showInHost(withRecord, await viewBlocks());
   expect(await frame.$("[aria-label='New in this version']")).toBeNull();
+  expect(errors).toEqual([]);
+});
+
+it("says in the frame why the dashboard did not open, as text", async () => {
+  const { page, frame, errors } = await openHost(
+    template(),
+    null,
+    undefined,
+    "key expired <b>x</b>",
+  );
+  await frame.waitForFunction(() => document.querySelector("#app .error"));
+  const text = await frame.innerText("#app");
+  expect(text).toContain("The dashboard could not open.");
+  expect(text).toContain("key expired <b>x</b>");
+  // the reason is a text node, not markup
+  expect(await frame.$("#app b")).toBeNull();
+  expect(await frame.$(".tile")).toBeNull();
+  // the frame is sized to the text, so it does not stay empty and flat
+  await expect.poll(() => page.evaluate(() => window.hostLog.sizes.at(-1) ?? 0)).toBeGreaterThan(0);
+  expect(errors).toEqual([]);
+});
+
+it("says it in English whatever the browser language", async () => {
+  const { frame, errors } = await openHost(template(), null, undefined, "no", "it-IT");
+  await frame.waitForFunction(() => document.querySelector("#app .error"));
+  expect(await frame.innerText("#app")).toContain("The dashboard could not open. no");
+  expect(errors).toEqual([]);
+});
+
+it("draws the dashboard when a result with data follows a failed one", async () => {
+  const { frame, errors } = await openHost(template(), await viewBlocks(), undefined, "first try");
+  await frame.waitForSelector(".tile");
+  const text = await frame.innerText("#app");
+  expect(text).toContain("Training + Recovery");
+  expect(text).not.toContain("The dashboard could not open.");
   expect(errors).toEqual([]);
 });

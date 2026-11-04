@@ -184,6 +184,7 @@
   "board.empty": "Dieses Board hat keine Widgets.",
   "board.emptyEdit": "Dieses Board hat keine Widgets: Füge mit „Widget hinzufügen“ welche hinzu.",
   "widget.failed": "Dieses Widget ist fehlgeschlagen: {message}",
+  "chat.failed": "Das Dashboard konnte nicht geöffnet werden.",
   "widget.unknown": "Unbekanntes Widget: {id}",
   "empty.window": "Keine Einheiten in den gewählten Wochen.",
   "w.coachNotes": "Coach-Notizen",

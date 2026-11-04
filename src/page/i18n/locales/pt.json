@@ -184,6 +184,7 @@
   "board.empty": "Este quadro não tem widgets.",
   "board.emptyEdit": "Este quadro não tem widgets: use “Adicionar widget” para colocar alguns.",
   "widget.failed": "Este widget falhou: {message}",
+  "chat.failed": "Não foi possível abrir o painel.",
   "widget.unknown": "Widget desconhecido: {id}",
   "empty.window": "Nenhuma sessão nas semanas selecionadas.",
   "w.coachNotes": "Notas do treinador",
