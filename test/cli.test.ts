@@ -150,12 +150,6 @@ describe("cli", () => {
     ["doctor", ["--foo"], "--foo"],
     ["doctor", ["--force"], "--force"],
     // --force is exact, it comes first and only setup has it
-    ["setup", ["--foo"], "--foo"],
-    ["setup", ["--FORCE"], "--FORCE"],
-    ["setup", ["-f"], "-f"],
-    ["setup", ["--force", "--force"], "--force"],
-    ["setup", ["word", "--force"], "--force"],
-    ["setup", ["--auto"], "--auto"],
     ["refresh", ["--force"], "--force"],
     ["schedule", ["--force"], "--force"],
     // the help flag of a command is exact
@@ -197,6 +191,63 @@ describe("cli", () => {
     expect(f.auto.status).not.toHaveBeenCalled();
     expect(f.auto.pages).not.toHaveBeenCalled();
     expect(write).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["--foo"],
+    ["--FORCE"],
+    ["-f"],
+    ["--force", "--force"],
+    ["word", "--force"],
+    ["--auto"],
+    ["--key=not-a-real-key"],
+    ["-not-a-real-key"],
+    ["--force", "--key=not-a-real-key"],
+  ])("setup %j refuses the arguments and never prints them", async (...args) => {
+    const { apiKeyFile, config } = newHome();
+    const f = fakes();
+    const r = await cli("setup", args, f.auto, f.writer, undefined, config);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("setup does not take the key as an argument");
+    for (const x of args.filter((y) => y !== "--force")) expect(r.stderr).not.toContain(x);
+    expect(existsSync(apiKeyFile)).toBe(false);
+  });
+
+  it.each([[["off", "coach"]], [["off", "coach.htm"]], [["off", "a.html", "b.html"]]])(
+    "schedule %j refuses a page it cannot use",
+    async (args) => {
+      const f = fakes();
+      const r = await cli("schedule", args, f.auto, f.writer);
+      expect(r.code).toBe(1);
+      expect(r.stderr).toMatch(/^schedule off takes one page/);
+      expect(f.auto.off).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([[["a.html", "b.html"]], [["--auto", "x.html"]]])(
+    "refresh %j refuses more than one argument",
+    async (args) => {
+      const f = fakes();
+      const write = vi.fn(f.writer);
+      const r = await cli("refresh", args, f.auto, write);
+      expect(r.code).toBe(1);
+      expect(r.stderr).toMatch(/^refresh takes one page/);
+      expect(write).not.toHaveBeenCalled();
+      expect(f.auto.saveRun).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps the working forms of schedule off and refresh", async () => {
+    const f = fakes();
+    expect((await cli("schedule", ["off"], f.auto, f.writer)).code).toBe(0);
+    expect(f.auto.off).toHaveBeenLastCalledWith(undefined);
+    expect((await cli("schedule", ["off", "coach.html"], f.auto, f.writer)).code).toBe(0);
+    expect(f.auto.off).toHaveBeenLastCalledWith("coach.html");
+    expect((await cli("refresh", [], f.auto, f.writer)).code).toBe(0);
+    expect((await cli("refresh", ["a.html"], f.auto, f.writer)).code).toBe(0);
+    expect(f.written).toEqual(["", "a.html"]);
+    expect((await cli("refresh", ["--auto"], f.auto, f.writer)).code).toBe(1);
+    expect(f.auto.pages).toHaveBeenCalled();
   });
 
   it.each(["info", "doctor", "setup", "refresh", "schedule"])(
