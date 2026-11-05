@@ -210,7 +210,7 @@ function setLanguage(choice: string): void {
 function render(): void {
   const app = document.getElementById("app")!;
   destroyCharts();
-  themeCharts();
+  themeCharts(lang);
   document.title = pageTitle();
   if (!G.data) {
     app.replaceChildren(

@@ -133,7 +133,7 @@ register({
           fmt.day(day(a)),
           a.name ?? "",
           fmt.dist(num(a.km), 2),
-          fmt.hms(ctx.calc.seconds(a.duration) || undefined),
+          fmt.hms(ctx.calc.seconds(a.elapsed ?? a.duration) || undefined),
           paceText(ctx, a.pace),
           fmt.num(num(a.avgHR)),
           num(a.avgPowerW) === undefined ? fmt.na : `${fmt.num(num(a.avgPowerW))} W`,

@@ -198,6 +198,17 @@ const ratios = (page: Page) =>
       .map((k) => k.querySelector(".kpi-value")?.textContent),
   );
 
+/** All sub texts of the tiles of the readiness widget: label → list. */
+const readinessSubs = (page: Page) =>
+  page.$$eval("[data-id=readiness] .kpi", (kpis): Record<string, string[]> =>
+    Object.fromEntries(
+      kpis.map((k) => [
+        k.querySelector(".kpi-label")?.textContent ?? "",
+        [...k.querySelectorAll(".kpi-sub")].map((x) => x.textContent ?? ""),
+      ]),
+    ),
+  );
+
 /** The tiles of a widget: label → [value, sub text or null]. */
 const kpiTexts = (page: Page, widget: string) =>
   page.$$eval(`[data-id=${widget}] .kpi`, (kpis) =>
@@ -1881,6 +1892,131 @@ describe("overview widgets", () => {
     expect(noHrvTiles["HRV status"]).toEqual(["n/a", null]);
     expect(noHrvTiles["Sleep score"]).toEqual([String(r.sleepScore), null]);
     expect(noHrvTiles).toEqual(readinessTiles(r));
+  });
+
+  describe("readiness row dates", () => {
+    const oldHrv = data.hrv.filter((r: { date: string }) => r.date <= "2026-10-24");
+    const oldRecovery = data.recovery.filter((r: { date: string }) => r.date <= "2026-10-25");
+
+    it("says the date of an HRV row that is not the last day of the data, readiness", async () => {
+      const file = pageFile({ data: { ...data, v: DASHBOARD_VERSION, hrv: oldHrv } });
+      const { page, errors } = await open(browser, file);
+      const s = await readinessSubs(page);
+      expect(s["HRV status"]).toEqual(["from Oct 24"]);
+      expect(s["Sleep score"]).toEqual([]);
+      expect(s["Resting HR"].some((x) => x.startsWith("from"))).toBe(false);
+      expect(errors).toEqual([]);
+    });
+
+    it("says the date of a recovery row that is not the last day of the data, readiness", async () => {
+      const file = pageFile({ data: { ...data, v: DASHBOARD_VERSION, recovery: oldRecovery } });
+      const { page, errors } = await open(browser, file);
+      const s = await readinessSubs(page);
+      expect(s["Sleep score"]).toEqual(["from Oct 25"]);
+      expect(s["Resting HR"]).toHaveLength(2);
+      expect(s["Resting HR"][0]).toMatch(/^7 days before: /);
+      expect(s["Resting HR"][1]).toBe("from Oct 25");
+      expect(s["HRV status"]).toEqual([]);
+      expect(errors).toEqual([]);
+    });
+
+    it("does not say a date for a readiness value that the last day lacks", async () => {
+      const recovery = data.recovery.map((r: { date: string }) =>
+        r.date === data.end ? { date: r.date } : r,
+      );
+      const file = pageFile({ data: { ...data, v: DASHBOARD_VERSION, recovery } });
+      const { page, errors } = await open(browser, file);
+      const t = await kpiTexts(page, "readiness");
+      expect(t["Sleep score"]).toEqual(["n/a", null]);
+      expect(t["Resting HR"][0]).toBe("n/a");
+      const s = await readinessSubs(page);
+      expect(s["Sleep score"]).toEqual([]);
+      expect(s["Resting HR"].some((x) => x.startsWith("from"))).toBe(false);
+      expect(errors).toEqual([]);
+    });
+
+    it("does not say a date for an HRV row without one, readiness", async () => {
+      const hrv = data.hrv.map((r: { date: string }) =>
+        r.date === data.end ? without(r, ["date"]) : r,
+      );
+      const file = pageFile({ data: { ...data, v: DASHBOARD_VERSION, hrv } });
+      const { page, errors } = await open(browser, file);
+      expect((await readinessSubs(page))["HRV status"]).toEqual([]);
+      expect(await page.textContent("[data-id=readiness]")).not.toContain("undefined");
+      expect(errors).toEqual([]);
+    });
+
+    it("does not say a date for a recovery row without one, readiness", async () => {
+      const recovery = data.recovery.map((r: { date: string }) =>
+        r.date === data.end ? without(r, ["date"]) : r,
+      );
+      const file = pageFile({ data: { ...data, v: DASHBOARD_VERSION, recovery } });
+      const { page, errors } = await open(browser, file);
+      const s = await readinessSubs(page);
+      expect(s["Sleep score"]).toEqual([]);
+      expect(s["Resting HR"].some((x) => x.startsWith("from"))).toBe(false);
+      expect(await page.textContent("[data-id=readiness]")).not.toContain("undefined");
+      expect(errors).toEqual([]);
+    });
+
+    it("does not say a date for an older row that has no values, readiness", async () => {
+      const recovery = oldRecovery.map((r: { date: string }) =>
+        r.date === "2026-10-25" ? { date: r.date } : r,
+      );
+      const hrv = oldHrv.map((r: { date: string }) =>
+        r.date === "2026-10-24" ? { date: r.date } : r,
+      );
+      const file = pageFile({ data: { ...data, v: DASHBOARD_VERSION, recovery, hrv } });
+      const { page, errors } = await open(browser, file);
+      const s = await readinessSubs(page);
+      expect(
+        Object.values(s)
+          .flat()
+          .some((x) => x.startsWith("from")),
+      ).toBe(false);
+      expect((await kpiTexts(page, "readiness"))["HRV status"]).toEqual(["n/a", null]);
+      expect(errors).toEqual([]);
+    });
+
+    it("does not say a date for HRV when there are no HRV rows, readiness", async () => {
+      const file = pageFile({ data: { ...data, v: DASHBOARD_VERSION, hrv: [] } });
+      const { page, errors } = await open(browser, file);
+      expect((await kpiTexts(page, "readiness"))["HRV status"]).toEqual(["n/a", null]);
+      expect((await readinessSubs(page))["HRV status"]).toEqual([]);
+      expect(errors).toEqual([]);
+    });
+
+    it("says the date in Italian, readiness", async () => {
+      const file = pageFile({
+        data: { ...data, v: DASHBOARD_VERSION, hrv: oldHrv },
+        settings: { languages: ["it"] },
+      });
+      const { page, errors } = await open(browser, file);
+      const day = await page.evaluate(() =>
+        new Intl.DateTimeFormat("it", { day: "numeric", month: "short", timeZone: "UTC" }).format(
+          new Date("2026-10-24T00:00:00Z"),
+        ),
+      );
+      expect((await readinessSubs(page))["Stato HRV"]).toEqual([`del ${day}`]);
+      expect(errors).toEqual([]);
+    });
+
+    it("tells in the readiness note that it uses the newest data", async () => {
+      const { page } = await open(browser, pageFile());
+      const note = await page.textContent("[data-id=readiness]");
+      expect(note).toContain("It uses the newest data");
+      expect(note).not.toContain("It shows today");
+    });
+
+    it("says no date on a readiness widget whose rows are from the last day", async () => {
+      const { page } = await open(browser, pageFile());
+      const s = await readinessSubs(page);
+      expect(
+        Object.values(s)
+          .flat()
+          .some((x) => x.startsWith("from")),
+      ).toBe(false);
+    });
   });
 
   it("shows the load ratio as n/a when the data does not cover its 28 days", async () => {
@@ -3906,5 +4042,88 @@ describe("new in this version", () => {
       expect(errors).toEqual([]);
       expect(await page.$(".page")).not.toBeNull();
     }
+  });
+});
+
+/** The test page with extra activities before the fixture's own. */
+const withActivities = (extra: unknown[]) =>
+  pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: [...extra, ...data.activities] } });
+/** The text of the KPI widget of the Run board with extra activities. */
+const runKpiText = async (activities: unknown[]) => {
+  const { page } = await open(browser, withActivities(activities), { hash: "#running" });
+  return page.textContent("[data-id=typeKpis]");
+};
+/** The tick labels of the y axis of the steps chart. */
+const stepsAxis = (page: Page) =>
+  page.evaluate(() => {
+    const c = Object.values(window.Chart!.instances).find((x) =>
+      x.canvas.closest("[data-widget=steps]"),
+    )!;
+    return c.scales.y.ticks.map((t) => t.label as string);
+  });
+
+describe("small numbers on the boards", () => {
+  const swim = {
+    id: 9101,
+    name: "Pool Swim",
+    type: "lap_swimming",
+    sport: "swimming",
+    start: "2026-10-24 07:00:00",
+    km: 1.5,
+    duration: "30:00",
+  };
+  const race = {
+    id: 9102,
+    name: "Town Race",
+    type: "running",
+    sport: "running",
+    start: "2026-10-20 08:00:00",
+    km: 21.1,
+    duration: "1:41:16",
+    elapsed: "1:45:00",
+    race: true,
+  };
+  const estimatedText = "Some loads are estimates: the activity has no Garmin load.";
+
+  it("shows the swimming pace per 100 m", async () => {
+    const { page, errors } = await open(browser, withActivities([swim]), { hash: "#swimming" });
+    expect((await kpiTexts(page, "typeKpis"))["Average pace"]?.[0]).toBe("2:00/100 m");
+    expect(errors).toEqual([]);
+  });
+
+  it("shows the elapsed time of a race, and the moving time without it", async () => {
+    const { page, errors } = await open(browser, withActivities([race]), { hash: "#running" });
+    const times = await page.$$eval("[data-id=races] tbody tr", (r) =>
+      r.map((x) => [x.children[1].textContent, x.children[3].textContent]),
+    );
+    expect(times).toContainEqual(["Town Race", "1:45:00"]);
+    expect(times).toContainEqual(["City 10K", "49:00"]);
+    expect(errors).toEqual([]);
+  });
+
+  it("says that a load is an estimate only when one is", async () => {
+    const noLoadRun = { ...row(9103, "Easy Run", "2026-10-21 07:00:00") };
+    expect(await runKpiText([{ ...noLoadRun, avgHR: 150 }])).toContain(estimatedText);
+    expect(await runKpiText([])).not.toContain(estimatedText);
+    // no load and no heart rate: there is nothing to estimate from
+    expect(await runKpiText([noLoadRun])).not.toContain(estimatedText);
+  });
+
+  it("writes the numbers of a chart axis in the language of the page", async () => {
+    const { page, errors } = await open(
+      browser,
+      pageFile({ settings: { languages: ["en", "it"] } }),
+      { hash: "#walking", locale: "en-US" },
+    );
+    // an English browser, an Italian page
+    await page.click(".account summary");
+    await page.selectOption("#lang", "it");
+    const italian = await stepsAxis(page);
+    expect(italian.some((l) => /^\d+\.\d{3}$/.test(l))).toBe(true);
+    expect(italian.some((l) => l.includes(","))).toBe(false);
+    // the change of language draws the axis again
+    await page.selectOption("#lang", "en");
+    expect((await stepsAxis(page)).some((l) => /^\d+,\d{3}$/.test(l))).toBe(true);
+    expect(errors).toEqual([]);
   });
 });

@@ -11,6 +11,7 @@ import {
   kpiRow,
   note,
   loadText,
+  maxHR,
   totals,
   weekLabel,
   windowEnd,
@@ -73,7 +74,9 @@ register({
         timed.km > 0 &&
         (ctx.type === "cycling"
           ? kpi(t("tk.speed"), fmt.speed(timed.km / (timed.seconds / 3600)))
-          : kpi(t("tk.pace"), fmt.pace(timed.seconds / timed.km))),
+          : ctx.type === "swimming"
+            ? kpi(t("tk.pace"), fmt.swimPace(timed.seconds / timed.km / 10))
+            : kpi(t("tk.pace"), fmt.pace(timed.seconds / timed.km))),
       ctx.type === "cycling" && kpi(t("tk.ascent"), fmt.elev(ascent)),
       kpi(
         t("tk.hr"),
@@ -88,7 +91,12 @@ register({
           t("tk.share", { v: fmt.num((sum.load / all.load) * 100) }),
       ),
     ].filter((x): x is HTMLElement => x instanceof HTMLElement);
-    append(el, kpiRow(...tiles), acts.length === 1 && note(t("one.session")));
+    append(
+      el,
+      kpiRow(...tiles),
+      acts.length === 1 && note(t("one.session")),
+      acts.some((a) => calc.loadOf(a, maxHR(ctx))?.estimate) && note(t("ls.estimated")),
+    );
   },
 });
 
