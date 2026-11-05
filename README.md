@@ -357,6 +357,7 @@ These prompts answer in the chat. They do not change a dashboard.
 | [race-readiness](#race-readiness)   | tells if you are ready for a race, with a plan for its pace | `/mcp__garmin-personal__race-readiness 2026-11-15 half 1:45:00` |
 | [strength-review](#strength-review) | reviews one strength session as a coach                     | `/mcp__garmin-personal__strength-review`                        |
 | [train-today](#train-today)         | tells if you should train hard today, with fitness and form | `/mcp__garmin-personal__train-today`                            |
+| [week-review](#week-review)         | reviews your last whole week against the weeks before       | `/mcp__garmin-personal__week-review`                            |
 
 A missing value shows as "n/a": the assistant does not estimate it.
 
@@ -415,6 +416,15 @@ assistant gives its date. Then it gives your fitness, fatigue and form, and a sh
 
 Without HRV and sleep data, for example when the page leaves out the recovery data, the summary has
 no readiness: the verdict and its inputs show as "n/a". The prompt has no arguments.
+
+### week-review
+
+The assistant reads the server's summary of the dashboard data (a `writeDashboard` preview, which
+writes nothing). It uses the weeks of your dashboard page, so the numbers are the same as on the
+page. It compares your last whole week, Monday to Sunday, with up to 4 weeks before it: sessions,
+hours, km, run km and load. Then it gives the load ratio and the form of today, and a short coach
+note. The summary has no split by sport for each week, so the review has none. The prompt has no
+arguments.
 
 ## Configuration
 

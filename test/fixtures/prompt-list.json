@@ -120,5 +120,9 @@
         "required": false
       }
     ]
+  },
+  {
+    "name": "week-review",
+    "description": "Review the last whole training week against the weeks before: sessions, hours, km, load and form"
   }
 ]

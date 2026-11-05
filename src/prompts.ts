@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { addDays, localToday } from "./dates";
+import { mondayOf } from "./page/calc";
 import { BUILT_IN } from "./page/i18n/built-in";
 import { en } from "./page/i18n/en";
 import { THEMES } from "./page/theme";
@@ -30,6 +31,7 @@ export function registerPrompts(server: McpServer): void {
   const readinessPrompt = load("race-readiness.md");
   const strengthPrompt = load("strength-review.md");
   const trainPrompt = load("train-today.md");
+  const weekPrompt = load("week-review.md");
 
   const dashboardDescription =
     "Build a personal training + recovery dashboard (volume, load, HRV, sleep) from Garmin data";
@@ -273,6 +275,16 @@ export function registerPrompts(server: McpServer): void {
   server.registerPrompt("train-today", { description: trainDescription }, () =>
     result(trainDescription, render(trainPrompt, { today: localToday() })),
   );
+
+  const weekDescription =
+    "Review the last whole training week against the weeks before: sessions, hours, km, load and form";
+  server.registerPrompt("week-review", { description: weekDescription }, () => {
+    const today = localToday();
+    return result(
+      weekDescription,
+      render(weekPrompt, { today, week: addDays(mondayOf(today), -7) }),
+    );
+  });
 }
 
 /**
