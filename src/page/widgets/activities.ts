@@ -2,7 +2,7 @@ import { type Activity, groupOf, seconds } from "../calc";
 import { append, h } from "../dom";
 import type { Fmt } from "../i18n";
 import { register } from "../registry";
-import { showAll, table, typeCell } from "./ui";
+import { garminWord, showAll, table, typeCell } from "./ui";
 
 /** Activities whose laps the page shows: the rows can open. */
 const open = new Set<string>();
@@ -100,7 +100,7 @@ register({
                       ? fmt.speed(l.kmh)
                       : "",
                   typeof l.avgHR === "number" ? fmt.num(l.avgHR) : "",
-                  String(l.intensity ?? ""),
+                  typeof l.intensity === "string" ? garminWord(ctx, "lapType", l.intensity) : "",
                 ]),
                 [1, 2, 3, 4],
               ),

@@ -7,6 +7,7 @@ import {
   between,
   delta,
   everyActivity,
+  garminWord,
   kpi,
   kpiRow,
   maxHR,
@@ -117,7 +118,11 @@ register({
         verdict ? t(`ready.${verdict}` as Key) : fmt.na,
       ),
       kpiRow(
-        kpi(t("ready.hrv"), inputs.hrvStatus ?? fmt.na, from(inputs.hrvStatus, inputs.hrvDate)),
+        kpi(
+          t("ready.hrv"),
+          inputs.hrvStatus === undefined ? fmt.na : garminWord(ctx, "hrvStatus", inputs.hrvStatus),
+          from(inputs.hrvStatus, inputs.hrvDate),
+        ),
         kpi(
           t("ready.sleep"),
           fmt.num(inputs.sleepScore),

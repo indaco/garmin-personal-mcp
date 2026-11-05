@@ -5,6 +5,7 @@ import {
   CategoryScale,
   Chart,
   type ChartConfiguration,
+  type ChartDataset,
   DoughnutController,
   Filler,
   Legend,
@@ -97,14 +98,60 @@ export function themeCharts(language: string): void {
 
 export const CHART_TYPES = ["bar", "line", "scatter", "doughnut", "pie"];
 
-/** A value of a dataset as text: a number, an {x, y} point, or nothing. */
-function text(v: unknown): string {
-  if (typeof v === "number") return String(Math.round(v * 100) / 100);
-  if (v && typeof v === "object" && "y" in v) {
-    const p = v as { x: unknown; y: unknown };
-    return `${text(p.x)}: ${text(p.y)}`;
+type Tick = (value: number) => unknown;
+
+/** The tick text of the axis that holds a dataset's values: the table reads as the chart does. */
+function axisText(config: ChartConfiguration, set: ChartDataset): Tick | undefined {
+  const horizontal = config.options?.indexAxis === "y";
+  const axis = horizontal
+    ? ((set as { xAxisID?: string }).xAxisID ?? "x")
+    : ((set as { yAxisID?: string }).yAxisID ?? "y");
+  const scales = config.options?.scales as
+    | Record<string, { ticks?: { callback?: unknown } }>
+    | undefined;
+  return scales?.[axis]?.ticks?.callback as Tick | undefined;
+}
+
+/** A value as text, by the axis when it can: a custom widget's callback may need what only a live chart has. */
+function valueText(v: number, tick: Tick | undefined): string {
+  try {
+    const shown = tick?.(v);
+    if (typeof shown === "string" || typeof shown === "number") return String(shown);
+  } catch {
+    // the plain number below
   }
-  return v === null || v === undefined ? "" : String(v);
+  return new Intl.NumberFormat(Chart.defaults.locale, { maximumFractionDigits: 2 }).format(v);
+}
+
+/** A value of a dataset as text: a number, an {x, y} point, or nothing. */
+function text(v: unknown, tick?: Tick): string {
+  if (typeof v === "number") return valueText(v, tick);
+  if (isPoint(v)) return `${text(v.x)}: ${text(v.y, tick)}`;
+  // an object that is not a point has no text; an array is a floating bar
+  const empty = v === null || v === undefined || (typeof v === "object" && !Array.isArray(v));
+  return empty ? "" : String(v);
+}
+
+function isPoint(v: unknown): v is { x: unknown; y: unknown } {
+  return typeof v === "object" && v !== null && "x" in v && "y" in v;
+}
+
+/** The category axis places a point by its label, not by its position. */
+function cell(
+  data: unknown[],
+  label: unknown,
+  i: number,
+  labelled: boolean,
+  tick: Tick | undefined,
+): string {
+  if (labelled && data.some(isPoint)) {
+    return data
+      .filter(isPoint)
+      .filter((p) => p.x === label)
+      .map((p) => text(p.y, tick))
+      .join(", ");
+  }
+  return text(data[i], tick);
 }
 
 /** The data of a chart as a table that only screen readers get: one row per label, one column per series. */
@@ -136,8 +183,14 @@ function dataTable(config: ChartConfiguration, title: string): HTMLElement {
           h(
             "tr",
             {},
-            h("th", { scope: "row" }, text(label)),
-            ...sets.map((d) => h("td", {}, text(d.data[i]))),
+            h("th", { scope: "row" }, String(label ?? "")),
+            ...sets.map((d) =>
+              h(
+                "td",
+                {},
+                cell(d.data, label, i, config.data.labels !== undefined, axisText(config, d)),
+              ),
+            ),
           ),
         ),
       ),

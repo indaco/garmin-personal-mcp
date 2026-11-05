@@ -223,10 +223,13 @@ const kpiTexts = (page: Page, widget: string) =>
     ),
   );
 
+/** The page text of the HRV statuses of the fixture. */
+const statusText: Record<string, string> = { BALANCED: "Balanced" };
+
 /** The readiness tiles the page must show for the digest's readiness. */
 function readinessTiles(r: NonNullable<ReturnType<typeof digest>["readiness"]>) {
   return {
-    "HRV status": [r.hrvStatus ?? "n/a", null],
+    "HRV status": [r.hrvStatus === null ? "n/a" : (statusText[r.hrvStatus] ?? r.hrvStatus), null],
     "Sleep score": [r.sleepScore === null ? "n/a" : String(r.sleepScore), null],
     "Resting HR": [
       r.rhr === null ? "n/a" : `${r.rhr} bpm`,
@@ -235,6 +238,49 @@ function readinessTiles(r: NonNullable<ReturnType<typeof digest>["readiness"]>) 
     "Load ratio 7:28": [r.loadRatio === null ? "n/a" : r.loadRatio.toFixed(2), null],
   };
 }
+
+/** Pages for the Garmin word tests. */
+const withStatus = (status?: string) => ({
+  ...data,
+  v: DASHBOARD_VERSION,
+  hrv: data.hrv.map((r: Record<string, unknown>, i: number, all: unknown[]) =>
+    i === all.length - 1 ? { ...r, status } : r,
+  ),
+});
+const lapTypes = async (languages: string[], intensities?: (string | undefined)[]) => {
+  const activities = data.activities.map((a: { laps?: Record<string, unknown>[] }) =>
+    a.laps && intensities
+      ? {
+          ...a,
+          laps: a.laps.map((l, i) => ({
+            ...l,
+            intensity: intensities[i % intensities.length],
+          })),
+        }
+      : a,
+  );
+  const { page, errors } = await open(
+    browser,
+    pageFile({ data: { ...data, activities, v: DASHBOARD_VERSION }, settings: { languages } }),
+  );
+  const buttons = page.locator("[data-id=activities] button[aria-expanded]:visible");
+  for (let i = 0, n = await buttons.count(); i < n; i++) await buttons.nth(i).click();
+  const cells = await page.$$eval(".laps-row tbody tr", (rows) =>
+    rows.map((r) => r.lastElementChild!.textContent),
+  );
+  expect(errors).toEqual([]);
+  return cells;
+};
+
+const hrvTile = async (status: string | undefined, languages: string[], label: string) => {
+  const { page, errors } = await open(
+    browser,
+    pageFile({ data: withStatus(status), settings: { languages } }),
+  );
+  const tile = (await kpiTexts(page, "readiness"))[label];
+  expect(errors).toEqual([]);
+  return { tile, verdict: await page.textContent(".verdict") };
+};
 
 /** A number as the page's fmt.num shows it in English: no decimals. */
 const whole = new Intl.NumberFormat("en", { maximumFractionDigits: 0 });
@@ -1883,7 +1929,7 @@ describe("overview widgets", () => {
     const lost = await kpiTexts(page, "readiness");
     expect(lost["Sleep score"]).toEqual(["n/a", null]);
     expect(lost["Resting HR"]).toEqual(["n/a", null]);
-    expect(lost["HRV status"]).toEqual([r.hrvStatus, null]);
+    expect(lost["HRV status"]).toEqual(["Balanced", null]);
     expect(lost).toEqual(readinessTiles(r));
     const noHrv = { ...data, v: DASHBOARD_VERSION, hrv: [] };
     ({ page } = await open(browser, pageFile({ data: noHrv })));
@@ -2724,6 +2770,68 @@ describe("type boards", () => {
       "lactate threshold",
     ]);
     expect([...en.errors, ...italian.errors]).toEqual([]);
+  });
+
+  describe("Garmin word", () => {
+    it("shows the HRV status in English", async () => {
+      expect((await hrvTile("BALANCED", ["en"], "HRV status")).tile).toEqual(["Balanced", null]);
+    });
+
+    it("shows the HRV status in Italian", async () => {
+      expect((await hrvTile("BALANCED", ["it"], "Stato HRV")).tile).toEqual(["Bilanciato", null]);
+    });
+
+    it("shows an HRV status that the catalogue does not know with a space", async () => {
+      expect((await hrvTile("NEW_STATUS", ["en"], "HRV status")).tile).toEqual([
+        "NEW STATUS",
+        null,
+      ]);
+    });
+
+    it("translates LOW and UNBALANCED and keeps the verdict of the raw status", async () => {
+      const low = await hrvTile("LOW", ["it"], "Stato HRV");
+      expect(low.tile).toEqual(["Basso", null]);
+      const lowEn = await hrvTile("LOW", ["en"], "HRV status");
+      expect(lowEn.verdict).toBe(enTexts["ready.easy"]);
+      const unbalanced = await hrvTile("UNBALANCED", ["it"], "Stato HRV");
+      expect(unbalanced.tile).toEqual(["Sbilanciato", null]);
+    });
+
+    it("shows the lap types in Italian", async () => {
+      const cells = await lapTypes(["it"]);
+      expect(cells).toContain("Riscaldamento");
+      expect(cells).toContain("Attivo");
+      expect(cells).toContain("Intervallo");
+    });
+
+    it("shows the lap types in English", async () => {
+      const cells = await lapTypes(["en"]);
+      expect(cells).toContain("Warm-up");
+      expect(cells).toContain("Active");
+    });
+
+    it("shows an empty cell for a lap without a type and a space for an unknown one", async () => {
+      const cells = await lapTypes(["en"], [undefined, "cool_off"]);
+      expect(cells.slice(0, 2)).toEqual(["", "cool off"]);
+      expect(cells).not.toContain("undefined");
+    });
+
+    it("takes the title of the HRV axis from the catalogue", async () => {
+      const { page, errors } = await open(
+        browser,
+        pageFile({ i18n: { it: { "lvr.hrv": "VFC (ms)" } }, settings: { languages: ["it"] } }),
+      );
+      const title = await page.evaluate(
+        () =>
+          (
+            Object.values(window.Chart!.instances).find((c) =>
+              c.canvas.closest("[data-widget=loadVsRecovery]"),
+            )!.options.scales!.y1 as { title: { text: string } }
+          ).title.text,
+      );
+      expect(title).toBe("VFC (ms)");
+      expect(errors).toEqual([]);
+    });
   });
 
   it("compares the same workout across weeks, up to 3 workouts, intervals by their work laps", async () => {
@@ -4125,5 +4233,211 @@ describe("small numbers on the boards", () => {
     await page.selectOption("#lang", "en");
     expect((await stepsAxis(page)).some((l) => /^\d+,\d{3}$/.test(l))).toBe(true);
     expect(errors).toEqual([]);
+  });
+});
+
+/** The body rows of the screen-reader table of a tile, as the texts of their cells. */
+const tableRows = (page: Page, id: string) =>
+  page.$$eval(`[data-id=${id}] .sr-only tbody tr`, (trs) =>
+    trs.map((r) => [...r.children].map((c) => c.textContent)),
+  );
+
+/** A chart config for a custom widget: one dataset of `values` on the labels. */
+const cfg = (values: string, options = "", labels = '["a", "b"]') =>
+  `{ type: "bar", data: { labels: ${labels}, datasets: [{ label: "x", data: ${values} }] }, options: { ${options} } }`;
+const yTicks = (fn: string) => `scales: { y: { ticks: { callback: ${fn} } } }`;
+const POINTS = '[{x:"b",y:2},{x:"c",y:3},{x:"c",y:4}]';
+const ABC = '["a", "b", "c"]';
+const PLAIN = [
+  ["a", "1"],
+  ["b", "2"],
+];
+
+/** The table rows of a custom widget that draws `config`. */
+async function customTable(config: string): Promise<(string | null)[][]> {
+  const { page, errors } = await open(
+    browser,
+    pageFile({ widgets: [custom("tbl", `ctx.chart(el, ${config});`)], layout: on("tbl") }),
+  );
+  const body = await tableRows(page, "tbl");
+  expect(await page.$$(".tile .error")).toEqual([]);
+  expect(errors).toEqual([]);
+  return body;
+}
+
+describe("chart table", () => {
+  it("shows a bedtime as the clock time of the chart", async () => {
+    const { page, errors } = await open(browser, pageFile(), { hash: "#recovery" });
+    expect((await tableRows(page, "bedtime"))[0]).toEqual(["Oct 13", "23:39"]);
+    expect(errors).toEqual([]);
+  });
+
+  it("shows a pace as the chart does and keeps a heart rate a number", async () => {
+    const { page, errors } = await open(browser, pageFile(), { hash: "#walking" });
+    const weeks = await tableRows(page, "walkDetails");
+    // 3432 s over 5.97 km is 574.9 s/km; the heart rate axis has no tick text
+    expect(weeks.find((r) => r[0] === "Oct 19")).toEqual(["Oct 19", "9:35", "98"]);
+    expect(weeks.find((r) => r[0] === "Aug 10")).toEqual(["Aug 10", "", ""]);
+    expect(errors).toEqual([]);
+  });
+
+  it("writes the numbers in the language of the page", async () => {
+    const en = await open(browser, pageFile(), { hash: "#walking" });
+    expect((await tableRows(en.page, "steps"))[0][1]).toBe("11,276");
+    const ital = await open(browser, pageFile({ settings: { languages: ["it"] } }), {
+      hash: "#walking",
+    });
+    expect((await tableRows(ital.page, "steps"))[0][1]).toBe("11.276");
+    expect(ital.errors).toEqual([]);
+  });
+
+  it.each<[string, string, (string | null)[][]]>([
+    [
+      "labels and plain values",
+      cfg("[1.234, 2]"),
+      [
+        ["a", "1.23"],
+        ["b", "2"],
+      ],
+    ],
+    [
+      "a callback",
+      cfg("[1, 2]", yTicks('(v) => v + " km"')),
+      [
+        ["a", "1 km"],
+        ["b", "2 km"],
+      ],
+    ],
+    [
+      "the horizontal axis of a horizontal chart",
+      cfg("[1, 2]", `indexAxis: "y", scales: { x: { ticks: { callback: (v) => v + " kg" } } }`),
+      [
+        ["a", "1 kg"],
+        ["b", "2 kg"],
+      ],
+    ],
+    [
+      "not the label axis of a horizontal chart",
+      cfg("[1, 2]", `indexAxis: "y", ${yTicks('(v) => v + " kg"')}`),
+      PLAIN,
+    ],
+    [
+      "a callback that throws when called without the ticks of a chart",
+      cfg("[1, 2]", yTicks("(v, i, ticks) => { if (!ticks) throw new Error('x'); return v; }")),
+      PLAIN,
+    ],
+    [
+      "a callback that needs the scale",
+      cfg("[1, 2]", yTicks("function (v) { return this.getLabelForValue(v); }")),
+      PLAIN,
+    ],
+    ["a callback that gives an array", cfg("[1, 2]", yTicks("(v) => [v, 'x']")), PLAIN],
+    ["a callback that gives null", cfg("[1, 2]", yTicks("() => null")), PLAIN],
+    ["a callback that is not a function", cfg("[1, 2]", yTicks('"x"')), PLAIN],
+    [
+      "an object that is not a point",
+      cfg("[{ a: 1 }, 2]"),
+      [
+        ["a", ""],
+        ["b", "2"],
+      ],
+    ],
+    [
+      "a floating bar as its two ends",
+      cfg("[[1, 3], 2]"),
+      [
+        ["a", "1,3"],
+        ["b", "2"],
+      ],
+    ],
+    [
+      "a value that is a string",
+      cfg('["5", 2]'),
+      [
+        ["a", "5"],
+        ["b", "2"],
+      ],
+    ],
+    [
+      "a callback that gives a number",
+      cfg("[1, 2]", yTicks("(v) => v * 10")),
+      [
+        ["a", "10"],
+        ["b", "20"],
+      ],
+    ],
+    [
+      "points by label",
+      cfg(POINTS, "", ABC),
+      [
+        ["a", ""],
+        ["b", "2"],
+        ["c", "3, 4"],
+      ],
+    ],
+    [
+      "points by label with a callback",
+      cfg(POINTS, yTicks('(v) => v + "s"'), ABC),
+      [
+        ["a", ""],
+        ["b", "2s"],
+        ["c", "3s, 4s"],
+      ],
+    ],
+    [
+      "gaps",
+      cfg("[null, 2]"),
+      [
+        ["a", ""],
+        ["b", "2"],
+      ],
+    ],
+    [
+      "labels as they are, a number without a thousands mark and null as nothing",
+      cfg("[1, 2]", "", "[2024, null]"),
+      [
+        ["2024", "1"],
+        ["", "2"],
+      ],
+    ],
+  ])("chart table reads %s", async (_name, config, expected) => {
+    expect(await customTable(config)).toEqual(expected);
+  });
+
+  it("reads a second axis by its own callback", async () => {
+    const got = await customTable(`{ type: "bar", data: { labels: ["a"], datasets: [
+      { label: "x", data: [1] },
+      { label: "y", data: [2], yAxisID: "y1" }] },
+      options: { scales: { y1: { ticks: { callback: (v) => v + " bpm" } } } } }`);
+    expect(got).toEqual([["a", "1", "2 bpm"]]);
+  });
+
+  it("reads the second value axis of a horizontal chart", async () => {
+    const got = await customTable(`{ type: "bar", data: { labels: ["a"], datasets: [
+      { label: "x", data: [1] },
+      { label: "y", data: [2], xAxisID: "x1" }] },
+      options: { indexAxis: "y", scales: { x1: { ticks: { callback: (v) => v + " kg" } } } } }`);
+    expect(got).toEqual([["a", "1", "2 kg"]]);
+  });
+
+  it("keeps the x: y rows of a scatter chart without labels", async () => {
+    const got = await customTable(
+      `{ type: "scatter", data: { datasets: [{ label: "x", data: [{ x: 1, y: 2 }] }] } }`,
+    );
+    expect(got).toEqual([["1", "1: 2"]]);
+  });
+
+  it("shows nothing for a scatter value without an x", async () => {
+    const got = await customTable(
+      `{ type: "scatter", data: { datasets: [{ label: "x", data: [{ y: 2 }] }] } }`,
+    );
+    expect(got).toEqual([["1", ""]]);
+  });
+
+  it("shows nothing for a scatter value without a y", async () => {
+    const got = await customTable(
+      `{ type: "scatter", data: { datasets: [{ label: "x", data: [{ x: 1 }] }] } }`,
+    );
+    expect(got).toEqual([["1", ""]]);
   });
 });
