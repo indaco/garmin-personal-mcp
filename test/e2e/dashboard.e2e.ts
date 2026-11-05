@@ -198,6 +198,17 @@ const ratios = (page: Page) =>
       .map((k) => k.querySelector(".kpi-value")?.textContent),
   );
 
+/** All sub texts of the tiles of the readiness widget: label → list. */
+const readinessSubs = (page: Page) =>
+  page.$$eval("[data-id=readiness] .kpi", (kpis): Record<string, string[]> =>
+    Object.fromEntries(
+      kpis.map((k) => [
+        k.querySelector(".kpi-label")?.textContent ?? "",
+        [...k.querySelectorAll(".kpi-sub")].map((x) => x.textContent ?? ""),
+      ]),
+    ),
+  );
+
 /** The tiles of a widget: label → [value, sub text or null]. */
 const kpiTexts = (page: Page, widget: string) =>
   page.$$eval(`[data-id=${widget}] .kpi`, (kpis) =>
@@ -1881,6 +1892,107 @@ describe("overview widgets", () => {
     expect(noHrvTiles["HRV status"]).toEqual(["n/a", null]);
     expect(noHrvTiles["Sleep score"]).toEqual([String(r.sleepScore), null]);
     expect(noHrvTiles).toEqual(readinessTiles(r));
+  });
+
+  describe("readiness row dates", () => {
+    const oldHrv = data.hrv.filter((r: { date: string }) => r.date <= "2026-10-24");
+    const oldRecovery = data.recovery.filter((r: { date: string }) => r.date <= "2026-10-25");
+
+    it("says the date of an HRV row that is not the last day of the data, readiness", async () => {
+      const file = pageFile({ data: { ...data, v: DASHBOARD_VERSION, hrv: oldHrv } });
+      const { page, errors } = await open(browser, file);
+      const s = await readinessSubs(page);
+      expect(s["HRV status"]).toEqual(["from Oct 24"]);
+      expect(s["Sleep score"]).toEqual([]);
+      expect(s["Resting HR"].some((x) => x.startsWith("from"))).toBe(false);
+      expect(errors).toEqual([]);
+    });
+
+    it("says the date of a recovery row that is not the last day of the data, readiness", async () => {
+      const file = pageFile({ data: { ...data, v: DASHBOARD_VERSION, recovery: oldRecovery } });
+      const { page, errors } = await open(browser, file);
+      const s = await readinessSubs(page);
+      expect(s["Sleep score"]).toEqual(["from Oct 25"]);
+      expect(s["Resting HR"]).toHaveLength(2);
+      expect(s["Resting HR"][0]).toMatch(/^7 days before: /);
+      expect(s["Resting HR"][1]).toBe("from Oct 25");
+      expect(s["HRV status"]).toEqual([]);
+      expect(errors).toEqual([]);
+    });
+
+    it("does not say a date for a readiness value that the last day lacks", async () => {
+      const recovery = data.recovery.map((r: { date: string }) =>
+        r.date === data.end ? { date: r.date } : r,
+      );
+      const file = pageFile({ data: { ...data, v: DASHBOARD_VERSION, recovery } });
+      const { page, errors } = await open(browser, file);
+      const t = await kpiTexts(page, "readiness");
+      expect(t["Sleep score"]).toEqual(["n/a", null]);
+      expect(t["Resting HR"][0]).toBe("n/a");
+      const s = await readinessSubs(page);
+      expect(s["Sleep score"]).toEqual([]);
+      expect(s["Resting HR"].some((x) => x.startsWith("from"))).toBe(false);
+      expect(errors).toEqual([]);
+    });
+
+    it("does not say a date for an older row that has no values, readiness", async () => {
+      const recovery = oldRecovery.map((r: { date: string }) =>
+        r.date === "2026-10-25" ? { date: r.date } : r,
+      );
+      const hrv = oldHrv.map((r: { date: string }) =>
+        r.date === "2026-10-24" ? { date: r.date } : r,
+      );
+      const file = pageFile({ data: { ...data, v: DASHBOARD_VERSION, recovery, hrv } });
+      const { page, errors } = await open(browser, file);
+      const s = await readinessSubs(page);
+      expect(
+        Object.values(s)
+          .flat()
+          .some((x) => x.startsWith("from")),
+      ).toBe(false);
+      expect((await kpiTexts(page, "readiness"))["HRV status"]).toEqual(["n/a", null]);
+      expect(errors).toEqual([]);
+    });
+
+    it("does not say a date for HRV when there are no HRV rows, readiness", async () => {
+      const file = pageFile({ data: { ...data, v: DASHBOARD_VERSION, hrv: [] } });
+      const { page, errors } = await open(browser, file);
+      expect((await kpiTexts(page, "readiness"))["HRV status"]).toEqual(["n/a", null]);
+      expect((await readinessSubs(page))["HRV status"]).toEqual([]);
+      expect(errors).toEqual([]);
+    });
+
+    it("says the date in Italian, readiness", async () => {
+      const file = pageFile({
+        data: { ...data, v: DASHBOARD_VERSION, hrv: oldHrv },
+        settings: { languages: ["it"] },
+      });
+      const { page, errors } = await open(browser, file);
+      const day = await page.evaluate(() =>
+        new Intl.DateTimeFormat("it", { day: "numeric", month: "short", timeZone: "UTC" }).format(
+          new Date("2026-10-24T00:00:00Z"),
+        ),
+      );
+      expect((await readinessSubs(page))["Stato HRV"]).toEqual([`del ${day}`]);
+      expect(errors).toEqual([]);
+    });
+
+    it("tells in the readiness note that it uses the newest data", async () => {
+      const { page } = await open(browser, pageFile());
+      const note = await page.textContent("[data-id=readiness]");
+      expect(note).toContain("It uses the newest data");
+      expect(note).not.toContain("It shows today");
+    });
+
+    it("says no date on a readiness widget whose rows are from the last day", async () => {
+      const { page } = await open(browser, pageFile());
+      const s = await readinessSubs(page);
+      expect(
+        Object.values(s)
+          .flat()
+          .some((x) => x.startsWith("from")),
+      ).toBe(false);
+    });
   });
 
   it("shows the load ratio as n/a when the data does not cover its 28 days", async () => {

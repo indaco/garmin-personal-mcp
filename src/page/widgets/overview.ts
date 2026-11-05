@@ -103,6 +103,12 @@ register({
     const ratio = calc.loadRatio(everyActivity(ctx), data.end, maxHR(ctx), data.prevStart).ratio;
     const inputs = calc.readinessOf(data.hrv, data.recovery, ratio);
     const { verdict, rhrAvg } = inputs;
+    // a row of an older night: the verdict uses it, so say so
+    const from = (value: unknown, date: string | undefined) =>
+      value !== undefined &&
+      date !== undefined &&
+      date !== data.end &&
+      t("ready.from", { day: fmt.day(date) });
     append(
       el,
       h(
@@ -111,12 +117,17 @@ register({
         verdict ? t(`ready.${verdict}` as Key) : fmt.na,
       ),
       kpiRow(
-        kpi(t("ready.hrv"), inputs.hrvStatus ?? fmt.na),
-        kpi(t("ready.sleep"), fmt.num(inputs.sleepScore)),
+        kpi(t("ready.hrv"), inputs.hrvStatus ?? fmt.na, from(inputs.hrvStatus, inputs.hrvDate)),
+        kpi(
+          t("ready.sleep"),
+          fmt.num(inputs.sleepScore),
+          from(inputs.sleepScore, inputs.recoveryDate),
+        ),
         kpi(
           t("ready.rhr"),
           inputs.rhr === undefined ? fmt.na : `${fmt.num(inputs.rhr)} bpm`,
           rhrAvg !== undefined && t("ready.rhrVs", { avg: fmt.num(rhrAvg, 1) }),
+          from(inputs.rhr, inputs.recoveryDate),
         ),
         kpi(t("ready.ratio"), ratio === null ? fmt.na : fmt.num(ratio, 2)),
       ),
