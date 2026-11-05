@@ -23,6 +23,8 @@ export const ABOUT: Record<string, string> = {
   hrv: "Nightly HRV of the last 14 days with its 7-day average and the balanced range.",
   restingHr: "Resting HR of the last 14 days.",
   stress: "Average stress of the last 14 days, from Garmin (0 to 100; lower is calmer).",
+  recoveryTrend:
+    "Weekly average of sleep, sleep score and resting HR over the week window. Needs the setting recoveryHistory.",
   sleep: "Sleep stages and sleep score of the last 14 nights.",
   sleepNeed: "Sleep against the sleep need of the last 14 nights, with the average gap.",
   bedtime: "Bedtimes of the last 14 nights and their spread.",

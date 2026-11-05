@@ -39,6 +39,14 @@ describe("widget catalogue", () => {
     ).toBe(true);
   });
 
+  it("has the Recovery trend only on a page that keeps the recovery rows of the period", () => {
+    const trend = CATALOGUE.find((c) => c.id === "recoveryTrend")!;
+    expect(inPage(trend, {})).toBe(false);
+    expect(inPage(trend, { recoveryHistory: false })).toBe(false);
+    expect(inPage(trend, { recoveryHistory: true })).toBe(true);
+    expect(inPage(trend, { recoveryHistory: true, exclude: ["recovery"] })).toBe(false);
+  });
+
   it("gives a board of any other SDK sport the preset of the Other board", () => {
     expect(preset("alpineSkiing")).toEqual(preset("generic"));
     expect(preset("generic").length).toBeGreaterThan(0);

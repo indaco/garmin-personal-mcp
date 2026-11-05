@@ -295,6 +295,8 @@
   "rec.board": "Die Erholungs-Widgets zeigen die letzten 14 Tage: Das Wochenfenster ändert sie nicht.",
   "w.restingHr": "Ruhe-HF",
   "w.stress": "Stress",
+  "w.recoveryTrend": "Erholungstrend",
+  "rt.note": "Wochenmittel: Dieses Widget folgt dem Wochenfenster.",
   "w.sleep": "Schlaf",
   "sl.deep": "Tief",
   "sl.light": "Leicht",

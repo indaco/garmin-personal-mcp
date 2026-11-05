@@ -295,6 +295,8 @@
   "rec.board": "Los widgets de recuperación muestran los últimos 14 días: el intervalo de semanas no los cambia.",
   "w.restingHr": "FC en reposo",
   "w.stress": "Estrés",
+  "w.recoveryTrend": "Tendencia de recuperación",
+  "rt.note": "Medias semanales: este widget sigue el intervalo de semanas.",
   "w.sleep": "Sueño",
   "sl.deep": "Profundo",
   "sl.light": "Ligero",

@@ -28,6 +28,7 @@ const PRESETS: Record<string, Row> & { generic: Row } = {
     ["bedtime", 1],
     ["bodyBattery", 1],
     ["stress", 3],
+    ["recoveryTrend", 3],
   ],
   running: [
     ["typeKpis", 3],

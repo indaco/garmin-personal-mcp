@@ -354,7 +354,7 @@ assistant calls `writeDashboard` with `settings`:
 | `themes`          | the themes to keep                                                         | all                                                    |
 | `theme`           | the theme that the page opens in                                           | `midnight`                                             |
 | `workouts`        | compare the same run workout across weeks (the Workout trend widget)       | off                                                    |
-| `recoveryHistory` | keep sleep and resting HR for the whole period, not only the last 14 days  | off                                                    |
+| `recoveryHistory` | keep sleep and resting HR for the whole period (the Recovery trend widget) | off                                                    |
 
 The server leaves the excluded data and sports out of the file, and out of the digest for the coach
 notes. The server cannot remove data from the chat. If another tool showed the data earlier in the
@@ -387,7 +387,8 @@ intervals the work laps, the reps and the fade. Without `workouts`, the page has
 widget.
 
 `recoveryHistory` keeps the date, sleep hours, sleep score and resting HR of each day of the period
-in the page. The widgets of the last 14 days do not change, and a custom widget can read the rows
+in the page. The Recovery trend widget draws them as weekly averages, and it follows the week window.
+The widgets of the last 14 days do not change, and a custom widget can read the rows
 from `ctx.data.recovery`. A year adds about 21 KB to the file. It is off by default, because a page
 that you share then holds more health data. A page that excludes `recovery` holds none of it. The
 first update of a 52-week page asks Garmin for up to 24 ranges, and a later update asks for 2.
@@ -395,7 +396,7 @@ Garmin has a rate limit: one account saw a limit of 100 requests in a short time
 the recovery data of an update, the next update goes on from what it saved.
 
 Settings need a page from the template, or a page that the assistant designed (`freeform`) with a
-`garmin-settings` block. The freeform prompt adds that block when you set `workouts`.
+`garmin-settings` block. The freeform prompt adds that block when you set `workouts` or `recoveryHistory`.
 
 ## Keyboard and screen readers
 

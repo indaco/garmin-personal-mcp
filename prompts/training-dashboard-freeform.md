@@ -20,6 +20,20 @@ runs of each workout, once: this build takes longer. On a yes:
   The page keeps it, so its updates load the laps too.
 - Add the Workout trend section to the Run board (below).
 
+## Recovery trend
+
+After that question, ask whether to add a Recovery trend. Options "No" (default) and "Yes, add the
+Recovery trend". Say that a yes adds a section with the weekly average of sleep, sleep score and
+resting HR for the whole period, and that the page file then holds these values for each day: this
+matters for a page that I share. On a yes:
+
+- Put the settings line of the Workout comparison first in the first inline script of the page,
+  once.
+- In the first `writeDashboard` call that writes the page, give `settings` with
+  `"recoveryHistory": true`, next to `"workouts": true` when I also said yes to that. The page
+  keeps it.
+- Add the Recovery trend to the Recovery board (below).
+
 ## 1. The data
 
 You design the page; the server puts the data into it. The page reads the data as `DATA`: the result
@@ -37,7 +51,9 @@ of `getDashboardData` with `weeks` = {{weeks}}, which has:
   `high`.
 - `recovery`: one row for each of the last 14 days: sleep hours (`sleepH`, and `deep`, `light`,
   `rem`, `awake`), `sleepScore`, sleep need `needH`, bedtime `bedMin` (minutes after midnight),
-  `rhr`, body battery `bbHigh` and `bbLow`, `stress`, `steps`, `stepGoal`, `floors`.
+  `rhr`, body battery `bbHigh` and `bbLow`, `stress`, `steps`, `stepGoal`, `floors`. With
+  `recoveryHistory`, the rows cover the whole period: a row older than the last 14 days has only
+  `date`, `sleepH`, `sleepScore` and `rhr`, so a panel of the last 14 days uses the last 14 rows.
 - `sync`: what the server fetched. The server keeps a local cache and asks Garmin only for the new
   days. If `failedDays` is more than 0, name the dates in `failedDates` in chat. If
   `failedSections` is not empty, name those sections in chat: `zones` and `fitnessAge` are then null
@@ -227,7 +243,10 @@ active.
 9. **Load vs. recovery**: one chart with daily load (bars, stacked by type) and HRV (line) on
    twin axes - the heart of the dashboard.
 10. **Recovery panel**: HRV with baseline band, resting HR, sleep hours by stage and score, sleep
-    need against actual sleep, bedtime regularity, body battery (last 14 days).
+    need against actual sleep, bedtime regularity, body battery (last 14 days). Only when I said yes
+    to the Recovery trend: a weekly chart over the week window with the mean of `sleepH`,
+    `sleepScore` and `rhr`. A mean counts only days with a value above 0, and a week with no value
+    is a gap, never 0.
 11. **Recent activities**: table with date, type, name, distance, time, pace, avg HR, ascent;
     the 3 most recent expandable to show laps.
 12. **Coach notes**: at most 5 bullet points, each tied to a specific number in the dashboard
