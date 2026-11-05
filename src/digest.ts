@@ -298,7 +298,8 @@ export function digest(data: Json): Digest {
       form: round(ff.form.at(-1)!, 1),
     },
     hrvLast14: hrv.slice(-14),
-    recovery: data.recovery,
+    // the digest stays small: a page can have a year of rows
+    recovery: Array.isArray(data.recovery) ? data.recovery.slice(-14) : data.recovery,
     fitnessAge: pick(age, ["fitnessAge", "chronologicalAge", "achievableFitnessAge"]),
     sync: data.sync,
   };

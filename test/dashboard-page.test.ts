@@ -888,6 +888,91 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
     expect(page()).toContain('"workouts":true');
   });
 
+  describe("recoveryHistory", () => {
+    const rows = Array.from({ length: 30 }, (_, i) => ({
+      date: `2026-09-${String(i + 1).padStart(2, "0")}`,
+      sleepH: 7,
+      sleepScore: 80,
+      rhr: 50,
+    }));
+    const asks: (boolean | undefined)[] = [];
+    const history = (settings: Record<string, unknown>) => {
+      asks.length = 0;
+      writer = new DashboardWriter(
+        async (_, __, h) => {
+          asks.push(h);
+          return JSON.stringify({ ...full, recovery: rows });
+        },
+        dir,
+        async () => templateText,
+      );
+      return writer.write({ weeks: 12, settings });
+    };
+
+    // the write does not check the block of a saved page: an update reads it as it is
+    const edit = async (block: string) => {
+      await history({ recoveryHistory: true });
+      writeFileSync(
+        file,
+        page().replace(
+          /\/\* garmin-settings:start \*\/.*\/\* garmin-settings:end \*\//,
+          `/* garmin-settings:start */${block}/* garmin-settings:end */`,
+        ),
+      );
+      asks.length = 0;
+      return later(() => writer.write({}));
+    };
+
+    it("reaches the data of a write, a preview, a view and an update, each with its own weeks", async () => {
+      await history({ recoveryHistory: true });
+      await writer.preview({ weeks: 11 });
+      await writer.view({ weeks: 10 });
+      await writer.write({ weeks: 9 });
+      expect(asks).toEqual([true, true, true, true]);
+    });
+
+    it("is off when not set, and a snapshot made without it does not serve a page that wants it", async () => {
+      await history({});
+      expect(asks).toEqual([false]);
+      await writer.write({ weeks: 12, settings: { recoveryHistory: true } });
+      await writer.write({ weeks: 12, settings: { recoveryHistory: false } });
+      expect(asks).toEqual([false, true, false]);
+    });
+
+    it("keeps the rows in the page, and 14 rows in the digest", async () => {
+      const r = await history({ recoveryHistory: true });
+      expect((readBlock(page(), "data") as Full).recovery).toHaveLength(30);
+      expect(r.digest.recovery).toEqual(rows.slice(-14));
+      expect(page()).toContain('"recoveryHistory":true');
+    });
+
+    describe("a data update of a saved page whose settings block was edited by hand", () => {
+      it("asks without the history for a recoveryHistory that is not true", async () => {
+        await edit('{"recoveryHistory":"yes"}');
+        expect(asks).toEqual([false]);
+      });
+
+      it("asks with the history when exclude is null", async () => {
+        await edit('{"recoveryHistory":true,"exclude":null}');
+        expect(asks).toEqual([true]);
+      });
+
+      it("asks without the history, and keeps no recovery row, when exclude has recovery", async () => {
+        const r = await edit('{"recoveryHistory":true,"exclude":["recovery"]}');
+        expect(asks).toEqual([false]);
+        expect((readBlock(page(), "data") as Full).recovery).toEqual([]);
+        expect(r.digest.recovery).toEqual([]);
+      });
+    });
+
+    it("asks for nothing more on a page that excludes recovery, which holds no rows", async () => {
+      const r = await history({ recoveryHistory: true, exclude: ["recovery"] });
+      expect(asks).toEqual([false]);
+      expect((readBlock(page(), "data") as Full).recovery).toEqual([]);
+      expect(r.digest.recovery).toEqual([]);
+    });
+  });
+
   it("keeps the settings of a page that Claude wrote with a settings block, for its updates", async () => {
     const workouts: (boolean | undefined)[] = [];
     writer = new DashboardWriter(
@@ -1178,6 +1263,9 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
     await expect(
       writer.write({ settings: { workouts: "yes" as unknown as boolean } }),
     ).rejects.toThrow(/workouts: true or false/);
+    await expect(
+      writer.write({ settings: { recoveryHistory: "yes" as unknown as boolean } }),
+    ).rejects.toThrow(/recoveryHistory: true or false/);
     await expect(
       writer.write({ settings: { colour: "red" } as unknown as Record<string, never> }),
     ).rejects.toThrow(/unknown settings colour/);

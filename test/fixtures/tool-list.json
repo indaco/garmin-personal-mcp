@@ -316,22 +316,26 @@
   },
   {
     "name": "getDashboardData",
-    "description": "All the data of the training dashboard in one call: HR zones, fitness age, the activities of the\nlast `weeks` weeks (compact summaries, with strength sets and laps where they apply), the activities\nof the weeks before for the period comparison, daily HRV, and the last 14 days of sleep and daily\nsummaries, and `units`: the measurement system of the Garmin profile (metric, statute_us or\nstatute_uk) that the page shows; the data itself is always metric; `locale`: the language of\nthe Garmin profile, e.g. it or pt-BR. Keeps a local cache and\nfetches from Garmin only what is new since the last call, so a rebuild or an update needs few\ncalls. `sync` in the result says what was fetched: Garmin calls, .FIT files downloaded\n(fitDownloads) and new activities.\n`digest`, first in the result: the server's totals for the whole period and for each\nMonday-Sunday week (sessions, km, hours, load), the training load of the last 7 and 28 days,\nbest efforts, races and strength top sets, the long runs with their half split and HR drift, the\nlongest run and the race predictions (Riegel), the page's readiness verdict for today with its\ninputs (`readiness`), and today's fitness, fatigue and form (`fitnessFatigue`); quote them\ninstead of your own sums. For another date range, use the activities: each one is on its own\nline. A load is null (n/a) when the sessions have none; estimatedLoads counts the loads that\nare estimates from heart rate. A week with partial: true starts before the period. Without HRV\nand sleep data the digest has no `readiness`: give the verdict as n/a.",
+    "description": "All the data of the training dashboard in one call: HR zones, fitness age, the activities of the\nlast `weeks` weeks (compact summaries, with strength sets and laps where they apply), the activities\nof the weeks before for the period comparison, daily HRV, the last 14 days of sleep and daily\nsummaries (with `recoveryHistory`, also short rows of the older days: date, sleep hours, sleep\nscore and resting HR), and `units`: the measurement system of the Garmin profile (metric, statute_us or\nstatute_uk) that the page shows; the data itself is always metric; `locale`: the language of\nthe Garmin profile, e.g. it or pt-BR. Keeps a local cache and\nfetches from Garmin only what is new since the last call, so a rebuild or an update needs few\ncalls. `sync` in the result says what was fetched: Garmin calls, .FIT files downloaded\n(fitDownloads) and new activities.\n`digest`, first in the result: the server's totals for the whole period and for each\nMonday-Sunday week (sessions, km, hours, load), the training load of the last 7 and 28 days,\nbest efforts, races and strength top sets, the long runs with their half split and HR drift, the\nlongest run and the race predictions (Riegel), the page's readiness verdict for today with its\ninputs (`readiness`), and today's fitness, fatigue and form (`fitnessFatigue`); quote them\ninstead of your own sums. For another date range, use the activities: each one is on its own\nline. A load is null (n/a) when the sessions have none; estimatedLoads counts the loads that\nare estimates from heart rate. A week with partial: true starts before the period. Without HRV\nand sleep data the digest has no `readiness`: give the verdict as n/a.",
     "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "additionalProperties": false,
       "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "weeks": {
           "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991,
           "description": "Weeks to cover, default 12, max 52"
         },
         "workouts": {
           "type": "boolean",
           "description": "Also the laps of the runs of each run name that repeats, to compare a workout across weeks: the last 8 (downloaded once) and older ones whose .FIT file is saved; default false"
+        },
+        "recoveryHistory": {
+          "type": "boolean",
+          "description": "Also the sleep and resting HR rows of the whole period, not only the last 14 days"
         }
-      },
-      "required": []
+      }
     }
   },
   {
@@ -521,6 +525,8 @@
       "properties": {
         "weeks": {
           "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991,
           "description": "Weeks to cover, default 12, max 52"
         },
         "notes": {
@@ -595,6 +601,10 @@
             "workouts": {
               "type": "boolean",
               "description": "Compare the same run workout across weeks (Workout trend widget): the server loads the laps of the last 8 sessions of each repeated run name, and of older ones whose .FIT file is saved; off when not set"
+            },
+            "recoveryHistory": {
+              "type": "boolean",
+              "description": "Keep the sleep and resting HR rows of the whole period in the page, not only the last 14 days; off when not set"
             }
           },
           "description": "The page settings; replaces the page's own"

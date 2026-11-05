@@ -1177,6 +1177,28 @@ describe("chart legends", () => {
   });
 });
 
+const dayOf = (i: number) => new Date(Date.UTC(2026, 7, 1 + i)).toISOString().slice(0, 10);
+
+describe("recovery history rows", () => {
+  it("draws the last 14 days in the Resting HR, Sleep and Stress widgets of a page with 60 rows", async () => {
+    // the rows before the last 14 are short, as the server writes them with recoveryHistory
+    const recovery = Array.from({ length: 60 }, (_, i) =>
+      i < 46
+        ? { date: dayOf(i), sleepH: 7, sleepScore: 80, rhr: 50 }
+        : { date: dayOf(i), sleepH: 7, deep: 1.5, sleepScore: 80, rhr: 50, stress: 35 },
+    );
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, recovery } }),
+      { hash: "#recovery" },
+    );
+    expect((await chartDataset(page, "restingHr", "Resting HR")).data).toHaveLength(14);
+    expect((await chartDataset(page, "sleep", "Score")).data).toHaveLength(14);
+    expect((await chartDataset(page, "stress", "Stress")).data).toEqual(Array(14).fill(35));
+    expect(errors).toEqual([]);
+  });
+});
+
 /** The first rows of the fixture, each with the given stress (undefined: the field is missing). */
 const stressData = (...values: (number | undefined)[]) => ({
   ...data,

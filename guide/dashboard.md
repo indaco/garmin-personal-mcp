@@ -343,17 +343,18 @@ The `dashboard-setup` prompt asks you questions and writes a page with your answ
 ask your assistant directly, for example "make a dashboard for my coach without my sleep data". The
 assistant calls `writeDashboard` with `settings`:
 
-| Setting     | What it does                                                               | Default                                                |
-| ----------- | -------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `title`     | replaces the title in every language                                       | the built-in title                                     |
-| `headline`  | replaces the line under the title in every language                        | the built-in headline                                  |
-| `sports`    | the boards to keep, for example `running` and `cycling`                    | all                                                    |
-| `exclude`   | the data to leave out: `recovery`, `fitnessAge`, `zones`, `names`, `notes` | none                                                   |
-| `languages` | the built-in languages to keep: `en`, `it`, `de`, `fr`, `es`, `pt`         | English and the language of the Garmin profile         |
-| `language`  | the language that the page opens in: `auto` or a language code             | the profile language when the page has it, else `auto` |
-| `themes`    | the themes to keep                                                         | all                                                    |
-| `theme`     | the theme that the page opens in                                           | `midnight`                                             |
-| `workouts`  | compare the same run workout across weeks (the Workout trend widget)       | off                                                    |
+| Setting           | What it does                                                               | Default                                                |
+| ----------------- | -------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `title`           | replaces the title in every language                                       | the built-in title                                     |
+| `headline`        | replaces the line under the title in every language                        | the built-in headline                                  |
+| `sports`          | the boards to keep, for example `running` and `cycling`                    | all                                                    |
+| `exclude`         | the data to leave out: `recovery`, `fitnessAge`, `zones`, `names`, `notes` | none                                                   |
+| `languages`       | the built-in languages to keep: `en`, `it`, `de`, `fr`, `es`, `pt`         | English and the language of the Garmin profile         |
+| `language`        | the language that the page opens in: `auto` or a language code             | the profile language when the page has it, else `auto` |
+| `themes`          | the themes to keep                                                         | all                                                    |
+| `theme`           | the theme that the page opens in                                           | `midnight`                                             |
+| `workouts`        | compare the same run workout across weeks (the Workout trend widget)       | off                                                    |
+| `recoveryHistory` | keep sleep and resting HR for the whole period, not only the last 14 days  | off                                                    |
 
 The server leaves the excluded data and sports out of the file, and out of the digest for the coach
 notes. The server cannot remove data from the chat. If another tool showed the data earlier in the
@@ -384,6 +385,14 @@ laps. The history grows with each update, but an update downloads at most 8 file
 The Workout trend widget compares those sessions: pace, HR, efficiency and running form, and for
 intervals the work laps, the reps and the fade. Without `workouts`, the page has no Workout trend
 widget.
+
+`recoveryHistory` keeps the date, sleep hours, sleep score and resting HR of each day of the period
+in the page. The widgets of the last 14 days do not change, and a custom widget can read the rows
+from `ctx.data.recovery`. A year adds about 21 KB to the file. It is off by default, because a page
+that you share then holds more health data. A page that excludes `recovery` holds none of it. The
+first update of a 52-week page asks Garmin for up to 24 ranges, and a later update asks for 2.
+Garmin has a rate limit: one account saw a limit of 100 requests in a short time. If the limit stops
+the recovery data of an update, the next update goes on from what it saved.
 
 Settings need a page from the template, or a page that the assistant designed (`freeform`) with a
 `garmin-settings` block. The freeform prompt adds that block when you set `workouts`.

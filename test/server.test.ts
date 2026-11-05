@@ -2,6 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
+import { GarminDashboard } from "../src/dashboard";
 import { AutoRefresh } from "../src/schedule";
 import { createParts } from "../src/server";
 
@@ -33,4 +34,16 @@ it("gives the page writer the schedule of the same data folder", () => {
   expect(auto).toBeInstanceOf(AutoRefresh);
   // the writer asks this schedule for the next run of each page it writes
   expect(Object.values(writer)).toContain(auto);
+});
+
+it("passes the weeks, workouts and recoveryHistory of a page to the dashboard data", async () => {
+  const data = { start: "2026-10-19", end: "2026-10-26", activities: [], previousActivities: [] };
+  const getData = vi
+    .spyOn(GarminDashboard.prototype, "getDashboardData")
+    .mockResolvedValue(JSON.stringify(data));
+  const dataDir = mkdtempSync(join(tmpdir(), "server-"));
+  const { writer } = createParts({ baseUrl: "https://api.test", apiKeyFile: "/none", dataDir });
+  await writer.preview({ weeks: 5, settings: { workouts: true, recoveryHistory: true } });
+  expect(getData).toHaveBeenCalledWith(5, true, true);
+  getData.mockRestore();
 });

@@ -19,7 +19,8 @@ export function createParts(config: Config) {
   const dashboard = new GarminDashboard(tools, api, config.dataDir);
   const auto = new AutoRefresh(config);
   const writer = new DashboardWriter(
-    (weeks, workouts) => dashboard.getDashboardData(weeks, workouts),
+    (weeks, workouts, recoveryHistory) =>
+      dashboard.getDashboardData(weeks, workouts, recoveryHistory),
     config.dataDir,
     template,
     auto,
