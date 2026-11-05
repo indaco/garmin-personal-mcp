@@ -99,6 +99,7 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
     span: 1,
   },
   { id: "restingHr", title: "w.restingHr", needs: "recovery", span: 1 },
+  { id: "stress", title: "w.stress", needs: "recovery", span: 3 },
   {
     id: "sleep",
     title: "w.sleep",

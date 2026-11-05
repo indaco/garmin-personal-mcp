@@ -350,6 +350,7 @@ out. To add one:
 | `rec14` | Last 14 days: the week window does not change it. |
 | `rec.board` | The recovery widgets show the last 14 days: the week window does not change them. |
 | `w.restingHr` | Resting HR |
+| `w.stress` | Stress |
 | `w.sleep` | Sleep |
 | `sl.deep` | Deep |
 | `sl.light` | Light |
