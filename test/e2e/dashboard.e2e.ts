@@ -2773,22 +2773,22 @@ describe("type boards", () => {
   });
 
   describe("Garmin word", () => {
-    it("shows the HRV status in English, Garmin word", async () => {
+    it("shows the HRV status in English", async () => {
       expect((await hrvTile("BALANCED", ["en"], "HRV status")).tile).toEqual(["Balanced", null]);
     });
 
-    it("shows the HRV status in Italian, Garmin word", async () => {
+    it("shows the HRV status in Italian", async () => {
       expect((await hrvTile("BALANCED", ["it"], "Stato HRV")).tile).toEqual(["Bilanciato", null]);
     });
 
-    it("shows an HRV status that the catalogue does not know with a space, Garmin word", async () => {
+    it("shows an HRV status that the catalogue does not know with a space", async () => {
       expect((await hrvTile("NEW_STATUS", ["en"], "HRV status")).tile).toEqual([
         "NEW STATUS",
         null,
       ]);
     });
 
-    it("translates LOW and UNBALANCED and keeps the verdict of the raw status, Garmin word", async () => {
+    it("translates LOW and UNBALANCED and keeps the verdict of the raw status", async () => {
       const low = await hrvTile("LOW", ["it"], "Stato HRV");
       expect(low.tile).toEqual(["Basso", null]);
       const lowEn = await hrvTile("LOW", ["en"], "HRV status");
@@ -2797,26 +2797,26 @@ describe("type boards", () => {
       expect(unbalanced.tile).toEqual(["Sbilanciato", null]);
     });
 
-    it("shows the lap types in Italian, Garmin word", async () => {
+    it("shows the lap types in Italian", async () => {
       const cells = await lapTypes(["it"]);
       expect(cells).toContain("Riscaldamento");
       expect(cells).toContain("Attivo");
       expect(cells).toContain("Intervallo");
     });
 
-    it("shows the lap types in English, Garmin word", async () => {
+    it("shows the lap types in English", async () => {
       const cells = await lapTypes(["en"]);
       expect(cells).toContain("Warm-up");
       expect(cells).toContain("Active");
     });
 
-    it("shows an empty cell for a lap without a type and a space for an unknown one, Garmin word", async () => {
+    it("shows an empty cell for a lap without a type and a space for an unknown one", async () => {
       const cells = await lapTypes(["en"], [undefined, "cool_off"]);
       expect(cells.slice(0, 2)).toEqual(["", "cool off"]);
       expect(cells).not.toContain("undefined");
     });
 
-    it("takes the title of the HRV axis from the catalogue, Garmin word", async () => {
+    it("takes the title of the HRV axis from the catalogue", async () => {
       const { page, errors } = await open(
         browser,
         pageFile({ i18n: { it: { "lvr.hrv": "VFC (ms)" } }, settings: { languages: ["it"] } }),
@@ -4333,6 +4333,31 @@ describe("chart table", () => {
     ],
     ["a callback that gives an array", cfg("[1, 2]", yTicks("(v) => [v, 'x']")), PLAIN],
     ["a callback that gives null", cfg("[1, 2]", yTicks("() => null")), PLAIN],
+    ["a callback that is not a function", cfg("[1, 2]", yTicks('"x"')), PLAIN],
+    [
+      "an object that is not a point",
+      cfg("[{ a: 1 }, 2]"),
+      [
+        ["a", ""],
+        ["b", "2"],
+      ],
+    ],
+    [
+      "a floating bar as its two ends",
+      cfg("[[1, 3], 2]"),
+      [
+        ["a", "1,3"],
+        ["b", "2"],
+      ],
+    ],
+    [
+      "a value that is a string",
+      cfg('["5", 2]'),
+      [
+        ["a", "5"],
+        ["b", "2"],
+      ],
+    ],
     [
       "a callback that gives a number",
       cfg("[1, 2]", yTicks("(v) => v * 10")),
@@ -4400,5 +4425,19 @@ describe("chart table", () => {
       `{ type: "scatter", data: { datasets: [{ label: "x", data: [{ x: 1, y: 2 }] }] } }`,
     );
     expect(got).toEqual([["1", "1: 2"]]);
+  });
+
+  it("shows nothing for a scatter value without an x", async () => {
+    const got = await customTable(
+      `{ type: "scatter", data: { datasets: [{ label: "x", data: [{ y: 2 }] }] } }`,
+    );
+    expect(got).toEqual([["1", ""]]);
+  });
+
+  it("shows nothing for a scatter value without a y", async () => {
+    const got = await customTable(
+      `{ type: "scatter", data: { datasets: [{ label: "x", data: [{ x: 1 }] }] } }`,
+    );
+    expect(got).toEqual([["1", ""]]);
   });
 });

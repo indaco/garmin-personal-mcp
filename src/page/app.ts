@@ -104,12 +104,8 @@ let tabBarObserver: ResizeObserver | undefined;
 let stickyObserver: ResizeObserver | undefined;
 
 /** Keyboard focus scrolls below the sticky bar, whatever its height: it wraps with the language and the width. */
-function watchStickyBar(): void {
+function watchStickyBar(bar: HTMLElement): void {
   stickyObserver?.disconnect();
-  const bar =
-    document.querySelector<HTMLElement>(".page > .edit-bar") ??
-    document.querySelector<HTMLElement>(".top");
-  if (!bar) return;
   stickyObserver = new ResizeObserver(() => {
     const sticks = getComputedStyle(bar).position === "sticky";
     document.documentElement.style.setProperty(
@@ -226,6 +222,8 @@ function render(): void {
   // a theme or language change renders again; the account menu stays as it was
   accountOpen = document.querySelector(".account[open]") !== null;
   const data = G.data;
+  const top = header(data);
+  const edit = editing && editBar();
   keepFocus(() =>
     app.replaceChildren(
       h(
@@ -244,14 +242,14 @@ function render(): void {
           },
           t("skip"),
         ),
-        header(data),
-        editing && editBar(),
+        top,
+        edit,
         boardView(data),
         footer(data),
       ),
     ),
   );
-  watchStickyBar();
+  watchStickyBar(edit || top);
 }
 
 // ------------------------------------------------------------------ footer

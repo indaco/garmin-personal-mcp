@@ -109,8 +109,7 @@ function axisText(config: ChartConfiguration, set: ChartDataset): Tick | undefin
   const scales = config.options?.scales as
     | Record<string, { ticks?: { callback?: unknown } }>
     | undefined;
-  const callback = scales?.[axis]?.ticks?.callback;
-  return typeof callback === "function" ? (callback as Tick) : undefined;
+  return scales?.[axis]?.ticks?.callback as Tick | undefined;
 }
 
 /** A value as text, by the axis when it can: a custom widget's callback may need what only a live chart has. */
@@ -128,7 +127,9 @@ function valueText(v: number, tick: Tick | undefined): string {
 function text(v: unknown, tick?: Tick): string {
   if (typeof v === "number") return valueText(v, tick);
   if (isPoint(v)) return `${text(v.x)}: ${text(v.y, tick)}`;
-  return v === null || v === undefined ? "" : String(v);
+  // an object that is not a point has no text; an array is a floating bar
+  const empty = v === null || v === undefined || (typeof v === "object" && !Array.isArray(v));
+  return empty ? "" : String(v);
 }
 
 function isPoint(v: unknown): v is { x: unknown; y: unknown } {
