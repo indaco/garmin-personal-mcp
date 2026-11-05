@@ -1061,8 +1061,19 @@ const shape = (t: {
 describe("MCP tools", () => {
   it("has the names, descriptions and parameters of the reference tool list", async () => {
     const { tools: listed } = await (await connect()).listTools();
-    const expected = toolList.map(shape);
-    expect(listed.map(shape).toSorted((a, b) => a.name.localeCompare(b.name))).toEqual(expected);
+    const sorted = listed.toSorted((a, b) => a.name.localeCompare(b.name));
+    if (process.env.UPDATE_DOCS) {
+      const rows = sorted.map(({ name, description, inputSchema }) => ({
+        name,
+        description,
+        inputSchema: unbounded(inputSchema),
+      }));
+      writeFileSync("test/fixtures/tool-list.json", `${JSON.stringify(rows, null, 2)}\n`);
+    } else {
+      expect(sorted.map(shape), "the tool list changed: run pnpm guide").toEqual(
+        toolList.map(shape),
+      );
+    }
   });
 
   it("lets only the model call each tool, never the page in the chat", async () => {

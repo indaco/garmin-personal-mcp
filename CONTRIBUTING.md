@@ -153,7 +153,7 @@ pnpm exec playwright-core install --only-shell chromium
 of statements, functions and lines, and 96% of branches. Test new code in the same change. When the
 coverage goes up, raise the floor in that change too.
 
-`pnpm fmt` corrects the format. `pnpm guide` writes the generated parts of `guide/`.
+`pnpm fmt` corrects the format. `pnpm guide` writes the generated parts of `guide/` and the tool and prompt lists in `test/fixtures/`.
 
 The README and the website show the same demo, `assets/dashboard.gif`. `pnpm demo` records it from
 the data of the website demo, with `assets/dashboard-chat.webp`, the page in a chat on the website.
