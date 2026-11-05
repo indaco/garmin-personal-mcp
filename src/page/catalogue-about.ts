@@ -6,7 +6,7 @@ export const ABOUT: Record<string, string> = {
   fitnessAge:
     "Garmin fitness age against actual age, the achievable age, and, under Details, its components with Garmin's targets.",
   periodComparison:
-    "Sessions, distance, time and load of the window against the same number of weeks before it, per type and in total.",
+    "Sessions, distance, time and load of the window against the same number of days right before it, per type and in total.",
   records:
     "Best efforts, longest run and ride, heaviest set and the best estimated 1RM of each exercise in the window: 4 first, the others under Show all.",
   weeklyVolume:

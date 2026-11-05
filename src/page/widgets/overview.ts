@@ -171,7 +171,7 @@ register({
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     const end = windowEnd(ctx);
-    const prev = calc.periodWindow(ctx.from, ctx.to, ctx.data.prevStart);
+    const prev = calc.periodWindow(ctx.from, end, ctx.data.prevStart);
     const now = ctx.activities;
     const before = ctx.ofType(between(everyActivity(ctx), prev.from, prev.to));
     const groups = groupsIn([...now, ...before]);

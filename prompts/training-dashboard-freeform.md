@@ -198,8 +198,8 @@ Under the header, put a window bar. It selects whole Monday-Sunday weeks inside 
 presets (last 4, 8, 12... weeks, and all) and a from-week and a to-week selector. Every widget about
 training follows the window, and the browser calculates it again from the embedded data. This
 includes totals, charts, calendar, records, strength exercise stats, and the period comparison. The
-period comparison compares the window with the same number of weeks right before it (from
-`activities` and `previousActivities`). Say "partial" when these weeks start before the data. The
+period comparison compares the window with the same number of days right before it (from
+`activities` and `previousActivities`). Say "partial" when these days start before the data. The
 tiles "last 7 days against the 4-week average" end on the last day of the window, and take their
 baseline from all embedded data. The widgets about today do not follow the window, and say so:
 readiness, fitness age and the 14-day recovery panel. The URL hash also keeps the window (for

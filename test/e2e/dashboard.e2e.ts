@@ -372,6 +372,52 @@ describe("the page", () => {
     expect(await sessions(nameless)).toBe("1");
   });
 
+  it("compares the window with as many days right before it, as the digest does", async () => {
+    // 2026-08-03 to 2026-10-26 is 85 days, so the previous period is 2026-05-10 to 2026-08-02
+    const activities = [row(9401, "Quarry Loop", "2026-10-20 07:00:00")];
+    const previousActivities = [
+      row(9411, "Quarry Loop", "2026-05-09 07:00:00"),
+      row(9412, "Quarry Loop", "2026-05-10 07:00:00"),
+      row(9413, "Quarry Loop", "2026-05-10 18:00:00"),
+      row(9414, "Quarry Loop", "2026-08-02 07:00:00"),
+    ];
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities, previousActivities } }),
+      { hash: "#all@2026-08-03_2026-10-26" },
+    );
+    const sel = "[data-widget=periodComparison]";
+    expect(await page.textContent(`${sel} p`)).toContain("May 10 to Aug 2");
+    // 1 session now against 3 before: the row of 9 May is outside the 85 days
+    expect(await page.textContent(`${sel} tbody tr:first-child td:nth-child(2)`)).toContain(
+      "1 ▼ 67%",
+    );
+    expect(errors).toEqual([]);
+  });
+
+  it("ends the compared window on the Sunday of its last week, not on its Monday", async () => {
+    // 2026-08-03 to Sunday 2026-10-25 is 84 days, so the previous period is 2026-05-11 to 2026-08-02
+    const activities = [row(9501, "Quarry Loop", "2026-10-20 07:00:00")];
+    const previousActivities = [
+      row(9511, "Quarry Loop", "2026-05-10 07:00:00"),
+      row(9512, "Quarry Loop", "2026-05-11 07:00:00"),
+      row(9513, "Quarry Loop", "2026-05-16 07:00:00"),
+      row(9514, "Quarry Loop", "2026-08-02 07:00:00"),
+    ];
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities, previousActivities } }),
+      { hash: "#all@2026-08-03_2026-10-19" },
+    );
+    const sel = "[data-widget=periodComparison]";
+    expect(await page.textContent(`${sel} p`)).toContain("May 11 to Aug 2");
+    // 1 session now against 3 before; ending on the Monday would give 78 days from 17 May, so 1
+    expect(await page.textContent(`${sel} tbody tr:first-child td:nth-child(2)`)).toContain(
+      "1 ▼ 67%",
+    );
+    expect(errors).toEqual([]);
+  });
+
   it("shows only the chosen activity names, also after a reload", async () => {
     const file = pageFile();
     const { page, errors } = await open(browser, file);

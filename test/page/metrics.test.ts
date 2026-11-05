@@ -434,16 +434,73 @@ describe("fitness, fatigue and form of a window", () => {
 });
 
 describe("period comparison", () => {
-  it("compares the window with the same number of weeks before it", () => {
-    expect(periodWindow("2026-10-05", "2026-10-19", "2026-05-04")).toEqual({
-      from: "2026-09-14",
-      to: "2026-10-04",
-      partial: false,
-    });
-    expect(periodWindow("2026-05-11", "2026-05-18", "2026-05-04")).toEqual({
-      from: "2026-04-27",
-      to: "2026-05-10",
-      partial: true,
-    });
+  const w = periodWindow;
+  it.each([
+    [
+      "whole past weeks",
+      "2026-10-05",
+      "2026-10-25",
+      "2026-05-04",
+      "2026-09-14",
+      "2026-10-04",
+      false,
+    ],
+    [
+      "the fixture period, 85 days each",
+      "2026-08-03",
+      "2026-10-26",
+      "2026-05-04",
+      "2026-05-10",
+      "2026-08-02",
+      false,
+    ],
+    [
+      "a one-week window on a Monday",
+      "2026-10-26",
+      "2026-10-26",
+      "2026-05-04",
+      "2026-10-25",
+      "2026-10-25",
+      false,
+    ],
+    [
+      "a one-week window on a Sunday",
+      "2026-10-19",
+      "2026-10-25",
+      "2026-05-04",
+      "2026-10-12",
+      "2026-10-18",
+      false,
+    ],
+    [
+      "days that start before the data",
+      "2026-05-11",
+      "2026-05-24",
+      "2026-05-04",
+      "2026-04-27",
+      "2026-05-10",
+      true,
+    ],
+    [
+      "a first day equal to the data start",
+      "2026-05-11",
+      "2026-05-17",
+      "2026-05-04",
+      "2026-05-04",
+      "2026-05-10",
+      false,
+    ],
+    ["no data start", "2026-05-11", "2026-05-24", undefined, "2026-04-27", "2026-05-10", false],
+    [
+      "a daylight-saving change",
+      "2026-03-30",
+      "2026-04-05",
+      undefined,
+      "2026-03-23",
+      "2026-03-29",
+      false,
+    ],
+  ])("compares equal days: %s", (_name, from, end, dataStart, pfrom, pto, partial) => {
+    expect(w(from, end, dataStart)).toEqual({ from: pfrom, to: pto, partial });
   });
 });
