@@ -86,7 +86,7 @@ assistant chooses the tools and can combine their data. Some examples:
 - **The dashboard in the chat**: in Claude Desktop, ask "show my training dashboard" and the page
   opens in the reply, with new data. See [Dashboard in the chat](#dashboard-in-the-chat).
 - **Coach prompts**: a review of one run or one strength session against its planned workout, a
-  readiness check before a race, and a check of today. See [Coach prompts](#coach-prompts).
+  review of the week, a readiness check before a race, and a check of today. See [Coach prompts](#coach-prompts).
 
 ## Quick start
 

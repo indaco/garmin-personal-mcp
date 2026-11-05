@@ -719,6 +719,9 @@ export function registerDashboard(server: McpServer, dashboard: GarminDashboard)
         "line. A load is null (n/a) when the sessions have none; estimatedLoads counts the loads that",
         "are estimates from heart rate. A week with partial: true starts before the period. Without HRV",
         "and sleep data the digest has no `readiness`: give the verdict as n/a.",
+        "The full result is large: 12 weeks can be about 180 KB, which can be over the tool output limit",
+        "of the assistant. `writeDashboard` with `preview: true` gives only the digest, the activities of",
+        "each board and the settings.",
       ].join("\n"),
       inputSchema: z.object({
         weeks: z.number().int().describe("Weeks to cover, default 12, max 52").optional(),
