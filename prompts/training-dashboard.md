@@ -70,7 +70,10 @@ If `estimatedLoads` is more than 0, say that a part of the load is an estimate f
 not compare a week with `partial: true` with whole weeks.
 If `sync.failedSections` is not empty, name those sections (HR zones, fitness age, HRV, units). HR
 zones and units then use the last saved values, if there are any; say so. Fitness age and HRV show
-as "n/a". If a call fails, say which one and why in one line.
+as "n/a". If a call fails, say which one and why in one line. If `sync.failedDetails` is more than
+0, say that this many sessions have no laps or sets, so the strength and lap numbers are not
+complete. If `sync.stoppedEarly` is true, say that Garmin stopped answering (a rate limit or the
+network), and that I can run the update again in a few minutes.
 
 Do not write or change the page yourself, and do not call `getDashboardData`: the digest has what the
 notes need.

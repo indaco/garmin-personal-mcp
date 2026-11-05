@@ -310,13 +310,22 @@ const recoveryByDay = (out: { recovery: Record<string, unknown>[] }) =>
   Object.fromEntries(out.recovery.map((r) => [r.date, r]));
 const recoveryPaths = () => recoveryCalls().map(([p]) => p);
 
+const rateLimit = () => new GarminApiError("GET /x -> HTTP 429: slow down", 429);
+const fiveSessions = () => [
+  activity(1, "2026-10-26", "strength_training"),
+  activity(2, "2026-10-25", "strength_training"),
+  activity(3, "2026-10-24", "strength_training"),
+  activity(4, "2026-10-23", "strength_training"),
+  activity(5, "2026-10-22", "strength_training"),
+];
+
 const refuse = () => {
   throw new GarminApiError("GET range -> HTTP 400: no", 400);
 };
 
 function fakeGarmin(path: string, q: Record<string, string>) {
   if ([...failing].some((p) => path.startsWith(p)))
-    throw new GarminApiError(`GET ${path} -> HTTP 500: down`);
+    throw new GarminApiError(`GET ${path} -> HTTP 500: down`, 500);
   if (path === "/activitylist-service/activities/search/activities") {
     const rows = garminActivities.filter((a) => {
       const day = String(a.startTimeLocal).slice(0, 10);
@@ -324,7 +333,7 @@ function fakeGarmin(path: string, q: Record<string, string>) {
     });
     // as Garmin: a page of about 190 or more activities answers HTTP 500
     if (rows.length - Number(q.start) >= 190 && Number(q.limit) >= 190)
-      throw new GarminApiError(`GET ${path} -> HTTP 500: too many`);
+      throw new GarminApiError(`GET ${path} -> HTTP 500: too many`, 500);
     return rows.slice(Number(q.start), Number(q.start) + Number(q.limit));
   }
   if (path.startsWith("/hrv-service/hrv/daily/")) {
@@ -360,7 +369,7 @@ function fakeGarmin(path: string, q: Record<string, string>) {
     };
   }
   if (path === "/sleep-service/sleep/dailySleep") {
-    if (failingSleep.has(q.date)) throw new GarminApiError(`GET ${path} -> HTTP 500: down`);
+    if (failingSleep.has(q.date)) throw new GarminApiError(`GET ${path} -> HTTP 500: down`, 500);
     return { sleepTimeSeconds: 27000 };
   }
   if (path === "/usersummary-service/usersummary/daily") return { restingHeartRate: 50 };
@@ -598,6 +607,8 @@ describe("getDashboardData", () => {
       failedDays: 0,
       failedDates: [],
       failedSections: [],
+      failedDetails: 0,
+      stoppedEarly: false,
       cachedActivities: 1,
     });
 
@@ -1530,6 +1541,204 @@ describe("getDashboardData", () => {
     ]);
   });
 
+  describe("a rate limit or a network failure stops the requests", () => {
+    const HRV = "/hrv-service/hrv/daily/";
+    const ZONES = "/biometric-service/heartRateZones/v2";
+    const SETTINGS = "/userprofile-service/userprofile/settings";
+    /** The paths of the calls after the activity search, apart from the recovery ones. */
+    const optionalCalls = () =>
+      [ZONES, SETTINGS].flatMap((p) => callsTo(p)).concat(callsTo("/fitnessage-service"));
+
+    it.each([
+      ["HTTP 429", rateLimit()],
+      ["a network failure", new GarminApiError("Network error calling /x: down")],
+    ])("asks for nothing more after %s on the first HRV chunk", async (_, error) => {
+      api.getJson.mockImplementation(async (path, q) => {
+        if (String(path).startsWith(HRV)) throw error;
+        return fakeGarmin(path, q);
+      });
+      const out = JSON.parse(await dashboard.getDashboardData(52));
+      // 52 weeks are 14 chunks of 4 weeks: only the first is asked for
+      expect(callsTo(HRV)).toHaveLength(1);
+      expect(recoveryCalls()).toHaveLength(0);
+      expect(optionalCalls()).toHaveLength(0);
+      expect(out.sync.failedSections).toEqual(["hrv", "zones", "fitnessAge", "units"]);
+      expect(out.sync.failedDates).toEqual(daysOf("2026-10-13", "2026-10-26"));
+      expect(out.sync.stoppedEarly).toBe(true);
+      // 1 activity page + 1 HRV chunk
+      expect(out.sync.garminCalls).toBe(2);
+    });
+
+    it("goes on after HTTP 500 on the first HRV chunk", async () => {
+      failing = new Set([HRV]);
+      const out = JSON.parse(await dashboard.getDashboardData(52));
+      expect(callsTo(HRV)).toHaveLength(14);
+      expect(recoveryCalls().length).toBeGreaterThan(0);
+      expect(optionalCalls()).toHaveLength(3);
+      expect(out.sync.failedSections).toEqual(["hrv"]);
+      expect(out.sync.stoppedEarly).toBe(false);
+    });
+
+    it("asks for no zones, fitness age, settings or .FIT file after HTTP 429 on a recovery range", async () => {
+      garminActivities = [activity(1, "2026-10-26", "strength_training")];
+      answer({
+        [SLEEP_RANGE]: () => {
+          throw rateLimit();
+        },
+      });
+      const out = JSON.parse(await dashboard.getDashboardData(1));
+      expect(optionalCalls()).toHaveLength(0);
+      expect(api.getBytes).not.toHaveBeenCalled();
+      expect(out.sync).toMatchObject({
+        stoppedEarly: true,
+        failedDetails: 1,
+        failedSections: ["zones", "fitnessAge", "units"],
+      });
+      expect(out.activities[0].detailError).toBe("Not downloaded: Garmin stopped answering");
+    });
+
+    it("asks for no later day after HTTP 429 on one day read after a range failed", async () => {
+      let sleeps = 0;
+      answer({
+        [SLEEP_RANGE]: () => {
+          throw new GarminApiError("GET range -> HTTP 500: down", 500);
+        },
+        "/sleep-service/sleep/dailySleep": (q) => {
+          if (++sleeps === 3) throw rateLimit();
+          return fakeGarmin("/sleep-service/sleep/dailySleep", q);
+        },
+      });
+      const out = JSON.parse(await dashboard.getDashboardData(1));
+      expect(sleeps).toBe(3);
+      expect(out.sync.failedDates).toEqual(daysOf("2026-10-15", "2026-10-26"));
+      expect(out.sync.stoppedEarly).toBe(true);
+      expect(optionalCalls()).toHaveLength(0);
+    });
+
+    describe("in the details of the sessions", () => {
+      it("stops downloading after HTTP 429 on the third file, and reports the sessions without details", async () => {
+        garminActivities = fiveSessions();
+        const ok = await api.getBytes();
+        api.getBytes.mockClear();
+        api.getBytes
+          .mockResolvedValueOnce(ok)
+          .mockResolvedValueOnce(ok)
+          .mockRejectedValueOnce(rateLimit());
+        const out = JSON.parse(await dashboard.getDashboardData(1));
+        expect(api.getBytes).toHaveBeenCalledTimes(3);
+        expect(out.sync).toMatchObject({ failedDetails: 3, stoppedEarly: true });
+        expect(out.activities.map((a: { detailError?: string }) => !!a.detailError)).toEqual([
+          false,
+          false,
+          true,
+          true,
+          true,
+        ]);
+        // the refused attempt counts too: it was a request
+        expect(out.sync.fitDownloads).toBe(3);
+      });
+
+      it("still reads a .FIT file that is saved after the stop", async () => {
+        garminActivities = [activity(101, "2026-10-26"), activity(102, "2026-10-25")];
+        const tools = new GarminTools(api as unknown as GarminApiClient, dataDir);
+        await tools.fetchFit(102);
+        api.getBytes.mockClear();
+        api.getBytes.mockRejectedValue(rateLimit());
+        const out = JSON.parse(await dashboard.getDashboardData(1));
+        expect(api.getBytes).toHaveBeenCalledTimes(1);
+        const [first, second] = out.activities;
+        expect(first.detailError).toMatch(/HTTP 429/);
+        expect(second.laps).toHaveLength(1);
+        expect(second).not.toHaveProperty("detailError");
+        expect(out.sync).toMatchObject({ failedDetails: 1, stoppedEarly: true });
+      });
+
+      it("goes on after HTTP 404 on one file", async () => {
+        garminActivities = fiveSessions().slice(0, 3);
+        const ok = await api.getBytes();
+        api.getBytes.mockClear();
+        api.getBytes
+          .mockRejectedValueOnce(new GarminApiError("GET /x -> HTTP 404: gone", 404))
+          .mockResolvedValue(ok);
+        const out = JSON.parse(await dashboard.getDashboardData(1));
+        expect(api.getBytes).toHaveBeenCalledTimes(3);
+        expect(out.sync).toMatchObject({ failedDetails: 1, stoppedEarly: false });
+        expect(out.activities[0].detailError).toMatch(/HTTP 404/);
+        expect(out.activities[1].exercises).toHaveLength(1);
+      });
+
+      it("goes on after a download that is not a .FIT file", async () => {
+        garminActivities = fiveSessions().slice(0, 3);
+        const ok = await api.getBytes();
+        api.getBytes.mockClear();
+        api.getBytes.mockResolvedValueOnce(new Uint8Array(3)).mockResolvedValue(ok);
+        const out = JSON.parse(await dashboard.getDashboardData(1));
+        expect(api.getBytes).toHaveBeenCalledTimes(3);
+        expect(out.sync).toMatchObject({ failedDetails: 1, stoppedEarly: false });
+        expect(out.activities[0].detailError).toMatch(/is not a \.FIT file/);
+        expect(out.activities[1].exercises).toHaveLength(1);
+        expect(out.activities[2].exercises).toHaveLength(1);
+      });
+
+      it("goes on after a saved file that does not decode, on every update", async () => {
+        garminActivities = fiveSessions().slice(0, 3);
+        const ok = await api.getBytes();
+        // a valid header and a wrong CRC
+        mkdirSync(join(dataDir, "fit"), { recursive: true });
+        writeFileSync(
+          join(dataDir, "fit", "1.fit"),
+          ok.map((v: number, i: number) => (i === ok.length - 1 ? v ^ 0xff : v)),
+        );
+        api.getBytes.mockClear();
+        const first = JSON.parse(await dashboard.getDashboardData(1));
+        // sessions 2 and 3 download
+        expect(api.getBytes).toHaveBeenCalledTimes(2);
+        expect(first.sync).toMatchObject({ failedDetails: 1, stoppedEarly: false });
+        expect(first.activities[0].detailError).toMatch(/^Cannot decode the \.FIT file of 1/);
+        expect(first.activities[2].exercises).toHaveLength(1);
+        api.getBytes.mockClear();
+        const second = JSON.parse(await dashboard.getDashboardData(1));
+        expect(api.getBytes).not.toHaveBeenCalled();
+        expect(second.sync).toMatchObject({ failedDetails: 1, stoppedEarly: false });
+        expect(second.activities[1].exercises).toHaveLength(1);
+      });
+
+      it("counts an error that is no Garmin error as a failed detail and does not stop the others", async () => {
+        garminActivities = fiveSessions().slice(0, 2);
+        const ok = await api.getBytes();
+        api.getBytes.mockClear();
+        api.getBytes.mockRejectedValueOnce(new Error("disk full")).mockResolvedValue(ok);
+        const out = JSON.parse(await dashboard.getDashboardData(1));
+        expect(api.getBytes).toHaveBeenCalledTimes(2);
+        expect(out.sync).toMatchObject({ failedDetails: 1, stoppedEarly: false });
+        expect(out.activities[0].detailError).toEqual(expect.any(String));
+        expect(out.activities[1]).not.toHaveProperty("detailError");
+      });
+    });
+
+    it("does not throw when Garmin answers a bare string for the HRV or the settings path", async () => {
+      api.getJson.mockImplementation(async (path, q) =>
+        String(path).startsWith(HRV) || path === SETTINGS ? "oops" : fakeGarmin(path, q),
+      );
+      const out = JSON.parse(await dashboard.getDashboardData(1));
+      expect(out.hrv).toEqual([]);
+      expect(out).not.toHaveProperty("units");
+      expect(out.sync.failedSections).toEqual([]);
+      expect(out.sync.stoppedEarly).toBe(false);
+    });
+
+    it("keeps the units and the language of an earlier update when the settings are skipped", async () => {
+      expect(await profile()).toMatchObject({ units: "statute_us", locale: "pt-BR" });
+      api.getJson.mockImplementation(async (path, q) => {
+        if (String(path).startsWith(HRV)) throw rateLimit();
+        return fakeGarmin(path, q);
+      });
+      const out = await get();
+      expect(out.sync.failedSections).toContain("units");
+      expect(out).toMatchObject({ units: "statute_us", locale: "pt-BR" });
+    });
+  });
+
   describe("previous rows", () => {
     it("gives the previous rows the board of their sport", async () => {
       const out = await previous();
@@ -1750,7 +1959,7 @@ describe("getDashboardData", () => {
   it("reports a detail that cannot be read on the activity", async () => {
     garminActivities = [activity(20, "2026-10-26", "strength_training")];
     api.getBytes.mockRejectedValue(
-      new GarminApiError("GET /download-service/files/activity/20 -> HTTP 404: gone"),
+      new GarminApiError("GET /download-service/files/activity/20 -> HTTP 404: gone", 404),
     );
     const out = JSON.parse(await dashboard.getDashboardData(1));
     expect(out.activities[0].detailError).toBe(

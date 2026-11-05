@@ -265,6 +265,8 @@ describe("prompts", () => {
     ]) {
       expect(text).toContain("failedDates");
       expect(text).toContain("failedSections");
+      expect(text).toContain("failedDetails");
+      expect(text).toContain("stoppedEarly");
     }
   });
 

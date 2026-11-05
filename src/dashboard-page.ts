@@ -418,8 +418,10 @@ export function filterData(data: Json, s: Settings): Json {
     listOf(items)
       .filter((a) => !s.sports || s.sports.includes(groupOf(a as Activity)))
       .map((a) => {
-        if (!no.has("names")) return a;
-        const { name: _, ...rest } = a;
+        // an error text can hold a local path: it stays out of a page that can be shared
+        const { detailError: _error, ...kept } = a;
+        if (!no.has("names")) return kept;
+        const { name: _, ...rest } = kept;
         return rest;
       });
   for (const key of ["activities", "previousActivities"]) {

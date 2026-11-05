@@ -51,7 +51,14 @@ interface Sync {
   calls: number;
   failedDates: string[];
   failedSections: string[];
+  /** Sessions whose laps or sets could not be read. */
+  failedDetails: number;
+  /** Garmin stopped answering: no more requests in this update. */
+  stopped: boolean;
 }
+
+/** Errors that more requests cannot mend, and a denied request counts against the limit. */
+const stopsAll = (e: GarminApiError) => e.status === undefined || e.status === 429;
 
 /**
  * All the data of the training dashboard in one call, with a local cache in `<data-dir>/dashboard-cache.json`
@@ -90,7 +97,13 @@ export class GarminDashboard {
     const prevStart = addDays(start, -7 * (w + 1));
     const recentFrom = addDays(today, -(RECOVERY_DAYS - 1));
     const recoveryFrom = recoveryHistory && start < recentFrom ? start : recentFrom;
-    const sync: Sync = { calls: 0, failedDates: [], failedSections: [] };
+    const sync: Sync = {
+      calls: 0,
+      failedDates: [],
+      failedSections: [],
+      failedDetails: 0,
+      stopped: false,
+    };
 
     const cache = await this.load();
     const before = new Set(Object.keys(objectAt(cache, "activities")));
@@ -101,8 +114,8 @@ export class GarminDashboard {
     await writeAtomically(this.#file(), JSON.stringify(cache));
 
     const [newZones, fitnessAge, settings] = await Promise.all([
-      optional(sync, "zones", () => this.tools.getHeartRateZones()),
-      optional(sync, "fitnessAge", () => this.tools.getFitnessAge(today)),
+      optional(sync, "zones", () => this.tools.getHeartRateZones().then(parsed)),
+      optional(sync, "fitnessAge", () => this.tools.getFitnessAge(today).then(parsed)),
       optional(sync, "units", () => this.api.getJson("/userprofile-service/userprofile/settings")),
     ]);
     // a failed call keeps the last good answer: one rate limit must not turn a page in miles into km
@@ -136,6 +149,8 @@ export class GarminDashboard {
       failedDays: sync.failedDates.length,
       failedDates: sync.failedDates,
       failedSections: sync.failedSections,
+      failedDetails: 0,
+      stoppedEarly: false,
       cachedActivities: cached.length,
     };
     out.sync = synced;
@@ -146,7 +161,9 @@ export class GarminDashboard {
       ...between(rows, recentFrom, today),
     ];
     const activities = activitiesBetween(cache, start, today).map((a) => structuredClone(a));
-    synced.fitDownloads = await this.#attachDetails(activities, workouts);
+    synced.fitDownloads = await this.#attachDetails(activities, workouts, sync);
+    synced.failedDetails = sync.failedDetails;
+    synced.stoppedEarly = sync.stopped;
     out.activities = activities;
     out.previousActivities = activitiesBetween(cache, prevStart, addDays(start, -1)).map(compact);
     return jsonByLines(out);
@@ -248,11 +265,10 @@ export class GarminDashboard {
     }
     const recentFrom = addDays(to, -(RECOVERY_DAYS - 1));
     const failedDays: string[] = [];
-    let stopped = false;
     // the newest first: if Garmin stops answering, the days that a reader looks at first are saved
     for (const [start, end] of recoveryChunks(needed).toReversed()) {
       const days = needed.filter((day) => day >= start && day <= end);
-      if (stopped) {
+      if (sync.stopped) {
         failedDays.push(...days);
         continue;
       }
@@ -268,9 +284,9 @@ export class GarminDashboard {
         if (!(e instanceof GarminApiError)) throw e;
         log("WARN", `Recovery data of ${start} to ${end} not fetched: ${e.message}`);
         // no more requests for what they cannot mend: the network, the key, a rate limit
-        stopped = e.status === undefined || e.status === 429;
+        if (stopsAll(e)) sync.stopped = true;
         for (const day of days) {
-          if (stopped || day < recentFrom) {
+          if (sync.stopped || day < recentFrom) {
             failedDays.push(day);
             continue;
           }
@@ -283,6 +299,7 @@ export class GarminDashboard {
           } catch (dayError) {
             if (!(dayError instanceof GarminApiError)) throw dayError;
             failedDays.push(day);
+            if (stopsAll(dayError)) sync.stopped = true;
             log("WARN", `Recovery data of ${day} not fetched: ${dayError.message}`);
           }
         }
@@ -333,7 +350,7 @@ export class GarminDashboard {
    * sessions of a plan, compared across weeks): the newest WORKOUT_SESSIONS, downloaded when needed, and
    * every older one whose .FIT file is saved, which costs no download.
    */
-  async #attachDetails(acts: Json[], workouts: boolean): Promise<number> {
+  async #attachDetails(acts: Json[], workouts: boolean, sync: Sync): Promise<number> {
     const isRun = (a: Json) => isRunning(a as Activity);
     // runs of one workout share it, whatever place Garmin puts in their name
     const workout = (a: Json) => (typeof a.name === "string" ? workoutOf(a.name) : undefined);
@@ -346,7 +363,10 @@ export class GarminDashboard {
     let downloads = 0;
     // the sets and the laps of an activity come from one .FIT file: count it once, when it is not saved
     const fit = async <T>(id: number, read: (id: number) => Promise<T>): Promise<T> => {
-      if (!(await this.tools.hasFit(id))) downloads++;
+      if (!(await this.tools.hasFit(id))) {
+        if (sync.stopped) throw new GarminApiError("Not downloaded: Garmin stopped answering");
+        downloads++;
+      }
       return read(id);
     };
     for (const [i, a] of acts.entries()) {
@@ -371,6 +391,8 @@ export class GarminDashboard {
         }
       } catch (e) {
         a.detailError = (e as Error).message;
+        sync.failedDetails++;
+        if (e instanceof GarminApiError && stopsAll(e)) sync.stopped = true;
       }
     }
     return downloads;
@@ -530,19 +552,30 @@ export function recoveryRow(day: string, sleep: unknown, summary: unknown): Json
 // ------------------------------------------------------------------ helpers
 
 /** Counts the Garmin call and parses a tool's JSON string. */
-async function call(sync: Sync, f: () => Promise<unknown>): Promise<unknown> {
+async function call(sync: Sync, f: () => Promise<string>): Promise<unknown> {
   sync.calls++;
-  const r = await f();
-  return typeof r === "string" ? JSON.parse(r) : r;
+  return parsed(await f());
 }
+
+/** A tool answers a JSON string. The API client answers parsed JSON, so its calls do not use this. */
+const parsed = (r: string): unknown => JSON.parse(r);
 
 /** A section the dashboard can do without: a Garmin error gives null and is reported in sync. */
 async function optional(sync: Sync, section: string, f: () => Promise<unknown>): Promise<unknown> {
+  const fail = () => {
+    if (!sync.failedSections.includes(section)) sync.failedSections.push(section);
+  };
+  if (sync.stopped) {
+    fail();
+    return null;
+  }
   try {
-    return await call(sync, f);
+    sync.calls++;
+    return await f();
   } catch (e) {
     if (!(e instanceof GarminApiError)) throw e;
-    if (!sync.failedSections.includes(section)) sync.failedSections.push(section);
+    fail();
+    if (stopsAll(e)) sync.stopped = true;
     log("WARN", `${section} not fetched: ${e.message}`);
     return null;
   }

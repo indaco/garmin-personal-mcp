@@ -58,7 +58,10 @@ of `getDashboardData` with `weeks` = {{weeks}}, which has:
   days. If `failedDays` is more than 0, name the dates in `failedDates` in chat. If
   `failedSections` is not empty, name those sections in chat. `zones` and `units` then hold the
   last saved values, if there are any, else `zones` is null and `units` is absent. `fitnessAge` is
-  then null and `hrv` can have no rows. A widget without its value shows "n/a".
+  then null and `hrv` can have no rows. A widget without its value shows "n/a". If `failedDetails` is
+  more than 0, say that this many sessions have no laps or sets, so the strength and lap numbers are
+  not complete. If `stoppedEarly` is true, say that Garmin stopped answering (a rate limit or the
+  network), and that I can run the update again in a few minutes.
 - `notes`: the coach notes, a list of strings. The server escapes them as HTML.
 - `units`: the measurement system of my Garmin profile. The data is always metric (km, m, kg,
   pace per km). Show every distance, pace, speed, elevation and weight in my units: `metric` km,

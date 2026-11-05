@@ -12,7 +12,7 @@ const DEFAULT_TOKEN_TTL_MS = 23 * 3600_000;
 export class GarminApiError extends Error {
   override name = "GarminApiError";
 
-  /** `status` is the HTTP status of an answer from Garmin; a network or token failure has none. */
+  /** `status` is the HTTP status of an answer from Garmin; a network or token failure has none. An OK answer with bad content has 200. */
   constructor(
     message: string,
     readonly status?: number,
@@ -61,7 +61,7 @@ export class GarminApiClient {
     try {
       return JSON.parse(new TextDecoder().decode(body));
     } catch {
-      throw new GarminApiError(`Response is not JSON: ${this.#preview(body, this.#token)}`);
+      throw new GarminApiError(`Response is not JSON: ${this.#preview(body, this.#token)}`, 200);
     }
   }
 
