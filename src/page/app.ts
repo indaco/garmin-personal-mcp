@@ -100,6 +100,25 @@ let accountOpen = false;
 let windowOpen = false;
 /** The observer of the tab bar: a redraw makes a new bar, and the old bar must not stay in memory. */
 let tabBarObserver: ResizeObserver | undefined;
+/** The observer of the bar that sticks to the top: a redraw makes a new bar. */
+let stickyObserver: ResizeObserver | undefined;
+
+/** Keyboard focus scrolls below the sticky bar, whatever its height: it wraps with the language and the width. */
+function watchStickyBar(): void {
+  stickyObserver?.disconnect();
+  const bar =
+    document.querySelector<HTMLElement>(".page > .edit-bar") ??
+    document.querySelector<HTMLElement>(".top");
+  if (!bar) return;
+  stickyObserver = new ResizeObserver(() => {
+    const sticks = getComputedStyle(bar).position === "sticky";
+    document.documentElement.style.setProperty(
+      "--sticky-h",
+      sticks ? `${bar.offsetHeight + 8}px` : "0px",
+    );
+  });
+  stickyObserver.observe(bar);
+}
 let tabs: string[] = [];
 let weeks: string[] = [];
 // the refresh record when this browser has not closed it yet
@@ -232,6 +251,7 @@ function render(): void {
       ),
     ),
   );
+  watchStickyBar();
 }
 
 // ------------------------------------------------------------------ footer

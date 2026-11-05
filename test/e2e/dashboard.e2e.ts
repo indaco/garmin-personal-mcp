@@ -56,6 +56,45 @@ async function startEdit(page: Page): Promise<void> {
   await page.click(".account-panel >> text=Edit layout");
 }
 
+/** The stops of Shift+Tab, from the last control up to the skip link, that sit under the given bar. */
+async function stopsUnder(page: Page, bar: string): Promise<{ hidden: string[]; stops: number }> {
+  await page.evaluate(() => {
+    window.scrollTo(0, document.documentElement.scrollHeight);
+    const all = [
+      ...document.querySelectorAll<HTMLElement>(
+        "a[href], button, input, select, summary, [tabindex='0']",
+      ),
+    ].filter((e) => e.offsetParent !== null && !e.hasAttribute("disabled"));
+    all[all.length - 1].focus();
+  });
+  const hidden: string[] = [];
+  let stops = 0;
+  for (; stops < 80; stops++) {
+    const hit = await page.evaluate((sel) => {
+      const el = document.activeElement as HTMLElement;
+      const b = document.querySelector(sel)!.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      const inside = el.closest(sel) !== null;
+      const under = !inside && r.width > 0 && r.height > 0 && r.top < b.bottom && r.bottom > b.top;
+      return {
+        skip: el.classList.contains("skip"),
+        label: under
+          ? `${el.tagName} ${el.getAttribute("aria-label") ?? el.textContent?.trim().slice(0, 30)}`
+          : "",
+      };
+    }, bar);
+    // the skip link is the end of the walk: it sits at the top of the page, above the bar
+    if (hit.skip) break;
+    if (hit.label) hidden.push(hit.label);
+    await page.keyboard.press("Shift+Tab");
+  }
+  return { hidden, stops };
+}
+
+/** The sticky offset the page sets for keyboard focus. */
+const stickyOffset = (page: Page) =>
+  page.evaluate(() => document.documentElement.style.getPropertyValue("--sticky-h"));
+
 /** A record that the all board met the whole preset, so a test layout of few widgets stays small. */
 const MET = { all: preset("all").map((i) => i.widget) };
 
@@ -1137,6 +1176,67 @@ async function problems(page: Page): Promise<string[]> {
       .map((v) => `${v.id}: ${v.nodes.length}`);
   });
 }
+
+describe("sticky header", () => {
+  const phone = { width: 390, height: 844 };
+  const desktop = { width: 1280, height: 900 };
+
+  it("sticky: keeps keyboard focus clear of the header on a phone", async () => {
+    const { page } = await open(browser, pageFile(), { viewport: phone });
+    const { hidden, stops } = await stopsUnder(page, ".top");
+    expect(hidden).toEqual([]);
+    expect(stops).toBeGreaterThan(20);
+  });
+
+  it("sticky: keeps keyboard focus clear of the edit bar on a desktop", async () => {
+    const { page } = await open(browser, pageFile(), { viewport: desktop });
+    await startEdit(page);
+    const { hidden, stops } = await stopsUnder(page, ".page > .edit-bar");
+    expect(hidden).toEqual([]);
+    expect(stops).toBeGreaterThan(20);
+  });
+
+  it("sticky: keeps keyboard focus clear of the edit bar on a phone", async () => {
+    const { page } = await open(browser, pageFile(), { viewport: phone });
+    await startEdit(page);
+    const { hidden, stops } = await stopsUnder(page, ".page > .edit-bar");
+    expect(hidden).toEqual([]);
+    expect(stops).toBeGreaterThan(20);
+  });
+
+  it("sticky: sets no offset where the header does not stick", async () => {
+    const { page } = await open(browser, pageFile(), { viewport: desktop });
+    await frames(page);
+    expect(await stickyOffset(page)).toBe("0px");
+  });
+
+  it("sticky: follows the header height when the width changes", async () => {
+    const { page } = await open(browser, pageFile(), { viewport: phone });
+    await frames(page);
+    const want = await page.evaluate(
+      () => `${(document.querySelector(".top") as HTMLElement).offsetHeight + 8}px`,
+    );
+    expect(await stickyOffset(page)).toBe(want);
+    await page.setViewportSize(desktop);
+    await frames(page);
+    expect(await stickyOffset(page)).toBe("0px");
+    await page.setViewportSize(phone);
+    await frames(page);
+    expect(await stickyOffset(page)).toBe(want);
+  });
+
+  it("sticky: follows the header height after a language change", async () => {
+    const file = pageFile({ settings: { languages: ["en", "it"] } });
+    const { page } = await open(browser, file, { viewport: phone, locale: "it-IT" });
+    await page.click(".account summary");
+    await page.selectOption("#lang", "en");
+    await frames(page);
+    const height = await page.evaluate(
+      () => (document.querySelector(".top") as HTMLElement).offsetHeight,
+    );
+    expect(await stickyOffset(page)).toBe(`${height + 8}px`);
+  });
+});
 
 describe("accessibility", () => {
   it("has no serious problem on the boards, in edit mode and in the light and both Munich themes", async () => {
