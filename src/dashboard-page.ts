@@ -159,6 +159,8 @@ export interface EditOptions {
 export interface EditResult {
   path: string;
   changed: boolean;
+  /** The old page, kept when a whole layout replaced the boards. */
+  backup?: string;
   layout: Layout;
   customWidgets: {
     id: string;
@@ -194,6 +196,9 @@ export class UnwritableBlockError extends Error {
   }
 }
 
+/** A block of the page that is not valid JSON or has the wrong shape; only a hand edit makes one. */
+export class BadBlockError extends Error {}
+
 /** The JSON text of a block value. A depth check before the write fails at one depth, so the real write is caught. */
 function jsonOf(block: Block, value: unknown, space?: number): string {
   try {
@@ -210,8 +215,27 @@ export function readBlock(page: string, block: Block): unknown {
   try {
     return JSON.parse(m[1]);
   } catch {
-    throw new Error(`The garmin-${block} block of the page is not valid JSON`);
+    throw new BadBlockError(`The garmin-${block} block of the page is not valid JSON`);
   }
+}
+
+/** The custom widgets of a page block. */
+function widgetsOf(page: string): CustomWidget[] {
+  const v = readBlock(page, "widgets") ?? [];
+  if (!Array.isArray(v))
+    throw new BadBlockError("The garmin-widgets block of the page is not a list");
+  return v as CustomWidget[];
+}
+
+/** The added languages of a page block. */
+function textsOf(page: string): Record<string, Record<string, string>> {
+  const v = readBlock(page, "i18n") ?? {};
+  const ok =
+    typeof v === "object" &&
+    !Array.isArray(v) &&
+    Object.values(v as object).every((t) => t !== null && typeof t === "object");
+  if (!ok) throw new BadBlockError("The garmin-i18n block of the page is not a list of languages");
+  return v as Record<string, Record<string, string>>;
 }
 
 /**
@@ -335,7 +359,7 @@ export const olderThan = (a: string, b: string): boolean =>
 /** `next` with the `i18n` block of `old`; {} when it cannot be read or written: a new layout is the way out of a broken page. */
 function carryLanguages(next: string, old: string): string {
   try {
-    return writeBlock(next, "i18n", readBlock(old, "i18n") ?? {});
+    return writeBlock(next, "i18n", textsOf(old));
   } catch {
     return writeBlock(next, "i18n", {});
   }
@@ -351,10 +375,21 @@ type Json = Record<string, unknown>;
 const listOf = (v: unknown): Json[] => (Array.isArray(v) ? (v as Json[]) : []);
 const same = (a: Settings, b: Settings) => JSON.stringify(a) === JSON.stringify(b);
 
-/** The settings of a page; none for no page or a page without them. */
+/** The settings of a page; none for no page or a page without them. The lists that keep data out must be lists. */
 function settingsOf(page: string | undefined): Settings {
   const s = page === undefined ? undefined : readBlock(page, "settings");
-  return s && typeof s === "object" ? (s as Settings) : {};
+  if (!s || typeof s !== "object") return {};
+  for (const key of ["exclude", "sports"] as const) {
+    const v = (s as Settings)[key] as unknown;
+    if (
+      v !== undefined &&
+      v !== null &&
+      !(Array.isArray(v) && v.every((x) => typeof x === "string"))
+    ) {
+      throw new Error(`The garmin-settings block of the page has a bad ${key}`);
+    }
+  }
+  return s as Settings;
 }
 
 /** The settings block of the page cannot be read: only new settings, or a new file, help. */
@@ -740,16 +775,30 @@ export class DashboardWriter {
     ) {
       next = writeBlock(next, "settings", Object.keys(own).length > 0 ? own : null);
     }
+    // before the library: a refusal changes no file
+    if (hasLanguages(next)) textsOf(next);
     if (page === undefined) {
       try {
         next = await this.#withLibrary(next, old);
       } catch (e) {
         // a new layout is the way out: widgets of the old page that cannot be written do not start the library
-        if (!layout || !(e instanceof UnwritableBlockError)) throw e;
+        if (!layout || !(e instanceof UnwritableBlockError || e instanceof BadBlockError)) throw e;
         next = await this.#withLibrary(next, undefined);
       }
     }
     next = withData(next, raw, own, notes, await this.schedule.due(target));
+    // first, so that a damaged block stops the call before the page changes
+    const report = {
+      notes: own.exclude?.includes("notes") ? 0 : notes.length,
+      digest: digest(filterData(raw, own)),
+      pageLanguages: pageLanguages(next, own),
+      settings: own,
+      ...(hasLanguages(next) ? { languages: missingTexts(next) } : {}),
+      ...(page === undefined && missingLanguage(next, raw.locale)
+        ? { missingProfileLanguage: raw.locale as string }
+        : {}),
+      ...(page === undefined ? withMissing(widgetGaps(next, pageLanguages(next, own))) : {}),
+    };
 
     // another process (a scheduled refresh, a second client) can write the page while this one waits for Garmin
     // shortcut: a write in the milliseconds between this read and writeAtomically is still lost; a lock file would close it
@@ -758,11 +807,7 @@ export class DashboardWriter {
         throw new Error(`${target} changed twice while it was being updated: run the update again`);
       return this.#write(options, true);
     }
-    // the second write of a build (notes, a typed title) must not overwrite the page from before the build
-    const sameBuild =
-      this.#wrote?.target === target &&
-      this.#wrote.page === old &&
-      Date.now() - this.#wrote.at < REUSE_MS;
+    const sameBuild = old !== undefined && this.#inBuild(target, old);
     let backup: string | undefined;
     if (old !== undefined && kind !== "updated" && !sameBuild) {
       backup = `${target}.bak`;
@@ -777,15 +822,7 @@ export class DashboardWriter {
       ...(kind === "upgraded" ? { page: kind, previousServer, server: version } : { page: kind }),
       ...(backup ? { backup } : {}),
       ...(Object.keys(addedWidgets).length > 0 ? { addedWidgets } : {}),
-      notes: own.exclude?.includes("notes") ? 0 : notes.length,
-      digest: digest(filterData(raw, own)),
-      pageLanguages: pageLanguages(next, own),
-      settings: own,
-      ...(hasLanguages(next) ? { languages: missingTexts(next) } : {}),
-      ...(page === undefined && missingLanguage(next, raw.locale)
-        ? { missingProfileLanguage: raw.locale as string }
-        : {}),
-      ...(page === undefined ? withMissing(widgetGaps(next, pageLanguages(next, own))) : {}),
+      ...report,
       ...this.#skippedReport(),
     };
   }
@@ -795,6 +832,15 @@ export class DashboardWriter {
     const run = this.#queue.then(() => this.#edit(options));
     this.#queue = run.catch(() => {});
     return run.catch(this.#unwritable(options.path));
+  }
+
+  /** The second write of a build (notes, a typed title, a new layout) must not overwrite the page from before the build. */
+  #inBuild(target: string, old: string): boolean {
+    return (
+      this.#wrote?.target === target &&
+      this.#wrote.page === old &&
+      Date.now() - this.#wrote.at < REUSE_MS
+    );
   }
 
   async #edit(o: EditOptions): Promise<EditResult> {
@@ -817,11 +863,17 @@ export class DashboardWriter {
         );
       }
       layout = parseLayout(saved);
-      widgets = (readBlock(old, "widgets") as CustomWidget[] | undefined) ?? [];
-      texts = (readBlock(old, "i18n") as Record<string, Record<string, string>> | undefined) ?? {};
+      widgets = widgetsOf(old);
+      texts = textsOf(old);
+    } catch (e) {
+      // a damaged block: #unwritable names the file and the way out
+      if (e instanceof BadBlockError) throw e;
+      throw new Error(`${(e as Error).message} in ${target}`, { cause: e });
+    }
+    try {
       settings = settingsOf(old);
     } catch (e) {
-      throw new Error(`${(e as Error).message} in ${target}`, { cause: e });
+      throw unreadable(e, target);
     }
     library = await this.#library(widgets);
     widgets = merged(widgets, library);
@@ -913,6 +965,12 @@ export class DashboardWriter {
         page = writeBlock(page, "i18n", texts);
       }
     }
+    // before the library is saved: a copy that fails changes no file
+    let backup: string | undefined;
+    if (o.layout !== undefined && !this.#inBuild(target, old)) {
+      backup = `${target}.bak`;
+      await copyFile(target, backup);
+    }
     if (o.widgets !== undefined || o.forgetWidgets !== undefined || o.widgetTexts !== undefined) {
       await this.#saveLibrary(library);
     }
@@ -920,6 +978,7 @@ export class DashboardWriter {
     return {
       path: target,
       changed,
+      ...(backup ? { backup } : {}),
       layout,
       customWidgets: widgets.map((w) => ({
         id: w.id,
@@ -993,7 +1052,7 @@ export class DashboardWriter {
   /** Names the page file in the error of a block that cannot be written back; other errors stay as they are. */
   #unwritable(path: string | undefined): (e: unknown) => never {
     return (e) => {
-      if (!(e instanceof UnwritableBlockError)) throw e;
+      if (!(e instanceof UnwritableBlockError) && !(e instanceof BadBlockError)) throw e;
       throw new Error(
         `${e.message} in ${this.#target(path)}: correct the block in the file, or give writeDashboard a new layout`,
         { cause: e },
@@ -1004,9 +1063,8 @@ export class DashboardWriter {
   /** The page with the library in its widgets block; `old` is the page that it replaces, to start the library. */
   async #withLibrary(page: string, old: string | undefined): Promise<string> {
     if (!marker("widgets").test(page)) return page;
-    const own = (readBlock(page, "widgets") as CustomWidget[] | null) ?? [];
-    const before =
-      old === undefined ? [] : ((readBlock(old, "widgets") as CustomWidget[] | null) ?? []);
+    const own = widgetsOf(page);
+    const before = old === undefined ? [] : widgetsOf(old);
     return writeBlock(page, "widgets", merged(own, await this.#library(before)));
   }
 
@@ -1182,8 +1240,8 @@ function pageLanguages(page: string, s: Settings): string[] {
  */
 function widgetGaps(page: string, languages: string[]): Record<string, string[]> {
   const out: Record<string, string[]> = {};
-  for (const w of (readBlock(page, "widgets") as CustomWidget[] | null | undefined) ?? []) {
-    if (!w.texts) continue;
+  for (const w of widgetsOf(page)) {
+    if (!w?.texts) continue;
     // the page shows a pt text for pt-BR, as it does for its own texts
     const gaps = languages.filter((code) => !w.texts![code] && !w.texts![code.slice(0, 2)]);
     if (gaps.length > 0) out[w.id] = gaps;
@@ -1204,7 +1262,7 @@ function missingLanguage(page: string, locale: unknown): boolean {
 
 /** For each language of the page, the keys that it does not translate. */
 function missingTexts(page: string): Record<string, { missing: string[] }> {
-  const t = (readBlock(page, "i18n") as Record<string, Record<string, string>> | undefined) ?? {};
+  const t = textsOf(page);
   return Object.fromEntries(
     Object.entries(t).map(([lang, texts]) => [
       lang,

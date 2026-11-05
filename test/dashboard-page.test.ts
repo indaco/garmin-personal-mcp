@@ -1909,3 +1909,201 @@ describe("writeBlock", () => {
     expect((err as Error).cause).toBeInstanceOf(RangeError);
   });
 });
+
+const blocks = (id: string) => `<!doctype html>
+<meta name="garmin-template" content="${id}">
+<script>
+window.GARMIN_SETTINGS = /* garmin-settings:start */null/* garmin-settings:end */;
+const DATA = /* garmin-data:start */null/* garmin-data:end */;
+const LAYOUT = /* garmin-layout:start */null/* garmin-layout:end */;
+const WIDGETS = /* garmin-widgets:start */[]/* garmin-widgets:end */;
+const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
+</script>
+`;
+const setBlock = (block: string, json: string) => {
+  const re = new RegExp(`(garmin-${block}:start \\*/).*?(/\\* garmin-${block}:end)`, "s");
+  writeFileSync(
+    file,
+    page().replace(re, (_, a: string, b: string) => a + json + b),
+  );
+};
+const times = (text: string, part: string) => text.split(part).length - 1;
+
+describe("a damaged page block", () => {
+  const named = {
+    ...data,
+    activities: [{ ...data.activities[0], name: "Run with Anna" }],
+  };
+  let w: DashboardWriter;
+  /** A page from the template with this block set by hand, and the page text before the call. */
+  async function damaged(block: string, json: string): Promise<string> {
+    await w.write({});
+    setBlock(block, json);
+    return page();
+  }
+
+  beforeEach(() => {
+    templateText = blocks(ID_A);
+    w = new DashboardWriter(
+      async () => JSON.stringify(named),
+      dir,
+      async () => templateText,
+    );
+  });
+
+  describe("settings", () => {
+    it.each([['{"exclude":"names"}'], ['{"sports":"running"}'], ['{"exclude":[1]}']])(
+      "refuses %s, names the file and writes nothing",
+      async (json) => {
+        const before = await damaged("settings", json);
+        await expect(w.write({})).rejects.toThrow(
+          /garmin-settings block of the page has a bad (exclude|sports) in .*garmin-dashboard\.html: give new settings/,
+        );
+        expect(page()).toBe(before);
+        expect(existsSync(`${file}.bak`)).toBe(false);
+        await expect(w.write({ onlyExisting: true })).rejects.toThrow(/has a bad/);
+        expect(page()).toBe(before);
+        await expect(w.view({})).rejects.toThrow(/has a bad/);
+        await expect(w.preview({})).rejects.toThrow(/has a bad/);
+      },
+    );
+
+    it("names new settings as the way out for edit too", async () => {
+      await damaged("settings", '{"exclude":"names"}');
+      await expect(w.edit({})).rejects.toThrow(
+        /has a bad exclude in .*garmin-dashboard\.html: give new settings, or delete the file/,
+      );
+      await w.write({ settings: {} });
+      await damaged("settings", "{oops");
+      await expect(w.edit({})).rejects.toThrow(/give new settings, or delete the file/);
+    });
+
+    it("lets new settings be the way out, and keeps the names out", async () => {
+      await damaged("settings", '{"exclude":"names"}');
+      await w.write({ settings: { exclude: ["names"] } });
+      expect(readBlock(page(), "settings")).toEqual({ exclude: ["names"] });
+      expect(page()).not.toContain("Run with Anna");
+    });
+
+    it("does not stop on an unknown key, or a null list", async () => {
+      for (const json of [
+        '{"exclude":["names"],"title":"x"}',
+        '{"exclude":null}',
+        '{"sports":null}',
+      ]) {
+        await damaged("settings", json);
+        expect((await w.write({})).page).toBe("updated");
+      }
+    });
+  });
+
+  describe("i18n", () => {
+    it("fails before the write, and writes no file", async () => {
+      const before = await damaged("i18n", '{"de":null}');
+      await expect(w.write({})).rejects.toThrow();
+      await expect(w.write({ settings: { title: "Mine" } })).rejects.toThrow();
+      expect(page()).toBe(before);
+      expect(existsSync(`${file}.bak`)).toBe(false);
+    });
+
+    it("does not start the widget library", async () => {
+      await w.write({});
+      setBlock("widgets", '[{"id":"mine","title":"Mine","code":"x"}]');
+      setBlock("i18n", '{"de":null}');
+      const before = page();
+      await expect(w.write({})).rejects.toThrow();
+      expect(existsSync(join(dir, "widgets.json"))).toBe(false);
+      expect(page()).toBe(before);
+    });
+
+    it.each([["5"], ["[]"], ['"x"']])("still updates a page whose block is %s", async (json) => {
+      await damaged("i18n", json);
+      expect((await w.write({})).page).toBe("updated");
+    });
+  });
+
+  describe("widgets, layout and i18n", () => {
+    const fileName =
+      /in .*garmin-dashboard\.html: correct the block in the file, or give writeDashboard a new layout/;
+
+    it("names a widgets block that is not a list, and the file", async () => {
+      const before = await damaged("widgets", "{}");
+      const err = await w.write({}).catch((e: Error) => e);
+      expect((err as Error).message).toMatch(/garmin-widgets block of the page is not a list/);
+      expect((err as Error).message).toMatch(fileName);
+      expect(page()).toBe(before);
+    });
+
+    it("names a layout block with invalid JSON on an upgrade, and the file", async () => {
+      const before = await damaged("layout", "{nope");
+      templateText = blocks(ID_B);
+      await expect(w.write({})).rejects.toThrow(
+        /garmin-layout block of the page is not valid JSON in .*garmin-dashboard\.html: correct the block in the file/,
+      );
+      expect(page()).toBe(before);
+    });
+
+    it.each([
+      ["a null language", '{"de":null}'],
+      ["a list", "[{}]"],
+      ["a text list", '{"de":5}'],
+    ])("names an i18n block with %s, and the file", async (_, json) => {
+      const before = await damaged("i18n", json);
+      await expect(w.write({})).rejects.toThrow(
+        /garmin-i18n block of the page is not a list of languages in .*garmin-dashboard\.html/,
+      );
+      expect(page()).toBe(before);
+    });
+
+    it("lets a new layout be the way out of each block", async () => {
+      await damaged("widgets", "{}");
+      expect((await w.write({ layout: "preset" })).page).toBe("replaced");
+      expect(readBlock(page(), "widgets")).toEqual([]);
+
+      await damaged("layout", "{nope");
+      templateText = blocks(ID_B);
+      expect((await w.write({ layout: "preset" })).page).toBe("replaced");
+      expect(readBlock(page(), "layout")).toMatchObject({ base: "preset", boards: {} });
+
+      await damaged("i18n", '{"de":null}');
+      expect((await w.write({ layout: "preset" })).page).toBe("replaced");
+      expect(readBlock(page(), "i18n")).toEqual({});
+    });
+
+    it("names the file once in the error of edit", async () => {
+      for (const [block, json] of [
+        ["widgets", "{}"],
+        ["layout", "{nope"],
+        ["i18n", '{"de":null}'],
+      ]) {
+        await damaged(block, json);
+        const err = await w.edit({}).catch((e: Error) => e);
+        expect((err as Error).message).toMatch(new RegExp(`garmin-${block} block`));
+        expect(times((err as Error).message, file)).toBe(1);
+        expect((err as Error).message).toMatch(
+          /correct the block in the file, or give writeDashboard a new layout/,
+        );
+        await w.write({ layout: "preset" });
+      }
+    });
+
+    it("names the file when a view cannot read the layout block", async () => {
+      await damaged("layout", "{nope");
+      await expect(w.view({})).rejects.toThrow(/not valid JSON in .*garmin-dashboard\.html/);
+    });
+
+    it("does not fail on a null widget entry or a null block", async () => {
+      await damaged("widgets", "[null]");
+      expect((await w.write({})).page).toBe("updated");
+      await damaged("widgets", "null");
+      expect((await w.write({})).page).toBe("updated");
+    });
+
+    it("leaves a data refresh time alone on a damaged page", async () => {
+      await damaged("widgets", "{}");
+      await patchDue(file, "2026-11-05T07:00:00");
+      expect((readBlock(page(), "data") as { due?: string }).due).toBe("2026-11-05T07:00:00");
+      expect(readBlock(page(), "widgets")).toEqual({});
+    });
+  });
+});

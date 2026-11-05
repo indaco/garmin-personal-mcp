@@ -228,6 +228,33 @@ async function cyclingAscent(activities: unknown[]): Promise<{ text: string | nu
   return { text, page };
 }
 
+/** A ride on a trainer, with a distance or without. */
+const indoorRide = (n: number, start: string, km?: number) => ({
+  id: 800 + n,
+  name: "Ride",
+  type: "indoor_cycling",
+  sport: "cycling",
+  duration: "45:00",
+  start: `${start} 09:00:00`,
+  ...(km === undefined ? {} : { km }),
+});
+/** The value and the number of lines under it of the "Distance" tile of the cycling board. */
+async function distanceTile(activities: unknown[]) {
+  const { page, errors } = await open(
+    browser,
+    pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }),
+    { hash: "#cycling" },
+  );
+  expect(errors).toEqual([]);
+  const tile = page.locator("[data-id=typeKpis] .kpi", {
+    has: page.locator(".kpi-label", { hasText: "Distance" }),
+  });
+  return {
+    value: await tile.locator(".kpi-value").textContent(),
+    sub: await tile.locator(".kpi-sub").count(),
+  };
+}
+
 describe("the page", () => {
   it("keeps the template small", () => {
     // minified, with only the Chart.js parts the page uses: Chart.js is most of it, and the page
@@ -734,6 +761,17 @@ describe("edit mode", () => {
     expect(await tiles(page)).toEqual(ALL_PRESET);
   });
 
+  it("shows no unsaved changes when Reset runs on an unedited board", async () => {
+    const listed = { rev: "r1", base: "preset", boards: { cycling: [] }, seen: { cycling: [] } };
+    for (const layout of [null, listed]) {
+      const { page, errors } = await open(browser, pageFile({ layout }));
+      await startEdit(page);
+      await page.click("text=Reset board");
+      expect(await page.innerText(".edit-bar")).not.toContain("Unsaved changes");
+      expect(errors).toEqual([]);
+    }
+  });
+
   it("keeps a browser edit after a reload, until the page gets a new layout", async () => {
     const file = pageFile({ layout: two });
     const { page } = await open(browser, file);
@@ -1139,6 +1177,40 @@ describe("chart legends", () => {
   });
 });
 
+/** An indoor ride on a day; `extra` adds fields. */
+const bikeRide = (start: string, extra: object = {}) => ({
+  id: Number(start.replace(/\D/g, "")),
+  name: "Indoor ride",
+  type: "cycling",
+  sport: "cycling",
+  start: `${start} 07:00:00`,
+  duration: "30:00",
+  ...extra,
+});
+/** The dataset of `label` for the last 5 weeks, and the 4-week average line. */
+async function lastWeeks(page: Page, widget: string, label: string) {
+  const bars = (await chartDataset(page, widget, label)).data as (number | null)[];
+  const avg = (await chartDataset(page, widget, "4-week average")).data as (number | null)[];
+  return { bars: bars.slice(-5), avg: avg.slice(-5) };
+}
+
+// the last 5 weeks start on 09-28, 10-05, 10-12, 10-19 and 10-26 (the last one is in progress)
+const loadSafety = async (rides: object[]) => {
+  const { page, errors } = await open(
+    browser,
+    pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: rides } }),
+  );
+  const last5 = async (label: string) =>
+    ((await chartDataset(page, "loadSafety", label)).data as (number | null)[]).slice(-5);
+  const flagged = (await kpiTexts(page, "loadSafety"))["Weeks above +10%"][0];
+  expect(errors).toEqual([]);
+  return {
+    bars: await last5("Weekly load"),
+    ramp: await last5("Change vs week before (%)"),
+    flagged,
+  };
+};
+
 describe("overview widgets", () => {
   it("shows a tooltip on every chart", async () => {
     const { page, errors } = await open(browser, pageFile());
@@ -1333,6 +1405,103 @@ describe("overview widgets", () => {
     expect(await axis()).toBe("km");
   });
 
+  describe("a week without a distance or a load in the weekly charts", () => {
+    // indoor rides: week -5 has a distance and a load, week -4 has neither, week -3 has both, then two empty weeks
+    const rides = [
+      bikeRide("2026-09-29", { km: 30, trainingLoad: 50 }),
+      bikeRide("2026-10-06"),
+      bikeRide("2026-10-07"),
+      bikeRide("2026-10-13", { km: 10, trainingLoad: 40 }),
+    ];
+    const weeklyPage = (tab = "") =>
+      open(browser, pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: rides } }), {
+        hash: tab,
+      });
+    it("leaves a gap on Distance, and the average line skips it", async () => {
+      const { page, errors } = await weeklyPage();
+      await page.click("[data-id=weeklyVolume] .picker >> text=Distance");
+      const { bars, avg } = await lastWeeks(page, "weeklyVolume", "Bike");
+      expect(bars).toEqual([30, null, 10, 0, 0]);
+      // the mean of the known weeks of the last 4: a gap is not a 0, an empty week is
+      expect(avg[1]).toBe(10);
+      expect(avg[2]).toBeCloseTo(40 / 3, 5);
+      expect(avg[3]).toBeCloseTo(40 / 3, 5);
+      expect(avg[4]).toBeCloseTo(10 / 3, 5);
+      expect(errors).toEqual([]);
+    });
+
+    it("counts the time of every week", async () => {
+      const { page } = await weeklyPage();
+      const { bars } = await lastWeeks(page, "weeklyVolume", "Bike");
+      expect(bars).toEqual([0.5, 1, 0.5, 0, 0]);
+    });
+
+    it("leaves a gap on Load for sessions without a load or a heart rate", async () => {
+      const { page } = await weeklyPage();
+      await page.click("[data-id=weeklyVolume] .picker >> text=Load");
+      const { bars } = await lastWeeks(page, "weeklyVolume", "Bike");
+      expect(bars).toEqual([50, null, 40, 0, 0]);
+    });
+
+    it("leaves the same gap in Each week on the Cycling board", async () => {
+      const { page, errors } = await weeklyPage("#cycling");
+      await page.click("[data-id=typeWeekly] .picker >> text=Distance");
+      const { bars } = await lastWeeks(page, "typeWeekly", "Bike");
+      expect(bars).toEqual([30, null, 10, 0, 0]);
+      expect(errors).toEqual([]);
+    });
+  });
+
+  describe("a week without a load in the Load safety chart", () => {
+    it("leaves a gap in the bars for sessions without a load, and an empty week is 0", async () => {
+      const { bars } = await loadSafety([
+        bikeRide("2026-09-29", { trainingLoad: 50 }),
+        bikeRide("2026-10-06"),
+        bikeRide("2026-10-13", { trainingLoad: 40 }),
+      ]);
+      expect(bars).toEqual([50, null, 40, 0, 0]);
+    });
+
+    it("has no ramp for the gap and none for the week after it", async () => {
+      const { ramp } = await loadSafety([
+        bikeRide("2026-09-29", { trainingLoad: 50 }),
+        bikeRide("2026-10-06"),
+        bikeRide("2026-10-13", { trainingLoad: 40 }),
+        bikeRide("2026-10-20", { trainingLoad: 40 }),
+      ]);
+      // week 10-05 is the gap and 10-12 comes after it: neither has a ramp, and none is -100;
+      // 10-19 is 40 against 40; the week in progress has none
+      expect(ramp).toEqual([null, null, null, 0, null]);
+    });
+
+    it("flags the same weeks with a gap as without", async () => {
+      const gap = await loadSafety([
+        bikeRide("2026-09-29", { trainingLoad: 20 }),
+        bikeRide("2026-10-06", { trainingLoad: 100 }),
+        bikeRide("2026-10-13"),
+        bikeRide("2026-10-20", { trainingLoad: 100 }),
+      ]);
+      expect(gap.bars).toEqual([20, 100, null, 100, 0]);
+      expect(gap.ramp).toEqual([null, 400, null, null, null]);
+      // only the rise from 20 to 100 is flagged, not the week after the gap
+      expect(gap.flagged).toBe("1");
+      const zero = await loadSafety([
+        bikeRide("2026-09-29", { trainingLoad: 20 }),
+        bikeRide("2026-10-06", { trainingLoad: 100 }),
+        bikeRide("2026-10-20", { trainingLoad: 100 }),
+      ]);
+      expect(zero.bars).toEqual([20, 100, 0, 100, 0]);
+      expect(zero.ramp).toEqual([null, 400, -100, null, null]);
+      expect(zero.flagged).toBe("1");
+    });
+
+    it("keeps -100% for an empty week after a load: that drop is real", async () => {
+      const { bars, ramp } = await loadSafety([bikeRide("2026-10-13", { trainingLoad: 40 })]);
+      expect(bars).toEqual([0, 0, 40, 0, 0]);
+      expect(ramp).toEqual([null, null, null, -100, null]);
+    });
+  });
+
   it("shows the widgets in Italian", async () => {
     const { page, errors } = await open(
       browser,
@@ -1484,7 +1653,7 @@ describe("type boards", () => {
     });
     // week A: no ascent data; week B: a real 0 m; week C: 120 m and one ride without data
     const weekA = [ride(1, "2026-10-06"), ride(2, "2026-10-08")];
-    const weekB = [ride(3, "2026-10-13", 0), ride(4, "2026-10-15", 0)];
+    const weekB = [ride(3, "2026-10-13", 0), indoorRide(4, "2026-10-15", 0)];
     const weekC = [ride(5, "2026-10-20", 120), ride(6, "2026-10-22")];
     expect((await cyclingAscent(weekA)).text).toBe("n/a");
     expect((await cyclingAscent(weekB)).text).toBe("0 m");
@@ -1493,6 +1662,73 @@ describe("type boards", () => {
     // 13 weeks: no ride in the first 9 and the 13th; A is a gap, B a real 0, C the known 120
     const bars = await chartDataset(all.page, "bikeDetails", "Weekly ascent");
     expect(bars.data).toEqual([...Array.from({ length: 10 }, () => null), 0, 120, null]);
+  });
+
+  it("shows n/a for the cycling distance without a distance, and keeps a real km", async () => {
+    // no ride has a distance: n/a and no "vs 4 weeks" line
+    expect(await distanceTile([indoorRide(1, "2026-10-20")])).toEqual({ value: "n/a", sub: 0 });
+    // a real distance, with its line
+    expect(await distanceTile([indoorRide(2, "2026-10-20", 12)])).toEqual({
+      value: "12.0 km",
+      sub: 1,
+    });
+    // one ride with and one without: the known km, and the line
+    expect(
+      await distanceTile([indoorRide(3, "2026-10-20", 12), indoorRide(4, "2026-10-21")]),
+    ).toEqual({
+      value: "12.0 km",
+      sub: 1,
+    });
+  });
+
+  it("shows n/a in the racket table for no zone time, and a real 0 for easy zones only", async () => {
+    const base = data.activities.find((a: Record<string, unknown>) => a.type === "paddelball");
+    const padel = (n: number, extra: Record<string, unknown>) => ({
+      ...without(base, ["hrZonesSec", "avgHR"]),
+      id: 700 + n,
+      start: `2026-10-2${n} 20:00:00`,
+      ...extra,
+    });
+    const rows = [
+      padel(1, { hrZonesSec: [0, 0, 0, 0, 0] }),
+      padel(2, { hrZonesSec: [600, 0, 600, 600, 600] }),
+      padel(3, { hrZonesSec: [600, 0, 0, 0, 0] }),
+      padel(4, {}),
+    ];
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: rows } }),
+      { hash: "#racket" },
+    );
+    const cells = await page.$$eval("[data-id=racketDetails] tbody tr", (r) =>
+      r.map((x) => `${x.children[6].textContent}|${x.children[7].textContent}`),
+    );
+    expect(errors).toEqual([]);
+    // the order of the rows does not matter here
+    expect(cells.toSorted()).toEqual(["0 min|0%", "30 min|50%", "n/a|n/a", "n/a|n/a"]);
+  });
+
+  it("observes the tab bar once, however often the page is drawn again", async () => {
+    const { page, errors } = await open(browser, pageFile(), {
+      init: `(() => {
+        const Native = window.ResizeObserver;
+        const live = new Set();
+        window.tabBars = () =>
+          [...live].flatMap((o) => [...o.els]).filter((el) => el.matches('[role="tablist"]')).length;
+        window.ResizeObserver = class extends Native {
+          els = new Set();
+          observe(el) { this.els.add(el); live.add(this); super.observe(el); }
+          disconnect() { live.delete(this); super.disconnect(); }
+        };
+      })();`,
+    });
+    for (const tab of ["running", "strengthTraining", "cycling"]) {
+      await page.click(`[data-tab=${tab}]`);
+    }
+    expect(
+      await page.evaluate(() => (window as unknown as { tabBars: () => number }).tabBars()),
+    ).toBe(1);
+    expect(errors).toEqual([]);
   });
 
   it("shows the grit and flow of mountain-bike rides, ride after ride", async () => {

@@ -191,7 +191,8 @@ const activity = (
   activityName: `A${id}`,
   startTimeLocal: `${day} 07:00:00`,
   activityType: { typeKey: type },
-  sportTypeId: 1,
+  // a ride is sportTypeId 2 in Garmin's data; the run check reads the sport
+  sportTypeId: type === "cycling" ? 2 : 1,
   distance: 5000,
   movingDuration: 1500,
   ...extra,
@@ -792,6 +793,18 @@ describe("getDashboardData", () => {
     // the 8 most recent Tempo runs; one Easy run and a ride do not make a repeat
     expect(withLaps(JSON.parse(await dashboard.getDashboardData(3, true)))).toEqual([
       30, 31, 32, 40, 41, 42, 43, 44, 45, 46, 47,
+    ]);
+  });
+
+  it("gives laps to the repeated runs of a type key that does not end in running, by their sport", async () => {
+    garminActivities = Array.from({ length: 4 }, (_, i) =>
+      activity(70 + i, `2026-10-${String(23 - i).padStart(2, "0")}`, "virtual_run", {
+        activityName: "Tempo",
+        sportTypeId: 1,
+      }),
+    );
+    expect(withLaps(JSON.parse(await dashboard.getDashboardData(1, true)))).toEqual([
+      70, 71, 72, 73,
     ]);
   });
 

@@ -66,6 +66,12 @@ export function groupOf(a: Activity): string {
   return TYPE_BOARD.get(a.type ?? "") ?? sport;
 }
 
+/** A run: by its board. A row without a sport, from an older server, by its type key. */
+export function isRunning(a: Activity): boolean {
+  if (typeof a.sport === "string" && a.sport) return groupOf(a) === "running";
+  return typeof a.type === "string" && a.type.endsWith("running");
+}
+
 /** The type boards in tab order: the fixed groups, then the other SDK sports in `present` sorted, then Other. */
 export function boardOrder(present: ReadonlySet<string>): string[] {
   const others = [...present].filter((g) => !GROUPS.includes(g)).toSorted();

@@ -20,11 +20,11 @@ import {
 const level = (m: number) => (m === 0 ? 0 : m < 30 ? 1 : m < 60 ? 2 : m < 90 ? 3 : 4);
 
 /** Bars stacked per type, one bar per week. */
-function stackedWeeks(ctx: Ctx, value: (a: Activity) => number) {
+function stackedWeeks(ctx: Ctx, value: (a: Activity) => number | undefined) {
   return groupsIn(ctx.activities).map((g) => ({
     type: "bar" as const,
     label: typeName(ctx.t, g),
-    data: ctx.calc.weekly(
+    data: ctx.calc.weeklyKnown(
       ctx.activities.filter((a) => groupOf(a) === g),
       ctx.weeks,
       value,
@@ -38,15 +38,18 @@ function stackedWeeks(ctx: Ctx, value: (a: Activity) => number) {
 export function renderVolume(el: HTMLElement, ctx: Ctx, only?: string[]): void {
   const { t, fmt, calc } = ctx;
   const max = maxHR(ctx);
-  const metrics: Record<string, [label: string, unit: string, value: (a: Activity) => number]> = {
+  const metrics: Record<
+    string,
+    [label: string, unit: string, value: (a: Activity) => number | undefined]
+  > = {
     time: [t("m.time"), "h", (a) => sessionSeconds(a) / 3600],
     distance: [
       t("m.distance"),
       fmt.unit.dist,
-      (a) => (typeof a.km === "number" ? fmt.to.dist(a.km) : 0),
+      (a) => (typeof a.km === "number" ? fmt.to.dist(a.km) : undefined),
     ],
     sessions: [t("m.sessions"), "", () => 1],
-    load: [t("m.load"), "", (a) => calc.loadOf(a, max)?.value ?? 0],
+    load: [t("m.load"), "", (a) => calc.loadOf(a, max)?.value],
   };
   const [metric, bar] = picker(
     ctx,
@@ -57,7 +60,7 @@ export function renderVolume(el: HTMLElement, ctx: Ctx, only?: string[]): void {
     t("m.label"),
   );
   const [, unit, value] = metrics[metric];
-  const total = calc.weekly(ctx.activities, ctx.weeks, value);
+  const total = calc.weeklyKnown(ctx.activities, ctx.weeks, value);
   append(el, bar);
   if (ctx.activities.length === 0) {
     ctx.empty(el);
@@ -142,7 +145,7 @@ register({
     const { t, fmt, calc } = ctx;
     const max = maxHR(ctx);
     const acts = ctx.allActivities;
-    const load = calc.weekly(acts, ctx.weeks, (a) => calc.loadOf(a, max)?.value ?? 0);
+    const load = calc.weeklyKnown(acts, ctx.weeks, (a) => calc.loadOf(a, max)?.value);
     const ramp = calc.ramp(load);
     const open =
       new Date(`${ctx.data.end}T00:00:00Z`).getUTCDay() !== 0 &&

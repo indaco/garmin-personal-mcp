@@ -240,6 +240,7 @@ out. To add one:
 | `board.empty` | This board has no widgets. |
 | `board.emptyEdit` | This board has no widgets: use “Add widget” to put some on it. |
 | `widget.failed` | This widget failed: {message} |
+| `chat.failed` | The dashboard could not open. |
 | `widget.unknown` | Unknown widget: {id} |
 | `empty.window` | No sessions in the selected weeks. |
 | `w.coachNotes` | Coach notes |

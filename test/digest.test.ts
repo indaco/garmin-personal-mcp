@@ -606,6 +606,23 @@ describe("digest", () => {
     ]);
   });
 
+  it("finds a run by its sport: a virtual run counts for the run km and the repeated names", () => {
+    const virtual = (day: string) => ({ ...run(day, "virtual_run"), sport: "running" });
+    const out = digest({
+      ...data,
+      activities: [
+        virtual("2026-10-12"),
+        virtual("2026-10-05"),
+        // a type key and a sport that disagree: the sport wins
+        { ...run("2026-10-04", "running"), sport: "cycling" },
+      ],
+    });
+    expect(out.weekly["2026-10-05"].runKm).toBe(5);
+    expect(out.weekly["2026-10-12"].runKm).toBe(5);
+    expect(out.weekly["2026-09-28"].runKm).toBe(0);
+    expect(out.repeatedRuns).toEqual({ "Easy Run": 2 });
+  });
+
   it("counts the run names that repeat: the workouts that the dashboard can compare across weeks", () => {
     expect(d.repeatedRuns).toEqual({});
     const more = digest({

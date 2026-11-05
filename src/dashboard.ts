@@ -6,7 +6,7 @@ import { type GarminApiClient, GarminApiError } from "./api-client";
 import { addDays, localToday } from "./dates";
 import { digest } from "./digest";
 import { log } from "./log";
-import { mondayOf } from "./page/calc";
+import { type Activity, isRunning, mondayOf } from "./page/calc";
 import { workoutOf } from "./page/running";
 import {
   type GarminTools,
@@ -256,7 +256,7 @@ export class GarminDashboard {
    * every older one whose .FIT file is saved, which costs no download.
    */
   async #attachDetails(acts: Json[], workouts: boolean): Promise<number> {
-    const isRun = (a: Json) => typeof a.type === "string" && a.type.endsWith("running");
+    const isRun = (a: Json) => isRunning(a as Activity);
     // runs of one workout share it, whatever place Garmin puts in their name
     const workout = (a: Json) => (typeof a.name === "string" ? workoutOf(a.name) : undefined);
     const runNames = new Map<unknown, number>();

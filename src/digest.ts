@@ -1,6 +1,14 @@
 import { addDays } from "./dates";
 import { hms, paceText, round } from "./fit";
-import { type Activity, dayOf, groupOf, mondayOf, sessionSeconds, seconds } from "./page/calc";
+import {
+  type Activity,
+  dayOf,
+  groupOf,
+  isRunning,
+  mondayOf,
+  sessionSeconds,
+  seconds,
+} from "./page/calc";
 import { fitnessFatigueFrom, loadOf, loadRatio, readinessOf, zonesOf } from "./page/metrics";
 import { racePredictionsOf, type SplitKind, splitOf, workoutOf } from "./page/running";
 import { completed, type StrengthSet, topSet as pageTopSet } from "./page/strength";
@@ -137,7 +145,7 @@ export function digest(data: Json): Digest {
       (weekly[mondayOf(dayOf(a as Activity)!)] ??= sum()),
     ]) {
       add(s, km, sessionSeconds(a as Activity) / 3600, loadIn(a));
-      if (type.endsWith("running")) s.runKm += km;
+      if (isRunning(a as Activity)) s.runKm += km;
     }
   }
 
@@ -300,7 +308,7 @@ export function digest(data: Json): Digest {
 function repeatedRuns(acts: Json[]): Record<string, number> {
   const count = new Map<string, number>();
   for (const a of acts) {
-    if (typeOf(a).endsWith("running") && typeof a.name === "string") {
+    if (isRunning(a as Activity) && typeof a.name === "string") {
       const w = workoutOf(a.name);
       count.set(w, (count.get(w) ?? 0) + 1);
     }

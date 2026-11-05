@@ -98,6 +98,8 @@ let draft: Layout | null = null;
 let accountOpen = false;
 // on a phone the week window folds into one control
 let windowOpen = false;
+/** The observer of the tab bar: a redraw makes a new bar, and the old bar must not stay in memory. */
+let tabBarObserver: ResizeObserver | undefined;
 let tabs: string[] = [];
 let weeks: string[] = [];
 // the refresh record when this browser has not closed it yet
@@ -704,7 +706,9 @@ function tabBar(data: Data): HTMLElement {
   const more = () =>
     nav.classList.toggle("more", nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 4);
   nav.addEventListener("scroll", more);
-  new ResizeObserver(more).observe(nav);
+  tabBarObserver?.disconnect();
+  tabBarObserver = new ResizeObserver(more);
+  tabBarObserver.observe(nav);
   return nav;
 }
 

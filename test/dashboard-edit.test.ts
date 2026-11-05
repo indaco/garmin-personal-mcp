@@ -1,4 +1,5 @@
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -9,7 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardWriter, readBlock } from "../src/dashboard-page";
 import { en } from "../src/page/i18n/en";
 
@@ -696,4 +697,100 @@ describe("widget texts", () => {
       /nope/,
     );
   });
+});
+
+const bak = () => `${file}.bak`;
+const one = (widgetId: string) => ({
+  base: "preset",
+  boards: { all: [{ id: widgetId, widget: widgetId, span: 1 }] },
+});
+describe("editDashboard keeps a copy of the page for a whole layout", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("copies the page from before the call, and returns the path", async () => {
+    const before = page();
+    const r = await writer.edit({ layout: one("hrv") });
+    expect(r.backup).toBe(bak());
+    expect(readFileSync(bak(), "utf8")).toBe(before);
+    expect(page()).not.toBe(before);
+  });
+
+  it("makes no copy for an edit without a layout", async () => {
+    const r = await writer.edit({ place: [{ board: "all", widget: "calendar" }] });
+    expect(r.changed).toBe(true);
+    expect(r).not.toHaveProperty("backup");
+    expect(existsSync(bak())).toBe(false);
+  });
+
+  it("keeps the copy of the build when the layout comes right after a write", async () => {
+    const before = page();
+    await writer.edit({ place: [{ board: "all", widget: "calendar" }] });
+    const built = page();
+    expect(built).not.toBe(before);
+    // a write with a new layout makes the .bak and starts the window of a build
+    await writer.write({ layout: "preset" });
+    const afterWrite = page();
+    const saved = readFileSync(bak(), "utf8");
+    expect(saved).toBe(built);
+    const r = await writer.edit({ layout: one("hrv") });
+    expect(r).not.toHaveProperty("backup");
+    expect(readFileSync(bak(), "utf8")).toBe(saved);
+    expect(page()).not.toBe(afterWrite);
+  });
+
+  it("makes no copy and leaves the page when the edit fails", async () => {
+    const before = page();
+    await expect(
+      writer.edit({ layout: one("hrv"), place: [{ board: "nowhere", widget: "hrv" }] }),
+    ).rejects.toThrow();
+    expect(existsSync(bak())).toBe(false);
+    expect(page()).toBe(before);
+  });
+
+  it("copies the page from before the second layout, so a wrong one can be undone", async () => {
+    await writer.edit({ layout: one("hrv") });
+    const afterFirst = page();
+    const r = await writer.edit({ layout: one("calendar") });
+    expect(r.backup).toBe(bak());
+    expect(readFileSync(bak(), "utf8")).toBe(afterFirst);
+  });
+
+  it("copies the page from before the edit when the window of a build is over", async () => {
+    await writer.write({ layout: "preset" });
+    const afterWrite = page();
+    vi.useFakeTimers({ now: Date.now() + 20 * 60_000, toFake: ["Date"] });
+    const r = await writer.edit({ layout: one("hrv") });
+    expect(r.backup).toBe(bak());
+    expect(readFileSync(bak(), "utf8")).toBe(afterWrite);
+  });
+
+  it.skipIf(process.platform === "win32")("gives the copy the mode of the page", async () => {
+    chmodSync(file, 0o600);
+    await writer.edit({ layout: one("hrv") });
+    expect(statSync(bak()).mode & 0o777).toBe(0o600);
+  });
+
+  // root ignores the mode of a folder
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "saves no widget when the copy cannot be written",
+    async () => {
+      const ro = join(dir, "ro");
+      mkdirSync(ro);
+      const roPage = join(ro, "page.html");
+      await writer.write({ path: roPage });
+      const before = readFileSync(roPage, "utf8");
+      chmodSync(ro, 0o500);
+      try {
+        await expect(
+          writer.edit({ path: roPage, layout: one("hrv"), widgets: [widget] }),
+        ).rejects.toThrow();
+      } finally {
+        chmodSync(ro, 0o700);
+      }
+      expect(readFileSync(roPage, "utf8")).toBe(before);
+      expect(existsSync(join(dir, "widgets.json"))).toBe(false);
+    },
+  );
 });

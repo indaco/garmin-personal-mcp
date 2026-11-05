@@ -184,6 +184,7 @@
   "board.empty": "Questa scheda non ha widget.",
   "board.emptyEdit": "Questa scheda non ha widget: usa “Aggiungi widget” per metterne.",
   "widget.failed": "Questo widget non funziona: {message}",
+  "chat.failed": "Non è stato possibile aprire la dashboard.",
   "widget.unknown": "Widget sconosciuto: {id}",
   "empty.window": "Nessuna sessione nelle settimane scelte.",
   "w.coachNotes": "Note del coach",

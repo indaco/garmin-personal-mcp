@@ -38,11 +38,12 @@ const blocks = { data: { weeks: 4 }, layout: null, widgets: [], languages: {}, i
 async function connected(hostContext: object = {}) {
   const m = await load();
   const show = vi.fn();
-  m.connect(show);
+  const fail = vi.fn();
+  m.connect(show, fail);
   fromHost({ id: 1, result: { protocolVersion: "2026-01-26", hostContext } });
   await settle();
   frame.parent.postMessage.mockClear();
-  return { ...m, show };
+  return { ...m, show, fail };
 }
 
 beforeEach(() => {
@@ -197,6 +198,95 @@ describe("connect", () => {
       { method: "ui/notifications/size-changed", params: { height: 1200 } },
     ]);
     expect(frame.root.style.height).toBe("100%");
+  });
+});
+
+const RESULT = "ui/notifications/tool-result";
+const failed = (content: unknown) => ({ method: RESULT, params: { isError: true, content } });
+
+describe("a failed tool result", () => {
+  it("gives the text of the error to fail, and does not show", async () => {
+    const { show, fail } = await connected();
+    fromHost(failed([{ type: "text", text: "the reason" }]));
+    expect(fail.mock.calls).toEqual([["the reason"]]);
+    expect(show).not.toHaveBeenCalled();
+  });
+
+  it("joins the texts with a space, cuts a long one at 300 characters, and allows none", async () => {
+    const { fail } = await connected();
+    fromHost(
+      failed([
+        { type: "text", text: "a" },
+        { type: "text", text: "b" },
+      ]),
+    );
+    fromHost(failed([{ type: "text", text: "x".repeat(400) }]));
+    fromHost(failed([]));
+    expect(fail.mock.calls).toEqual([["a b"], ["x".repeat(300)], [""]]);
+  });
+
+  it("copes with content that is not a list of texts", async () => {
+    const { fail } = await connected();
+    fromHost(failed("oops"));
+    fromHost(failed(undefined));
+    fromHost(failed([null, { type: "image" }, { text: 5 }, { type: "text", text: "ok" }]));
+    expect(fail.mock.calls).toEqual([[""], [""], ["ok"]]);
+  });
+
+  it("lets a later result with data show", async () => {
+    const { show, fail } = await connected();
+    fromHost(failed([{ type: "text", text: "no" }]));
+    fromHost({ method: RESULT, params: { structuredContent: blocks } });
+    expect(fail).toHaveBeenCalledTimes(1);
+    expect(show.mock.calls).toEqual([[blocks]]);
+  });
+
+  it("does not fail after the dashboard was shown", async () => {
+    const { fail } = await connected();
+    fromHost({ method: RESULT, params: { structuredContent: blocks } });
+    fromHost(failed([{ type: "text", text: "late" }]));
+    expect(fail).not.toHaveBeenCalled();
+  });
+
+  it("shows the data when a result has both data and isError", async () => {
+    const { show, fail } = await connected();
+    fromHost({ method: RESULT, params: { isError: true, structuredContent: blocks } });
+    expect(show.mock.calls).toEqual([[blocks]]);
+    expect(fail).not.toHaveBeenCalled();
+  });
+
+  it("calls neither for a result without data and without isError", async () => {
+    const { show, fail } = await connected();
+    fromHost({ method: RESULT, params: { content: [{ type: "text", text: "{}" }] } });
+    expect(show).not.toHaveBeenCalled();
+    expect(fail).not.toHaveBeenCalled();
+  });
+
+  it("works without a fail function", async () => {
+    const m = await load();
+    m.connect(vi.fn());
+    expect(() => fromHost(failed([]))).not.toThrow();
+  });
+});
+
+const cancelled = (params?: unknown) => ({ method: "ui/notifications/tool-cancelled", params });
+
+describe("a cancelled tool call", () => {
+  it("gives its reason to fail, or an empty text", async () => {
+    const { fail } = await connected();
+    fromHost(cancelled({ reason: "stopped" }));
+    fromHost(cancelled({}));
+    fromHost(cancelled());
+    fromHost(cancelled({ reason: 5 }));
+    fromHost(cancelled({ reason: "r".repeat(400) }));
+    expect(fail.mock.calls).toEqual([["stopped"], [""], [""], [""], ["r".repeat(300)]]);
+  });
+
+  it("does not fail after the dashboard was shown", async () => {
+    const { fail } = await connected();
+    fromHost({ method: RESULT, params: { structuredContent: blocks } });
+    fromHost(cancelled({ reason: "late" }));
+    expect(fail).not.toHaveBeenCalled();
   });
 });
 

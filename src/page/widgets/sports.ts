@@ -366,6 +366,8 @@ register({
     const rows = ctx.activities.map((a) => {
       const z = calc.zoneSeconds(a, floors);
       approximate ||= !!z?.approximate;
+      // all zeros: no zone time was measured, which is not 0 minutes
+      const zone = z?.sec.some((s) => s > 0) ? z : undefined;
       const runLoad = perMinute === null ? undefined : (perMinute * sessionSeconds(a)) / 60;
       const sport = sportOf(a.type ?? "");
       return [
@@ -375,8 +377,8 @@ register({
         fmt.hours(sessionSeconds(a)),
         fmt.num(num(a.avgHR)),
         fmt.num(num(a.maxHR)),
-        z ? `${fmt.num((z.sec[2] + z.sec[3] + z.sec[4]) / 60)} min` : fmt.na,
-        z ? `${fmt.num(calc.zoneShare(z.sec, [3, 4]) ?? undefined)}%` : fmt.na,
+        zone ? `${fmt.num((zone.sec[2] + zone.sec[3] + zone.sec[4]) / 60)} min` : fmt.na,
+        zone ? withUnit(ctx, fmt.num(calc.zoneShare(zone.sec, [3, 4]) ?? undefined), "%") : fmt.na,
         fmt.num(num(a.calories) === undefined ? undefined : calc.perHour(num(a.calories)!, a)),
         fmt.num(num(a.aerobicTE), 1),
         `${fmt.num(num(a.trainingLoad))} / ${fmt.num(runLoad)}`,

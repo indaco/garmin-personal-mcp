@@ -43,8 +43,23 @@ export async function toggleFullscreen(): Promise<void> {
 /** In a frame and without data: the page waits for the host. */
 export const inChat = () => window.parent !== window && !window.GARMIN?.data;
 
-/** Sends `ui/initialize`, then calls `show` with the blocks of the first tool result. */
-export function connect(show: (blocks: ViewBlocks) => void): void {
+/** The text of a failed result, short enough for a frame; the server's errors hold no key or token. */
+function errorText(content: unknown): string {
+  if (!Array.isArray(content)) return "";
+  const texts = content.flatMap((c: { text?: unknown } | null) =>
+    typeof c?.text === "string" ? [c.text] : [],
+  );
+  return texts.join(" ").slice(0, 300);
+}
+
+/**
+ * Sends `ui/initialize`, then calls `show` with the blocks of the first tool result, or `fail` with
+ * the reason when the call failed or was cancelled before that.
+ */
+export function connect(
+  show: (blocks: ViewBlocks) => void,
+  fail: (reason: string) => void = () => {},
+): void {
   let shown = false;
 
   window.addEventListener("message", (e) => {
@@ -53,7 +68,12 @@ export function connect(show: (blocks: ViewBlocks) => void): void {
     const m = e.data as {
       id?: number;
       method?: string;
-      params?: { structuredContent?: unknown } & HostContext;
+      params?: {
+        structuredContent?: unknown;
+        isError?: boolean;
+        content?: unknown;
+        reason?: unknown;
+      } & HostContext;
       result?: Record<string, unknown>;
     };
     if (m.method === undefined) {
@@ -64,7 +84,12 @@ export function connect(show: (blocks: ViewBlocks) => void): void {
       if (!shown && blocks?.data) {
         shown = true;
         show(blocks);
+      } else if (!shown && m.params?.isError) {
+        fail(errorText(m.params.content));
       }
+    } else if (m.method === "ui/notifications/tool-cancelled") {
+      const reason = m.params?.reason;
+      if (!shown) fail(typeof reason === "string" ? reason.slice(0, 300) : "");
     } else if (m.method === "ui/notifications/host-context-changed") {
       follow(m.params);
       screen.redraw();

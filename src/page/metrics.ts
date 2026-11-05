@@ -68,9 +68,12 @@ export function loadRatio(acts: Activity[], day: string, maxHR?: number, dataSta
   return { acute, chronic, ratio: chronic > 0 ? acute / chronic : null };
 }
 
-/** The change in % of each value against the one before; null for the first and after a 0. */
-export function ramp(values: number[]): (number | null)[] {
-  return values.map((v, i) => (i > 0 && values[i - 1] > 0 ? change(v, values[i - 1]) : null));
+/** The change in % of each value against the one before; null for the first, after a 0, and for a gap and the value after it. */
+export function ramp(values: (number | null)[]): (number | null)[] {
+  return values.map((v, i) => {
+    const before = i > 0 ? values[i - 1] : null;
+    return v !== null && before !== null && before > 0 ? change(v, before) : null;
+  });
 }
 
 /** Foster's monotony (mean / SD of the daily loads) and strain (week load x monotony) of 7 days. */
@@ -171,6 +174,19 @@ export function weekly(
     if (i >= 0) out[i] += value(a);
   }
   return out;
+}
+
+/** As `weekly`, for a value that a session can lack: a week of sessions without it is null (a gap), and a week without sessions is 0. */
+export function weeklyKnown(
+  acts: Activity[],
+  weeks: string[],
+  value: (a: Activity) => number | undefined,
+): (number | null)[] {
+  const sessions = weekly(acts, weeks, () => 1);
+  const lacking = weekly(acts, weeks, (a) => (value(a) === undefined ? 1 : 0));
+  return weekly(acts, weeks, (a) => value(a) ?? 0).map((sum, i) =>
+    sessions[i] > 0 && lacking[i] === sessions[i] ? null : sum,
+  );
 }
 
 /** Estimated 1RM (Epley), only for sets of 1 to 12 reps. */

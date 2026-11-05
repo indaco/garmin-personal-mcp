@@ -20,6 +20,7 @@ import {
   rolling,
   sd,
   weekly,
+  weeklyKnown,
   zonesOf,
 } from "../../src/page/metrics";
 
@@ -29,6 +30,9 @@ const act = (start: string, extra: Record<string, unknown> = {}) => ({
   duration: "30:00",
   ...extra,
 });
+
+/** The distance of a session, or undefined without one. */
+const km = (a: { km?: unknown }) => a.km as number | undefined;
 
 /** Recovery rows, one a day up to 2026-10-26; the last one is today. */
 const recoveryRows = (rhr: (number | undefined)[], today: Record<string, unknown> = {}) =>
@@ -147,6 +151,16 @@ describe("load", () => {
     expect(ramp([100, 110, 0, 50])).toEqual([null, 10, -100, null]);
   });
 
+  it.each([
+    ["a gap and the value after it", [100, null, 50], [null, null, null]],
+    ["a gap first", [null, 100, 110], [null, null, 10]],
+    ["the rise before a gap", [100, 200, null], [null, 100, null]],
+    ["only gaps", [null, null], [null, null]],
+    ["no values", [], []],
+  ])("gives no ramp for %s", (_name, values, expected) => {
+    expect(ramp(values)).toEqual(expected);
+  });
+
   it("gives monotony and strain of a week (Foster)", () => {
     const m = monotony([10, 10, 10, 10, 10, 10, 10]);
     // no variation: monotony has no value
@@ -185,6 +199,38 @@ describe("statistics", () => {
     // an activity without a start and one after the last week count nowhere
     const more = [...acts, { id: 9, type: "running", km: 9 }, act("2026-10-19", { km: 4 })];
     expect(weekly(more, ["2026-10-05", "2026-10-12"], (a) => a.km as number)).toEqual([8, 7]);
+  });
+
+  describe("weeklyKnown", () => {
+    const weeks = ["2026-10-05", "2026-10-12", "2026-10-19"];
+
+    it("sums the sessions of a week that have a value", () => {
+      const acts = [act("2026-10-05", { km: 5 }), act("2026-10-06", { km: 3 })];
+      expect(weeklyKnown(acts, weeks, km)[0]).toBe(8);
+    });
+
+    it("keeps the value of the one session that has it", () => {
+      const acts = [act("2026-10-05", { km: 5 }), act("2026-10-06")];
+      expect(weeklyKnown(acts, weeks, km)[0]).toBe(5);
+    });
+
+    it("gives null for a week of sessions without a value, and 0 for a week without sessions", () => {
+      const acts = [act("2026-10-05"), act("2026-10-06"), act("2026-10-19", { km: 2 })];
+      expect(weeklyKnown(acts, weeks, km)).toEqual([null, 0, 2]);
+    });
+
+    it("keeps a real 0", () => {
+      expect(weeklyKnown([act("2026-10-05", { km: 0 })], weeks, km)[0]).toBe(0);
+    });
+
+    it("ignores an activity without a start and one after the last week", () => {
+      const acts = [act("2026-10-05", { km: 5 }), { id: 9, type: "running" }, act("2026-10-26")];
+      expect(weeklyKnown(acts, weeks, km)).toEqual([5, 0, 0]);
+    });
+
+    it("gives 0 for every week without activities", () => {
+      expect(weeklyKnown([], weeks, km)).toEqual([0, 0, 0]);
+    });
   });
 });
 

@@ -199,7 +199,7 @@ function presetNames(preset: (board: string) => Instance[], board: string): stri
  * Gives each listed board of a preset layout the preset widgets that it has not met: after the
  * nearest earlier preset widget on the board, with the preset width. A board without a record has met
  * the `baseline` widgets. The record then holds the
- * current preset names. Running it again changes nothing, so the page and the server can both run it.
+ * current preset names first, then the earlier ones. Running it again changes nothing, so the page and the server can both run it.
  */
 export function withPresetWidgets(
   layout: Layout,
@@ -211,8 +211,10 @@ export function withPresetWidgets(
   const results = Object.entries(layout.boards).map(([name, list]) => {
     const want = preset(name);
     const names = want.map((i) => i.widget);
+    const had = Object.hasOwn(old, name) ? old[name] : undefined;
     // a board without a record is from before the record: it has met the baseline, not nothing
-    const met = new Set(Object.hasOwn(old, name) ? old[name] : baseline(name));
+    const earlier = had ?? baseline(name);
+    const met = new Set(earlier);
     const ids: string[] = [];
     let next = list;
     for (const [at, w] of want.entries()) {
@@ -221,21 +223,23 @@ export function withPresetWidgets(
       next = insertAfterPrevious(next, want.slice(0, at), fresh);
       ids.push(fresh.id);
     }
-    const recordChanged =
-      JSON.stringify(Object.hasOwn(old, name) ? old[name] : null) !== JSON.stringify(names);
-    return { name, next, names, ids, changed: ids.length > 0 || recordChanged };
+    // the names stay in the record when a preset drops them: an older server can write the page, and a removed widget must not come back
+    const record = [...names, ...earlier.filter((n) => !names.includes(n))].slice(0, MAX_SEEN);
+    const recordChanged = had === undefined || names.some((n) => !had.includes(n));
+    return { name, next, record, ids, changed: ids.length > 0 || recordChanged };
   });
   // fromEntries defines own keys, so a board called __proto__ stays data
   const boards = Object.fromEntries(results.map((r) => [r.name, r.next]));
   const seen = Object.fromEntries([
     ...Object.entries(old),
-    ...results.map((r) => [r.name, r.names] as const),
+    ...results.map((r) => [r.name, r.record] as const),
   ]);
   const added = Object.fromEntries(
     results.filter((r) => r.ids.length > 0).map((r) => [r.name, r.ids]),
   );
+  const { seen: _, ...rest } = layout;
   return {
-    layout: { ...layout, boards, seen },
+    layout: { ...rest, boards, ...(Object.keys(seen).length > 0 ? { seen } : {}) },
     added,
     changed: results.some((r) => r.changed),
   };

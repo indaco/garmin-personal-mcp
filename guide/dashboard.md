@@ -94,7 +94,8 @@ The next update of your page writes the new page code. Use one of these procedur
 
 The update compares the page code of your page with the page code of the server. When they are
 different, the update writes the page code of the server. Your layout, custom widgets, languages
-and page settings stay. The old page stays as a `.bak` file.
+and page settings stay. The old page stays as a `.bak` file. `editDashboard` with a whole `layout`
+also keeps the old page as a `.bak` file.
 
 The client keeps the server process that it started. Thus, after a release, restart the client
 before you run the prompt:
