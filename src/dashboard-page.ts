@@ -1308,14 +1308,21 @@ function missingLanguage(page: string, locale: unknown): boolean {
   return ![locale, locale.slice(0, 2)].some((code) => known.includes(code));
 }
 
-/** For each language of the page, the keys that it does not translate. */
+/** True for a plain object; an array or null is not one. */
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** For each language of the page, the keys that neither its custom texts nor its built-in texts have. */
 function missingTexts(page: string): Record<string, { missing: string[] }> {
   const t = textsOf(page);
+  const built = readBlock(page, "languages");
   return Object.fromEntries(
-    Object.entries(t).map(([lang, texts]) => [
-      lang,
-      { missing: Object.keys(en).filter((k) => !(k in texts)) },
-    ]),
+    Object.entries(t).map(([lang, texts]) => {
+      // the page reads both blocks by the exact code: pt-BR does not take the texts of pt
+      const own = isObject(built) && isObject(built[lang]) ? built[lang] : {};
+      return [lang, { missing: Object.keys(en).filter((k) => !(k in texts) && !(k in own)) }];
+    }),
   );
 }
 

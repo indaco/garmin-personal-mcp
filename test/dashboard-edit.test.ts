@@ -11,7 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DashboardWriter, readBlock } from "../src/dashboard-page";
+import { DashboardWriter, readBlock, writeBlock } from "../src/dashboard-page";
 import { en } from "../src/page/i18n/en";
 
 const template = `<!doctype html>
@@ -795,4 +795,67 @@ describe("editDashboard keeps a copy of the page for a whole layout", () => {
       expect(existsSync(join(dir, "widgets.json"))).toBe(false);
     },
   );
+});
+
+describe("missing texts and built-in languages", () => {
+  const withBuiltIn = template.replace(
+    "  i18n:",
+    "  languages: /* garmin-languages:start */{}/* garmin-languages:end */,\n" +
+      "  settings: /* garmin-settings:start */null/* garmin-settings:end */,\n  i18n:",
+  );
+  const total = Object.keys(en).length;
+  let w: DashboardWriter;
+
+  beforeEach(async () => {
+    w = new DashboardWriter(
+      async () => JSON.stringify(data),
+      dir,
+      async () => withBuiltIn,
+    );
+    await w.write({ settings: { languages: ["it"] } });
+  });
+
+  it("does not list the built-in texts of a language with one custom text", async () => {
+    const r = await w.edit({ languages: { it: { title: "Mio" } } });
+    expect(r.languages.it.missing).toEqual([]);
+    expect((await w.write({})).languages?.it.missing).toEqual([]);
+  });
+
+  it("lists every other text of a custom language next to a built-in one", async () => {
+    const r = await w.edit({ languages: { it: { title: "Mio" }, de: { title: "Titel" } } });
+    expect(r.languages.it.missing).toEqual([]);
+    expect(r.languages.de.missing).toHaveLength(total - 1);
+  });
+
+  it("lists a key that neither the custom texts nor the built-in block have", async () => {
+    await w.edit({ languages: { it: { na: "n/d" } } });
+    const built = readBlock(page(), "languages") as Record<string, Record<string, string>>;
+    const { title: _dropped, ...rest } = built.it;
+    writeFileSync(file, writeBlock(page(), "languages", { it: rest }));
+    expect((await w.edit({})).languages.it.missing).toEqual(["title"]);
+  });
+
+  it("lists every other text when the page does not choose that built-in language", async () => {
+    await w.write({ settings: { languages: ["fr"] } });
+    const r = await w.edit({ languages: { it: { title: "Mio" } } });
+    expect(r.languages.it.missing).toHaveLength(total - 1);
+  });
+
+  it.each([
+    ["is not an object", 5],
+    ["is a list", [1]],
+    ["has a list for the code", { it: [1] }],
+    ["has a number for the code", { it: 5 }],
+    ["is null", null],
+  ])("counts the keys as missing when the languages block %s", async (_name, block) => {
+    await w.edit({ languages: { it: { title: "Mio" } } });
+    writeFileSync(file, writeBlock(page(), "languages", block));
+    expect((await w.edit({})).languages.it.missing).toHaveLength(total - 1);
+  });
+
+  it("does not take the texts of pt for pt-BR", async () => {
+    await w.write({ settings: { languages: ["pt"] } });
+    const r = await w.edit({ languages: { "pt-BR": { title: "Meu" } } });
+    expect(r.languages["pt-BR"].missing).toHaveLength(total - 1);
+  });
 });
