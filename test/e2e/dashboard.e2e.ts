@@ -1177,6 +1177,119 @@ describe("chart legends", () => {
   });
 });
 
+/** The first rows of the fixture, each with the given stress (undefined: the field is missing). */
+const stressData = (...values: (number | undefined)[]) => ({
+  ...data,
+  v: DASHBOARD_VERSION,
+  recovery: values.map((stress, i) => ({
+    ...without(data.recovery[i], ["stress"]),
+    ...(stress === undefined ? {} : { stress }),
+  })),
+});
+const openStress = async (values: (number | undefined)[]) => {
+  const { page, errors } = await open(browser, pageFile({ data: stressData(...values) }), {
+    hash: "#recovery",
+  });
+  return { page, errors, stress: await chartDataset(page, "stress", "Stress") };
+};
+
+describe("stress widget", () => {
+  it("draws the stress of the last 14 days, with gaps for missing and negative values", async () => {
+    const { stress, errors } = await openStress([35, 0, undefined, -1]);
+    expect(stress.data).toEqual([35, 0, null, null]);
+    expect(stress.spanGaps).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  it("keeps a real value of 100, and draws only gaps when no day has a stress value", async () => {
+    expect((await openStress([100])).stress.data).toEqual([100]);
+    const none = await openStress([undefined, undefined]);
+    expect(none.stress.data).toEqual([null, null]);
+    expect(none.errors).toEqual([]);
+  });
+
+  it("scales the y axis from 0 to 100", async () => {
+    const { page } = await openStress([35]);
+    const scale = await page.evaluate(() => {
+      const c = Object.values(window.Chart!.instances).find((x) =>
+        x.canvas.closest("[data-widget=stress]"),
+      )!;
+      const y = (c.options.scales as Record<string, { min?: number; max?: number }>).y;
+      return [y.min, y.max];
+    });
+    expect(scale).toEqual([0, 100]);
+  });
+
+  it("has no stress widget on a page without recovery data", async () => {
+    const withStress = {
+      rev: "r0",
+      base: "preset",
+      seen: MET,
+      boards: {
+        all: [
+          { id: "coachNotes", widget: "coachNotes", span: 3 },
+          { id: "stress", widget: "stress", span: 3 },
+        ],
+      },
+    };
+    const kept = await open(browser, pageFile({ layout: withStress }));
+    expect(await tiles(kept.page)).toEqual(["coachNotes", "stress"]);
+    const { page, errors } = await open(
+      browser,
+      pageFile({ layout: withStress, settings: { exclude: ["recovery"] } }),
+    );
+    expect(await tiles(page)).toEqual(["coachNotes"]);
+    // the preset layout has no recovery board at all
+    const presetPage = await open(browser, pageFile({ settings: { exclude: ["recovery"] } }));
+    expect(await tiles(presetPage.page)).not.toContain("stress");
+    expect(await presetPage.page.$("[data-tab=recovery]")).toBeNull();
+    expect(errors).toEqual([]);
+  });
+
+  describe("on an edited Recovery board", () => {
+    const edited = {
+      rev: "r0",
+      base: "preset",
+      seen: {
+        recovery: preset("recovery")
+          .map((i) => i.widget)
+          .filter((w) => w !== "stress"),
+      },
+      boards: { recovery: [{ id: "readiness", widget: "readiness", span: 2 }] },
+    };
+
+    it("adds the widget one time, and keeps it removed after a reload", async () => {
+      const { page, errors } = await open(browser, pageFile({ layout: edited }), {
+        hash: "#recovery",
+      });
+      expect(await tiles(page)).toEqual(["readiness", "stress"]);
+      expect(await page.getAttribute("[data-id=stress]", "class")).toContain("span-3");
+      await startEdit(page);
+      await page.click("[aria-label='Hide Stress']");
+      await page.click(".edit-bar >> text=Add widget");
+      await page.click("dialog >> text=Remove Stress");
+      await page.click("text=Done");
+      expect(await tiles(page)).toEqual(["readiness"]);
+      expect(JSON.parse((await saved(page)) ?? "null").layout.seen.recovery).toContain("stress");
+      await page.reload();
+      await page.waitForSelector(".page");
+      expect(await tiles(page)).toEqual(["readiness"]);
+      expect(errors).toEqual([]);
+    });
+  });
+
+  it("ends the preset Recovery board with a tile of its own row, wider than the others", async () => {
+    const { page, errors } = await open(browser, pageFile(), { hash: "#recovery" });
+    const ids = await tiles(page);
+    expect(ids.at(-1)).toBe("stress");
+    const box = async (id: string) => (await page.locator(`[data-id=${id}]`).boundingBox())!;
+    const [stress, battery] = [await box("stress"), await box("bodyBattery")];
+    expect(stress.y).toBeGreaterThan(battery.y + battery.height - 1);
+    expect(stress.width).toBeGreaterThan(battery.width * 2);
+    expect(errors).toEqual([]);
+  });
+});
+
 /** An indoor ride on a day; `extra` adds fields. */
 const bikeRide = (start: string, extra: object = {}) => ({
   id: Number(start.replace(/\D/g, "")),
@@ -1536,6 +1649,7 @@ describe("type boards", () => {
       "sleepNeed",
       "bedtime",
       "bodyBattery",
+      "stress",
     ]);
     expect(await page.textContent(".board-note")).toContain("last 14 days");
     expect(await page.$$eval(".tile .note", (els) => els.map((e) => e.textContent))).not.toContain(

@@ -108,6 +108,32 @@ register({
 });
 
 register({
+  id: "stress",
+  render(el, ctx) {
+    const rows = recoveryDays(ctx);
+    if (noRows(el, ctx, rows)) return;
+    ctx.chart(el, {
+      type: "line",
+      data: {
+        labels: labels(ctx, rows),
+        datasets: [
+          {
+            label: ctx.t("w.stress"),
+            // below 0: Garmin has no value for that day
+            data: series(rows, "stress").map((v) => (v !== null && v < 0 ? null : v)),
+            borderColor: ctx.color("accent"),
+            pointRadius: 2,
+            spanGaps: true,
+          },
+        ],
+      },
+      options: { scales: { y: { min: 0, max: 100 } } },
+    });
+    rec14(el, ctx);
+  },
+});
+
+register({
   id: "sleep",
   render(el, ctx) {
     const { t } = ctx;
