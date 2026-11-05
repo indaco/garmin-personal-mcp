@@ -2,12 +2,22 @@ import { addDays } from "../../dates";
 import { type Activity, groupOf } from "../calc";
 import { append, h } from "../dom";
 import type { Key } from "../i18n";
-import { en } from "../i18n/en";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
 import type { WorkoutMetric } from "../running";
 import { oneSession } from "./types";
-import { alpha, delta, kpi, kpiRow, note, picker, showAll, table, weekLabel } from "./ui";
+import {
+  alpha,
+  delta,
+  garminWord,
+  kpi,
+  kpiRow,
+  note,
+  picker,
+  showAll,
+  table,
+  weekLabel,
+} from "./ui";
 
 /** The Run board: best efforts, races, aerobic fitness, intensity, form, run/walk, training effect, predictions, long runs, workouts. */
 
@@ -480,8 +490,7 @@ register({
           labels: ctx.weeks.map((w) => weekLabel(ctx, w)),
           datasets: labels.map((label, n) => ({
             // Garmin's label key; one that the catalogue does not know keeps Garmin's words
-            label:
-              `teLabel.${label}` in en ? t(`teLabel.${label}` as Key) : label.replaceAll("_", " "),
+            label: garminWord(ctx, "teLabel", label),
             data: ctx.weeks.map(
               (_, i) => runs(ctx).filter((a) => weekOf(ctx, a) === i && a.teLabel === label).length,
             ),

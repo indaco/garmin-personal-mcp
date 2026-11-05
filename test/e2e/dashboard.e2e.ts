@@ -223,10 +223,13 @@ const kpiTexts = (page: Page, widget: string) =>
     ),
   );
 
+/** The page text of the HRV statuses of the fixture. */
+const statusText: Record<string, string> = { BALANCED: "Balanced" };
+
 /** The readiness tiles the page must show for the digest's readiness. */
 function readinessTiles(r: NonNullable<ReturnType<typeof digest>["readiness"]>) {
   return {
-    "HRV status": [r.hrvStatus ?? "n/a", null],
+    "HRV status": [r.hrvStatus === null ? "n/a" : (statusText[r.hrvStatus] ?? r.hrvStatus), null],
     "Sleep score": [r.sleepScore === null ? "n/a" : String(r.sleepScore), null],
     "Resting HR": [
       r.rhr === null ? "n/a" : `${r.rhr} bpm`,
@@ -235,6 +238,49 @@ function readinessTiles(r: NonNullable<ReturnType<typeof digest>["readiness"]>) 
     "Load ratio 7:28": [r.loadRatio === null ? "n/a" : r.loadRatio.toFixed(2), null],
   };
 }
+
+/** Pages for the Garmin word tests. */
+const withStatus = (status?: string) => ({
+  ...data,
+  v: DASHBOARD_VERSION,
+  hrv: data.hrv.map((r: Record<string, unknown>, i: number, all: unknown[]) =>
+    i === all.length - 1 ? { ...r, status } : r,
+  ),
+});
+const lapTypes = async (languages: string[], intensities?: (string | undefined)[]) => {
+  const activities = data.activities.map((a: { laps?: Record<string, unknown>[] }) =>
+    a.laps && intensities
+      ? {
+          ...a,
+          laps: a.laps.map((l, i) => ({
+            ...l,
+            intensity: intensities[i % intensities.length],
+          })),
+        }
+      : a,
+  );
+  const { page, errors } = await open(
+    browser,
+    pageFile({ data: { ...data, activities, v: DASHBOARD_VERSION }, settings: { languages } }),
+  );
+  const buttons = page.locator("[data-id=activities] button[aria-expanded]:visible");
+  for (let i = 0, n = await buttons.count(); i < n; i++) await buttons.nth(i).click();
+  const cells = await page.$$eval(".laps-row tbody tr", (rows) =>
+    rows.map((r) => r.lastElementChild!.textContent),
+  );
+  expect(errors).toEqual([]);
+  return cells;
+};
+
+const hrvTile = async (status: string | undefined, languages: string[], label: string) => {
+  const { page, errors } = await open(
+    browser,
+    pageFile({ data: withStatus(status), settings: { languages } }),
+  );
+  const tile = (await kpiTexts(page, "readiness"))[label];
+  expect(errors).toEqual([]);
+  return { tile, verdict: await page.textContent(".verdict") };
+};
 
 /** A number as the page's fmt.num shows it in English: no decimals. */
 const whole = new Intl.NumberFormat("en", { maximumFractionDigits: 0 });
@@ -1883,7 +1929,7 @@ describe("overview widgets", () => {
     const lost = await kpiTexts(page, "readiness");
     expect(lost["Sleep score"]).toEqual(["n/a", null]);
     expect(lost["Resting HR"]).toEqual(["n/a", null]);
-    expect(lost["HRV status"]).toEqual([r.hrvStatus, null]);
+    expect(lost["HRV status"]).toEqual(["Balanced", null]);
     expect(lost).toEqual(readinessTiles(r));
     const noHrv = { ...data, v: DASHBOARD_VERSION, hrv: [] };
     ({ page } = await open(browser, pageFile({ data: noHrv })));
@@ -2724,6 +2770,68 @@ describe("type boards", () => {
       "lactate threshold",
     ]);
     expect([...en.errors, ...italian.errors]).toEqual([]);
+  });
+
+  describe("Garmin word", () => {
+    it("shows the HRV status in English, Garmin word", async () => {
+      expect((await hrvTile("BALANCED", ["en"], "HRV status")).tile).toEqual(["Balanced", null]);
+    });
+
+    it("shows the HRV status in Italian, Garmin word", async () => {
+      expect((await hrvTile("BALANCED", ["it"], "Stato HRV")).tile).toEqual(["Bilanciato", null]);
+    });
+
+    it("shows an HRV status that the catalogue does not know with a space, Garmin word", async () => {
+      expect((await hrvTile("NEW_STATUS", ["en"], "HRV status")).tile).toEqual([
+        "NEW STATUS",
+        null,
+      ]);
+    });
+
+    it("translates LOW and UNBALANCED and keeps the verdict of the raw status, Garmin word", async () => {
+      const low = await hrvTile("LOW", ["it"], "Stato HRV");
+      expect(low.tile).toEqual(["Basso", null]);
+      const lowEn = await hrvTile("LOW", ["en"], "HRV status");
+      expect(lowEn.verdict).toBe(enTexts["ready.easy"]);
+      const unbalanced = await hrvTile("UNBALANCED", ["it"], "Stato HRV");
+      expect(unbalanced.tile).toEqual(["Sbilanciato", null]);
+    });
+
+    it("shows the lap types in Italian, Garmin word", async () => {
+      const cells = await lapTypes(["it"]);
+      expect(cells).toContain("Riscaldamento");
+      expect(cells).toContain("Attivo");
+      expect(cells).toContain("Intervallo");
+    });
+
+    it("shows the lap types in English, Garmin word", async () => {
+      const cells = await lapTypes(["en"]);
+      expect(cells).toContain("Warm-up");
+      expect(cells).toContain("Active");
+    });
+
+    it("shows an empty cell for a lap without a type and a space for an unknown one, Garmin word", async () => {
+      const cells = await lapTypes(["en"], [undefined, "cool_off"]);
+      expect(cells.slice(0, 2)).toEqual(["", "cool off"]);
+      expect(cells).not.toContain("undefined");
+    });
+
+    it("takes the title of the HRV axis from the catalogue, Garmin word", async () => {
+      const { page, errors } = await open(
+        browser,
+        pageFile({ i18n: { it: { "lvr.hrv": "VFC (ms)" } }, settings: { languages: ["it"] } }),
+      );
+      const title = await page.evaluate(
+        () =>
+          (
+            Object.values(window.Chart!.instances).find((c) =>
+              c.canvas.closest("[data-widget=loadVsRecovery]"),
+            )!.options.scales!.y1 as { title: { text: string } }
+          ).title.text,
+      );
+      expect(title).toBe("VFC (ms)");
+      expect(errors).toEqual([]);
+    });
   });
 
   it("compares the same workout across weeks, up to 3 workouts, intervals by their work laps", async () => {

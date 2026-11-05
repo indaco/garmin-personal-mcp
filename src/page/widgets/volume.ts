@@ -329,7 +329,7 @@ register({
             y1: {
               position: "right",
               grid: { drawOnChartArea: false },
-              title: { display: true, text: "HRV (ms)" },
+              title: { display: true, text: t("lvr.hrv") },
             },
           },
         },

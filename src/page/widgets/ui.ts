@@ -12,6 +12,16 @@ import { store } from "../theme";
 /** The name of a board in the page language; every SDK sport has a text, so the key shows only for unknown data. */
 export const typeName = (t: T, g: string) => (`type.${g}` in en ? t(`type.${g}` as Key) : g);
 
+/** A word from Garmin: its text when the catalogue knows it, else Garmin's word. */
+export function garminWord(
+  ctx: Ctx,
+  group: "hrvStatus" | "lapType" | "teLabel",
+  word: string,
+): string {
+  const key = `${group}.${word}`;
+  return key in en ? ctx.t(key as Key) : word.replaceAll("_", " ");
+}
+
 /** A formatted value with its unit, e.g. "12.3 km"; the missing-value text alone when there is no value. */
 export const withUnit = (ctx: Ctx, text: string, unit: string) =>
   text === ctx.fmt.na ? text : `${text}${unit}`;
