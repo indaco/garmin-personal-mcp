@@ -3,7 +3,7 @@
   garmin-personal-mcp
 </h1>
 
-<p align="center"><b>Ask Claude, Codex or another AI assistant about your Garmin training, and get a training dashboard, also inside the chat. Official Personal API, read-only, nothing to install.</b></p>
+<p align="center"><b>Ask Claude, Codex or another AI assistant about your Garmin training, and get a training dashboard, also inside the chat. Official Personal API, read-only, runs with one command.</b></p>
 
 <p align="center">
   🌐 <a href="https://garmin-personal-mcp.indaco.dev/"><b>Website</b></a> &nbsp;&middot;&nbsp; 👉
