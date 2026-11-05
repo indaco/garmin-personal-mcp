@@ -41,7 +41,7 @@ const MONTHS = [
   "November",
   "December",
 ];
-/** Garmin gets about 8 requests per refresh: two runs must be at least this far apart. */
+/** Garmin gets about 7 requests per refresh: two runs must be at least this far apart. */
 const MIN_GAP_MINUTES = 60;
 
 /** A 5-field cron expression in local time, read into its values. */

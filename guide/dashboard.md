@@ -75,8 +75,8 @@ After an update that writes new page code, the page shows a note on the board, o
 browser. The note gives the server version, the preset widgets that the update added to the boards that you edited, and a link to the
 [What's new](https://garmin-personal-mcp.indaco.dev/whats-new.html) page of the website. An update to an older version with other page code does not show the note and removes the record. Select **Close** to hide it. The dashboard in the chat does not show the note.
 
-The first update sends approximately 35 requests to Garmin. Later updates use the local cache and
-send approximately 8.
+The first update sends about 10 requests to Garmin, and one more for each .FIT file that it does not
+have yet. Later updates use the local cache and send about 7.
 
 Reload the page in the browser to see the new data.
 
@@ -222,8 +222,9 @@ The page uses the training load, HR zones and training effect from Garmin. It la
 it calculates as an estimate, and a missing value shows as "n/a".
 
 The All board shows all types. The Recovery board shows readiness, fitness age, load against
-recovery and the 14-day recovery widgets: HRV, resting HR, sleep, sleep need, bedtime and Body
-Battery. Each type board shows one sport. The board of an activity is its
+recovery and the 14-day recovery widgets: HRV, resting HR, stress, sleep, sleep need, bedtime and
+Body Battery. With the `recoveryHistory` setting, it also shows the Recovery trend widget. Each type
+board shows one sport. The board of an activity is its
 sport in the Garmin FIT SDK. Garmin sends that sport as a number with each activity. The server
 gives it the SDK name, for example `running` or `racket`.
 
@@ -392,8 +393,9 @@ The widgets of the last 14 days do not change, and a custom widget can read the 
 from `ctx.data.recovery`. A year adds about 21 KB to the file. It is off by default, because a page
 that you share then holds more health data. A page that excludes `recovery` holds none of it. The
 first update of a 52-week page asks Garmin for up to 24 ranges, and a later update asks for 2.
-Garmin has a rate limit: one account saw a limit of 100 requests in a short time. If the limit stops
-the recovery data of an update, the next update goes on from what it saved.
+Garmin has a rate limit of about 100 requests in a short time. One real first update of a 52-week
+page sent 81 requests: 45 calls and 36 .FIT downloads. `workouts` can add up to 8 .FIT files for each
+workout. If the limit stops the recovery data of an update, the next update goes on from what it saved.
 
 Settings need a page from the template, or a page that the assistant designed (`freeform`) with a
 `garmin-settings` block. The freeform prompt adds that block when you set `workouts` or `recoveryHistory`.
