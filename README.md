@@ -218,7 +218,8 @@ The prompts remove all spaces around an argument, also the no-break space from a
 ### training-dashboard
 
 The server writes the dashboard page from its template, and the assistant writes the coach notes.
-The page is one HTML file, `garmin-dashboard.html` in the data folder. It works offline.
+The page is one HTML file, `garmin-dashboard.html` in the data folder. A page from the template
+works offline. A freeform page loads Chart.js from the web.
 
 | Argument | Values                            | Default  |
 | -------- | --------------------------------- | -------- |
@@ -308,8 +309,8 @@ remove it: `editDashboard` with `removeLanguages`.
 ### Presets or freeform
 
 In many setup guides for Claude and Garmin, Claude reads the data and writes the whole dashboard
-page. With a preset, the server writes the page from a tested template, and Claude writes only the
-coach notes. My measurements for a first build, with Claude Code and Opus
+page. With a preset, the server writes the page from a tested template, and the assistant writes
+only the coach notes. My measurements for a first build, with Claude Code and Opus
 (other clients and models give other times and costs):
 
 | First build            | Time         | Cost         |
@@ -317,7 +318,8 @@ coach notes. My measurements for a first build, with Claude Code and Opus
 | Preset                 | 34 s         | $0.16        |
 | Claude writes the page | 24 to 35 min | $6.6 to $9.2 |
 
-For a design of your own, use `layout` = `freeform`: Claude writes the page, as in those guides.
+For a design of your own, use `layout` = `freeform`: the assistant writes the page, as in those
+guides.
 
 [Presets or freeform](guide/presets.md) gives the measurements and the limits of the presets.
 

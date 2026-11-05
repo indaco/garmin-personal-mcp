@@ -282,7 +282,7 @@ A release can add functions to the dashboard and correct problems in it. These c
 npx -y @indaco/garmin-personal-mcp@latest refresh
 ```
 
-This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+This command updates `garmin-dashboard.html` and removes its coach notes. The prompt writes new notes. For another page, add its file name to the command. A scheduled refresh does the same update.
 
 The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
 

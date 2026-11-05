@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -130,6 +131,51 @@ describe("prompts", () => {
     expect(text).toContain("`page` = the page code");
     expect(text).toContain("last **8 weeks**");
     expect(text.includes("{{")).toBe(false);
+  });
+
+  it("gives a freeform page a pinned Chart.js and a policy that blocks requests", async () => {
+    const text = await render("training-dashboard", { layout: "freeform" });
+    expect(text).toMatch(
+      /<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/Chart\.js\/4\.\d+\.\d+\/chart\.umd(\.min)?\.js" integrity="sha512-[A-Za-z0-9+/=]{88}" crossorigin="anonymous"><\/script>/,
+    );
+    expect(text).toContain(
+      `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">`,
+    );
+    expect(text).not.toContain("unsafe-eval");
+    expect(text).not.toContain("self-contained");
+    expect(text).toContain("`const DATA = /* garmin-data:start */null/* garmin-data:end */;`");
+    expect(text).toContain("first in the first inline script of the page");
+    expect(text.includes("{{")).toBe(false);
+    const flat = text.replace(/\s+/g, " ");
+    for (const line of [
+      "Write the page as one HTML file, with everything inline except Chart.js. It has no calls to Garmin.",
+      "Load Chart.js with exactly this tag.",
+      "Put this tag first in `<head>`, exactly as it is. It blocks requests from the page:",
+      "Do not load anything else from the web.",
+      "Do not put data into the code.",
+    ]) {
+      expect(flat).toContain(line);
+    }
+    expect(flat).not.toContain("sending the data anywhere");
+  });
+
+  it("pins the hash of the Chart.js file that the dev dependency has", async () => {
+    const text = await render("training-dashboard", { layout: "freeform" });
+    const m = text.match(/Chart\.js\/(\d+\.\d+\.\d+)\/([\w.]+)" integrity="sha512-([^"]+)"/);
+    expect(m).not.toBeNull();
+    const [, version, file, hash] = m as RegExpMatchArray;
+    const pkg = JSON.parse(
+      readFileSync(new URL("../node_modules/chart.js/package.json", import.meta.url), "utf8"),
+    );
+    // cdnjs can be behind npm: a bump of the dev dependency must not fail here.
+    if (pkg.version !== version) return;
+    const bytes = readFileSync(new URL(`../node_modules/chart.js/dist/${file}`, import.meta.url));
+    expect(createHash("sha512").update(bytes).digest("base64")).toBe(hash);
+  });
+
+  it.each(["preset", "blank"])("does not give the CDN tag to the %s layout", async (layout) => {
+    const text = await render("training-dashboard", { layout });
+    expect(text).not.toContain("cdnjs");
   });
 
   it("tells the update prompt that a page with different page code gets the server's code", async () => {

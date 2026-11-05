@@ -49,10 +49,12 @@ keeps the languages that you added, but not a languages block that it cannot rea
 assistant then writes the coach notes or your title. To write the page in a different place, ask
 your assistant for a path. A relative path is in the data folder.
 
-The page works offline. It has Chart.js inside, and its own code sends no requests. Its footer tells the date and
+A page from the template works offline. It has Chart.js inside, and its own code sends no
+requests. Its footer tells the date and
 time when the server wrote the data, in the time zone of the browser. When Garmin did not give some days, the footer also gives their number: their
 values show "n/a". The footer also shows the version of the server that wrote the page, with a link
-to its release notes. Give this version when you report a problem.
+to its release notes. Give this version when you report a problem. A freeform page loads Chart.js
+from the web.
 
 ## Update the dashboard
 
@@ -85,8 +87,8 @@ The next update of your page writes the new page code. Use one of these procedur
 
 - **Prompt**: run `training-dashboard-update`. The assistant tells you that the page has new page
   code. It also tells you which server version wrote the page before.
-- **Terminal**: run `npx -y @indaco/garmin-personal-mcp@latest refresh`. See
-  [`refresh`](cli.md#refresh).
+- **Terminal**: run `npx -y @indaco/garmin-personal-mcp@latest refresh`. It removes the
+  coach notes. See [`refresh`](cli.md#refresh).
 - **Schedule**: the [scheduled refresh](#update-the-dashboard-on-a-schedule) does the same update.
   It does not show a message.
 

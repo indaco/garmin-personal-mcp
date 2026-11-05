@@ -13,10 +13,14 @@
   to get the token.
 - **Exercise catalogue**: the server gets the catalogue from `connect.garmin.com` without your
   token.
-- **Dashboard page**: the page has a Content-Security-Policy. It blocks the requests that the page
-  and its custom widgets send in the background with fetch or XMLHttpRequest, and images, scripts
-  and styles from the web. It does not cover WebRTC connections, and it cannot stop code that opens
-  another web address. Add only custom widgets that you asked for.
+- **Dashboard page**: a page from the template has a Content-Security-Policy. It blocks the
+  requests that the page and its custom widgets send in the background with fetch or
+  XMLHttpRequest, and images, scripts and styles from the web. It does not cover WebRTC
+  connections, and it cannot stop code that opens another web address. Add only custom widgets
+  that you asked for. A freeform page is code that the assistant writes. The prompt asks for a
+  policy and for a Chart.js tag with a hash. The server does not check this code, so a freeform
+  page can have no policy and can load any script from the web. A freeform page from an older
+  version has no policy until you build it again.
 - **Dashboard in the chat**: each tool tells the client that only the assistant can call it (MCP
   Apps visibility `model`). A client that obeys this rule does not let the page in the chat, or a
   custom widget in it, call a tool.
@@ -59,7 +63,10 @@ examples of problems in scope:
 
 - the key or the token goes to a log, to stdout, to a tool result or to a host other than Garmin
 - a tool argument makes the server send the token to a different host
-- the server reads or writes a file other than the key file, the log and the files in the data folder.
-  `doctor` also makes and removes an empty test folder, in the data and log folders or in their
-  nearest parent that exists
+- the server reads or writes a file other than: the key file, the log, the files in the data
+  folder, a dashboard page at the path that a tool or a command gets (an `.html` file, the file
+  that it links to, and its `.bak`), and the job of the automatic refresh (a launchd plist, a
+  crontab line, or a Task Scheduler task and its script). A write also makes a temporary file next
+  to the file that it writes, for a short time. `doctor` also makes and removes an empty test
+  folder, in the data and log folders or in their nearest parent that exists
 - the server sends a request that changes data in Garmin Connect
