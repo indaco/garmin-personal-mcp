@@ -22,4 +22,6 @@ export interface Settings {
   theme?: string;
   /** Compare the same run workout across weeks: the server loads the laps of its last sessions. Off when not set. */
   workouts?: boolean;
+  /** Keep the recovery rows of the whole period, not only the last 14 days. Off when not set. */
+  recoveryHistory?: boolean;
 }

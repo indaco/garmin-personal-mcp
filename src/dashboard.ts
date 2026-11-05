@@ -25,6 +25,8 @@ type Range = [string, string];
 const DEFAULT_WEEKS = 12;
 const MAX_WEEKS = 52;
 const RECOVERY_DAYS = 14;
+/** The rows kept in the cache: the longest period, from a Monday, for each page that shares the cache. */
+const RECOVERY_KEEP_DAYS = 7 * MAX_WEEKS + 7;
 /** Days in one pair of range requests: Garmin's sleep range refuses more than 32. */
 const RECOVERY_CHUNK_DAYS = 31;
 const SLEEP_RANGE = "/sleep-service/sleep/dailySleepSummariesByDate";
@@ -62,26 +64,35 @@ export class GarminDashboard {
     private readonly dataDir: string,
   ) {}
 
-  /** `workouts` adds the laps of the last sessions of each repeated run name, for the workout trend. */
-  getDashboardData(weeks?: number, workouts = false): Promise<string> {
-    const run = this.#queue.then(() => this.#build(weeks, workouts));
+  /**
+   * `workouts` adds the laps of the last sessions of each repeated run name, for the workout trend.
+   * `recoveryHistory` keeps the recovery rows of the whole period; the days before the last 14 are short.
+   */
+  getDashboardData(weeks?: number, workouts = false, recoveryHistory = false): Promise<string> {
+    const run = this.#queue.then(() => this.#build(weeks, workouts, recoveryHistory));
     this.#queue = run.catch(() => {});
     return run;
   }
 
-  async #build(weeks: number | undefined, workouts: boolean): Promise<string> {
+  async #build(
+    weeks: number | undefined,
+    workouts: boolean,
+    recoveryHistory: boolean,
+  ): Promise<string> {
     const w = weeksCovered(weeks);
     const today = localToday();
     const start = mondayOf(addDays(today, -7 * w));
     // one extra week before: the dashboard shows whole Monday-Sunday weeks
     const prevStart = addDays(start, -7 * (w + 1));
+    const recentFrom = addDays(today, -(RECOVERY_DAYS - 1));
+    const recoveryFrom = recoveryHistory && start < recentFrom ? start : recentFrom;
     const sync: Sync = { calls: 0, failedDates: [], failedSections: [] };
 
     const cache = await this.load();
     const before = new Set(Object.keys(objectAt(cache, "activities")));
     await this.#syncActivities(cache, prevStart, today, sync);
     await this.#syncHrv(cache, start, today, sync);
-    await this.#syncRecovery(cache, addDays(today, -(RECOVERY_DAYS - 1)), today, sync);
+    await this.#syncRecovery(cache, recoveryFrom, today, sync);
     cache.syncedAt = new Date().toISOString();
     await writeAtomically(this.#file(), JSON.stringify(cache));
 
@@ -119,11 +130,11 @@ export class GarminDashboard {
     };
     out.sync = synced;
     out.hrv = between(objectAt(cache, "hrv"), start, today);
-    out.recovery = between(
-      objectAt(cache, "recovery"),
-      addDays(today, -(RECOVERY_DAYS - 1)),
-      today,
-    );
+    const rows = objectAt(cache, "recovery");
+    out.recovery = [
+      ...between(rows, recoveryFrom, addDays(recentFrom, -1)).map(trendRow),
+      ...between(rows, recentFrom, today),
+    ];
     const activities = activitiesBetween(cache, start, today).map((a) => structuredClone(a));
     synced.fitDownloads = await this.#attachDetails(activities, workouts);
     out.activities = activities;
@@ -225,26 +236,29 @@ export class GarminDashboard {
     for (let day = from; day <= to; day = addDays(day, 1)) {
       if (!(day in byDate) || day >= refreshFrom) needed.push(day);
     }
-    let stale: string | undefined;
-    const failed = (day: string, e: Error): void => {
-      // the old row stays; recoveryTo stops at this day, so the next call fetches it again
-      if (day in byDate) stale ??= day;
-      sync.failedDates.push(day);
-      log("WARN", `Recovery data of ${day} not fetched: ${e.message}`);
-    };
-    for (const [start, end] of recoveryChunks(needed)) {
+    const recentFrom = addDays(to, -(RECOVERY_DAYS - 1));
+    const failedDays: string[] = [];
+    let stopped = false;
+    // the newest first: if Garmin stops answering, the days that a reader looks at first are saved
+    for (const [start, end] of recoveryChunks(needed).toReversed()) {
       const days = needed.filter((day) => day >= start && day <= end);
+      if (stopped) {
+        failedDays.push(...days);
+        continue;
+      }
       try {
         const { nights, summaries } = await this.#recoveryRanges(start, end, sync);
         for (const day of days) byDate[day] = recoveryRow(day, nights.get(day), summaries.get(day));
       } catch (e) {
         if (!(e instanceof GarminApiError)) throw e;
-        // no day requests for what they cannot mend: the network, the key, a rate limit
-        if (e.status === undefined || e.status === 429) {
-          for (const day of days) failed(day, e);
-          continue;
-        }
+        log("WARN", `Recovery data of ${start} to ${end} not fetched: ${e.message}`);
+        // no more requests for what they cannot mend: the network, the key, a rate limit
+        stopped = e.status === undefined || e.status === 429;
         for (const day of days) {
+          if (stopped || day < recentFrom) {
+            failedDays.push(day);
+            continue;
+          }
           try {
             const [sleep, summary] = await Promise.all([
               call(sync, () => this.tools.getSleep(day, true)),
@@ -253,14 +267,18 @@ export class GarminDashboard {
             byDate[day] = recoveryRow(day, sleep, summary);
           } catch (dayError) {
             if (!(dayError instanceof GarminApiError)) throw dayError;
-            failed(day, dayError);
+            failedDays.push(day);
+            log("WARN", `Recovery data of ${day} not fetched: ${dayError.message}`);
           }
         }
       }
     }
-    cache.recoveryTo = stale ?? to;
-    // the cache keeps only what a dashboard can show
-    const keepFrom = addDays(from, -RECOVERY_DAYS);
+    failedDays.sort();
+    sync.failedDates.push(...failedDays);
+    // the old rows stay; recoveryTo stops at the first of them, so the next call fetches it again
+    cache.recoveryTo = failedDays.find((day) => day in byDate) ?? to;
+    // the cache keeps what a dashboard of any period can show
+    const keepFrom = addDays(to, -RECOVERY_KEEP_DAYS);
     for (const day of Object.keys(byDate)) {
       // a key that is not a date is dropped too
       if (date(day) === undefined || day < keepFrom) {
@@ -449,6 +467,13 @@ export function rangeSummary(row: unknown): Json {
   };
 }
 
+/** A row older than the last 14 days has only what a weekly trend shows: a shared page holds less. */
+function trendRow(row: unknown): Json {
+  const r: Json = {};
+  for (const name of ["date", "sleepH", "sleepScore", "rhr"]) copy(row, r, name, name);
+  return r;
+}
+
 /** One compact row per day: sleep, sleep need, bedtime, resting HR, body battery, stress, steps. */
 export function recoveryRow(day: string, sleep: unknown, summary: unknown): Json {
   const r: Json = { date: day };
@@ -619,8 +644,9 @@ export function registerDashboard(server: McpServer, dashboard: GarminDashboard)
       description: [
         "All the data of the training dashboard in one call: HR zones, fitness age, the activities of the",
         "last `weeks` weeks (compact summaries, with strength sets and laps where they apply), the activities",
-        "of the weeks before for the period comparison, daily HRV, and the last 14 days of sleep and daily",
-        "summaries, and `units`: the measurement system of the Garmin profile (metric, statute_us or",
+        "of the weeks before for the period comparison, daily HRV, the last 14 days of sleep and daily",
+        "summaries (with `recoveryHistory`, also short rows of the older days: date, sleep hours, sleep",
+        "score and resting HR), and `units`: the measurement system of the Garmin profile (metric, statute_us or",
         "statute_uk) that the page shows; the data itself is always metric; `locale`: the language of",
         "the Garmin profile, e.g. it or pt-BR. Keeps a local cache and",
         "fetches from Garmin only what is new since the last call, so a rebuild or an update needs few",
@@ -644,10 +670,18 @@ export function registerDashboard(server: McpServer, dashboard: GarminDashboard)
             `Also the laps of the runs of each run name that repeats, to compare a workout across weeks: the last ${WORKOUT_SESSIONS} (downloaded once) and older ones whose .FIT file is saved; default false`,
           )
           .optional(),
+        recoveryHistory: z
+          .boolean()
+          .describe(
+            "Also the sleep and resting HR rows of the whole period, not only the last 14 days",
+          )
+          .optional(),
       }),
     },
     async (a) => {
-      const data = JSON.parse(await dashboard.getDashboardData(a.weeks, a.workouts)) as Json;
+      const data = JSON.parse(
+        await dashboard.getDashboardData(a.weeks, a.workouts, a.recoveryHistory),
+      ) as Json;
       // only in the tool result: the page data and the widgets' ctx.data stay without it
       return {
         content: [{ type: "text" as const, text: jsonByLines({ digest: digest(data), ...data }) }],

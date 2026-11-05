@@ -26,6 +26,7 @@ import {
 import { filterData } from "../src/dashboard-page";
 import { addDays } from "../src/dates";
 import { digest } from "../src/digest";
+import { log as logMock } from "../src/log";
 import { groupOf, weeksOf } from "../src/page/calc";
 import { periodWindow } from "../src/page/metrics";
 import { GarminTools, writeAtomically } from "../src/tools";
@@ -356,6 +357,44 @@ function fakeGarmin(path: string, q: Record<string, string>) {
     return { measurementSystem: units, preferredLocale: locale };
   throw new Error(`unexpected path ${path}`);
 }
+
+/** A cached recovery row with only a date and a sleep time. */
+const oneRow = (date: string) => ({ date, sleepH: 1 });
+/** Range answers with every field of a recovery row, and no sleep score on 2026-01-05. */
+const rich = () =>
+  answer({
+    [SLEEP_RANGE]: (q) =>
+      daysOf(q.startDate, q.endDate).map((calendarDate) => ({
+        calendarDate,
+        sleepTimeSeconds: 27000,
+        deepSleepSeconds: 6000,
+        sleepScores: { overall: { value: calendarDate === "2026-01-05" ? null : 80 } },
+        sleepNeed: { actual: 450 },
+        sleepStartTimestampLocal: 1792885868000,
+      })),
+    [SUMMARY_RANGE]: (q) => ({
+      data: daysOf(q.startDate, q.endDate).map((calendarDate) => ({
+        calendarDate,
+        heartRate: { restingValue: 50 },
+        bodyBattery: { maxValue: 53, minValue: 12 },
+        stress: { avgLevel: 31 },
+        movement: { steps: { value: 9000, goal: 10000 } },
+      })),
+    }),
+  });
+/** The spans that the sleep range was asked for, in the order of the requests. */
+const sleepSpans = () =>
+  recoveryCalls()
+    .filter(([p]) => p === SLEEP_RANGE)
+    .map(([, q]): [string, string] => [q.startDate, q.endDate]);
+const warns = () =>
+  vi
+    .mocked(logMock)
+    .mock.calls.filter(
+      ([level, message]) => level === "WARN" && message.startsWith("Recovery data"),
+    )
+    .map(([, message]) => message);
+const restore = () => api.getJson.mockImplementation(async (path, q) => fakeGarmin(path, q));
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -918,6 +957,196 @@ describe("getDashboardData", () => {
     });
   });
 
+  describe("recovery history", () => {
+    // today is Monday 2026-10-26: 52 weeks start on 2025-10-27, 365 days, 12 spans of at most 31 days
+    // (11 of 31 days and the newest of 24, from 2026-10-03), so 24 range requests
+    const FIRST = "2025-10-27";
+    const NEWEST = "2026-10-03";
+    it("asks for the last 14 days only, and keeps whole rows, without the setting", async () => {
+      rich();
+      const out = JSON.parse(await dashboard.getDashboardData(52));
+      expect(recoveryCalls().map(([p, q]) => [p, q.startDate, q.endDate])).toEqual([
+        [SLEEP_RANGE, "2026-10-13", "2026-10-26"],
+        [SUMMARY_RANGE, "2026-10-13", "2026-10-26"],
+      ]);
+      expect(out.recovery).toHaveLength(14);
+      for (const r of out.recovery) {
+        expect(r).toEqual(readCache().recovery[r.date]);
+        expect(r).toHaveProperty("bbHigh", 53);
+      }
+    });
+
+    it("asks for every span of the period, the newest first, and gives a row for each day", async () => {
+      const out = JSON.parse(await dashboard.getDashboardData(52, false, true));
+      const asked = sleepSpans();
+      expect(recoveryCalls()).toHaveLength(24);
+      expect(asked).toHaveLength(12);
+      expect(asked[0]).toEqual([NEWEST, "2026-10-26"]);
+      const starts = asked.map(([start]) => start);
+      expect(starts).toEqual(starts.toSorted().toReversed());
+      const oldestFirst = asked.toReversed();
+      expect(oldestFirst[0][0]).toBe(FIRST);
+      oldestFirst.forEach(([start, end], i) => {
+        expect(daysOf(start, end).length).toBeLessThanOrEqual(31);
+        if (i > 0) expect(start).toBe(addDays(oldestFirst[i - 1][1], 1));
+      });
+      expect(oldestFirst.at(-1)![1]).toBe("2026-10-26");
+      const summaries = recoveryCalls().filter(([p]) => p === SUMMARY_RANGE);
+      expect(summaries.map(([, q]) => [q.startDate, q.endDate])).toEqual(asked);
+      expect(out.recovery.map((r: { date: string }) => r.date)).toEqual(
+        daysOf(FIRST, "2026-10-26"),
+      );
+      expect(out.recovery).toHaveLength(365);
+    });
+
+    it("keeps whole rows for the last 14 days and short rows for the older days, and whole rows in the cache", async () => {
+      rich();
+      const out = JSON.parse(await dashboard.getDashboardData(52, false, true));
+      const rows = recoveryByDay(out);
+      const cache = readCache().recovery;
+      expect(rows["2026-10-20"]).toEqual(cache["2026-10-20"]);
+      expect(rows["2026-10-13"]).toHaveProperty("bbHigh", 53);
+      expect(rows["2026-10-12"]).toEqual({
+        date: "2026-10-12",
+        sleepH: 7.5,
+        sleepScore: 80,
+        rhr: 50,
+      });
+      // a field that the day does not have is not in the short row either
+      expect(rows["2026-01-05"]).toEqual({ date: "2026-01-05", sleepH: 7.5, rhr: 50 });
+      expect(Object.keys(cache["2026-01-05"]).toSorted()).toEqual(
+        [
+          "bbHigh",
+          "bbLow",
+          "bedMin",
+          "date",
+          "deep",
+          "needH",
+          "rhr",
+          "sleepH",
+          "stepGoal",
+          "steps",
+          "stress",
+        ].toSorted(),
+      );
+      expect(cache["2026-01-06"]).toMatchObject({ deep: 1.67, bbHigh: 53, needH: 7.5, stress: 31 });
+    });
+
+    it("keeps 14 rows for a period shorter than 14 days", async () => {
+      const out = JSON.parse(await dashboard.getDashboardData(1, false, true));
+      expect(out.recovery).toHaveLength(14);
+      expect(out.recovery[0].date).toBe("2026-10-13");
+      expect(sleepSpans()).toEqual([["2026-10-13", "2026-10-26"]]);
+    });
+
+    it("keeps the cache of a long page in a 14-day update, and the next long update asks for 2 days", async () => {
+      await dashboard.getDashboardData(52, false, true);
+      await dashboard.getDashboardData(1);
+      expect(Object.keys(readCache().recovery)).toHaveLength(365);
+      api.getJson.mockClear();
+      const out = JSON.parse(await dashboard.getDashboardData(52, false, true));
+      expect(recoveryCalls()).toHaveLength(2);
+      expect(sleepSpans()).toEqual([["2026-10-25", "2026-10-26"]]);
+      expect(out.recovery).toHaveLength(365);
+    });
+
+    it.each([
+      ["HTTP 429", new GarminApiError("GET /x -> HTTP 429: slow down", 429)],
+      ["a network failure", new GarminApiError("Network error calling /x: down")],
+    ])(
+      "stops after %s, keeps the saved rows and fetches only the rest next time",
+      async (_, error) => {
+        let pairs = 0;
+        answer({
+          [SLEEP_RANGE]: (q) => {
+            if (++pairs === 2) throw error;
+            return fakeGarmin(SLEEP_RANGE, q);
+          },
+        });
+        const out = JSON.parse(await dashboard.getDashboardData(52, false, true));
+        // the second pair failed: no more request after it
+        expect(recoveryCalls()).toHaveLength(4);
+        expect(warns()).toEqual([
+          expect.stringMatching(/^Recovery data of 2026-09-02 to 2026-10-02 not fetched/),
+        ]);
+        expect(out.recovery.map((r: { date: string }) => r.date)).toEqual(
+          daysOf(NEWEST, "2026-10-26"),
+        );
+        const failed = daysOf(FIRST, "2026-10-02");
+        expect(out.sync.failedDates).toEqual(failed);
+        expect(out.sync.failedDays).toBe(341);
+        restore();
+        api.getJson.mockClear();
+        const again = JSON.parse(await dashboard.getDashboardData(52, false, true));
+        const days = sleepSpans().flatMap(([a, b]) => daysOf(a, b));
+        expect(days.toSorted()).toEqual([...failed, "2026-10-25", "2026-10-26"]);
+        expect(again.sync.failedDates).toEqual([]);
+        expect(again.recovery).toHaveLength(365);
+      },
+    );
+
+    it("reads only the last 14 days one by one when the ranges answer HTTP 400, and leaves the older days to the next update", async () => {
+      answer({ [SLEEP_RANGE]: refuse, [SUMMARY_RANGE]: refuse });
+      const out = JSON.parse(await dashboard.getDashboardData(52, false, true));
+      const rangeCalls = recoveryCalls().filter(([p]) => p === SLEEP_RANGE || p === SUMMARY_RANGE);
+      expect(rangeCalls).toHaveLength(24);
+      expect(recoveryCalls()).toHaveLength(24 + 28);
+      const week = daysOf("2026-10-13", "2026-10-26");
+      const days = (path: string, key: string) =>
+        recoveryCalls()
+          .filter(([p]) => p === path)
+          .map(([, q]) => q[key]);
+      expect(days("/sleep-service/sleep/dailySleep", "date")).toEqual(week);
+      expect(days("/usersummary-service/usersummary/daily", "calendarDate")).toEqual(week);
+      expect(out.recovery).toHaveLength(14);
+      for (const r of out.recovery) {
+        expect(r).toEqual({ date: r.date, sleepH: 7.5, rhr: 50 });
+        expect(r).toEqual(readCache().recovery[r.date]);
+      }
+      expect(out.sync.failedDates).toEqual(daysOf(FIRST, "2026-10-12"));
+      // one line for each failed span, none for each day
+      expect(warns()).toHaveLength(12);
+      expect(warns()[0]).toMatch(/^Recovery data of 2026-10-03 to 2026-10-26 not fetched/);
+    });
+
+    it.each([
+      ["HTTP 429", new GarminApiError("GET /x -> HTTP 429: slow down", 429), 365],
+      ["HTTP 500", new GarminApiError("GET /x -> HTTP 500: down", 500), 351],
+    ])(
+      "restarts from the earliest failed day that has a row after %s",
+      async (_, error, failedDays) => {
+        mkdirSync(dataDir, { recursive: true });
+        writeFileSync(
+          cacheFile(),
+          JSON.stringify({
+            recoveryTo: "2025-12-01",
+            recovery: { "2026-02-01": oneRow("2026-02-01"), "2026-10-19": oneRow("2026-10-19") },
+          }),
+        );
+        answer({
+          [SLEEP_RANGE]: () => {
+            throw error;
+          },
+        });
+        const out = JSON.parse(await dashboard.getDashboardData(52, false, true));
+        // the earliest failed day has no row, and the newest span fails first
+        expect(out.sync.failedDays).toBe(failedDays);
+        expect(out.sync.failedDates[0]).toBe(FIRST);
+        expect(readCache().recoveryTo).toBe("2026-02-01");
+      },
+    );
+
+    it("keeps its own line for a day that fails after a failed range", async () => {
+      answer({ [SLEEP_RANGE]: refuse, [SUMMARY_RANGE]: refuse });
+      failingSleep.add("2026-10-26");
+      await dashboard.getDashboardData(1);
+      expect(warns()).toEqual([
+        expect.stringMatching(/^Recovery data of 2026-10-13 to 2026-10-26 not fetched/),
+        expect.stringMatching(/^Recovery data of 2026-10-26 not fetched/),
+      ]);
+    });
+  });
+
   it("passes on an error that is not a Garmin error, in the recovery days and the optional parts", async () => {
     for (const prefix of ["/sleep-service", "/biometric-service/heartRateZones"]) {
       api.getJson.mockImplementation(async (path, q) => {
@@ -1283,14 +1512,23 @@ describe("getDashboardData", () => {
     expect(Object.keys(readCache().hrv)).toEqual(["2026-10-26"]);
   });
 
-  it("drops recovery rows older than the window from the cache", async () => {
-    const old = { date: "2026-09-01", sleepH: 1 };
+  it("keeps the recovery rows of the last 371 days in the cache, and drops older ones and keys that are no date", async () => {
+    // 365 days back is 2025-10-26: 371 days back is Monday 2025-10-20
+    const edge = addDays(TO, -371);
+    expect(edge).toBe("2025-10-20");
     writeFileSync(
       cacheFile(),
-      JSON.stringify({ recovery: { "2026-09-01": old, "2026-10-01": old } }),
+      JSON.stringify({
+        recovery: {
+          [edge]: oneRow(edge),
+          [addDays(edge, -1)]: oneRow(addDays(edge, -1)),
+          "not a date": oneRow("x"),
+        },
+      }),
     );
     await dashboard.getDashboardData(1);
-    expect(Object.keys(readCache().recovery)).not.toContain("2026-09-01");
-    expect(Object.keys(readCache().recovery)).toContain("2026-10-01");
+    expect(Object.keys(readCache().recovery)).toContain(edge);
+    expect(Object.keys(readCache().recovery)).not.toContain("2025-10-19");
+    expect(Object.keys(readCache().recovery)).not.toContain("not a date");
   });
 });

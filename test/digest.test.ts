@@ -652,6 +652,25 @@ describe("digest", () => {
     expect(e.totals).toEqual({});
   });
 
+  it("keeps the last 14 recovery rows of a page with a year of them, and the same verdict", () => {
+    const rows = Array.from({ length: 30 }, (_, i) => ({
+      date: `2026-09-${String(i + 1).padStart(2, "0")}`,
+      sleepScore: 60 + i,
+      rhr: 50 + (i % 3),
+    }));
+    const out = digest({ ...data, recovery: rows });
+    expect(out.recovery).toEqual(rows.slice(-14));
+    expect(out.recovery).toHaveLength(14);
+    expect(out.readiness).toEqual(digest({ ...data, recovery: rows.slice(-14) }).readiness);
+    expect(out.readiness?.recoveryDate).toBe("2026-09-30");
+    expect(out.readiness?.sleepScore).toBe(89);
+  });
+
+  it("keeps an empty recovery list empty, and an absent one absent", () => {
+    expect(digest({ ...data, recovery: [] }).recovery).toEqual([]);
+    expect(digest({ ...data, recovery: undefined }).recovery).toBeUndefined();
+  });
+
   it("gives the page's readiness verdict and its inputs, rounded", () => {
     const hrv = hrvTo("2026-10-26", "BALANCED");
     const recovery = [

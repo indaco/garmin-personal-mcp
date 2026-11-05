@@ -406,6 +406,10 @@ function countBy(items: Json[], key: (a: Activity) => string): Record<string, nu
   return out;
 }
 
+/** A page that leaves out the recovery data asks Garmin for no more of it. */
+const wantsHistory = (s: Settings): boolean =>
+  s.recoveryHistory === true && !s.exclude?.includes("recovery");
+
 /** The data without what the settings leave out: what the page holds and what the digest quotes. */
 export function filterData(data: Json, s: Settings): Json {
   const out: Json = { ...data };
@@ -535,6 +539,7 @@ export function checkSettings(s: Settings): Settings {
         "themes",
         "theme",
         "workouts",
+        "recoveryHistory",
       ].includes(k),
   );
   if (unknown.length > 0) problems.push(`unknown settings ${unknown.join(", ")}`);
@@ -554,6 +559,8 @@ export function checkSettings(s: Settings): Settings {
     problems.push(`theme: one of ${(s.themes ?? themeIds).join(", ")}`);
   if (s.workouts !== undefined && typeof s.workouts !== "boolean")
     problems.push("workouts: true or false");
+  if (s.recoveryHistory !== undefined && typeof s.recoveryHistory !== "boolean")
+    problems.push("recoveryHistory: true or false");
   if (problems.length > 0) throw new Error(`Settings: ${problems.join("; ")}`);
   return {
     ...s,
@@ -566,14 +573,20 @@ export class DashboardWriter {
   /** Writes run one at a time, so two calls never mix their pages. */
   #queue: Promise<unknown> = Promise.resolve();
   /** The data of the last call: a second call soon after (to add the notes) uses the same snapshot. */
-  #last: { weeks: number; workouts: boolean; at: number; json: string } | undefined;
+  #last:
+    | { weeks: number; workouts: boolean; history: boolean; at: number; json: string }
+    | undefined;
   /** The last page of a build (a write that made or kept the .bak): a replace of it within REUSE_MS keeps the .bak. */
   #wrote: { target: string; page: string; at: number } | undefined;
   /** The library entries that the last read of the library could not use. They stay in the file when it is saved. */
   #skipped: SkippedWidget[] = [];
 
   constructor(
-    private readonly getData: (weeks?: number, workouts?: boolean) => Promise<string>,
+    private readonly getData: (
+      weeks?: number,
+      workouts?: boolean,
+      recoveryHistory?: boolean,
+    ) => Promise<string>,
     private readonly dataDir: string,
     readonly template: () => Promise<string>,
     /** The next automatic refresh of a page; undefined when it has no schedule. */
@@ -600,7 +613,11 @@ export class DashboardWriter {
         throw options.settings ? e : unreadable(e, target);
       }
       const data = JSON.parse(
-        await this.#data(options.weeks ?? weeksOf(old), settings.workouts === true),
+        await this.#data(
+          options.weeks ?? weeksOf(old),
+          settings.workouts === true,
+          wantsHistory(settings),
+        ),
       ) as Json;
       return {
         path: target,
@@ -644,7 +661,11 @@ export class DashboardWriter {
       }
       page = await this.#withLibrary(page, old);
       const raw = JSON.parse(
-        await this.#data(options.weeks ?? weeksOf(old), settings.workouts === true),
+        await this.#data(
+          options.weeks ?? weeksOf(old),
+          settings.workouts === true,
+          wantsHistory(settings),
+        ),
       ) as Json;
       page = withData(page, raw, settings, []);
       return {
@@ -737,7 +758,9 @@ export class DashboardWriter {
         "Settings need a page from the template; this page has no garmin-settings block",
       );
     }
-    const raw = JSON.parse(await this.#data(weeks ?? weeksOf(old), own.workouts === true)) as Json;
+    const raw = JSON.parse(
+      await this.#data(weeks ?? weeksOf(old), own.workouts === true, wantsHistory(own)),
+    ) as Json;
     let addedWidgets: Record<string, string[]> = {};
     let addedNames: Record<string, string[]> = {};
     // only a page from the template has a layout block that the server owns
@@ -1069,18 +1092,19 @@ export class DashboardWriter {
   }
 
   /** The data for `weeks`; the same snapshot for 15 minutes, so the notes match the digest they come from. */
-  async #data(weeks: number | undefined, workouts: boolean): Promise<string> {
+  async #data(weeks: number | undefined, workouts: boolean, history: boolean): Promise<string> {
     const covered = weeksCovered(weeks);
     const last = this.#last;
     if (
       last &&
       last.weeks === covered &&
       last.workouts === workouts &&
+      last.history === history &&
       Date.now() - last.at < REUSE_MS
     )
       return last.json;
-    const json = await this.getData(weeks, workouts);
-    this.#last = { weeks: covered, workouts, at: Date.now(), json };
+    const json = await this.getData(weeks, workouts, history);
+    this.#last = { weeks: covered, workouts, history, at: Date.now(), json };
     return json;
   }
 
@@ -1369,6 +1393,12 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
               .boolean()
               .describe(
                 "Compare the same run workout across weeks (Workout trend widget): the server loads the laps of the last 8 sessions of each repeated run name, and of older ones whose .FIT file is saved; off when not set",
+              )
+              .optional(),
+            recoveryHistory: z
+              .boolean()
+              .describe(
+                "Keep the sleep and resting HR rows of the whole period in the page, not only the last 14 days; off when not set",
               )
               .optional(),
           })
