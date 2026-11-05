@@ -304,6 +304,53 @@ describe("the period", () => {
     });
   });
 
+  it.each([
+    [1, "2026-10-19", 1],
+    [undefined, "2026-08-03", 12],
+    [52, "2025-10-27", 52],
+    [100, "2025-10-27", 52],
+  ])("starts on a Monday for weeks %s", async (weeks, start, count) => {
+    vi.setSystemTime(new Date(2026, 9, 28, 12));
+    const out = JSON.parse(await dashboard.getDashboardData(weeks));
+    expect(out.start).toBe(start);
+    expect(out.weeks).toBe(count);
+  });
+
+  it.each([
+    [new Date(2027, 0, 3, 12), "2026-12-14", "2026-12-13", "2026-11-23"],
+    [new Date(2026, 9, 25, 12), "2026-10-05", "2026-10-04", "2026-09-14"],
+    [new Date(2027, 2, 28, 12), "2027-03-08", "2027-03-07", "2027-02-15"],
+  ])(
+    "keeps the Monday across a new year and a time change, case %#",
+    async (now, start, prevEnd, prevStart) => {
+      vi.setSystemTime(now);
+      const out = JSON.parse(await dashboard.getDashboardData(2));
+      expect(out).toMatchObject({ start, prevEnd, prevStart });
+    },
+  );
+
+  it("asks for the HRV from the Monday", async () => {
+    vi.setSystemTime(new Date(2026, 9, 28, 12));
+    await dashboard.getDashboardData(2);
+    expect(String(callsTo("/hrv-service/hrv/daily/")[0][0])).toContain("/2026-10-12/");
+  });
+
+  it("moves the cache of a server that started on a Wednesday back to the Monday", async () => {
+    vi.setSystemTime(new Date(2026, 9, 28, 12));
+    await dashboard.getDashboardData(2);
+    const cache = readCache();
+    cache.activitiesFrom = "2026-09-23";
+    cache.hrvFrom = "2026-10-14";
+    writeFileSync(cacheFile(), JSON.stringify(cache));
+    api.getJson.mockClear();
+    garminActivities = [activity(3, "2026-09-22")];
+    const out = JSON.parse(await dashboard.getDashboardData(2));
+    expect(readCache().activitiesFrom).toBe("2026-09-21");
+    expect(readCache().hrvFrom).toBe("2026-10-12");
+    expect(String(callsTo("/hrv-service/hrv/daily/")[0][0])).toContain("/2026-10-12/");
+    expect(out.previousActivities.map((a: { id: number }) => a.id)).toEqual([3]);
+  });
+
   it("splits the activities at the Monday and has no partial week", async () => {
     vi.setSystemTime(new Date(2026, 9, 28, 12));
     garminActivities = [activity(1, "2026-10-12"), activity(2, "2026-10-11")];
@@ -627,13 +674,36 @@ describe("getDashboardData", () => {
 
     it("keeps the previous runs of a page that shows only running", async () => {
       const out = await previous();
-      const kept = filterData(out, { sports: ["running"] } as never);
+      const kept = filterData(out, { sports: ["running"] });
       expect((kept.previousActivities as { id: number }[]).map((a) => a.id)).toEqual([5]);
     });
 
     it("gives a previous session its estimated load from the heart rate", async () => {
-      const out = await previous();
+      garminActivities = [activity(5, "2026-10-05", "running", { averageHR: 150 })];
+      const out = JSON.parse(await dashboard.getDashboardData(2));
       expect(out.previousActivities.find((a: { id: number }) => a.id === 5).avgHR).toBe(150);
+      const zones = [{ sport: "DEFAULT", maxHeartRateUsed: 190 }];
+      const withZones = digest({ ...out, zones }).previousPeriodTotals.running;
+      expect(withZones.estimatedLoads).toBe(1);
+      expect(withZones.load).toBeCloseTo((25 * 150) / 190, 0);
+      expect(digest(out).previousPeriodTotals.running.load).toBeNull();
+    });
+
+    it.each([
+      ["strength_training", 1, "strengthTraining"],
+      ["pickleball", 1, "racket"],
+      ["mountain_biking", 2, "cycling"],
+    ])("gives a previous %s row the board %s", async (type, sportTypeId, group) => {
+      garminActivities = [activity(8, "2026-09-25", type, { sportTypeId })];
+      const out = JSON.parse(await dashboard.getDashboardData(2));
+      expect(groupOf(out.previousActivities[0])).toBe(group);
+    });
+
+    it("gives a previous row of an unknown sport the generic board, and a running page drops it", async () => {
+      garminActivities = [activity(9, "2026-09-25", "running", { sportTypeId: 999 })];
+      const out = JSON.parse(await dashboard.getDashboardData(2));
+      expect(groupOf(out.previousActivities[0])).toBe("generic");
+      expect(filterData(out, { sports: ["running"] }).previousActivities).toEqual([]);
     });
 
     it("the fixture's previous rows have only fields that the server writes", async () => {

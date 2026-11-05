@@ -1,4 +1,15 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -96,6 +107,17 @@ function racingWriter(json: unknown, during: () => unknown) {
   );
   return { w, calls };
 }
+/** Runs `run` 20 minutes later, past the reuse window of the page. */
+const later = async <T>(run: () => Promise<T>) => {
+  vi.useFakeTimers({ now: Date.now() + 20 * 60_000, toFake: ["Date"] });
+  try {
+    return await run();
+  } finally {
+    vi.useRealTimers();
+  }
+};
+/** The permission bits of a file. */
+const mode = (f: string) => statSync(f).mode & 0o777;
 /** The page without its data block: what an update must keep. */
 const code = (s: string) =>
   s.replace(/\/\* garmin-data:start \*\/[\s\S]*?\/\* garmin-data:end \*\//, "");
@@ -531,6 +553,50 @@ describe("writeDashboard", () => {
     expect(readBlock(page(), "widgets")).toEqual([{ id: "w" }]);
   });
 
+  describe.skipIf(process.platform === "win32")("mode and links of the page", () => {
+    it("keeps a private page private at an update", async () => {
+      await writer.write({});
+      chmodSync(file, 0o600);
+      expect((await later(() => writer.write({}))).page).toBe("updated");
+      expect(mode(file)).toBe(0o600);
+    });
+
+    it("keeps the mode in a scheduled refresh", async () => {
+      await writer.write({});
+      chmodSync(file, 0o600);
+      expect((await later(() => writer.write({ onlyExisting: true }))).page).toBe("updated");
+      expect(mode(file)).toBe(0o600);
+    });
+
+    it("keeps a private page private in its backup", async () => {
+      templateText = template(ID_A);
+      await writer.write({});
+      chmodSync(file, 0o600);
+      // an older, wider .bak is there first
+      writeFileSync(`${file}.bak`, "older");
+      chmodSync(`${file}.bak`, 0o644);
+      templateText = template(ID_B, "newCode();\n");
+      expect(await writer.write({})).toMatchObject({ page: "upgraded", backup: `${file}.bak` });
+      expect(mode(`${file}.bak`)).toBe(0o600);
+      expect(mode(file)).toBe(0o600);
+    });
+
+    it("updates the page behind a link", async () => {
+      const other = join(dir, "synced");
+      mkdirSync(other);
+      const real = join(other, "real.html");
+      await writer.write({ path: "real.html" });
+      writeFileSync(real, readFileSync(join(dir, "real.html"), "utf8"));
+      rmSync(join(dir, "real.html"));
+      symlinkSync(real, file);
+      await later(() => writer.write({ notes: ["through a link"] }));
+      expect(lstatSync(file).isSymbolicLink()).toBe(true);
+      expect(readBlock(readFileSync(real, "utf8"), "data")).toMatchObject({
+        notes: ["through a link"],
+      });
+    });
+  });
+
   /** Writes the page with ID_A, then sets the data block of the saved page to this text. */
   async function oldPage(dataText?: string) {
     templateText = template(ID_A);
@@ -822,6 +888,105 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
     // new settings without any setting: the block is empty again
     await writer.write({ page: own, settings: {} });
     expect(page()).toContain("/* garmin-settings:start */null/* garmin-settings:end */");
+  });
+
+  describe("new settings on a page that Claude wrote", () => {
+    const own = `<html><script>window.GARMIN_SETTINGS = /* garmin-settings:start */null/* garmin-settings:end */;
+const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
+
+    it("saves new settings without a page on a page that the assistant wrote", async () => {
+      await writer.write({ page: own });
+      await writer.write({ settings: { exclude: ["names"] } });
+      expect(page()).toContain('{"exclude":["names"]}');
+      const r = await later(() => writer.write({}));
+      expect(r.settings).toEqual({ exclude: ["names"] });
+      const d = readBlock(page(), "data") as Full;
+      for (const a of d.activities) expect(a).not.toHaveProperty("name");
+      expect(page()).not.toContain("Anna");
+    });
+
+    it("empty settings clear the block", async () => {
+      await writer.write({ page: own });
+      await writer.write({ settings: { exclude: ["names"] } });
+      await writer.write({ settings: {} });
+      expect(page()).toContain("/* garmin-settings:start */null/* garmin-settings:end */");
+    });
+
+    it("repairs an unreadable block of such a page", async () => {
+      await writer.write({ page: own });
+      writeFileSync(
+        file,
+        page().replace(
+          "/* garmin-settings:start */null/* garmin-settings:end */",
+          "/* garmin-settings:start */{bad/* garmin-settings:end */",
+        ),
+      );
+      await later(async () => {
+        await expect(writer.write({})).rejects.toThrow();
+        await writer.write({ settings: { workouts: true } });
+      });
+      expect(readBlock(page(), "settings")).toEqual({ workouts: true });
+    });
+
+    it("applies the new settings in a scheduled refresh", async () => {
+      await writer.write({ page: own });
+      await writer.write({ settings: { exclude: ["names"] } });
+      const r = await later(() => writer.write({ onlyExisting: true }));
+      expect(r.settings).toEqual({ exclude: ["names"] });
+      expect(page()).not.toContain("Anna");
+    });
+
+    it("keeps an excluded recovery and a sport filter at the next update", async () => {
+      await writer.write({ page: own });
+      await writer.write({ settings: { exclude: ["recovery"], sports: ["running"] } });
+      await later(() => writer.write({}));
+      const d = readBlock(page(), "data") as Full;
+      expect(d.recovery).toEqual([]);
+      expect(JSON.stringify(d.activities)).not.toContain("Ride");
+    });
+
+    it("replaces the old settings with the new ones, it does not merge", async () => {
+      await writer.write({ page: own });
+      await writer.write({ settings: { exclude: ["names"] } });
+      await writer.write({ settings: { workouts: true } });
+      expect(page()).toContain(
+        '/* garmin-settings:start */{"workouts":true}/* garmin-settings:end */',
+      );
+    });
+
+    it("repairs an unreadable block with empty settings", async () => {
+      await writer.write({ page: own });
+      writeFileSync(
+        file,
+        page().replace(
+          "/* garmin-settings:start */null/* garmin-settings:end */",
+          "/* garmin-settings:start */{bad/* garmin-settings:end */",
+        ),
+      );
+      await later(() => writer.write({ settings: {} }));
+      expect(readBlock(page(), "settings")).toBeNull();
+    });
+
+    it("accepts empty settings on a page with no settings block, and refuses real ones", async () => {
+      const bare =
+        "<html><script>const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>";
+      await writer.write({ page: bare });
+      await writer.write({ settings: {} });
+      expect(page()).not.toContain("garmin-settings");
+      const before = page();
+      await expect(writer.write({ settings: { exclude: ["names"] } })).rejects.toThrow(
+        "this page has no garmin-settings block",
+      );
+      expect(page()).toBe(before);
+    });
+
+    it("does not change the block of a write without settings", async () => {
+      await writer.write({ page: own, settings: { exclude: ["names"] } });
+      await later(() => writer.write({ notes: ["n"] }));
+      expect(page()).toContain(
+        '/* garmin-settings:start */{"exclude":["names"]}/* garmin-settings:end */',
+      );
+    });
   });
 
   it("leaves out of the page and of the digest the data and the sports that the settings exclude", async () => {

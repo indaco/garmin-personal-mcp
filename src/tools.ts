@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { Profile } from "@garmin/fitsdk";
 import type { McpServer } from "@modelcontextprotocol/server";
@@ -504,14 +504,22 @@ export function firstArray(json: unknown): unknown[] | undefined {
   return undefined;
 }
 
-/** Writes a temp file and moves it into place, so a stopped process never leaves a half-written file. */
+/**
+ * Writes a temp file and moves it into place, so a stopped process never leaves a half-written file. A link stays
+ * a link and an existing file keeps its mode. A new file has the default mode.
+ */
 export async function writeAtomically(target: string, data: Uint8Array | string): Promise<void> {
-  await mkdir(dirname(resolve(target)), { recursive: true });
+  const real = await realpath(target).catch(() => target);
+  const mode = (await stat(real).catch(() => undefined))?.mode;
+  await mkdir(dirname(resolve(real)), { recursive: true });
   // a unique name: two writers of one file never share a temp file
-  const tmp = `${target}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
+  const tmp = `${real}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
   try {
-    await writeFile(tmp, data);
-    await rename(tmp, target);
+    // the mode from the start: a private page is never readable by others, also not for a moment
+    await writeFile(tmp, data, mode === undefined ? undefined : { mode: mode & 0o777 });
+    // writeFile's mode goes through the umask. Windows has no modes
+    if (mode !== undefined && process.platform !== "win32") await chmod(tmp, mode & 0o777);
+    await rename(tmp, real);
   } catch (e) {
     await rm(tmp, { force: true });
     throw e;

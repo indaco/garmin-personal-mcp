@@ -170,6 +170,7 @@ describe("prompts", () => {
       expect(step1).toContain("The reply of step 3 does not have them");
       expect(step1).toContain("Without `addedWidgets`, say nothing about added widgets");
       expect(step1).toContain("do not make up a title");
+      expect(step1).toContain("If the reply has `skippedWidgets`");
     }
   });
 

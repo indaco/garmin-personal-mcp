@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -412,7 +420,9 @@ describe("widget library", () => {
     await expect(writer.edit({ widgets: [widget] })).rejects.toThrow(/widgets\.json/);
     await expect(writer.write({ layout: "preset" })).rejects.toThrow(/widgets\.json/);
     writeFileSync(libraryFile(), JSON.stringify([{ ...widget, id: "kpis" }]));
-    await expect(writer.edit({})).rejects.toThrow(/built-in/);
+    expect(await writer.edit({})).toMatchObject({
+      skippedWidgets: [{ id: "kpis", problem: expect.stringContaining("built-in") }],
+    });
     expect(readFileSync(libraryFile(), "utf8")).toContain("kpis");
     writeFileSync(libraryFile(), "{}");
     await expect(writer.edit({})).rejects.toThrow(/not a list of widgets/);
@@ -431,6 +441,206 @@ describe("widget library", () => {
   it("stops when the library cannot be read at all", async () => {
     mkdirSync(libraryFile());
     await expect(writer.edit({ widgets: [widget] })).rejects.toThrow(/EISDIR/);
+  });
+});
+
+const put = (list: unknown) => writeFileSync(libraryFile(), JSON.stringify(list));
+const onAll = (w: string) =>
+  (layout().boards.all as { widget: string }[]).some((i) => i.widget === w);
+const raw = () => JSON.parse(readFileSync(libraryFile(), "utf8")) as unknown[];
+
+describe("a library entry that cannot be used", () => {
+  const good = { ...widget, span: 1 };
+  const bad = { ...widget, id: "hrv" };
+  const another = { ...widget, id: "another-ride" };
+  const skipped = { id: "hrv", problem: expect.stringContaining("built-in") };
+
+  it("goes on without the entry, and says which one it skipped", async () => {
+    put([good, bad]);
+    const r = await writer.write({});
+    expect(ids(page())).toEqual(["longest-ride"]);
+    expect(r.skippedWidgets).toEqual([skipped]);
+  });
+
+  it("keeps the entry in the file when the library is saved", async () => {
+    put([good, bad]);
+    await writer.write({});
+    await writer.edit({ widgets: [another] });
+    const saved = raw();
+    expect(saved).toHaveLength(3);
+    expect(saved).toContainEqual(bad);
+  });
+
+  it("does not bring old bad entries back into a new library file", async () => {
+    put([good, bad]);
+    expect((await writer.edit({})).skippedWidgets).toEqual([skipped]);
+    unlinkSync(libraryFile());
+    const r = await writer.edit({ widgets: [another] });
+    expect(r).not.toHaveProperty("skippedWidgets");
+    expect(raw()).not.toContainEqual(bad);
+  });
+
+  it("drops the entry when it is forgotten", async () => {
+    put([good, bad]);
+    await writer.write({});
+    const r = await writer.edit({ forgetWidgets: ["hrv"] });
+    expect(raw()).toEqual([good]);
+    expect(r).not.toHaveProperty("skippedWidgets");
+    expect(await writer.write({})).not.toHaveProperty("skippedWidgets");
+  });
+
+  it("starts the library from the page with only the widgets that can run", async () => {
+    writeFileSync(
+      file,
+      page().replace(
+        "/* garmin-widgets:start */[]",
+        () => `/* garmin-widgets:start */${JSON.stringify([good, bad])}`,
+      ),
+    );
+    await writer.write({});
+    expect(raw()).toEqual([good]);
+    await writer.write({});
+    unlinkSync(libraryFile());
+    await writer.write({});
+    expect(raw()).toEqual([good]);
+  });
+
+  it("skips an entry that is not an object, as (no id), and keeps it", async () => {
+    put([good, null, 3]);
+    const r = await writer.write({});
+    expect(r.skippedWidgets).toEqual([
+      { id: "(no id)", problem: expect.any(String) },
+      { id: "(no id)", problem: expect.any(String) },
+    ]);
+    await writer.edit({ widgets: [another] });
+    expect(raw()).toEqual([good, { ...another, span: 1 }, null, 3]);
+  });
+
+  it("still stops at a file that is not JSON or not a list, and leaves it as it is", async () => {
+    for (const text of ["{ not json", "{}"]) {
+      writeFileSync(libraryFile(), text);
+      await expect(writer.write({})).rejects.toThrow(/widgets\.json/);
+      expect(readFileSync(libraryFile(), "utf8")).toBe(text);
+    }
+  });
+
+  it("has no skippedWidgets when every entry can run", async () => {
+    put([good]);
+    expect(await writer.write({})).not.toHaveProperty("skippedWidgets");
+    expect(await writer.edit({})).not.toHaveProperty("skippedWidgets");
+  });
+
+  it("reports nothing for a write that does not read the library", async () => {
+    put([good, bad]);
+    expect((await writer.write({})).skippedWidgets).toEqual([skipped]);
+    const own = `<html><script>const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
+    expect(await writer.write({ page: own })).not.toHaveProperty("skippedWidgets");
+  });
+
+  it("goes on when every entry is bad, and keeps them all", async () => {
+    put([bad, { ...bad, id: "kpis" }]);
+    const r = await writer.write({});
+    expect(r.skippedWidgets).toHaveLength(2);
+    await writer.edit({ widgets: [another] });
+    expect(raw()).toHaveLength(3);
+  });
+
+  it("reads an empty library as no widgets", async () => {
+    put([]);
+    expect(await writer.write({})).not.toHaveProperty("skippedWidgets");
+    expect(raw()).toEqual([]);
+  });
+
+  it("makes no library file from a page whose only widget is bad", async () => {
+    writeFileSync(
+      file,
+      page().replace(
+        "/* garmin-widgets:start */[]",
+        () => `/* garmin-widgets:start */${JSON.stringify([bad])}`,
+      ),
+    );
+    const r = await writer.write({});
+    expect(r).not.toHaveProperty("skippedWidgets");
+    expect(existsSync(libraryFile())).toBe(false);
+  });
+
+  it("skips an entry whose id is not a string, and names it (no id)", async () => {
+    put([{ ...good, id: 7 }]);
+    expect((await writer.write({})).skippedWidgets).toEqual([
+      { id: "(no id)", problem: expect.any(String) },
+    ]);
+  });
+
+  it("forgets an id that is not in the file without changing the bad entries", async () => {
+    put([good, bad]);
+    const r = await writer.edit({ forgetWidgets: ["nothing-here"] });
+    expect(r.skippedWidgets).toEqual([skipped]);
+    expect(raw()).toEqual([good, bad]);
+  });
+
+  it("forgets one of two bad entries and keeps the other", async () => {
+    const kpis = { ...bad, id: "kpis" };
+    put([bad, kpis]);
+    const r = await writer.edit({ forgetWidgets: ["hrv"] });
+    expect(r.skippedWidgets).toEqual([{ id: "kpis", problem: expect.any(String) }]);
+    expect(raw()).toEqual([kpis]);
+  });
+
+  it.each(["forgetWidgets", "removeWidgets"] as const)(
+    "%s of a bad entry with a built-in id keeps the built-in widget on its board",
+    async (option) => {
+      await writer.edit({ place: [{ board: "all", widget: "hrv" }] });
+      put([bad]);
+      const r = await writer.edit({ [option]: ["hrv"] });
+      expect(onAll("hrv")).toBe(true);
+      if (option === "forgetWidgets") {
+        expect(raw()).toEqual([]);
+        expect(r).not.toHaveProperty("skippedWidgets");
+      }
+    },
+  );
+
+  it("still takes a custom widget off the board with forgetWidgets", async () => {
+    await writer.edit({ widgets: [widget], place: [{ board: "all", widget: "longest-ride" }] });
+    expect(onAll("longest-ride")).toBe(true);
+    await writer.edit({ forgetWidgets: ["longest-ride"] });
+    expect(onAll("longest-ride")).toBe(false);
+  });
+
+  it("gives the chat view the widgets that can run", async () => {
+    put([good, bad]);
+    const v = await writer.view({});
+    expect((v.blocks.widgets as { id: string }[]).map((w) => w.id)).toEqual(["longest-ride"]);
+  });
+
+  it("goes on in a refresh of an existing page, and reports the entry", async () => {
+    put([good, bad]);
+    expect((await writer.write({ onlyExisting: true })).skippedWidgets).toEqual([skipped]);
+  });
+
+  it("never loses an entry that cannot be written back", async () => {
+    const text = `[{"id":"hrv","x":${"[".repeat(200_000)}${"]".repeat(200_000)}}]`;
+    writeFileSync(libraryFile(), text);
+    await expect(writer.edit({ widgets: [another] })).rejects.toThrow(/too deeply nested/);
+    expect(readFileSync(libraryFile(), "utf8")).toBe(text);
+    expect((await writer.write({})).skippedWidgets).toEqual([skipped]);
+    expect(readFileSync(libraryFile(), "utf8")).toBe(text);
+  });
+
+  it("forgets the entries without an id with (no id)", async () => {
+    put([good, null, 3, bad]);
+    const r = await writer.edit({ forgetWidgets: ["(no id)"] });
+    expect(r.skippedWidgets).toEqual([skipped]);
+    expect(raw()).toEqual([good, bad]);
+  });
+
+  it("replaces the entry with a corrected widget of the same id", async () => {
+    put([good, { id: "fixable", title: "", code: "x" }]);
+    const r = await writer.edit({ widgets: [{ ...widget, id: "fixable" }] });
+    expect(r).not.toHaveProperty("skippedWidgets");
+    expect(raw().filter((w) => (w as { id: string }).id === "fixable")).toEqual([
+      expect.objectContaining({ id: "fixable", title: "Longest ride" }),
+    ]);
   });
 });
 

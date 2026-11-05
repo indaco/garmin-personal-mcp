@@ -151,7 +151,11 @@ export async function cli(
   if (!COMMANDS.includes(command)) return usage(`Unknown command: ${command}`);
   const help = COMMAND_HELP[command];
   if (help && (args.includes("--help") || args.includes("-h"))) return { code: 0, stdout: help };
-  const flag = args.find((a, i) => a.startsWith("-") && !(i === 0 && a === FLAGS[command]));
+  // an argument of setup can be the key: setup refuses it without printing it
+  const flag =
+    command === "setup"
+      ? undefined
+      : args.find((a, i) => a.startsWith("-") && !(i === 0 && a === FLAGS[command]));
   if (flag) return usage(`Unknown flag: ${flag}`);
   if (command === "--version" || command === "-v") return { code: 0, stdout: version };
   if (command === "--help" || command === "-h") return { code: 0, stdout: HELP };
@@ -167,6 +171,7 @@ export async function cli(
   }
   try {
     if (command === "refresh") {
+      if (args.length > 1) return usage("refresh takes one page, or --auto");
       const scheduled = args[0] === "--auto";
       const at = new Date().toISOString();
       // the job starts at the run times and at login: nothing to do when no run time was missed
@@ -194,6 +199,10 @@ export async function cli(
     }
     const rest = [...args];
     const path = rest.at(-1)?.toLowerCase().endsWith(".html") ? rest.pop() : undefined;
+    if (rest[0] === "off" && rest.length > 1) {
+      // without this, a typo in the page name would stop the schedule of every page
+      return usage("schedule off takes one page, a file that ends in .html");
+    }
     const status =
       rest[0] === "off"
         ? await auto.off(path)
