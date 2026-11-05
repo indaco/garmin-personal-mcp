@@ -416,6 +416,16 @@ describe("requests", () => {
     await expect(client().getJson("/x")).rejects.toThrow("Response is not JSON: <html>");
   });
 
+  it("gives the HTTP status of a failed GET, and none for a network error", async () => {
+    mockFetch(tokenJson({ access_token: "tok" }), { status: 400, body: "bad" });
+    const api = client();
+    await expect(api.getJson("/x")).rejects.toMatchObject({ status: 400 });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
+    const e = await api.getJson("/x").catch((err: unknown) => err);
+    expect(e).toBeInstanceOf(GarminApiError);
+    expect((e as GarminApiError).status).toBeUndefined();
+  });
+
   it("wraps network errors", async () => {
     mockFetch(tokenJson({ access_token: "tok" }));
     const api = client();

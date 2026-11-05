@@ -11,6 +11,14 @@ const DEFAULT_TOKEN_TTL_MS = 23 * 3600_000;
 
 export class GarminApiError extends Error {
   override name = "GarminApiError";
+
+  /** `status` is the HTTP status of an answer from Garmin; a network or token failure has none. */
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+  }
 }
 
 /** Garmin refuses the key, or it cannot be a key: another key is necessary. */
@@ -118,6 +126,7 @@ export class GarminApiClient {
     if (!resp.ok) {
       throw new GarminApiError(
         `GET ${path} -> HTTP ${resp.status}: ${this.#preview(body, this.#token)}`,
+        resp.status,
       );
     }
     return body;
