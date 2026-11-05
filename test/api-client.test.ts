@@ -319,6 +319,30 @@ describe("retries", () => {
     await expect(client().getJson("/x")).rejects.toThrow("GET /x -> HTTP 401: still no");
   });
 
+  it("keeps the status 401 on the error of the second 401", async () => {
+    mockFetch(
+      tokenJson({ access_token: "old" }),
+      { status: 401, body: "no" },
+      tokenJson({ access_token: "new" }),
+      { status: 401, body: "still no" },
+    );
+    const error = await client()
+      .getJson("/x")
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(GarminApiError);
+    expect((error as GarminApiError).status).toBe(401);
+  });
+
+  it("keeps the status 404 on the error of getBytes", async () => {
+    mockFetch(tokenJson({ access_token: "tok" }), { status: 404, body: "gone" });
+    const error = await client()
+      .getBytes("/file")
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(GarminApiError);
+    expect((error as GarminApiError).status).toBe(404);
+    expect((error as GarminApiError).message).toBe("GET /file -> HTTP 404: gone");
+  });
+
   it("retries a 406 once with Accept */*", async () => {
     mockFetch(tokenJson({ access_token: "tok" }), { status: 406 }, ok([1]));
     expect(await client().getJson("/x")).toEqual([1]);
