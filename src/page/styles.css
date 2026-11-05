@@ -1,6 +1,10 @@
 /* All page styles sit in one cascade layer. The few rules after the layer are unlayered, so they win
    over any rule in it whatever its specificity, without !important. */
 @layer page {
+  /* keyboard focus scrolls below the sticky bar; app.ts sets the height */
+  html {
+    scroll-padding-top: var(--sticky-h, 0px);
+  }
   /* Theme tokens. Midnight is the default, also for "system" on a dark OS. */
   :root,
   :root[data-theme="midnight"],
@@ -1034,8 +1038,8 @@
     background: var(--good);
   }
   .cal-tip {
-    position: absolute;
-    z-index: 5;
+    position: fixed;
+    z-index: 40;
     width: 220px;
     background: var(--panel2);
     border: 1px solid var(--line);
