@@ -12,11 +12,13 @@ import { join } from "node:path";
 import { Profile } from "@garmin/fitsdk";
 import { asServer } from "../scripts/fill-dashboard-fixture.mjs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GarminApiError, type GarminApiClient } from "../src/api-client";
+import { GarminApiError, KeyRefusedError, type GarminApiClient } from "../src/api-client";
 import {
   covered,
   GarminDashboard,
   jsonByLines,
+  rangeSummary,
+  recoveryChunks,
   recoveryRefreshFrom,
   recoveryRow,
   toFetch,
@@ -122,6 +124,65 @@ describe("cache file", () => {
   });
 });
 
+const SLEEP_RANGE = "/sleep-service/sleep/dailySleepSummariesByDate";
+const SUMMARY_RANGE = "/usersummary-service/v2/dailysummaries";
+const daysOf = (from: string, to: string) => {
+  const days: string[] = [];
+  for (let d = from; d <= to; d = addDays(d, 1)) days.push(d);
+  return days;
+};
+
+const spans = (days: string[]) => recoveryChunks(days).map(([a, b]) => `${a}..${b}`);
+const run = (n: number) => daysOf("2026-01-01", addDays("2026-01-01", n - 1));
+
+describe("recoveryChunks", () => {
+  it("gives no span for no day, and one span for one day", () => {
+    expect(spans([])).toEqual([]);
+    expect(spans(["2026-10-26"])).toEqual(["2026-10-26..2026-10-26"]);
+  });
+
+  it("cuts a span after 31 days", () => {
+    expect(spans(run(31))).toEqual(["2026-01-01..2026-01-31"]);
+    expect(spans(run(32))).toEqual(["2026-01-01..2026-01-31", "2026-02-01..2026-02-01"]);
+    expect(spans(run(63))).toHaveLength(3);
+  });
+
+  it("joins days that are 30 days apart and cuts 31 days apart", () => {
+    expect(spans(["2026-01-01", "2026-01-31"])).toEqual(["2026-01-01..2026-01-31"]);
+    expect(spans(["2026-01-01", "2026-02-01"])).toHaveLength(2);
+    expect(spans(["2026-01-01", "2026-02-10"])).toHaveLength(2);
+  });
+});
+
+describe("rangeSummary", () => {
+  it("gives the names of a single-day summary", () => {
+    const row = rangeSummary({
+      calendarDate: "2026-10-25",
+      heartRate: { restingValue: 49 },
+      bodyBattery: { maxValue: 53, minValue: 12 },
+      stress: { avgLevel: 31 },
+      movement: { steps: { value: 15037, goal: 14520 }, floorsAscended: { value: 93 } },
+    });
+    expect(recoveryRow("2026-10-25", null, row)).toEqual({
+      date: "2026-10-25",
+      rhr: 49,
+      bbHigh: 53,
+      bbLow: 12,
+      stress: 31,
+      steps: 15037,
+      stepGoal: 14520,
+      floors: 93,
+    });
+  });
+
+  it.each([null, 7, {}, { heartRate: 3, movement: { steps: null } }])(
+    "gives a row of the date only for %j",
+    (row) => {
+      expect(recoveryRow("2026-10-25", null, rangeSummary(row))).toEqual({ date: "2026-10-25" });
+    },
+  );
+});
+
 describe("recoveryRow", () => {
   it("keeps the dashboard fields of sleep and the daily summary", () => {
     const row = recoveryRow(
@@ -151,6 +212,10 @@ describe("recoveryRow", () => {
         '"needH":7.5,"bedMin":1431,"rhr":49,"bbHigh":53,"bbLow":12,"steps":15037,' +
         '"stepGoal":14520,"floors":93}',
     );
+  });
+
+  it("rounds the floors down, as Garmin does in its ranges", () => {
+    expect(recoveryRow("2026-10-25", null, { floorsAscended: 93.9 }).floors).toBe(93);
   });
 
   it("skips fields that are missing, null or not numbers", () => {
@@ -212,6 +277,29 @@ const previous = async () => {
 const callsTo = (prefix: string) =>
   api.getJson.mock.calls.filter(([path]) => String(path).startsWith(prefix));
 
+const RECOVERY_PATHS = [
+  SLEEP_RANGE,
+  SUMMARY_RANGE,
+  "/sleep-service/sleep/dailySleep",
+  "/usersummary-service/usersummary/daily",
+];
+/** The recovery calls, by path and query. */
+const recoveryCalls = () =>
+  api.getJson.mock.calls.filter(([path]) => RECOVERY_PATHS.includes(String(path)));
+
+/** Makes the given paths answer their own way. */
+const answer = (overrides: Record<string, (q: Record<string, string>) => unknown>) =>
+  api.getJson.mockImplementation(async (path, q) =>
+    path in overrides ? overrides[path](q) : fakeGarmin(path, q),
+  );
+const recoveryByDay = (out: { recovery: Record<string, unknown>[] }) =>
+  Object.fromEntries(out.recovery.map((r) => [r.date, r]));
+const recoveryPaths = () => recoveryCalls().map(([p]) => p);
+
+const refuse = () => {
+  throw new GarminApiError("GET range -> HTTP 400: no", 400);
+};
+
 function fakeGarmin(path: string, q: Record<string, string>) {
   if ([...failing].some((p) => path.startsWith(p)))
     throw new GarminApiError(`GET ${path} -> HTTP 500: down`);
@@ -242,6 +330,20 @@ function fakeGarmin(path: string, q: Record<string, string>) {
       });
     }
     return { hrvSummaries: days };
+  }
+  if (path === SLEEP_RANGE) {
+    const days = daysOf(q.startDate, q.endDate);
+    if (days.some((d) => failingSleep.has(d)))
+      throw new GarminApiError(`GET ${path} -> HTTP 500: down`, 500);
+    return days.map((calendarDate) => ({ calendarDate, sleepTimeSeconds: 27000 }));
+  }
+  if (path === SUMMARY_RANGE) {
+    return {
+      data: daysOf(q.startDate, q.endDate).map((calendarDate) => ({
+        calendarDate,
+        heartRate: { restingValue: 50 },
+      })),
+    };
   }
   if (path === "/sleep-service/sleep/dailySleep") {
     if (failingSleep.has(q.date)) throw new GarminApiError(`GET ${path} -> HTTP 500: down`);
@@ -422,9 +524,9 @@ describe("getDashboardData", () => {
     });
     expect(out.recovery).toHaveLength(14);
     expect(out.recovery[0]).toEqual({ date: "2026-10-13", sleepH: 7.5, rhr: 50 });
-    // 1 activity page + 1 HRV range + 14 days x 2 recovery calls + zones + fitness age + settings
+    // 1 activity page + 1 HRV range + 2 recovery ranges + zones + fitness age + settings
     expect(out.sync).toEqual({
-      garminCalls: 33,
+      garminCalls: 7,
       // the laps of the one activity
       fitDownloads: 1,
       newActivities: 1,
@@ -479,9 +581,12 @@ describe("getDashboardData", () => {
     expect(callsTo("/hrv-service").map(([p]) => p)).toEqual([
       "/hrv-service/hrv/daily/2026-10-25/2026-10-26",
     ]);
-    expect(callsTo("/sleep-service").map(([, q]) => q.date)).toEqual(["2026-10-25", "2026-10-26"]);
+    expect(recoveryCalls().map(([p, q]) => [p, q.startDate, q.endDate])).toEqual([
+      [SLEEP_RANGE, "2026-10-25", "2026-10-26"],
+      [SUMMARY_RANGE, "2026-10-25", "2026-10-26"],
+    ]);
     expect(out.activities.map((a: { id: number }) => a.id)).toEqual([4, 1]);
-    expect(out.sync).toMatchObject({ garminCalls: 9, newActivities: 1, cachedActivities: 2 });
+    expect(out.sync).toMatchObject({ garminCalls: 7, newActivities: 1, cachedActivities: 2 });
   });
 
   it("fetches the activities again when the cache has rows without a sport", async () => {
@@ -543,7 +648,7 @@ describe("getDashboardData", () => {
     expect(out.sync.cachedActivities).toBe(450);
   });
 
-  it("asks for the sleep and the summary of a day together", async () => {
+  it("asks for the sleep range and the summary range together", async () => {
     const log: string[] = [];
     api.getJson.mockImplementation(async (path, q) => {
       log.push(`start ${path}`);
@@ -552,8 +657,8 @@ describe("getDashboardData", () => {
       return fakeGarmin(path, q);
     });
     await dashboard.getDashboardData(1);
-    const sleep = log.indexOf("start /sleep-service/sleep/dailySleep");
-    expect(log[sleep + 1]).toBe("start /usersummary-service/usersummary/daily");
+    const sleep = log.indexOf(`start ${SLEEP_RANGE}`);
+    expect(log[sleep + 1]).toBe(`start ${SUMMARY_RANGE}`);
   });
 
   it("keeps the old recovery row of a day that fails and reports the day", async () => {
@@ -575,8 +680,242 @@ describe("getDashboardData", () => {
     failingSleep.clear();
     api.getJson.mockClear();
     await dashboard.getDashboardData(1);
-    expect(callsTo("/sleep-service").map(([, q]) => q.date)).toContain("2026-10-19");
+    expect(recoveryCalls().map(([, q]) => q.startDate)).toEqual(["2026-10-18", "2026-10-18"]);
     expect(readCache().recoveryTo).toBe("2026-10-26");
+  });
+
+  describe("recovery from ranges", () => {
+    it("asks each range once for the window, and no single day", async () => {
+      await dashboard.getDashboardData(1);
+      expect(recoveryCalls().map(([p, q]) => [p, q.startDate, q.endDate])).toEqual([
+        [SLEEP_RANGE, "2026-10-13", "2026-10-26"],
+        [SUMMARY_RANGE, "2026-10-13", "2026-10-26"],
+      ]);
+    });
+
+    it("leaves the rows before the refresh day as they are", async () => {
+      await dashboard.getDashboardData(1);
+      answer({
+        [SLEEP_RANGE]: (q) =>
+          daysOf(q.startDate, q.endDate).map((calendarDate) => ({
+            calendarDate,
+            sleepTimeSeconds: 3600,
+          })),
+      });
+      api.getJson.mockClear();
+      const r = recoveryByDay(JSON.parse(await dashboard.getDashboardData(1)));
+      expect(r["2026-10-20"]).toMatchObject({ sleepH: 7.5 });
+      expect(r["2026-10-25"]).toMatchObject({ sleepH: 1 });
+      expect(recoveryCalls().map(([, q]) => q.startDate)).toEqual(["2026-10-25", "2026-10-25"]);
+    });
+
+    it("keeps the row of a cached day between two needed days", async () => {
+      await dashboard.getDashboardData(1);
+      const cache = readCache();
+      cache.recovery["2026-10-22"] = { date: "2026-10-22", rhr: 99 };
+      delete cache.recovery["2026-10-20"];
+      writeFileSync(cacheFile(), JSON.stringify(cache));
+      api.getJson.mockClear();
+      const r = recoveryByDay(JSON.parse(await dashboard.getDashboardData(1)));
+      expect(recoveryCalls().map(([, q]) => [q.startDate, q.endDate])[0]).toEqual([
+        "2026-10-20",
+        "2026-10-26",
+      ]);
+      expect(r["2026-10-20"]).toMatchObject({ sleepH: 7.5, rhr: 50 });
+      expect(r["2026-10-22"]).toEqual({ date: "2026-10-22", rhr: 99 });
+    });
+
+    it("gives a day left out of both answers a row of the date, and keeps what one answer has", async () => {
+      answer({
+        [SLEEP_RANGE]: (q) =>
+          daysOf(q.startDate, q.endDate)
+            .filter((d) => d !== "2026-10-20" && d !== "2026-10-21")
+            .map((calendarDate) => ({ calendarDate, sleepTimeSeconds: 27000 })),
+        [SUMMARY_RANGE]: (q) => ({
+          data: daysOf(q.startDate, q.endDate)
+            .filter((d) => d !== "2026-10-20" && d !== "2026-10-22")
+            .map((calendarDate) => ({ calendarDate, heartRate: { restingValue: 50 } })),
+        }),
+      });
+      const out = JSON.parse(await dashboard.getDashboardData(1));
+      const r = recoveryByDay(out);
+      expect(r["2026-10-20"]).toEqual({ date: "2026-10-20" });
+      expect(r["2026-10-21"]).toEqual({ date: "2026-10-21", rhr: 50 });
+      expect(r["2026-10-22"]).toEqual({ date: "2026-10-22", sleepH: 7.5 });
+      expect(out.sync.failedDays).toBe(0);
+    });
+
+    it("puts a night without a date on the day of its sleep need", async () => {
+      answer({
+        [SLEEP_RANGE]: () => [{ sleepNeed: { calendarDate: "2026-10-24", actual: 480 } }],
+      });
+      const r = recoveryByDay(JSON.parse(await dashboard.getDashboardData(1)));
+      expect(r["2026-10-24"]).toEqual({ date: "2026-10-24", needH: 8, rhr: 50 });
+    });
+
+    it("adds nothing for a row without a date, outside the window, null or named __proto__", async () => {
+      answer({
+        [SLEEP_RANGE]: () => [
+          { sleepTimeSeconds: 3600 },
+          { calendarDate: "2026-01-01", sleepTimeSeconds: 3600 },
+          null,
+          { calendarDate: "__proto__", sleepTimeSeconds: 3600 },
+        ],
+        [SUMMARY_RANGE]: () => ({
+          data: [
+            { heartRate: { restingValue: 1 } },
+            { calendarDate: "2026-01-01", heartRate: { restingValue: 1 } },
+            null,
+            { calendarDate: "__proto__", heartRate: { restingValue: 1 } },
+          ],
+        }),
+      });
+      const out = JSON.parse(await dashboard.getDashboardData(1));
+      expect(out.recovery).toHaveLength(14);
+      for (const r of out.recovery) expect(Object.keys(r)).toEqual(["date"]);
+      expect(Object.keys(readCache().recovery)).not.toContain("__proto__");
+      expect(Object.keys(readCache().recovery)).not.toContain("2026-01-01");
+      expect(({} as Record<string, unknown>).sleepH).toBeUndefined();
+      expect(({} as Record<string, unknown>).rhr).toBeUndefined();
+    });
+
+    it("keeps the old row, writes nothing from the other range, and fetches again when a range and its days fail", async () => {
+      await dashboard.getDashboardData(1);
+      answer({
+        [SUMMARY_RANGE]: (q) => ({
+          data: daysOf(q.startDate, q.endDate).map((calendarDate) => ({
+            calendarDate,
+            heartRate: { restingValue: 77 },
+          })),
+        }),
+      });
+      failingSleep.add("2026-10-25");
+      failingSleep.add("2026-10-26");
+      const out = JSON.parse(await dashboard.getDashboardData(1));
+      expect(out.sync.failedDates).toEqual(["2026-10-25", "2026-10-26"]);
+      expect(recoveryByDay(out)["2026-10-26"]).toEqual({
+        date: "2026-10-26",
+        sleepH: 7.5,
+        rhr: 50,
+      });
+      expect(readCache().recoveryTo).toBe("2026-10-25");
+      failingSleep.clear();
+      const again = JSON.parse(await dashboard.getDashboardData(1));
+      expect(again.sync.failedDates).toEqual([]);
+      expect(recoveryByDay(again)["2026-10-26"]).toMatchObject({ rhr: 77 });
+      expect(readCache().recoveryTo).toBe("2026-10-26");
+    });
+
+    it("reads the days one by one when the ranges answer HTTP 400", async () => {
+      answer({ [SLEEP_RANGE]: refuse, [SUMMARY_RANGE]: refuse });
+      failingSleep.add("2026-10-26");
+      const out = JSON.parse(await dashboard.getDashboardData(1));
+      expect(out.sync.failedDates).toEqual(["2026-10-26"]);
+      expect(out.recovery).toHaveLength(13);
+      expect(out.recovery[0]).toEqual({ date: "2026-10-13", sleepH: 7.5, rhr: 50 });
+      expect(recoveryPaths()).toHaveLength(2 + 14 * 2);
+    });
+
+    it.each([
+      ["a sleep range that is an object", { [SLEEP_RANGE]: () => ({}) }],
+      ["a summary range that is a list", { [SUMMARY_RANGE]: () => [] }],
+      ["a sleep range that is null", { [SLEEP_RANGE]: () => null }],
+      ["a summary range that is null", { [SUMMARY_RANGE]: () => null }],
+      ["a summary range with data null", { [SUMMARY_RANGE]: () => ({ data: null }) }],
+      ["a summary range with data an empty object", { [SUMMARY_RANGE]: () => ({ data: {} }) }],
+      ["a summary range that is an empty object", { [SUMMARY_RANGE]: () => ({}) }],
+    ])("reads the days one by one for %s", async (_, over) => {
+      answer(over);
+      const out = JSON.parse(await dashboard.getDashboardData(1));
+      expect(out.sync.failedDates).toEqual([]);
+      expect(out.recovery).toHaveLength(14);
+      expect(out.recovery[0]).toEqual({ date: "2026-10-13", sleepH: 7.5, rhr: 50 });
+      expect(recoveryPaths()).toContain("/sleep-service/sleep/dailySleep");
+    });
+
+    it.each([
+      ["sleep", SLEEP_RANGE],
+      ["summary", SUMMARY_RANGE],
+    ])("reads the days one by one when the %s range answers a bare string", async (_, path) => {
+      answer({ [path]: () => "oops" });
+      const out = JSON.parse(await dashboard.getDashboardData(1));
+      expect(out.sync.failedDates).toEqual([]);
+      expect(out.recovery).toHaveLength(14);
+      expect(out.recovery[0]).toEqual({ date: "2026-10-13", sleepH: 7.5, rhr: 50 });
+      expect(recoveryPaths()).toContain("/sleep-service/sleep/dailySleep");
+    });
+
+    it.each([
+      ["a network failure", new GarminApiError("Network error calling /x: down")],
+      ["a refused key", new KeyRefusedError("key refused")],
+      ["HTTP 429", new GarminApiError("GET /x -> HTTP 429: slow down", 429)],
+    ])("does not read the days one by one after %s", async (_, error) => {
+      answer({
+        [SLEEP_RANGE]: () => {
+          throw error;
+        },
+      });
+      const out = JSON.parse(await dashboard.getDashboardData(1));
+      expect(recoveryCalls()).toHaveLength(2);
+      expect(out.sync.failedDates).toEqual(daysOf("2026-10-13", "2026-10-26"));
+      expect(out.recovery).toEqual([]);
+    });
+
+    it.each([
+      ["sleep", SLEEP_RANGE, 403],
+      ["sleep", SLEEP_RANGE, 404],
+      ["sleep", SLEEP_RANGE, 500],
+      ["sleep", SLEEP_RANGE, 503],
+      ["summary", SUMMARY_RANGE, 500],
+    ])("reads the days one by one when the %s range answers HTTP %i", async (_, path, status) => {
+      answer({
+        [path]: () => {
+          throw new GarminApiError(`GET range -> HTTP ${status}: no`, status);
+        },
+      });
+      const out = JSON.parse(await dashboard.getDashboardData(1));
+      expect(out.sync.failedDates).toEqual([]);
+      expect(out.recovery).toHaveLength(14);
+      expect(out.recovery[0]).toEqual({ date: "2026-10-13", sleepH: 7.5, rhr: 50 });
+      expect(recoveryPaths()).toHaveLength(2 + 14 * 2);
+    });
+
+    it.each([
+      ["a network failure", new GarminApiError("Network error calling /x: down")],
+      ["a refused key", new KeyRefusedError("key refused")],
+      ["HTTP 429", new GarminApiError("GET /x -> HTTP 429: slow down", 429)],
+    ])("does not read the days one by one after %s on the summary range", async (_, error) => {
+      answer({
+        [SUMMARY_RANGE]: () => {
+          throw error;
+        },
+      });
+      const out = JSON.parse(await dashboard.getDashboardData(1));
+      expect(recoveryCalls()).toHaveLength(2);
+      expect(recoveryPaths()).toEqual([SLEEP_RANGE, SUMMARY_RANGE]);
+      expect(out.sync.failedDates).toEqual(daysOf("2026-10-13", "2026-10-26"));
+      expect(out.recovery).toEqual([]);
+    });
+
+    it("gives a row of the date to each day when both ranges answer lists with no row", async () => {
+      answer({ [SLEEP_RANGE]: () => [], [SUMMARY_RANGE]: () => ({ data: [] }) });
+      const out = JSON.parse(await dashboard.getDashboardData(1));
+      expect(out.recovery).toEqual(daysOf("2026-10-13", "2026-10-26").map((date) => ({ date })));
+      expect(out.sync.failedDates).toEqual([]);
+      expect(recoveryCalls()).toHaveLength(2);
+    });
+
+    it("passes on an error that is not a Garmin error from a day read after a range fails", async () => {
+      answer({
+        [SLEEP_RANGE]: () => {
+          throw new GarminApiError("GET range -> HTTP 500: down", 500);
+        },
+        "/sleep-service/sleep/dailySleep": () => {
+          throw new TypeError("bug in a day");
+        },
+      });
+      await expect(dashboard.getDashboardData(1)).rejects.toThrow("bug in a day");
+    });
   });
 
   it("passes on an error that is not a Garmin error, in the recovery days and the optional parts", async () => {

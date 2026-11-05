@@ -25,6 +25,10 @@ type Range = [string, string];
 const DEFAULT_WEEKS = 12;
 const MAX_WEEKS = 52;
 const RECOVERY_DAYS = 14;
+/** Days in one pair of range requests: Garmin's sleep range refuses more than 32. */
+const RECOVERY_CHUNK_DAYS = 31;
+const SLEEP_RANGE = "/sleep-service/sleep/dailySleepSummariesByDate";
+const SUMMARY_RANGE = "/usersummary-service/v2/dailysummaries";
 /** The newest sessions of each repeated run name whose laps are downloaded, for the workout trend. */
 export const WORKOUT_SESSIONS = 8;
 
@@ -217,23 +221,41 @@ export class GarminDashboard {
   async #syncRecovery(cache: Json, from: string, to: string, sync: Sync): Promise<void> {
     const byDate = objectAt(cache, "recovery");
     const refreshFrom = recoveryRefreshFrom(date(cache.recoveryTo), to);
-    let stale: string | undefined;
+    const needed: string[] = [];
     for (let day = from; day <= to; day = addDays(day, 1)) {
-      if (day in byDate && day < refreshFrom) {
-        continue;
-      }
+      if (!(day in byDate) || day >= refreshFrom) needed.push(day);
+    }
+    let stale: string | undefined;
+    const failed = (day: string, e: Error): void => {
+      // the old row stays; recoveryTo stops at this day, so the next call fetches it again
+      if (day in byDate) stale ??= day;
+      sync.failedDates.push(day);
+      log("WARN", `Recovery data of ${day} not fetched: ${e.message}`);
+    };
+    for (const [start, end] of recoveryChunks(needed)) {
+      const days = needed.filter((day) => day >= start && day <= end);
       try {
-        const [sleep, summary] = await Promise.all([
-          call(sync, () => this.tools.getSleep(day, true)),
-          call(sync, () => this.tools.getDailySummary(day)),
-        ]);
-        byDate[day] = recoveryRow(day, sleep, summary);
+        const { nights, summaries } = await this.#recoveryRanges(start, end, sync);
+        for (const day of days) byDate[day] = recoveryRow(day, nights.get(day), summaries.get(day));
       } catch (e) {
         if (!(e instanceof GarminApiError)) throw e;
-        // the old row stays; recoveryTo stops at this day, so the next call fetches it again
-        if (day in byDate) stale ??= day;
-        sync.failedDates.push(day);
-        log("WARN", `Recovery data of ${day} not fetched: ${e.message}`);
+        // no day requests for what they cannot mend: the network, the key, a rate limit
+        if (e.status === undefined || e.status === 429) {
+          for (const day of days) failed(day, e);
+          continue;
+        }
+        for (const day of days) {
+          try {
+            const [sleep, summary] = await Promise.all([
+              call(sync, () => this.tools.getSleep(day, true)),
+              call(sync, () => this.tools.getDailySummary(day)),
+            ]);
+            byDate[day] = recoveryRow(day, sleep, summary);
+          } catch (dayError) {
+            if (!(dayError instanceof GarminApiError)) throw dayError;
+            failed(day, dayError);
+          }
+        }
       }
     }
     cache.recoveryTo = stale ?? to;
@@ -245,6 +267,29 @@ export class GarminDashboard {
         delete byDate[day];
       }
     }
+  }
+
+  /** A day's night and summary, by date. Garmin leaves out a day without data. */
+  async #recoveryRanges(
+    from: string,
+    to: string,
+    sync: Sync,
+  ): Promise<{ nights: Map<unknown, unknown>; summaries: Map<unknown, Json> }> {
+    const query = { startDate: from, endDate: to };
+    // getJson answers parsed JSON: `call` would parse a bare string answer again
+    const ask = (path: string): Promise<unknown> => {
+      sync.calls++;
+      return this.api.getJson(path, query);
+    };
+    const [nights, summaries] = await Promise.all([ask(SLEEP_RANGE), ask(SUMMARY_RANGE)]);
+    const rows = field(summaries, "data");
+    if (!Array.isArray(nights) || !Array.isArray(rows)) {
+      throw new GarminApiError("The recovery ranges did not answer a list", 200);
+    }
+    return {
+      nights: new Map(nights.map((n: unknown) => [sleepSummary(n).date, n])),
+      summaries: new Map(rows.map((r: unknown) => [field(r, "calendarDate"), rangeSummary(r)])),
+    };
   }
 
   // ------------------------------------------------------------------ output
@@ -379,6 +424,31 @@ export function recoveryRefreshFrom(lastSync: string | undefined, today: string)
   return addDays(last, -(REFRESH_DAYS - 1));
 }
 
+/** Spans of at most RECOVERY_CHUNK_DAYS days over the given days, which are in date order. */
+export function recoveryChunks(days: string[]): Range[] {
+  const spans: Range[] = [];
+  for (const day of days) {
+    const last = spans.at(-1);
+    if (last !== undefined && day <= addDays(last[0], RECOVERY_CHUNK_DAYS - 1)) last[1] = day;
+    else spans.push([day, day]);
+  }
+  return spans;
+}
+
+/** A row of the summary range with the names of a single-day summary, for recoveryRow. */
+export function rangeSummary(row: unknown): Json {
+  const steps = field(field(row, "movement"), "steps");
+  return {
+    restingHeartRate: field(field(row, "heartRate"), "restingValue"),
+    bodyBatteryHighestValue: field(field(row, "bodyBattery"), "maxValue"),
+    bodyBatteryLowestValue: field(field(row, "bodyBattery"), "minValue"),
+    averageStressLevel: field(field(row, "stress"), "avgLevel"),
+    totalSteps: field(steps, "value"),
+    dailyStepGoal: field(steps, "goal"),
+    floorsAscended: field(field(field(row, "movement"), "floorsAscended"), "value"),
+  };
+}
+
 /** One compact row per day: sleep, sleep need, bedtime, resting HR, body battery, stress, steps. */
 export function recoveryRow(day: string, sleep: unknown, summary: unknown): Json {
   const r: Json = { date: day };
@@ -402,7 +472,8 @@ export function recoveryRow(day: string, sleep: unknown, summary: unknown): Json
   copy(summary, r, "dailyStepGoal", "stepGoal");
   const floors = field(summary, "floorsAscended");
   if (typeof floors === "number") {
-    r.floors = Math.round(floors);
+    // a single-day answer is a fraction; Garmin's own whole number, in the range, is rounded down
+    r.floors = Math.floor(floors);
   }
   return r;
 }
