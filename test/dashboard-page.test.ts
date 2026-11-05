@@ -909,6 +909,20 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
       return writer.write({ weeks: 12, settings });
     };
 
+    // the write does not check the block of a saved page: an update reads it as it is
+    const edit = async (block: string) => {
+      await history({ recoveryHistory: true });
+      writeFileSync(
+        file,
+        page().replace(
+          /\/\* garmin-settings:start \*\/.*\/\* garmin-settings:end \*\//,
+          `/* garmin-settings:start */${block}/* garmin-settings:end */`,
+        ),
+      );
+      asks.length = 0;
+      return later(() => writer.write({}));
+    };
+
     it("reaches the data of a write, a preview, a view and an update, each with its own weeks", async () => {
       await history({ recoveryHistory: true });
       await writer.preview({ weeks: 11 });
@@ -930,6 +944,25 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
       expect((readBlock(page(), "data") as Full).recovery).toHaveLength(30);
       expect(r.digest.recovery).toEqual(rows.slice(-14));
       expect(page()).toContain('"recoveryHistory":true');
+    });
+
+    describe("a data update of a saved page whose settings block was edited by hand", () => {
+      it("asks without the history for a recoveryHistory that is not true", async () => {
+        await edit('{"recoveryHistory":"yes"}');
+        expect(asks).toEqual([false]);
+      });
+
+      it("asks with the history when exclude is null", async () => {
+        await edit('{"recoveryHistory":true,"exclude":null}');
+        expect(asks).toEqual([true]);
+      });
+
+      it("asks without the history, and keeps no recovery row, when exclude has recovery", async () => {
+        const r = await edit('{"recoveryHistory":true,"exclude":["recovery"]}');
+        expect(asks).toEqual([false]);
+        expect((readBlock(page(), "data") as Full).recovery).toEqual([]);
+        expect(r.digest.recovery).toEqual([]);
+      });
     });
 
     it("asks for nothing more on a page that excludes recovery, which holds no rows", async () => {

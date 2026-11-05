@@ -666,6 +666,24 @@ describe("digest", () => {
     expect(out.readiness?.sleepScore).toBe(89);
   });
 
+  it.each([
+    [14, 0],
+    [15, 1],
+  ])("keeps the last 14 of %i recovery rows", (count, skipped) => {
+    const rows = Array.from({ length: count }, (_, i) => ({
+      date: `2026-10-${String(i + 1).padStart(2, "0")}`,
+      rhr: 50 + i,
+    }));
+    const out = digest({ ...data, recovery: rows });
+    expect(out.recovery).toHaveLength(14);
+    expect(out.recovery).toEqual(rows.slice(skipped));
+  });
+
+  it("leaves a recovery that is an object as it is", () => {
+    const recovery = { date: "2026-10-26", rhr: 50 };
+    expect(digest({ ...data, recovery }).recovery).toEqual(recovery);
+  });
+
   it("keeps an empty recovery list empty, and an absent one absent", () => {
     expect(digest({ ...data, recovery: [] }).recovery).toEqual([]);
     expect(digest({ ...data, recovery: undefined }).recovery).toBeUndefined();

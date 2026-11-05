@@ -1136,6 +1136,95 @@ describe("getDashboardData", () => {
       },
     );
 
+    it("gives 14 whole rows in an update without the setting that follows one with it, and keeps the cache", async () => {
+      rich();
+      await dashboard.getDashboardData(52, false, true);
+      const out = JSON.parse(await dashboard.getDashboardData(52));
+      expect(out.recovery).toHaveLength(14);
+      for (const r of out.recovery) {
+        expect(r).toEqual(readCache().recovery[r.date]);
+        expect(r).toHaveProperty("bbHigh", 53);
+      }
+      expect(Object.keys(readCache().recovery)).toHaveLength(365);
+    });
+
+    it("keeps whole rows for the last 14 days, fails the older days and asks for them again, after HTTP 400 and then HTTP 429", async () => {
+      let pairs = 0;
+      answer({
+        [SLEEP_RANGE]: (q) => {
+          pairs++;
+          if (pairs === 1) throw new GarminApiError("GET range -> HTTP 400: no", 400);
+          if (pairs === 2) throw new GarminApiError("GET range -> HTTP 429: slow down", 429);
+          return fakeGarmin(SLEEP_RANGE, q);
+        },
+      });
+      const out = JSON.parse(await dashboard.getDashboardData(52, false, true));
+      expect(
+        recoveryCalls().filter(([p]) => p === SLEEP_RANGE || p === SUMMARY_RANGE),
+      ).toHaveLength(4);
+      expect(out.recovery.map((r: { date: string }) => r.date)).toEqual(
+        daysOf("2026-10-13", "2026-10-26"),
+      );
+      for (const r of out.recovery) expect(r).toEqual({ date: r.date, sleepH: 7.5, rhr: 50 });
+      const failed = daysOf(FIRST, "2026-10-12");
+      expect(out.sync.failedDates).toEqual(failed);
+      expect(new Set(out.sync.failedDates).size).toBe(failed.length);
+      restore();
+      api.getJson.mockClear();
+      const again = JSON.parse(await dashboard.getDashboardData(52, false, true));
+      const days = sleepSpans().flatMap(([a, b]) => daysOf(a, b));
+      // a span may cover a day that has its row: every failed day is asked for again
+      expect(failed.filter((day) => !days.includes(day))).toEqual([]);
+      expect(again.sync.failedDates).toEqual([]);
+      expect(again.recovery).toHaveLength(365);
+    });
+
+    it("saves the older rows and fails only the days of the newest span when only the newest span fails", async () => {
+      for (const day of daysOf(NEWEST, "2026-10-26")) failingSleep.add(day);
+      const out = JSON.parse(await dashboard.getDashboardData(52, false, true));
+      expect(out.sync.failedDates).toEqual(daysOf(NEWEST, "2026-10-26"));
+      expect(out.recovery.map((r: { date: string }) => r.date)).toEqual(
+        daysOf(FIRST, "2026-10-02"),
+      );
+      expect(Object.keys(readCache().recovery)).toHaveLength(341);
+      expect(readCache().recovery["2026-10-02"]).toMatchObject({ sleepH: 7.5 });
+    });
+
+    it.each([["oops"], [null], [7]])(
+      "does not throw for a cached older row that is %j, and keeps the whole row beside it short",
+      async (broken) => {
+        mkdirSync(dataDir, { recursive: true });
+        writeFileSync(
+          cacheFile(),
+          JSON.stringify({
+            recoveryTo: "2026-10-26",
+            recovery: {
+              "2026-02-01": broken,
+              "2026-02-02": { date: "2026-02-02", sleepH: 6, rhr: 49, bbHigh: 80 },
+            },
+          }),
+        );
+        const out = JSON.parse(await dashboard.getDashboardData(52, false, true));
+        const rows = recoveryByDay(out);
+        expect(rows["2026-02-02"]).toEqual({ date: "2026-02-02", sleepH: 6, rhr: 49 });
+        // the broken row gives an empty short row, which has no date
+        expect(out.recovery).toContainEqual({});
+      },
+    );
+
+    it("keeps a row with no recovery field as a row of its date", async () => {
+      mkdirSync(dataDir, { recursive: true });
+      writeFileSync(
+        cacheFile(),
+        JSON.stringify({
+          recoveryTo: "2026-10-26",
+          recovery: { "2026-02-03": { date: "2026-02-03" } },
+        }),
+      );
+      const out = JSON.parse(await dashboard.getDashboardData(52, false, true));
+      expect(recoveryByDay(out)["2026-02-03"]).toEqual({ date: "2026-02-03" });
+    });
+
     it("keeps its own line for a day that fails after a failed range", async () => {
       answer({ [SLEEP_RANGE]: refuse, [SUMMARY_RANGE]: refuse });
       failingSleep.add("2026-10-26");
