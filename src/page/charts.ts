@@ -76,8 +76,9 @@ Chart.overrides.pie.plugins.legend.onClick = legendClick;
 
 const live: Chart[] = [];
 
-/** Chart.js defaults from the theme tokens; called before each render, so a theme change draws again. */
-export function themeCharts(): void {
+/** Chart.js defaults from the theme tokens and the language; called before each render, so a theme change draws again. */
+export function themeCharts(language: string): void {
+  Chart.defaults.locale = language;
   Chart.defaults.color = token("muted");
   Chart.defaults.borderColor = token("line");
   Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;

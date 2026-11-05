@@ -4020,3 +4020,86 @@ describe("new in this version", () => {
     }
   });
 });
+
+/** The test page with extra activities before the fixture's own. */
+const withActivities = (extra: unknown[]) =>
+  pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: [...extra, ...data.activities] } });
+/** The text of the KPI widget of the Run board with extra activities. */
+const runKpiText = async (activities: unknown[]) => {
+  const { page } = await open(browser, withActivities(activities), { hash: "#running" });
+  return page.textContent("[data-id=typeKpis]");
+};
+/** The tick labels of the y axis of the steps chart. */
+const stepsAxis = (page: Page) =>
+  page.evaluate(() => {
+    const c = Object.values(window.Chart!.instances).find((x) =>
+      x.canvas.closest("[data-widget=steps]"),
+    )!;
+    return c.scales.y.ticks.map((t) => t.label as string);
+  });
+
+describe("small numbers on the boards", () => {
+  const swim = {
+    id: 9101,
+    name: "Pool Swim",
+    type: "lap_swimming",
+    sport: "swimming",
+    start: "2026-10-24 07:00:00",
+    km: 1.5,
+    duration: "30:00",
+  };
+  const race = {
+    id: 9102,
+    name: "Town Race",
+    type: "running",
+    sport: "running",
+    start: "2026-10-20 08:00:00",
+    km: 21.1,
+    duration: "1:41:16",
+    elapsed: "1:45:00",
+    race: true,
+  };
+  const estimatedText = "Some loads are estimates: the activity has no Garmin load.";
+
+  it("shows the swimming pace per 100 m", async () => {
+    const { page, errors } = await open(browser, withActivities([swim]), { hash: "#swimming" });
+    expect((await kpiTexts(page, "typeKpis"))["Average pace"]?.[0]).toBe("2:00/100 m");
+    expect(errors).toEqual([]);
+  });
+
+  it("shows the elapsed time of a race, and the moving time without it", async () => {
+    const { page, errors } = await open(browser, withActivities([race]), { hash: "#running" });
+    const times = await page.$$eval("[data-id=races] tbody tr", (r) =>
+      r.map((x) => [x.children[1].textContent, x.children[3].textContent]),
+    );
+    expect(times).toContainEqual(["Town Race", "1:45:00"]);
+    expect(times).toContainEqual(["City 10K", "49:00"]);
+    expect(errors).toEqual([]);
+  });
+
+  it("says that a load is an estimate only when one is", async () => {
+    const noLoadRun = { ...row(9103, "Easy Run", "2026-10-21 07:00:00") };
+    expect(await runKpiText([{ ...noLoadRun, avgHR: 150 }])).toContain(estimatedText);
+    expect(await runKpiText([])).not.toContain(estimatedText);
+    // no load and no heart rate: there is nothing to estimate from
+    expect(await runKpiText([noLoadRun])).not.toContain(estimatedText);
+  });
+
+  it("writes the numbers of a chart axis in the language of the page", async () => {
+    const { page, errors } = await open(
+      browser,
+      pageFile({ settings: { languages: ["en", "it"] } }),
+      { hash: "#walking", locale: "en-US" },
+    );
+    // an English browser, an Italian page
+    await page.click(".account summary");
+    await page.selectOption("#lang", "it");
+    const italian = await stepsAxis(page);
+    expect(italian.some((l) => /^\d+\.\d{3}$/.test(l))).toBe(true);
+    expect(italian.some((l) => l.includes(","))).toBe(false);
+    // the change of language draws the axis again
+    await page.selectOption("#lang", "en");
+    expect((await stepsAxis(page)).some((l) => /^\d+,\d{3}$/.test(l))).toBe(true);
+    expect(errors).toEqual([]);
+  });
+});
