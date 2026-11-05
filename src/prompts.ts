@@ -302,7 +302,7 @@ function findActivity(activity: string, one: string, many: string, type: string)
 
 function renderDashboard(template: string, w: number): string {
   const today = localToday();
-  const start = addDays(today, -7 * w);
+  const start = mondayOf(addDays(today, -7 * w));
   return render(template, {
     dashboardVersion: String(DASHBOARD_VERSION),
     weeks: String(w),

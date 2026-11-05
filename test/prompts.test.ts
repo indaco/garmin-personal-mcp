@@ -335,11 +335,33 @@ describe("prompts", () => {
       template("training-dashboard-freeform")
         .replaceAll("{{weeks}}", "4")
         .replaceAll("{{today}}", "2026-10-28")
-        .replaceAll("{{startDate}}", "2026-09-30")
-        .replaceAll("{{prevStartDate}}", "2026-08-26")
-        .replaceAll("{{prevEndDate}}", "2026-09-29"),
+        .replaceAll("{{startDate}}", "2026-09-28")
+        .replaceAll("{{prevStartDate}}", "2026-08-24")
+        .replaceAll("{{prevEndDate}}", "2026-09-27"),
     );
   });
+
+  it.each([
+    ["2026-10-26", "4", "2026-09-28", "2026-08-24", "2026-09-27"],
+    ["2026-11-01", "4", "2026-09-28", "2026-08-24", "2026-09-27"],
+    ["2026-11-01", "1", "2026-10-19", "2026-10-05", "2026-10-18"],
+    ["2027-01-03", "1", "2026-12-21", "2026-12-07", "2026-12-20"],
+  ])(
+    "starts the time window on a Monday when today is %s",
+    async (today, weeks, start, prevStart, prevEnd) => {
+      const [y, m, d] = today.split("-").map(Number);
+      vi.setSystemTime(new Date(y, m - 1, d, 12));
+      const text = await render("training-dashboard", { weeks, layout: "freeform" });
+      expect(text).toBe(
+        template("training-dashboard-freeform")
+          .replaceAll("{{weeks}}", weeks)
+          .replaceAll("{{today}}", today)
+          .replaceAll("{{startDate}}", start)
+          .replaceAll("{{prevStartDate}}", prevStart)
+          .replaceAll("{{prevEndDate}}", prevEnd),
+      );
+    },
+  );
 
   it.each([
     ["", 12],
