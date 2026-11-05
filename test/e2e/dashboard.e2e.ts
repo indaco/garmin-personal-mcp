@@ -1312,6 +1312,208 @@ describe("stress widget", () => {
   });
 });
 
+/** Recovery rows of the Recovery trend tests; the last 5 weeks start 09-28, 10-05, 10-12, 10-19, 10-26. */
+const TREND_ROWS = [
+  // the week of 10-05 has sleep 0 only: a gap in Sleep, not a 0
+  { date: "2026-10-05", sleepH: 0, sleepScore: 75, rhr: 49 },
+  { date: "2026-10-12", sleepH: 7, sleepScore: 80, rhr: 50 },
+  { date: "2026-10-14", sleepH: 8, sleepScore: 90, rhr: 52 },
+  // sleep and score, no resting HR; a 0 sleep does not pull the mean down
+  { date: "2026-10-19", sleepH: 6.4, sleepScore: 70 },
+  { date: "2026-10-20", sleepH: 0 },
+  { date: "2026-10-26", sleepH: 7, sleepScore: 80, rhr: 48 },
+  { date: "2026-10-28", sleepH: 7.5, sleepScore: 82, rhr: 50 },
+];
+const openTrend = async (
+  recovery: object[] = TREND_ROWS,
+  settings: object = { recoveryHistory: true },
+  extra: object = {},
+  options: object = {},
+) => {
+  const { page, errors } = await open(
+    browser,
+    pageFile({ data: { ...data, v: DASHBOARD_VERSION, recovery, ...extra }, settings }),
+    { hash: "#recovery", ...options },
+  );
+  const line = async (label: string) =>
+    (await chartDataset(page, "recoveryTrend", label)) as {
+      data: (number | null)[];
+      spanGaps: unknown;
+    };
+  return { page, errors, line };
+};
+
+describe("recovery trend widget", () => {
+  it("draws the weekly means of sleep, sleep score and resting HR on the Recovery board", async () => {
+    const { page, errors, line } = await openTrend();
+    expect(await tiles(page)).toContain("recoveryTrend");
+    const sleep = await line("Sleep");
+    expect(sleep.data.slice(-5)).toEqual([null, null, 7.5, 6.4, 7.3]);
+    expect((await line("Sleep score")).data.slice(-5)).toEqual([null, 75, 85, 70, 81]);
+    expect((await line("Resting HR")).data.slice(-5)).toEqual([null, 49, 51, null, 49]);
+    // one point for each week of the window
+    expect(sleep.data).toHaveLength(13);
+    expect(errors).toEqual([]);
+  });
+
+  it("leaves a week without a row as a gap in every line, and spans the gaps", async () => {
+    const { errors, line } = await openTrend();
+    for (const label of ["Sleep", "Sleep score", "Resting HR"]) {
+      const d = await line(label);
+      expect(d.data[0], label).toBeNull();
+      expect(d.spanGaps, label).toBe(true);
+    }
+    expect(errors).toEqual([]);
+  });
+
+  it("puts sleep on the left axis, and sleep score and resting HR on the right axis", async () => {
+    const { page } = await openTrend();
+    const axes = await page.evaluate(() => {
+      const c = Object.values(window.Chart!.instances).find((x) =>
+        x.canvas.closest("[data-widget=recoveryTrend]"),
+      )!;
+      return c.data.datasets.map((d) => [d.label, (d as { yAxisID?: string }).yAxisID]);
+    });
+    expect(axes).toEqual([
+      ["Sleep", "y"],
+      ["Sleep score", "y1"],
+      ["Resting HR", "y1"],
+    ]);
+  });
+
+  it("tells the lines apart, and colours a measure as the widget of that measure does", async () => {
+    const { page, errors } = await openTrend();
+    const colour = (widget: string, label: string) =>
+      page.evaluate(
+        ([w, l]) =>
+          String(
+            Object.values(window.Chart!.instances)
+              .filter((c) => c.canvas.closest(`[data-widget=${w}]`))
+              .flatMap((c) => c.data.datasets)
+              .find((x) => x.label === l)!.borderColor,
+          ),
+        [widget, label],
+      );
+    const trend = [
+      await colour("recoveryTrend", "Sleep"),
+      await colour("recoveryTrend", "Sleep score"),
+      await colour("recoveryTrend", "Resting HR"),
+    ];
+    expect(new Set(trend).size).toBe(3);
+    expect(trend[2]).toBe(await colour("restingHr", "Resting HR"));
+    expect(trend[1]).toBe(await colour("sleep", "Score"));
+    expect(errors).toEqual([]);
+  });
+
+  it("follows the week window", async () => {
+    const { page, errors, line } = await openTrend();
+    await page.click(".window-bar .chip >> text=Last 4");
+    expect((await line("Sleep")).data).toEqual([null, 7.5, 6.4, 7.3]);
+    expect((await line("Resting HR")).data).toEqual([49, 51, null, 49]);
+    expect(errors).toEqual([]);
+  });
+
+  it("says that it follows the week window", async () => {
+    const { page } = await openTrend();
+    expect(await page.textContent("[data-id=recoveryTrend]")).toContain(
+      "Weekly averages: this widget follows the week window.",
+    );
+  });
+
+  it("is not on the page without the setting, also when the rows are there", async () => {
+    for (const settings of [{}, { recoveryHistory: false }]) {
+      const { page, errors } = await openTrend(TREND_ROWS, settings);
+      expect(await tiles(page)).not.toContain("recoveryTrend");
+      expect(errors).toEqual([]);
+    }
+  });
+
+  it("is not on a page that excludes recovery", async () => {
+    const { page, errors } = await openTrend(TREND_ROWS, {
+      recoveryHistory: true,
+      exclude: ["recovery"],
+    });
+    expect(await tiles(page)).not.toContain("recoveryTrend");
+    expect(errors).toEqual([]);
+  });
+
+  it("shows n/a and no chart when no row has a value", async () => {
+    const { page, errors } = await openTrend([{ date: "2026-10-19" }, { date: "2026-10-20" }]);
+    expect(await page.textContent("[data-id=recoveryTrend]")).toContain("n/a");
+    expect(await page.$("[data-id=recoveryTrend] canvas")).toBeNull();
+    expect(errors).toEqual([]);
+  });
+
+  it("shows n/a, no chart and no error for an empty recovery list", async () => {
+    const { page, errors } = await openTrend([]);
+    expect(await page.textContent("[data-id=recoveryTrend]")).toContain("n/a");
+    expect(await page.$("[data-id=recoveryTrend] canvas")).toBeNull();
+    expect(errors).toEqual([]);
+  });
+
+  it("shows n/a and no chart for rows that have only a date", async () => {
+    const { page, errors } = await openTrend([{ date: "2026-10-05" }, { date: "2026-10-26" }]);
+    expect(await page.textContent("[data-id=recoveryTrend]")).toContain("n/a");
+    expect(await page.$("[data-id=recoveryTrend] canvas")).toBeNull();
+    expect(errors).toEqual([]);
+  });
+
+  it("gives the last week a point from the days so far when the week is partial", async () => {
+    const { errors, line } = await openTrend(
+      [
+        { date: "2026-10-26", sleepH: 7, sleepScore: 80, rhr: 48 },
+        { date: "2026-10-28", sleepH: 8, sleepScore: 90, rhr: 50 },
+      ],
+      { recoveryHistory: true },
+      { end: "2026-10-28" },
+    );
+    expect((await line("Sleep")).data.at(-1)).toBe(7.5);
+    expect((await line("Sleep score")).data.at(-1)).toBe(85);
+    expect((await line("Resting HR")).data.at(-1)).toBe(49);
+    expect(errors).toEqual([]);
+  });
+
+  it("gives a point to the first week of the period, and null to each later week, for rows of that week only", async () => {
+    const { errors, line } = await openTrend([
+      { date: "2026-08-03", sleepH: 6, sleepScore: 70, rhr: 55 },
+      { date: "2026-08-09", sleepH: 7, sleepScore: 80, rhr: 53 },
+    ]);
+    for (const [label, first] of [
+      ["Sleep", 6.5],
+      ["Sleep score", 75],
+      ["Resting HR", 54],
+    ] as const) {
+      const d = (await line(label)).data;
+      expect(d, label).toHaveLength(13);
+      expect(d[0], label).toBe(first);
+      expect(d.slice(1), label).toEqual(Array(12).fill(null));
+    }
+    expect(errors).toEqual([]);
+  });
+
+  it("draws one row in a window of one week without an error", async () => {
+    const { page, errors, line } = await openTrend(
+      [{ date: "2026-10-26", sleepH: 7, sleepScore: 80, rhr: 48 }],
+      { recoveryHistory: true },
+      { start: "2026-10-26", end: "2026-10-26" },
+    );
+    expect((await line("Sleep")).data).toEqual([7]);
+    expect(await tiles(page)).toContain("recoveryTrend");
+    expect(errors).toEqual([]);
+  });
+
+  it("has an Italian title", async () => {
+    const { page, errors } = await openTrend(
+      TREND_ROWS,
+      { recoveryHistory: true, languages: ["en", "it"] },
+      {},
+      { locale: "it-IT" },
+    );
+    expect(await page.textContent("[data-id=recoveryTrend] h2")).toBe("Andamento recupero");
+    expect(errors).toEqual([]);
+  });
+});
+
 /** An indoor ride on a day; `extra` adds fields. */
 const bikeRide = (start: string, extra: object = {}) => ({
   id: Number(start.replace(/\D/g, "")),

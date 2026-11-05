@@ -1,7 +1,7 @@
 import { append } from "../dom";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
-import { alpha, kpi, kpiRow, note } from "./ui";
+import { alpha, kpi, kpiRow, note, weekLabel } from "./ui";
 
 /** The recovery widgets show the last 14 days of the data: today's state, so the week window does not change them. */
 
@@ -130,6 +130,38 @@ register({
       options: { scales: { y: { min: 0, max: 100 } } },
     });
     rec14(el, ctx);
+  },
+});
+
+register({
+  id: "recoveryTrend",
+  render(el, ctx) {
+    const { t, calc } = ctx;
+    const line = (field: string, label: string, color: string, yAxisID: string) => ({
+      label,
+      data: calc.weeklyMeans(ctx.data.recovery, ctx.weeks, field),
+      borderColor: ctx.color(color),
+      pointRadius: 3,
+      spanGaps: true,
+      yAxisID,
+    });
+    const datasets = [
+      line("sleepH", t("w.sleep"), "accent", "y"),
+      line("sleepScore", t("ready.sleep"), "text", "y1"),
+      line("rhr", t("w.restingHr"), "bad", "y1"),
+    ];
+    if (datasets.every((d) => d.data.every((v) => v === null))) return ctx.empty(el, ctx.fmt.na);
+    ctx.chart(el, {
+      type: "line",
+      data: { labels: ctx.weeks.map((w) => weekLabel(ctx, w)), datasets },
+      options: {
+        scales: {
+          y: { title: { display: true, text: "h" } },
+          y1: { position: "right", grid: { drawOnChartArea: false } },
+        },
+      },
+    });
+    append(el, note(t("rt.note")));
   },
 });
 

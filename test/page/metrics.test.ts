@@ -21,6 +21,7 @@ import {
   sd,
   weekly,
   weeklyKnown,
+  weeklyMeans,
   zonesOf,
 } from "../../src/page/metrics";
 
@@ -30,6 +31,9 @@ const act = (start: string, extra: Record<string, unknown> = {}) => ({
   duration: "30:00",
   ...extra,
 });
+
+/** A recovery row with a date and the sleep hours; both can be bad on purpose. */
+const sleep = (date: unknown, sleepH: unknown) => ({ date, sleepH });
 
 /** The distance of a session, or undefined without one. */
 const km = (a: { km?: unknown }) => a.km as number | undefined;
@@ -199,6 +203,55 @@ describe("statistics", () => {
     // an activity without a start and one after the last week count nowhere
     const more = [...acts, { id: 9, type: "running", km: 9 }, act("2026-10-19", { km: 4 })];
     expect(weekly(more, ["2026-10-05", "2026-10-12"], (a) => a.km as number)).toEqual([8, 7]);
+  });
+
+  describe("weeklyMeans", () => {
+    const weeks = ["2026-10-19", "2026-10-26"];
+
+    it("puts a Monday and a Sunday in the same week, and the days around them in the next and the last", () => {
+      const rows = [
+        sleep("2026-10-18", 1),
+        sleep("2026-10-19", 7),
+        sleep("2026-10-25", 8),
+        sleep("2026-10-26", 4),
+      ];
+      expect(weeklyMeans(rows, weeks, "sleepH")).toEqual([7.5, 4]);
+    });
+
+    it("rounds the mean to one decimal", () => {
+      expect(
+        weeklyMeans([sleep("2026-10-19", 7), sleep("2026-10-20", 7.5)], weeks, "sleepH")[0],
+      ).toBe(7.3);
+      expect(weeklyMeans([sleep("2026-10-19", 8)], weeks, "sleepH")[0]).toBe(8);
+    });
+
+    it("counts only the values above 0", () => {
+      const rows = [
+        sleep("2026-10-19", 8),
+        sleep("2026-10-20", 0),
+        sleep("2026-10-21", null),
+        sleep("2026-10-22", "7"),
+        sleep("2026-10-23", Number.NaN),
+        sleep("2026-10-24", -1),
+        { date: "2026-10-25" },
+      ];
+      expect(weeklyMeans(rows, weeks, "sleepH")).toEqual([8, null]);
+    });
+
+    it("gives null for a week with only values that do not count", () => {
+      const rows = [sleep("2026-10-19", 0), sleep("2026-10-20", -2), sleep("2026-10-21", null)];
+      expect(weeklyMeans(rows, weeks, "sleepH")).toEqual([null, null]);
+    });
+
+    it("handles no weeks and no rows", () => {
+      expect(weeklyMeans([sleep("2026-10-19", 8)], [], "sleepH")).toEqual([]);
+      expect(weeklyMeans([], weeks, "sleepH")).toEqual([null, null]);
+    });
+
+    it("leaves out a row without a date or with a date that is not text", () => {
+      const rows = [{ sleepH: 9 }, sleep(20261020, 9), sleep(null, 9), sleep("2026-10-20", 6)];
+      expect(weeklyMeans(rows, weeks, "sleepH")).toEqual([6, null]);
+    });
   });
 
   describe("weeklyKnown", () => {

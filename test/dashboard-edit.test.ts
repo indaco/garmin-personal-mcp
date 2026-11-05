@@ -116,6 +116,7 @@ describe("editDashboard", () => {
         "bedtime",
         "bodyBattery",
         "stress",
+        "recoveryTrend",
       ]);
     });
 

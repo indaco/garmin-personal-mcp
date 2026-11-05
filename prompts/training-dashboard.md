@@ -13,8 +13,8 @@ Answer in my language.
      `settings` has `exclude`, name each item that it excludes. Say that the defaults add them to
      the page again, also on each automatic update: this matters for a page that I share.
      Options "Keep these settings" (default) and "Use the defaults: all sports, all data, English and
-     the language of my Garmin profile, all themes, opens in midnight, no workout comparison". Say
-     that I can type my own choice, for example "all sports, keep the rest".
+     the language of my Garmin profile, all themes, opens in midnight, no workout comparison, no
+     Recovery trend". Say that I can type my own choice, for example "all sports, keep the rest".
    - **Title**: options "Keep the title" (default: the `title` of `settings`, else "{{title}}") and
      "Type my own".
    - **Headline** (the line under the title): options "Keep the headline" (default: the `headline`
@@ -24,12 +24,17 @@ Answer in my language.
      compare them across weeks". Say that a yes adds the Workout trend widget for those runs, and
      that the page then downloads the laps of the last 8 runs of each workout, once: this build
      takes longer.
+   - **Recovery trend**: only when `settings` has no `recoveryHistory` and its `exclude` has no
+     `recovery`. Options "No" (default) and "Yes, add the Recovery trend". Say that a yes adds a
+     widget with the weekly average of sleep, sleep score and resting HR for the whole period, and
+     that the page file then holds these values for each day: this matters for a page that I share.
    When I choose "Type my own" and give no text, ask for the text in chat.
 3. Call `writeDashboard` with `weeks` = {{weeks}} and `layout` = "{{layout}}". If I chose the
    defaults, also give `settings` = only the `title` and `headline` of `settings`, the ones that it
    has. If I typed my own choice, give `settings` = `settings` changed as I said. If I said yes to
    the workout comparison, give `settings` with `workouts` = true: added to the settings of this
-   step, or to `settings` when this step gives none. The server gets the data, writes the page from
+   step, or to `settings` when this step gives none. Do the same with `recoveryHistory` = true if I
+   said yes to the Recovery trend. The server gets the data, writes the page from
    its template, and returns the path of the page and a digest of the data. An existing page stays
    as a `.bak` file.
 4. Write at most 5 coach notes from the digest. Each note names a specific number of the digest, for

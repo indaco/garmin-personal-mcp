@@ -243,6 +243,10 @@ widget. The server downloads the laps of the last 8 runs of each workout once an
 the comparison grows with each update. See
 [Page settings](guide/dashboard.md#page-settings).
 
+The assistant also asks whether to add the Recovery trend. The default is no. A yes adds a widget
+with the weekly average of sleep, sleep score and resting HR for the whole period, and the file then
+holds these values for each day. See [Page settings](guide/dashboard.md#page-settings).
+
 [The dashboard guide](guide/dashboard.md) tells about the title and the headline, the boards, the
 themes and languages, the units and the activity-name filter, and how to change the layout.
 [The widget catalogue](guide/widgets.md) lists every widget.

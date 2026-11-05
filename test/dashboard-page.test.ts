@@ -1514,6 +1514,15 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
   });
 });
 
+/** A page whose template has a settings block, written once. */
+const settingsTemplate = async () => {
+  templateText = template(
+    ID_B,
+    "window.S = /* garmin-settings:start */null/* garmin-settings:end */;\n",
+  );
+  rmSync(file);
+  await writer.write({});
+};
 const setLayout = (value: unknown) => writeFileSync(file, writeBlock(page(), "layout", value));
 const widgetsOf = (name: string) =>
   (
@@ -1646,6 +1655,34 @@ describe("writeDashboard new preset widgets", () => {
     // the settings of this write decide what the page shows, not those of the page before
     const r = await writer.write({ settings: { workouts: true } });
     expect(r).toMatchObject({ addedWidgets: { running: ["workoutTrend"] } });
+  });
+
+  /** The Recovery board without recoveryTrend, and not met: the only new widget is the opt-in one. */
+  const withoutRecoveryTrend = () => {
+    const board = preset("recovery").filter((i) => i.widget !== "recoveryTrend");
+    return edited({ boards: { recovery: board }, seen: { recovery: board.map((i) => i.widget) } });
+  };
+  it("reports the Recovery trend when its setting is newly on", async () => {
+    await settingsTemplate();
+    setLayout(withoutRecoveryTrend());
+    const r = await writer.write({ settings: { recoveryHistory: true } });
+    expect(r).toMatchObject({ addedWidgets: { recovery: ["recoveryTrend"] } });
+  });
+
+  it("reports the Recovery trend on a page of one sport, because the Recovery board does not depend on the sports", async () => {
+    await settingsTemplate();
+    setLayout(withoutRecoveryTrend());
+    const r = await writer.write({ settings: { sports: ["cycling"], recoveryHistory: true } });
+    expect(r.addedWidgets?.recovery).toEqual(["recoveryTrend"]);
+  });
+
+  it("does not report the Recovery trend without its setting, and reports it on a later update with it", async () => {
+    await settingsTemplate();
+    setLayout(withoutRecoveryTrend());
+    expect(await writer.write({})).not.toHaveProperty("addedWidgets");
+    setLayout(withoutRecoveryTrend());
+    const r = await writer.write({ settings: { recoveryHistory: true } });
+    expect(r).toMatchObject({ addedWidgets: { recovery: ["recoveryTrend"] } });
   });
 
   it("reports a sport board only when the page has a tab for it", async () => {

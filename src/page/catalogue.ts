@@ -18,7 +18,7 @@ export interface CatalogueEntry {
   /** The data the widget shows: a page without it has no such widget. */
   needs?: DataItem;
   /** The page setting that turns the widget on: a page without it has no such widget. */
-  optIn?: "workouts";
+  optIn?: "workouts" | "recoveryHistory";
 }
 
 /** Whether a page with these settings has the widget. */
@@ -100,6 +100,13 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
   },
   { id: "restingHr", title: "w.restingHr", needs: "recovery", span: 1 },
   { id: "stress", title: "w.stress", needs: "recovery", span: 3 },
+  {
+    id: "recoveryTrend",
+    title: "w.recoveryTrend",
+    needs: "recovery",
+    span: 3,
+    optIn: "recoveryHistory",
+  },
   {
     id: "sleep",
     title: "w.sleep",

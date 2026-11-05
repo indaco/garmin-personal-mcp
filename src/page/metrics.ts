@@ -176,6 +176,8 @@ export function weekly(
   return out;
 }
 
+const finite = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+
 /** As `weekly`, for a value that a session can lack: a week of sessions without it is null (a gap), and a week without sessions is 0. */
 export function weeklyKnown(
   acts: Activity[],
@@ -187,6 +189,23 @@ export function weeklyKnown(
   return weekly(acts, weeks, (a) => value(a) ?? 0).map((sum, i) =>
     sessions[i] > 0 && lacking[i] === sessions[i] ? null : sum,
   );
+}
+
+/** The mean of a recovery field for each week; only days with a value above 0 count, so a week without one is a gap. */
+export function weeklyMeans(
+  rows: Record<string, unknown>[],
+  weeks: string[],
+  field: string,
+): (number | null)[] {
+  return weeks.map((week) => {
+    const end = addDays(week, 6);
+    const values = rows
+      .filter((r) => typeof r.date === "string" && r.date >= week && r.date <= end)
+      .map((r) => finite(r[field]))
+      .filter((v): v is number => v !== undefined && v > 0);
+    const m = mean(values);
+    return m === null ? null : Math.round(m * 10) / 10;
+  });
 }
 
 /** Estimated 1RM (Epley), only for sets of 1 to 12 reps. */
@@ -235,8 +254,6 @@ export function readiness(x: ReadinessInputs): "easy" | "push" | "normal" | null
   }
   return "normal";
 }
-
-const finite = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 
 /**
  * The readiness inputs as the page reads them, with the dates of their rows, and the verdict: the last

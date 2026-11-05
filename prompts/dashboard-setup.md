@@ -35,10 +35,15 @@ such a tool, ask the questions in chat as numbered lists, with the default first
    of runs. Options "No" (default) and "Yes, compare them across weeks". Say that a yes adds the
    Workout trend widget for those runs (when I keep the running board), and that the page then
    downloads the laps of the last 8 runs of each workout, once: this build takes longer.
+   In the same call, ask about the **Recovery trend**, only when I kept the recovery data. Options
+   "No" (default) and "Yes, add the Recovery trend". Say that a yes adds a widget with the weekly
+   average of sleep, sleep score and resting HR for the whole period, and that the page file then
+   holds these values for each day: this matters for a page that I share.
 4. Call `writeDashboard` with `weeks` = {{weeks}}, the `path` and `settings`. The settings are
    `title`, `headline`, `sports` (the boards to keep), `exclude` (from `recovery`, `fitnessAge`,
    `zones`, `names`, `notes`), `languages` (the codes to keep: {{languages}}), `language` (the one
-   it opens in), `themes`, `theme`, `workouts` (true when I said yes to the workout comparison). Do
+   it opens in), `themes`, `theme`, `workouts` (true when I said yes to the workout comparison),
+   `recoveryHistory` (true when I said yes to the Recovery trend). Do
    not give a setting that keeps its default. If there is no page at the path, also give `layout` =
    "preset".
    If the reply has `addedWidgets` (board -> widget ids), tell me which widgets it added to which

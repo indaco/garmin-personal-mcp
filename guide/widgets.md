@@ -19,6 +19,7 @@ it by hand.
 | HRV | `hrv` | Nightly HRV of the last 14 days with its 7-day average and the balanced range. | - | 1 |
 | Resting HR | `restingHr` | Resting HR of the last 14 days. | - | 1 |
 | Stress | `stress` | Average stress of the last 14 days, from Garmin (0 to 100; lower is calmer). | - | 3 |
+| Recovery trend | `recoveryTrend` | Weekly average of sleep, sleep score and resting HR over the week window. Needs the setting recoveryHistory. | - | 3 |
 | Sleep | `sleep` | Sleep stages and sleep score of the last 14 nights. | - | 1 |
 | Sleep need | `sleepNeed` | Sleep against the sleep need of the last 14 nights, with the average gap. | - | 1 |
 | Bedtime | `bedtime` | Bedtimes of the last 14 nights and their spread. | - | 1 |
