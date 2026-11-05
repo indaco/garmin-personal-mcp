@@ -68,8 +68,9 @@ Use only numbers of the digest. **Never invent, interpolate or estimate missing 
 is missing, write "n/a". If `sync.failedDays` is more than 0, name the dates in `sync.failedDates`.
 If `estimatedLoads` is more than 0, say that a part of the load is an estimate from heart rate. Do
 not compare a week with `partial: true` with whole weeks.
-If `sync.failedSections` is not empty, name those sections (HR zones, fitness age, HRV) and say that
-they show as "n/a". If a call fails, say which one and why in one line.
+If `sync.failedSections` is not empty, name those sections (HR zones, fitness age, HRV, units). HR
+zones and units then use the last saved values, if there are any; say so. Fitness age and HRV show
+as "n/a". If a call fails, say which one and why in one line.
 
 Do not write or change the page yourself, and do not call `getDashboardData`: the digest has what the
 notes need.

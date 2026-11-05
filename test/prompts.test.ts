@@ -268,6 +268,16 @@ describe("prompts", () => {
     }
   });
 
+  it("tells Claude that the last saved zones and units are used when a call fails", async () => {
+    for (const text of [
+      await render("training-dashboard"),
+      await render("training-dashboard-update"),
+      await render("training-dashboard", { layout: "freeform" }),
+    ]) {
+      expect(text).toContain("last saved");
+    }
+  });
+
   it("offers the automatic refresh when a page is made, and only mentions it on an update", async () => {
     for (const text of [
       await render("training-dashboard"),

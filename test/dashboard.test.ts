@@ -253,6 +253,12 @@ let units: unknown;
 let locale: unknown;
 
 const cacheFile = () => join(dataDir, "dashboard-cache.json");
+const get = async () => JSON.parse(await dashboard.getDashboardData(1));
+const profile = async () => {
+  units = "statute_us";
+  locale = "pt_BR";
+  return get();
+};
 const readCache = () => JSON.parse(readFileSync(cacheFile(), "utf8"));
 const activity = (
   id: number,
@@ -1397,6 +1403,93 @@ describe("getDashboardData", () => {
     expect(out).not.toHaveProperty("units");
     expect(out.sync.failedSections).toEqual(["units"]);
     expect(Array.isArray(out.activities)).toBe(true);
+  });
+
+  describe("a failed call keeps the last good profile values", () => {
+    it("keeps the zones of the last good update when the zones call fails", async () => {
+      const first = await get();
+      failing.add("/biometric-service/heartRateZones");
+      const out = await get();
+      expect(out.zones).toEqual(first.zones);
+      expect(out.zones).toEqual([{ zone: 1 }]);
+      expect(out.sync.failedSections).toContain("zones");
+    });
+
+    it("keeps the units and the language when the settings call fails", async () => {
+      await profile();
+      failing.add("/userprofile-service/");
+      const out = await get();
+      expect(out.units).toBe("statute_us");
+      expect(out.locale).toBe("pt-BR");
+      expect(out.sync.failedSections).toEqual(["units"]);
+    });
+
+    it("gives no fitness age when its call fails after a good one", async () => {
+      expect((await get()).fitnessAge).toEqual({ fitnessAge: 40 });
+      failing.add("/fitnessage-service/");
+      const out = await get();
+      expect(out.fitnessAge).toBeNull();
+      expect(out.sync.failedSections).toContain("fitnessAge");
+    });
+
+    it("saves the values in the cache and reads them in a new dashboard", async () => {
+      await profile();
+      expect(readCache()).toMatchObject({
+        units: "statute_us",
+        locale: "pt-BR",
+        zones: [{ zone: 1 }],
+      });
+      failing.add("/userprofile-service/");
+      failing.add("/biometric-service/heartRateZones");
+      const client = api as unknown as GarminApiClient;
+      dashboard = new GarminDashboard(new GarminTools(client, dataDir), client, dataDir);
+      const out = await get();
+      expect(out).toMatchObject({ units: "statute_us", locale: "pt-BR", zones: [{ zone: 1 }] });
+    });
+
+    it("keeps only the units and the language of the settings answer", async () => {
+      api.getJson.mockImplementation(async (path, q) =>
+        path === "/userprofile-service/userprofile/settings"
+          ? { measurementSystem: "metric", preferredLocale: "en", birthDate: "1900-02-03" }
+          : fakeGarmin(path, q),
+      );
+      await get();
+      expect(JSON.stringify(readCache())).not.toContain("1900-02-03");
+    });
+
+    it("does not bring back an old unit after a settings answer without a valid one", async () => {
+      await profile();
+      units = "nautical";
+      expect(await get()).not.toHaveProperty("units");
+      failing.add("/userprofile-service/");
+      const out = await get();
+      expect(out).not.toHaveProperty("units");
+      expect(out.locale).toBe("pt-BR");
+    });
+
+    it("leaves out damaged cached values when the settings call fails", async () => {
+      writeFileSync(cacheFile(), JSON.stringify({ units: 5, locale: "bad locale" }));
+      failing.add("/userprofile-service/");
+      const out = await get();
+      expect(out).not.toHaveProperty("units");
+      expect(out).not.toHaveProperty("locale");
+    });
+
+    it("leaves out a cached locale that is not a string", async () => {
+      writeFileSync(cacheFile(), JSON.stringify({ locale: 5 }));
+      failing.add("/userprofile-service/");
+      expect(await get()).not.toHaveProperty("locale");
+    });
+
+    it("keeps the cached zones when Garmin answers null, and adds no failed section", async () => {
+      await get();
+      api.getJson.mockImplementation(async (path, q) =>
+        path === "/biometric-service/heartRateZones/v2" ? null : fakeGarmin(path, q),
+      );
+      const out = await get();
+      expect(out.zones).toEqual([{ zone: 1 }]);
+      expect(out.sync.failedSections).not.toContain("zones");
+    });
   });
 
   it("builds the dashboard without HRV when a range fails, and fetches it again next time", async () => {

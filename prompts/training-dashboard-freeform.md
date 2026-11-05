@@ -56,8 +56,9 @@ of `getDashboardData` with `weeks` = {{weeks}}, which has:
   `date`, `sleepH`, `sleepScore` and `rhr`, so a panel of the last 14 days uses the last 14 rows.
 - `sync`: what the server fetched. The server keeps a local cache and asks Garmin only for the new
   days. If `failedDays` is more than 0, name the dates in `failedDates` in chat. If
-  `failedSections` is not empty, name those sections in chat: `zones` and `fitnessAge` are then null
-  and `hrv` can have no rows. Their widgets show "n/a".
+  `failedSections` is not empty, name those sections in chat. `zones` and `units` then hold the
+  last saved values, if there are any, else `zones` is null and `units` is absent. `fitnessAge` is
+  then null and `hrv` can have no rows. A widget without its value shows "n/a".
 - `notes`: the coach notes, a list of strings. The server escapes them as HTML.
 - `units`: the measurement system of my Garmin profile. The data is always metric (km, m, kg,
   pace per km). Show every distance, pace, speed, elevation and weight in my units: `metric` km,

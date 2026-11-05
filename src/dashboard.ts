@@ -100,15 +100,21 @@ export class GarminDashboard {
     cache.syncedAt = new Date().toISOString();
     await writeAtomically(this.#file(), JSON.stringify(cache));
 
-    const [zones, fitnessAge, settings] = await Promise.all([
+    const [newZones, fitnessAge, settings] = await Promise.all([
       optional(sync, "zones", () => this.tools.getHeartRateZones()),
       optional(sync, "fitnessAge", () => this.tools.getFitnessAge(today)),
       optional(sync, "units", () => this.api.getJson("/userprofile-service/userprofile/settings")),
     ]);
-    // Garmin answers in metric whatever this setting says: it only tells the page what to show
-    const units = isObject(settings) ? settings.measurementSystem : undefined;
-    // Garmin writes a locale as pt_BR; the page keeps the built-in language that matches it
-    const locale = isObject(settings) ? String(settings.preferredLocale).replace("_", "-") : "";
+    // a failed call keeps the last good answer: one rate limit must not turn a page in miles into km
+    if (newZones !== null) cache.zones = newZones;
+    if (isObject(settings)) {
+      // Garmin answers in metric whatever this setting says: it only tells the page what to show
+      cache.units = settings.measurementSystem;
+      // Garmin writes a locale as pt_BR; the page keeps the built-in language that matches it
+      cache.locale = String(settings.preferredLocale).replace("_", "-");
+    }
+    await writeAtomically(this.#file(), JSON.stringify(cache));
+    const { units, locale } = cache;
     const out: Json = {
       generated: today,
       weeks: w,
@@ -116,10 +122,10 @@ export class GarminDashboard {
       end: today,
       prevStart,
       prevEnd: addDays(start, -1),
-      zones,
+      zones: cache.zones ?? null,
       fitnessAge,
       ...(typeof units === "string" && UNITS.includes(units) ? { units } : {}),
-      ...(/^[a-z]{2,3}(-[A-Z]{2})?$/.test(locale) ? { locale } : {}),
+      ...(typeof locale === "string" && /^[a-z]{2,3}(-[A-Z]{2})?$/.test(locale) ? { locale } : {}),
     };
     const cached = Object.keys(objectAt(cache, "activities"));
     // the small parts first: a reader that stops early still sees them
