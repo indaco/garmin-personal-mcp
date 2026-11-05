@@ -6,6 +6,7 @@ import { type GarminApiClient, GarminApiError } from "./api-client";
 import { addDays, localToday } from "./dates";
 import { digest } from "./digest";
 import { log } from "./log";
+import { mondayOf } from "./page/calc";
 import { workoutOf } from "./page/running";
 import {
   type GarminTools,
@@ -67,7 +68,7 @@ export class GarminDashboard {
   async #build(weeks: number | undefined, workouts: boolean): Promise<string> {
     const w = weeksCovered(weeks);
     const today = localToday();
-    const start = addDays(today, -7 * w);
+    const start = mondayOf(addDays(today, -7 * w));
     // one extra week before: the dashboard shows whole Monday-Sunday weeks
     const prevStart = addDays(start, -7 * (w + 1));
     const sync: Sync = { calls: 0, failedDates: [], failedSections: [] };
@@ -441,10 +442,20 @@ function activitiesBetween(cache: Json, from: string, to: string): Json[] {
     });
 }
 
-/** The fields the period comparison needs. */
+/** The fields that the period comparison, the boards and the load of a previous session need. */
 function compact(a: Json): Json {
   const o: Json = {};
-  for (const f of ["id", "start", "type", "km", "duration", "elapsed", "trainingLoad"]) {
+  for (const f of [
+    "id",
+    "start",
+    "type",
+    "sport",
+    "km",
+    "duration",
+    "elapsed",
+    "avgHR",
+    "trainingLoad",
+  ]) {
     copy(a, o, f, f);
   }
   return o;

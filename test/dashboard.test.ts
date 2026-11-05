@@ -21,7 +21,11 @@ import {
   recoveryRow,
   toFetch,
 } from "../src/dashboard";
+import { filterData } from "../src/dashboard-page";
 import { addDays } from "../src/dates";
+import { digest } from "../src/digest";
+import { groupOf, weeksOf } from "../src/page/calc";
+import { periodWindow } from "../src/page/metrics";
 import { GarminTools, writeAtomically } from "../src/tools";
 import { fitFile } from "./fit-file";
 
@@ -195,6 +199,15 @@ const activity = (
 /** The ids of the activities that have laps. */
 const withLaps = (out: { activities: Record<string, unknown>[] }) =>
   out.activities.filter((a) => a.laps).map((a) => a.id);
+/** One run and one ride in the weeks before the period. */
+const previous = async () => {
+  garminActivities = [
+    activity(5, "2026-09-25", "running", { averageHR: 150 }),
+    activity(6, "2026-10-05", "cycling", { sportTypeId: 2 }),
+  ];
+  return JSON.parse(await dashboard.getDashboardData(2));
+};
+
 const callsTo = (prefix: string) =>
   api.getJson.mock.calls.filter(([path]) => String(path).startsWith(prefix));
 
@@ -274,6 +287,33 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe("the period", () => {
+  it.each([
+    ["Monday", new Date(2026, 9, 26, 12)],
+    ["Wednesday", new Date(2026, 9, 28, 12)],
+    ["Sunday", new Date(2026, 10, 1, 12)],
+  ])("starts on a Monday when today is a %s", async (_day, now) => {
+    vi.setSystemTime(now);
+    const out = JSON.parse(await dashboard.getDashboardData(2));
+    expect(out).toMatchObject({
+      start: "2026-10-12",
+      prevEnd: "2026-10-11",
+      prevStart: "2026-09-21",
+    });
+  });
+
+  it("splits the activities at the Monday and has no partial week", async () => {
+    vi.setSystemTime(new Date(2026, 9, 28, 12));
+    garminActivities = [activity(1, "2026-10-12"), activity(2, "2026-10-11")];
+    const out = JSON.parse(await dashboard.getDashboardData(2));
+    expect(out.activities.map((a: { id: number }) => a.id)).toEqual([1]);
+    expect(out.previousActivities.map((a: { id: number }) => a.id)).toEqual([2]);
+    const weeks = weeksOf(out.start, out.end);
+    expect(periodWindow(weeks[0], weeks.at(-1)!, out.prevStart).partial).toBe(false);
+    expect(Object.values(digest(out).weekly).some((w) => w.partial)).toBe(false);
+  });
 });
 
 describe("jsonByLines", () => {
@@ -554,20 +594,65 @@ describe("getDashboardData", () => {
   it("keeps the previous weeks compact, most recent first", async () => {
     garminActivities = [
       activity(5, "2026-09-25", "running", { activityTrainingLoad: 80.26, averageHR: 150 }),
-      activity(6, "2026-10-05", "cycling"),
+      activity(6, "2026-10-05", "cycling", { sportTypeId: 2 }),
     ];
     const out = JSON.parse(await dashboard.getDashboardData(2));
     expect(out.previousActivities).toEqual([
-      { id: 6, start: "2026-10-05 07:00:00", type: "cycling", km: 5, duration: "25:00" },
+      {
+        id: 6,
+        start: "2026-10-05 07:00:00",
+        type: "cycling",
+        sport: "cycling",
+        km: 5,
+        duration: "25:00",
+      },
       {
         id: 5,
         start: "2026-09-25 07:00:00",
         type: "running",
+        sport: "running",
         km: 5,
         duration: "25:00",
+        avgHR: 150,
         trainingLoad: 80.3,
       },
     ]);
+  });
+
+  describe("previous rows", () => {
+    it("gives the previous rows the board of their sport", async () => {
+      const out = await previous();
+      expect(out.previousActivities.map(groupOf)).toEqual(["cycling", "running"]);
+    });
+
+    it("keeps the previous runs of a page that shows only running", async () => {
+      const out = await previous();
+      const kept = filterData(out, { sports: ["running"] } as never);
+      expect((kept.previousActivities as { id: number }[]).map((a) => a.id)).toEqual([5]);
+    });
+
+    it("gives a previous session its estimated load from the heart rate", async () => {
+      const out = await previous();
+      expect(out.previousActivities.find((a: { id: number }) => a.id === 5).avgHR).toBe(150);
+    });
+
+    it("the fixture's previous rows have only fields that the server writes", async () => {
+      garminActivities = [
+        activity(7, "2026-09-25", "running", {
+          activityTrainingLoad: 80,
+          averageHR: 150,
+          duration: 1800,
+        }),
+      ];
+      const out = JSON.parse(await dashboard.getDashboardData(2));
+      const server = new Set(Object.keys(out.previousActivities[0]));
+      const fixture = JSON.parse(
+        readFileSync(join(__dirname, "fixtures/dashboard-data.json"), "utf8"),
+      );
+      for (const row of fixture.previousActivities) {
+        for (const k of Object.keys(row)) expect(server.has(k), k).toBe(true);
+      }
+    });
   });
 
   it("adds strength sets and the laps of recent activities, races and long runs", async () => {
