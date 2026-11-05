@@ -1034,8 +1034,8 @@
     background: var(--good);
   }
   .cal-tip {
-    position: absolute;
-    z-index: 5;
+    position: fixed;
+    z-index: 40;
     width: 220px;
     background: var(--panel2);
     border: 1px solid var(--line);

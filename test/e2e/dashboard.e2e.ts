@@ -266,6 +266,54 @@ const row = (id: number, name: string | undefined, start: string) => ({
   duration: "30:00",
 });
 
+type Block = "start" | "center" | "end";
+
+/** The dates whose calendar tip leaves the viewport, or whose tile body grows a scroll. */
+async function badTipDates(page: Page, block: Block, only?: string): Promise<string[]> {
+  return page.$$eval(
+    "[data-id=calendar] .cal-cell[data-date]",
+    (cells, args) => {
+      const bad: string[] = [];
+      const tip = document.querySelector(".cal-tip") as HTMLElement;
+      const body = document.querySelector("[data-id=calendar] .tile-body") as HTMLElement;
+      const view = document.documentElement;
+      for (const cell of cells) {
+        const date = cell.getAttribute("data-date") ?? "";
+        if (args.only && date !== args.only) continue;
+        cell.scrollIntoView({ block: args.block });
+        cell.dispatchEvent(new PointerEvent("pointerenter"));
+        const r = tip.getBoundingClientRect();
+        const inside =
+          !tip.hidden &&
+          r.left >= 0 &&
+          r.top >= 0 &&
+          r.right <= view.clientWidth &&
+          r.bottom <= view.clientHeight;
+        if (!inside || body.scrollHeight > body.clientHeight) bad.push(date);
+        cell.dispatchEvent(new PointerEvent("pointerleave"));
+      }
+      return bad;
+    },
+    { block, only },
+  );
+}
+
+const frames = (page: Page) =>
+  page.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+  );
+
+/** The tip's top minus the cell's bottom, and the cell's top minus the tip's bottom. */
+const tipGaps = (page: Page, selector: string) =>
+  page.evaluate((s) => {
+    const cell = document.querySelector(s)!.getBoundingClientRect();
+    const tip = document.querySelector(".cal-tip")!.getBoundingClientRect();
+    return { below: tip.top - cell.bottom, above: cell.top - tip.bottom };
+  }, selector);
+
+const followsCell = (g: { below: number; above: number }) =>
+  Math.abs(g.below - 6) <= 1 || Math.abs(g.above - 6) <= 1;
+
 describe("the page", () => {
   it("keeps the template small", () => {
     // minified, with only the Chart.js parts the page uses: Chart.js is most of it, and the page
@@ -1722,6 +1770,94 @@ describe("overview widgets", () => {
     const tip = await page.textContent(".cal-tip");
     expect(tip).toContain("Riverside Half Marathon");
     expect(await page.isVisible(".cal-tip")).toBe(true);
+  });
+
+  it.each([
+    [1280, 800, "start"],
+    [1280, 800, "center"],
+    [1280, 800, "end"],
+    [390, 844, "start"],
+    [390, 844, "center"],
+    [390, 844, "end"],
+  ] as const)(
+    "keeps every calendar tip in the viewport at %ix%i with the cell at %s",
+    async (width, height, block) => {
+      const { page } = await open(browser, pageFile(), { viewport: { width, height } });
+      expect(await badTipDates(page, block)).toEqual([]);
+    },
+  );
+
+  it("keeps the calendar tip of a day with five activities in the viewport", async () => {
+    const busy = [1, 2, 3, 4, 5].map((i) => row(9300 + i, `Busy day ${i}`, "2026-10-20 07:00:00"));
+    const { page } = await open(
+      browser,
+      pageFile({
+        data: { ...data, v: DASHBOARD_VERSION, activities: [...data.activities, ...busy] },
+      }),
+      { viewport: { width: 390, height: 844 } },
+    );
+    expect(await badTipDates(page, "end", "2026-10-20")).toEqual([]);
+    await page.focus("[data-date='2026-10-20']");
+    expect(await page.textContent(".cal-tip")).toContain("Busy day 5");
+  });
+
+  it("has no ancestor of the calendar tip that makes a containing block or a stacking context", async () => {
+    const { page } = await open(browser, pageFile(), { viewport: { width: 390, height: 844 } });
+    await page.focus("[data-date='2026-10-17']");
+    const bad = await page.evaluate(() => {
+      const found: string[] = [];
+      for (let n = document.querySelector(".cal-tip")!.parentElement; n; n = n.parentElement) {
+        const c = getComputedStyle(n);
+        const stacks = c.position !== "static" && c.zIndex !== "auto";
+        if (
+          c.transform !== "none" ||
+          c.filter !== "none" ||
+          c.perspective !== "none" ||
+          c.contain !== "none" ||
+          stacks
+        )
+          found.push(n.className || n.tagName);
+      }
+      return found;
+    });
+    expect(bad).toEqual([]);
+  });
+
+  it("shows the calendar tip on keyboard focus and hides it on blur", async () => {
+    const { page } = await open(browser, pageFile(), { viewport: { width: 390, height: 844 } });
+    await page.focus("[data-date='2026-10-17']");
+    expect(await page.isVisible(".cal-tip")).toBe(true);
+    await page.evaluate(() => (document.activeElement as HTMLElement).blur());
+    expect(await page.isVisible(".cal-tip")).toBe(false);
+  });
+
+  it("moves the calendar tip with its cell when the page scrolls", async () => {
+    const { page } = await open(browser, pageFile(), { viewport: { width: 390, height: 844 } });
+    const cell = "[data-date='2026-10-17']";
+    await page.focus(cell);
+    await page.evaluate(() => window.scrollBy(0, 40));
+    await frames(page);
+    expect(followsCell(await tipGaps(page, cell))).toBe(true);
+    await page.evaluate(() => (document.activeElement as HTMLElement).blur());
+    await page.evaluate(() => window.scrollBy(0, 40));
+    await frames(page);
+    expect(await page.isVisible(".cal-tip")).toBe(false);
+  });
+
+  it("moves the calendar tip with its cell when the tile body scrolls", async () => {
+    const { page } = await open(browser, pageFile(), { viewport: { width: 390, height: 844 } });
+    await page.addStyleTag({
+      content: "[data-id=calendar] .tile-body { height: 100px; overflow-y: auto; }",
+    });
+    const cell = "[data-date='2026-10-17']";
+    await page.focus(cell);
+    // let the scroll that the focus caused end: it must not stand in for the box scroll
+    await frames(page);
+    await page.evaluate(() => {
+      document.querySelector("[data-id=calendar] .tile-body")!.scrollTop = 30;
+    });
+    await frames(page);
+    expect(followsCell(await tipGaps(page, cell))).toBe(true);
   });
 
   it("keeps one tab stop in the calendar of an older window", async () => {

@@ -353,6 +353,20 @@ register({
       (byDay.get(d) ?? []).reduce((s, a) => s + sessionSeconds(a) / 60, 0);
     const weekday = new Intl.DateTimeFormat(ctx.lang, { weekday: "short", timeZone: "UTC" });
     const tip = h("div", { class: "cal-tip", role: "status", hidden: true });
+    let shown: HTMLElement | undefined;
+    // in viewport coordinates: a tile body clips what is absolute inside it
+    const place = () => {
+      if (tip.hidden || !shown?.isConnected) return;
+      const box = shown.getBoundingClientRect();
+      const { width, height } = tip.getBoundingClientRect();
+      const view = document.documentElement;
+      const below = box.bottom + 6;
+      const top = below + height <= view.clientHeight - 8 ? below : box.top - 6 - height;
+      tip.style.left = `${Math.max(8, Math.min(box.left, view.clientWidth - width - 8))}px`;
+      tip.style.top = `${Math.max(8, top)}px`;
+      // a focus can scroll the page: follow the cell for as long as the tip shows
+      window.addEventListener("scroll", place, { capture: true, once: true, passive: true });
+    };
     // the last day of the window takes the tab stop
     const last = windowEnd(ctx);
     const show = (cell: HTMLElement, d: string) => {
@@ -369,10 +383,8 @@ register({
         ),
       );
       tip.hidden = false;
-      const box = cell.getBoundingClientRect();
-      const host = el.getBoundingClientRect();
-      tip.style.left = `${Math.min(box.left - host.left, host.width - 220)}px`;
-      tip.style.top = `${box.bottom - host.top + 6}px`;
+      shown = cell;
+      place();
     };
     // one tab stop: the arrow keys move a day (up, down) or a week (left, right)
     const grid = h("div", {
