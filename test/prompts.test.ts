@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { en } from "../src/page/i18n/en";
@@ -317,9 +317,19 @@ describe("prompts", () => {
 
   it("has the names, descriptions and arguments of the reference prompt list", async () => {
     const { prompts } = await client.listPrompts();
-    expect(prompts.map(shape).toSorted((a, b) => a.name.localeCompare(b.name))).toEqual(
-      promptList.map(shape),
-    );
+    const sorted = prompts.toSorted((a, b) => a.name.localeCompare(b.name));
+    if (process.env.UPDATE_DOCS) {
+      const rows = sorted.map(({ name, description, arguments: args }) => ({
+        name,
+        description,
+        arguments: args,
+      }));
+      writeFileSync("test/fixtures/prompt-list.json", `${JSON.stringify(rows, null, 2)}\n`);
+    } else {
+      expect(sorted.map(shape), "the prompt list changed: run pnpm guide").toEqual(
+        promptList.map(shape),
+      );
+    }
   });
 
   it("returns the prompt description with the messages", async () => {

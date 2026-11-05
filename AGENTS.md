@@ -25,7 +25,7 @@ pnpm build:all           # both builds, and the demo GIF when its inputs changed
 pnpm demo                # record assets/dashboard.gif again, from the data of the website demo
 pnpm test:page           # the dashboard page and the website in headless Chromium, after both builds
 pnpm test:e2e            # the built commands on this system, with a fake Garmin, after the build
-pnpm guide               # write the generated parts of guide/
+pnpm guide               # write the generated parts of guide/ and the tool and prompt lists of the tests
 ```
 
 Smoke test: the server must answer with one JSON line and nothing else on stdout.
