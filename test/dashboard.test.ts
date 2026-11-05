@@ -1523,6 +1523,7 @@ describe("getDashboardData", () => {
       {
         id: 6,
         start: "2026-10-05 07:00:00",
+        name: "A6",
         type: "cycling",
         sport: "cycling",
         km: 5,
@@ -1531,6 +1532,7 @@ describe("getDashboardData", () => {
       {
         id: 5,
         start: "2026-09-25 07:00:00",
+        name: "A5",
         type: "running",
         sport: "running",
         km: 5,
@@ -1539,6 +1541,17 @@ describe("getDashboardData", () => {
         trainingLoad: 80.3,
       },
     ]);
+  });
+
+  it("keeps the name of a previous row, and no name when the activity has none", async () => {
+    garminActivities = [
+      activity(5, "2026-09-25"),
+      { ...activity(6, "2026-09-26"), activityName: undefined },
+    ];
+    const out = JSON.parse(await dashboard.getDashboardData(2));
+    const byId = (id: number) => out.previousActivities.find((r: { id: number }) => r.id === id);
+    expect(byId(5).name).toBe("A5");
+    expect(byId(6)).not.toHaveProperty("name");
   });
 
   describe("a rate limit or a network failure stops the requests", () => {

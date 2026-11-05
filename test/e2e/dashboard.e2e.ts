@@ -255,6 +255,17 @@ async function distanceTile(activities: unknown[]) {
   };
 }
 
+/** A synthetic running row; a missing name gives a row without the field. */
+const row = (id: number, name: string | undefined, start: string) => ({
+  id,
+  ...(name ? { name } : {}),
+  type: "running",
+  sport: "running",
+  start,
+  km: 5,
+  duration: "30:00",
+});
+
 describe("the page", () => {
   it("keeps the template small", () => {
     // minified, with only the Chart.js parts the page uses: Chart.js is most of it, and the page
@@ -327,6 +338,38 @@ describe("the page", () => {
       "true",
     );
     expect(await again.page.inputValue("#from")).toBe("2026-10-05");
+  });
+
+  it("name filter: compares the chosen names with the previous rows of the same names", async () => {
+    const activities = [
+      row(9301, "Quarry Loop", "2026-10-20 07:00:00"),
+      row(9302, "Ridge Walk", "2026-10-21 07:00:00"),
+    ];
+    const named = [
+      row(9311, "Quarry Loop", "2026-07-20 07:00:00"),
+      row(9312, "Quarry Loop", "2026-07-21 07:00:00"),
+      row(9313, "Quarry Loop", "2026-07-22 07:00:00"),
+      row(9314, "Ridge Walk", "2026-07-23 07:00:00"),
+    ];
+    const hashOf = "#all@2026-08-03_2026-10-26~Quarry%20Loop";
+    const sessions = async (previousActivities: unknown[]) => {
+      const { page, errors } = await open(
+        browser,
+        pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities, previousActivities } }),
+        { hash: hashOf },
+      );
+      const cells = await page.$$eval(
+        "[data-widget=periodComparison] tbody tr:first-child td",
+        (c) => c.map((x) => x.textContent?.trim()),
+      );
+      expect(errors).toEqual([]);
+      return cells[1];
+    };
+    // 1 chosen session now against 3 chosen sessions before: the 4th row has another name
+    expect(await sessions(named)).toBe("1 ▼ 67%");
+    // the control: rows without a name leave nothing to compare with
+    const nameless = named.map((r) => row(r.id, undefined, r.start));
+    expect(await sessions(nameless)).toBe("1");
   });
 
   it("shows only the chosen activity names, also after a reload", async () => {
