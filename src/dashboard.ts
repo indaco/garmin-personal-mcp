@@ -37,10 +37,14 @@ export const WORKOUT_SESSIONS = 8;
 /** The weeks that getDashboardData covers for an asked number: 12 by default, 1 to 52. */
 export const weeksCovered = (weeks: number | undefined): number =>
   weeks == null ? DEFAULT_WEEKS : Math.min(Math.max(weeks, 1), MAX_WEEKS);
-/** The last days of a cached range are fetched again: Garmin can still add activities or finish a night's data. */
-const REFRESH_DAYS = 2;
-/** Bump when summarize keeps a new field: cached rows from before it are fetched again, once. */
-const SUMMARY = 2;
+/**
+ * The last days of a cached range are fetched again: a watch can sync days late, and Garmin can still
+ * change a session or finish a night's data. 14 days fit one search page, one HRV chunk and one recovery
+ * range pair, so the window costs no extra requests.
+ */
+const REFRESH_DAYS = 14;
+/** Bump when summarize keeps a new field, or to mend cached rows that an older rule got wrong: cached rows from before it are fetched again, once. */
+const SUMMARY = 3;
 
 /** What one getDashboardData call counts. */
 interface Sync {
@@ -52,7 +56,7 @@ interface Sync {
 /**
  * All the data of the training dashboard in one call, with a local cache in `<data-dir>/dashboard-cache.json`
  * (keep its format: other servers on the same data dir read it): each call fetches from Garmin only the days
- * it does not have yet, plus the last two days, which can still change.
+ * it does not have yet, plus the last 14 days, which can still change.
  */
 export class GarminDashboard {
   /** Calls run one at a time, so the cache file has one writer. */
@@ -248,7 +252,12 @@ export class GarminDashboard {
       }
       try {
         const { nights, summaries } = await this.#recoveryRanges(start, end, sync);
-        for (const day of days) byDate[day] = recoveryRow(day, nights.get(day), summaries.get(day));
+        for (const day of days) {
+          byDate[day] = mergedRow(
+            byDate[day],
+            recoveryRow(day, nights.get(day), summaries.get(day)),
+          );
+        }
       } catch (e) {
         if (!(e instanceof GarminApiError)) throw e;
         log("WARN", `Recovery data of ${start} to ${end} not fetched: ${e.message}`);
@@ -264,7 +273,7 @@ export class GarminDashboard {
               call(sync, () => this.tools.getSleep(day, true)),
               call(sync, () => this.tools.getDailySummary(day)),
             ]);
-            byDate[day] = recoveryRow(day, sleep, summary);
+            byDate[day] = mergedRow(byDate[day], recoveryRow(day, sleep, summary));
           } catch (dayError) {
             if (!(dayError instanceof GarminApiError)) throw dayError;
             failedDays.push(day);
@@ -409,6 +418,10 @@ export function toFetch(
   if (tail < from) {
     tail = from;
   }
+  // the part before the cached range is its own range: the two never overlap
+  if (tail < cachedFrom) {
+    tail = cachedFrom;
+  }
   if (tail <= to) {
     out.push([tail, to]);
   }
@@ -472,6 +485,11 @@ function trendRow(row: unknown): Json {
   const r: Json = {};
   for (const name of ["date", "sleepH", "sleepScore", "rhr"]) copy(row, r, name, name);
   return r;
+}
+
+/** A refreshed row over the cached one: what Garmin leaves out now does not erase what the cache has. */
+function mergedRow(old: unknown, row: Json): Json {
+  return { ...(isObject(old) ? old : {}), ...row };
 }
 
 /** One compact row per day: sleep, sleep need, bedtime, resting HR, body battery, stress, steps. */

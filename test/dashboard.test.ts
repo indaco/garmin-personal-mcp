@@ -43,10 +43,10 @@ describe("toFetch and covered", () => {
     expect(ranges(toFetch(undefined, undefined, FROM, TO))).toEqual(["2026-08-03..2026-10-26"]);
   });
 
-  it("fetches only the last two cached days and the new ones", () => {
-    // last sync on 20 Oct: refetch 19-20 Oct (they could still change) and everything after
-    expect(ranges(toFetch(FROM, "2026-10-20", FROM, TO))).toEqual(["2026-10-19..2026-10-26"]);
-    expect(ranges(toFetch(FROM, TO, FROM, TO))).toEqual(["2026-10-25..2026-10-26"]);
+  it("fetches only the refresh window of the cached days and the new ones", () => {
+    // last sync on 20 Oct: refetch 7-20 Oct (they could still change) and everything after
+    expect(ranges(toFetch(FROM, "2026-10-20", FROM, TO))).toEqual(["2026-10-07..2026-10-26"]);
+    expect(ranges(toFetch(FROM, TO, FROM, TO))).toEqual(["2026-10-13..2026-10-26"]);
   });
 
   it("starts the refresh at the window when the cache ends on its first day", () => {
@@ -56,7 +56,7 @@ describe("toFetch and covered", () => {
   it("also fetches the missing start of a longer window", () => {
     expect(ranges(toFetch(FROM, TO, "2026-05-04", TO))).toEqual([
       "2026-05-04..2026-08-02",
-      "2026-10-25..2026-10-26",
+      "2026-10-13..2026-10-26",
     ]);
   });
 
@@ -76,7 +76,14 @@ describe("toFetch and covered", () => {
     // a later, longer window fetches the gap instead of trusting it
     expect(ranges(toFetch(c[0], c[1], "2026-10-01", to))).toEqual([
       "2026-10-01..2026-11-15",
-      "2026-11-22..2026-11-23",
+      "2026-11-16..2026-11-23",
+    ]);
+  });
+
+  it("never starts the refresh before the cached range, so the two ranges do not overlap", () => {
+    expect(ranges(toFetch("2026-11-16", "2026-11-23", "2026-10-01", "2026-11-23"))).toEqual([
+      "2026-10-01..2026-11-15",
+      "2026-11-16..2026-11-23",
     ]);
   });
 
@@ -87,10 +94,10 @@ describe("toFetch and covered", () => {
   });
 
   it("refreshes recovery from the last sync, not from today", () => {
-    // last call on Monday 19 Oct, next on Monday 26 Oct: 18 and 19 Oct may be incomplete
-    expect(recoveryRefreshFrom("2026-10-19", TO)).toBe("2026-10-18");
-    expect(recoveryRefreshFrom(undefined, TO)).toBe("2026-10-25");
-    expect(recoveryRefreshFrom("2026-10-31", TO)).toBe("2026-10-25");
+    // last call on Monday 19 Oct, next on Monday 26 Oct: 6 to 19 Oct may be incomplete
+    expect(recoveryRefreshFrom("2026-10-19", TO)).toBe("2026-10-06");
+    expect(recoveryRefreshFrom(undefined, TO)).toBe("2026-10-13");
+    expect(recoveryRefreshFrom("2026-10-31", TO)).toBe("2026-10-13");
   });
 });
 
@@ -530,6 +537,19 @@ const keptSets = (saved: boolean) =>
     saved,
   ).filter((a: Record<string, unknown>) => a.exercises).length;
 
+const ids = (out: { activities: { id: number }[] }) => out.activities.map((a) => a.id).toSorted();
+/** Range answers without any day. */
+const empty = { [SLEEP_RANGE]: () => [], [SUMMARY_RANGE]: () => ({ data: [] }) };
+/** The sleep range fails, so days are read one by one; each day's sleep answer is the given one. */
+const oneByOne = (sleep: unknown) =>
+  answer({
+    [SLEEP_RANGE]: () => {
+      throw new GarminApiError("GET range -> HTTP 500: down", 500);
+    },
+    "/sleep-service/sleep/dailySleep": () => sleep,
+    "/usersummary-service/usersummary/daily": () => ({}),
+  });
+
 describe("getDashboardData", () => {
   it("fetches everything on the first call and keeps it in the cache", async () => {
     garminActivities = [
@@ -607,7 +627,7 @@ describe("getDashboardData", () => {
     expect(lines[first + 3]).toBe("],");
   });
 
-  it("asks Garmin only for the last two days on the next call", async () => {
+  it("asks Garmin only for the last 14 days on the next call", async () => {
     garminActivities = [activity(1, "2026-10-20")];
     await dashboard.getDashboardData(2);
     api.getJson.mockClear();
@@ -615,14 +635,14 @@ describe("getDashboardData", () => {
 
     const out = JSON.parse(await dashboard.getDashboardData(2));
     expect(callsTo("/activitylist").map(([, q]) => [q.startDate, q.endDate])).toEqual([
-      ["2026-10-25", "2026-10-26"],
+      ["2026-10-13", "2026-10-26"],
     ]);
     expect(callsTo("/hrv-service").map(([p]) => p)).toEqual([
-      "/hrv-service/hrv/daily/2026-10-25/2026-10-26",
+      "/hrv-service/hrv/daily/2026-10-13/2026-10-26",
     ]);
     expect(recoveryCalls().map(([p, q]) => [p, q.startDate, q.endDate])).toEqual([
-      [SLEEP_RANGE, "2026-10-25", "2026-10-26"],
-      [SUMMARY_RANGE, "2026-10-25", "2026-10-26"],
+      [SLEEP_RANGE, "2026-10-13", "2026-10-26"],
+      [SUMMARY_RANGE, "2026-10-13", "2026-10-26"],
     ]);
     expect(out.activities.map((a: { id: number }) => a.id)).toEqual([4, 1]);
     expect(out.sync).toMatchObject({ garminCalls: 7, newActivities: 1, cachedActivities: 2 });
@@ -661,8 +681,101 @@ describe("getDashboardData", () => {
     api.getJson.mockClear();
     await dashboard.getDashboardData(2);
     expect(callsTo("/activitylist").map(([, q]) => [q.startDate, q.endDate])).toEqual([
-      ["2026-10-25", "2026-10-26"],
+      ["2026-10-13", "2026-10-26"],
     ]);
+  });
+
+  it("fetches the whole activity period once for a cache of the previous summary version", async () => {
+    garminActivities = [activity(1, "2026-10-20")];
+    await dashboard.getDashboardData(2);
+    expect(readCache().activitiesSummary).toBe(3);
+    // a session that the old two-day window lost: it is in Garmin, not in the cache
+    garminActivities.push(activity(2, "2026-10-01"));
+    writeFileSync(cacheFile(), JSON.stringify({ ...readCache(), activitiesSummary: 2 }));
+    api.getJson.mockClear();
+
+    await dashboard.getDashboardData(2);
+    expect(callsTo("/activitylist").map(([, q]) => [q.startDate, q.endDate])).toEqual([
+      ["2026-09-21", "2026-10-26"],
+    ]);
+    expect(Object.keys(readCache().activities).toSorted()).toEqual(["1", "2"]);
+    api.getJson.mockClear();
+    await dashboard.getDashboardData(2);
+    expect(callsTo("/activitylist").map(([, q]) => [q.startDate, q.endDate])).toEqual([
+      ["2026-10-13", "2026-10-26"],
+    ]);
+  });
+
+  describe("data that reaches Garmin late", () => {
+    it("adds an activity of 5 days ago that Garmin gets after the last update", async () => {
+      garminActivities = [activity(1, "2026-10-20")];
+      await dashboard.getDashboardData(2);
+      garminActivities.push(activity(2, "2026-10-21"));
+      const out = JSON.parse(await dashboard.getDashboardData(2));
+      expect(ids(out)).toEqual([1, 2]);
+      expect(out.sync.newActivities).toBe(1);
+    });
+
+    it("shows a rename and a deletion on the first day of the window", async () => {
+      garminActivities = [
+        activity(1, "2026-10-13"),
+        activity(2, "2026-10-13"),
+        activity(3, "2026-10-20"),
+      ];
+      await dashboard.getDashboardData(2);
+      garminActivities = [
+        activity(1, "2026-10-13", "running", { activityName: "Renamed" }),
+        activity(3, "2026-10-20"),
+      ];
+      const out = JSON.parse(await dashboard.getDashboardData(2));
+      expect(ids(out)).toEqual([1, 3]);
+      expect(out.activities.find((a: { id: number }) => a.id === 1).name).toBe("Renamed");
+    });
+
+    it("does not look for an activity of 14 days ago that appears late", async () => {
+      garminActivities = [activity(1, "2026-10-20")];
+      await dashboard.getDashboardData(2);
+      garminActivities.push(activity(2, "2026-10-12"));
+      const out = JSON.parse(await dashboard.getDashboardData(2));
+      expect(ids(out)).toEqual([1]);
+    });
+
+    it("fills in a recovery day that was empty at the last update", async () => {
+      answer(empty);
+      let r = recoveryByDay(JSON.parse(await dashboard.getDashboardData(1)));
+      expect(r["2026-10-20"]).toEqual({ date: "2026-10-20" });
+      restore();
+      r = recoveryByDay(JSON.parse(await dashboard.getDashboardData(1)));
+      expect(r["2026-10-20"]).toEqual({ date: "2026-10-20", sleepH: 7.5, rhr: 50 });
+    });
+
+    it("keeps the values of a cached day that a later range leaves out, and updates the fields it has", async () => {
+      await dashboard.getDashboardData(1);
+      answer(empty);
+      let r = recoveryByDay(JSON.parse(await dashboard.getDashboardData(1)));
+      expect(r["2026-10-20"]).toEqual({ date: "2026-10-20", sleepH: 7.5, rhr: 50 });
+      // only the sleep is in the answer: its new value wins and the resting heart rate stays
+      answer({
+        ...empty,
+        [SLEEP_RANGE]: (q) =>
+          daysOf(q.startDate, q.endDate).map((calendarDate) => ({
+            calendarDate,
+            sleepTimeSeconds: 3600,
+          })),
+      });
+      r = recoveryByDay(JSON.parse(await dashboard.getDashboardData(1)));
+      expect(r["2026-10-20"]).toEqual({ date: "2026-10-20", sleepH: 1, rhr: 50 });
+    });
+
+    it("does the same when the days are read one by one", async () => {
+      await dashboard.getDashboardData(1);
+      oneByOne({});
+      let r = recoveryByDay(JSON.parse(await dashboard.getDashboardData(1)));
+      expect(r["2026-10-20"]).toEqual({ date: "2026-10-20", sleepH: 7.5, rhr: 50 });
+      oneByOne({ sleepTimeSeconds: 3600 });
+      r = recoveryByDay(JSON.parse(await dashboard.getDashboardData(1)));
+      expect(r["2026-10-20"]).toEqual({ date: "2026-10-20", sleepH: 1, rhr: 50 });
+    });
   });
 
   it("drops a cached activity that Garmin no longer has in a refetched day", async () => {
@@ -719,7 +832,7 @@ describe("getDashboardData", () => {
     failingSleep.clear();
     api.getJson.mockClear();
     await dashboard.getDashboardData(1);
-    expect(recoveryCalls().map(([, q]) => q.startDate)).toEqual(["2026-10-18", "2026-10-18"]);
+    expect(recoveryCalls().map(([, q]) => q.startDate)).toEqual(["2026-10-13", "2026-10-13"]);
     expect(readCache().recoveryTo).toBe("2026-10-26");
   });
 
@@ -733,7 +846,7 @@ describe("getDashboardData", () => {
     });
 
     it("leaves the rows before the refresh day as they are", async () => {
-      await dashboard.getDashboardData(1);
+      await dashboard.getDashboardData(52, false, true);
       answer({
         [SLEEP_RANGE]: (q) =>
           daysOf(q.startDate, q.endDate).map((calendarDate) => ({
@@ -742,26 +855,26 @@ describe("getDashboardData", () => {
           })),
       });
       api.getJson.mockClear();
-      const r = recoveryByDay(JSON.parse(await dashboard.getDashboardData(1)));
-      expect(r["2026-10-20"]).toMatchObject({ sleepH: 7.5 });
-      expect(r["2026-10-25"]).toMatchObject({ sleepH: 1 });
-      expect(recoveryCalls().map(([, q]) => q.startDate)).toEqual(["2026-10-25", "2026-10-25"]);
+      const r = recoveryByDay(JSON.parse(await dashboard.getDashboardData(52, false, true)));
+      expect(r["2026-10-12"]).toMatchObject({ sleepH: 7.5 });
+      expect(r["2026-10-13"]).toMatchObject({ sleepH: 1 });
+      expect(recoveryCalls().map(([, q]) => q.startDate)).toEqual(["2026-10-13", "2026-10-13"]);
     });
 
     it("keeps the row of a cached day between two needed days", async () => {
-      await dashboard.getDashboardData(1);
+      await dashboard.getDashboardData(52, false, true);
       const cache = readCache();
-      cache.recovery["2026-10-22"] = { date: "2026-10-22", rhr: 99 };
-      delete cache.recovery["2026-10-20"];
+      cache.recovery["2026-10-08"] = { date: "2026-10-08", rhr: 99 };
+      delete cache.recovery["2026-10-05"];
       writeFileSync(cacheFile(), JSON.stringify(cache));
       api.getJson.mockClear();
-      const r = recoveryByDay(JSON.parse(await dashboard.getDashboardData(1)));
+      const r = recoveryByDay(JSON.parse(await dashboard.getDashboardData(52, false, true)));
       expect(recoveryCalls().map(([, q]) => [q.startDate, q.endDate])[0]).toEqual([
-        "2026-10-20",
+        "2026-10-05",
         "2026-10-26",
       ]);
-      expect(r["2026-10-20"]).toMatchObject({ sleepH: 7.5, rhr: 50 });
-      expect(r["2026-10-22"]).toEqual({ date: "2026-10-22", rhr: 99 });
+      expect(r["2026-10-05"]).toMatchObject({ sleepH: 7.5, rhr: 50 });
+      expect(r["2026-10-08"]).toEqual({ date: "2026-10-08", rhr: 99 });
     });
 
     it("gives a day left out of both answers a row of the date, and keeps what one answer has", async () => {
@@ -1039,14 +1152,14 @@ describe("getDashboardData", () => {
       expect(sleepSpans()).toEqual([["2026-10-13", "2026-10-26"]]);
     });
 
-    it("keeps the cache of a long page in a 14-day update, and the next long update asks for 2 days", async () => {
+    it("keeps the cache of a long page in a 14-day update, and the next long update asks for 14 days", async () => {
       await dashboard.getDashboardData(52, false, true);
       await dashboard.getDashboardData(1);
       expect(Object.keys(readCache().recovery)).toHaveLength(365);
       api.getJson.mockClear();
       const out = JSON.parse(await dashboard.getDashboardData(52, false, true));
       expect(recoveryCalls()).toHaveLength(2);
-      expect(sleepSpans()).toEqual([["2026-10-25", "2026-10-26"]]);
+      expect(sleepSpans()).toEqual([["2026-10-13", "2026-10-26"]]);
       expect(out.recovery).toHaveLength(365);
     });
 
@@ -1079,7 +1192,7 @@ describe("getDashboardData", () => {
         api.getJson.mockClear();
         const again = JSON.parse(await dashboard.getDashboardData(52, false, true));
         const days = sleepSpans().flatMap(([a, b]) => daysOf(a, b));
-        expect(days.toSorted()).toEqual([...failed, "2026-10-25", "2026-10-26"]);
+        expect(days.toSorted()).toEqual([...failed, ...daysOf("2026-10-13", "2026-10-26")]);
         expect(again.sync.failedDates).toEqual([]);
         expect(again.recovery).toHaveLength(365);
       },
