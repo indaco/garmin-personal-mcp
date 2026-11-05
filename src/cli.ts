@@ -187,6 +187,7 @@ export async function cli(
       const result = await refreshPages(w, pages);
       const { lines } = result;
       let { failed } = result;
+      const partial = [...result.partial];
       // at login or after a wake the network can come a little after the job: wait for it
       for (const ms of scheduled ? RETRY_MS : []) {
         const offline = failed.filter((f) => f.error.startsWith("Network error"));
@@ -198,9 +199,10 @@ export async function cli(
           offline.map((f) => f.path),
         );
         lines.push(...again.lines);
+        partial.push(...again.partial);
         failed = [...failed.filter((f) => !offline.includes(f)), ...again.failed];
       }
-      if (scheduled) await auto.saveRun({ at, failed });
+      if (scheduled) await auto.saveRun({ at, failed, ...(partial.length > 0 ? { partial } : {}) });
       return { code: failed.length > 0 ? 1 : 0, stdout: lines.join("\n") };
     }
     const rest = [...args];
@@ -564,10 +566,17 @@ export async function setup(
 }
 
 function lastLine(last: LastRun): string {
-  if (last.failed.length === 0) return `Last run: ${last.at}, every page updated`;
+  const partial = last.partial ?? [];
+  if (last.failed.length === 0 && partial.length === 0) {
+    return `Last run: ${last.at}, every page updated`;
+  }
+  const gaps = partial.map((p) => `  ${p.path}: ${p.gaps}`);
+  if (last.failed.length === 0)
+    return [`Last run: ${last.at}, updated with gaps:`, ...gaps].join("\n");
   return [
     `Last run: ${last.at}, failed:`,
     ...last.failed.map((f) => `  ${f.path}: ${f.error}`),
+    ...(partial.length > 0 ? ["updated with gaps:", ...gaps] : []),
   ].join("\n");
 }
 

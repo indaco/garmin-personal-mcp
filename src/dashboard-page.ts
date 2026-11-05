@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { weeksCovered } from "./dashboard";
-import { type Digest, digest } from "./digest";
+import { type Digest, digest, syncGaps } from "./digest";
 import { Profile } from "@garmin/fitsdk";
 import { type Activity, GROUPS, groupOf, tabsFor } from "./page/calc";
 import { CATALOGUE, inPage } from "./page/catalogue";
@@ -576,7 +576,14 @@ export class DashboardWriter {
   #queue: Promise<unknown> = Promise.resolve();
   /** The data of the last call: a second call soon after (to add the notes) uses the same snapshot. */
   #last:
-    | { weeks: number; workouts: boolean; history: boolean; at: number; json: string }
+    | {
+        weeks: number;
+        workouts: boolean;
+        history: boolean;
+        at: number;
+        json: string;
+        failed: boolean;
+      }
     | undefined;
   /** The last page of a build (a write that made or kept the .bak): a replace of it within REUSE_MS keeps the .bak. */
   #wrote: { target: string; page: string; at: number } | undefined;
@@ -761,7 +768,12 @@ export class DashboardWriter {
       );
     }
     const raw = JSON.parse(
-      await this.#data(weeks ?? weeksOf(old), own.workouts === true, wantsHistory(own)),
+      await this.#data(
+        weeks ?? weeksOf(old),
+        own.workouts === true,
+        wantsHistory(own),
+        again || notes.length > 0,
+      ),
     ) as Json;
     let addedWidgets: Record<string, string[]> = {};
     let addedNames: Record<string, string[]> = {};
@@ -1093,8 +1105,16 @@ export class DashboardWriter {
     return writeBlock(page, "widgets", merged(own, await this.#library(before)));
   }
 
-  /** The data for `weeks`; the same snapshot for 15 minutes, so the notes match the digest they come from. */
-  async #data(weeks: number | undefined, workouts: boolean, history: boolean): Promise<string> {
+  /**
+   * The data for `weeks`; the same snapshot for 15 minutes, so the notes match the digest they come
+   * from. A snapshot with gaps serves only the second write of the same update.
+   */
+  async #data(
+    weeks: number | undefined,
+    workouts: boolean,
+    history: boolean,
+    reuseFailed = false,
+  ): Promise<string> {
     const covered = weeksCovered(weeks);
     const last = this.#last;
     if (
@@ -1102,11 +1122,13 @@ export class DashboardWriter {
       last.weeks === covered &&
       last.workouts === workouts &&
       last.history === history &&
+      (!last.failed || reuseFailed) &&
       Date.now() - last.at < REUSE_MS
     )
       return last.json;
     const json = await this.getData(weeks, workouts, history);
-    this.#last = { weeks: covered, workouts, history, at: Date.now(), json };
+    const failed = syncGaps((JSON.parse(json) as Json).sync) !== undefined;
+    this.#last = { weeks: covered, workouts, history, at: Date.now(), json, failed };
     return json;
   }
 
