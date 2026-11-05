@@ -200,6 +200,17 @@ describe("site footer", () => {
     }
   });
 
+  it("opens the demo of the header in a new tab, and says so", async () => {
+    const { page } = await site();
+    const [target, rel, text] = await page.$eval("#site-nav a[href='demo/index.html']", (a) => [
+      a.getAttribute("target"),
+      a.getAttribute("rel"),
+      a.textContent?.trim(),
+    ]);
+    expect([target, rel]).toEqual(["_blank", "noopener"]);
+    expect(text).toBe("demo (opens in a new tab)");
+  });
+
   it("names the version link for screen readers by what it opens", async () => {
     const { page } = await site();
     const version = JSON.parse(readFileSync("package.json", "utf8")).version;
