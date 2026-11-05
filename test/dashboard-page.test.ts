@@ -1669,6 +1669,13 @@ describe("writeDashboard new preset widgets", () => {
     expect(r).toMatchObject({ addedWidgets: { recovery: ["recoveryTrend"] } });
   });
 
+  it("reports the Recovery trend on a page of one sport, because the Recovery board does not depend on the sports", async () => {
+    await settingsTemplate();
+    setLayout(withoutRecoveryTrend());
+    const r = await writer.write({ settings: { sports: ["cycling"], recoveryHistory: true } });
+    expect(r.addedWidgets?.recovery).toEqual(["recoveryTrend"]);
+  });
+
   it("does not report the Recovery trend without its setting, and reports it on a later update with it", async () => {
     await settingsTemplate();
     setLayout(withoutRecoveryTrend());

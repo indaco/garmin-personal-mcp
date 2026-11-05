@@ -57,6 +57,16 @@ describe("catalogues", () => {
     expect(Object.values(catalogue).filter((v) => v.trim() === "")).toEqual([]);
   });
 
+  it.each(Object.entries(BUILT_IN))(
+    "%s has its own non-empty text for the Recovery trend",
+    (_, catalogue) => {
+      for (const key of ["w.recoveryTrend", "rt.note"] as const) {
+        expect(catalogue[key].trim(), key).not.toBe("");
+        expect(catalogue[key], key).not.toBe(en[key]);
+      }
+    },
+  );
+
   it.each(Object.entries(ALL))("%s keeps every {placeholder} of en", (_, catalogue) => {
     for (const [key, text] of Object.entries(en)) {
       expect([key, names(catalogue[key as keyof typeof en])]).toEqual([key, names(text)]);

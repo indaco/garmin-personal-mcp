@@ -1444,6 +1444,53 @@ describe("recovery trend widget", () => {
     expect(errors).toEqual([]);
   });
 
+  it("shows n/a, no chart and no error for an empty recovery list", async () => {
+    const { page, errors } = await openTrend([]);
+    expect(await page.textContent("[data-id=recoveryTrend]")).toContain("n/a");
+    expect(await page.$("[data-id=recoveryTrend] canvas")).toBeNull();
+    expect(errors).toEqual([]);
+  });
+
+  it("shows n/a and no chart for rows that have only a date", async () => {
+    const { page, errors } = await openTrend([{ date: "2026-10-05" }, { date: "2026-10-26" }]);
+    expect(await page.textContent("[data-id=recoveryTrend]")).toContain("n/a");
+    expect(await page.$("[data-id=recoveryTrend] canvas")).toBeNull();
+    expect(errors).toEqual([]);
+  });
+
+  it("gives the last week a point from the days so far when the week is partial", async () => {
+    const { errors, line } = await openTrend(
+      [
+        { date: "2026-10-26", sleepH: 7, sleepScore: 80, rhr: 48 },
+        { date: "2026-10-28", sleepH: 8, sleepScore: 90, rhr: 50 },
+      ],
+      { recoveryHistory: true },
+      { end: "2026-10-28" },
+    );
+    expect((await line("Sleep")).data.at(-1)).toBe(7.5);
+    expect((await line("Sleep score")).data.at(-1)).toBe(85);
+    expect((await line("Resting HR")).data.at(-1)).toBe(49);
+    expect(errors).toEqual([]);
+  });
+
+  it("gives a point to the first week of the period, and null to each later week, for rows of that week only", async () => {
+    const { errors, line } = await openTrend([
+      { date: "2026-08-03", sleepH: 6, sleepScore: 70, rhr: 55 },
+      { date: "2026-08-09", sleepH: 7, sleepScore: 80, rhr: 53 },
+    ]);
+    for (const [label, first] of [
+      ["Sleep", 6.5],
+      ["Sleep score", 75],
+      ["Resting HR", 54],
+    ] as const) {
+      const d = (await line(label)).data;
+      expect(d, label).toHaveLength(13);
+      expect(d[0], label).toBe(first);
+      expect(d.slice(1), label).toEqual(Array(12).fill(null));
+    }
+    expect(errors).toEqual([]);
+  });
+
   it("draws one row in a window of one week without an error", async () => {
     const { page, errors, line } = await openTrend(
       [{ date: "2026-10-26", sleepH: 7, sleepScore: 80, rhr: 48 }],

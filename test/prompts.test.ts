@@ -519,6 +519,26 @@ describe("recovery trend", () => {
     expect(setup).toContain("`recoveryHistory` (true when I said yes to the Recovery trend)");
   });
 
+  it("pins the other sentences of the Recovery trend in the three prompts", async () => {
+    for (const layout of ["preset", "blank"]) {
+      expect(await pageText("training-dashboard", { layout })).toContain(
+        'opens in midnight, no workout comparison, no Recovery trend". Say that I can type my own choice',
+      );
+    }
+    expect(await pageText("dashboard-setup")).toContain(
+      "Say that a yes adds a widget with the weekly average of sleep, sleep score and resting HR for the whole period, and that the page file then holds these values for each day: this matters for a page that I share.",
+    );
+    const free = await pageText("training-dashboard", { layout: "freeform" });
+    expect(free).toContain(
+      "Say that a yes adds a section with the weekly average of sleep, sleep score and resting HR for the whole period, and that the page file then holds these values for each day: this matters for a page that I share. On a yes:",
+    );
+    expect(free).toContain(
+      "Put the settings line of the Workout comparison first in the first inline script of the page, once.",
+    );
+    expect(free).toContain("Add the Recovery trend to the Recovery board (below).");
+    expect(free).toContain("a week with no value is a gap, never 0.");
+  });
+
   it("is not asked in an update, which keeps the choice of the page", async () => {
     expect(await render("training-dashboard-update")).not.toContain("Recovery trend");
   });
