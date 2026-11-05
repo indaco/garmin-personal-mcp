@@ -8,7 +8,7 @@ it by hand.
 | Overview | `kpis` | Window totals; the last 7 days against the 4-week average for distance and time; the 7:28 load ratio; last night's HRV against its 7-day average. | all and each type | 3 |
 | Readiness today | `readiness` | Today's verdict (go easy, normal, ready to push) from HRV status, sleep score, resting HR and the load ratio. The dashboard's own rule. | - | 2 |
 | Fitness age | `fitnessAge` | Garmin fitness age against actual age, the achievable age, and, under Details, its components with Garmin's targets. | - | 1 |
-| Period comparison | `periodComparison` | Sessions, distance, time and load of the window against the same number of weeks before it, per type and in total. | all and each type | 3 |
+| Period comparison | `periodComparison` | Sessions, distance, time and load of the window against the same number of days right before it, per type and in total. | all and each type | 3 |
 | Records | `records` | Best efforts, longest run and ride, heaviest set and the best estimated 1RM of each exercise in the window: 4 first, the others under Show all. | all and each type | 3 |
 | Weekly volume | `weeklyVolume` | Time, distance, sessions or load of each week, stacked by type, with a 4-week average line. | all and each type | 2 |
 | Intensity minutes | `intensityMinutes` | Moderate + 2 x vigorous minutes of the activities each week, against 150 minutes. | all and each type | 1 |

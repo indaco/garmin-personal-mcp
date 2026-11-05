@@ -897,7 +897,13 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
       },
     ],
     previousActivities: [
-      { id: 3, sport: "cycling", type: "road_biking", start: "2026-07-24 07:00:00" },
+      {
+        id: 3,
+        name: "Quarry Loop",
+        sport: "cycling",
+        type: "road_biking",
+        start: "2026-07-24 07:00:00",
+      },
     ],
     hrv: [{ date: "2026-10-25", hrv: 50 }],
     recovery: [{ date: "2026-10-25", sleepH: 7.5, sleepScore: 80 }],
@@ -1144,6 +1150,17 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
         '/* garmin-settings:start */{"exclude":["names"]}/* garmin-settings:end */',
       );
     });
+  });
+
+  it("leaves the names of the previous rows out of the page when the names are excluded", async () => {
+    await writer.write({ settings: { exclude: ["names"] } });
+    const d = readBlock(page(), "data") as Full;
+    expect(d.previousActivities).toHaveLength(1);
+    expect(d.previousActivities[0]).not.toHaveProperty("name");
+    expect(page()).not.toContain("Quarry Loop");
+    // without the exclusion the name is on the page
+    await later(() => writer.write({ settings: {} }));
+    expect(page()).toContain("Quarry Loop");
   });
 
   it("leaves out of the page and of the digest the data and the sports that the settings exclude", async () => {

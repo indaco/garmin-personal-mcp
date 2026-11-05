@@ -285,9 +285,9 @@ export function readinessOf(
   };
 }
 
-/** The same number of weeks just before the window; partial when they start before the data. */
-export function periodWindow(from: string, to: string, dataStart: string | undefined) {
-  const days = (Date.parse(to) - Date.parse(from)) / 86_400_000 + 7;
+/** As many days as the window, right before it, as the digest does; partial when they start before the data. */
+export function periodWindow(from: string, end: string, dataStart: string | undefined) {
+  const days = (Date.parse(end) - Date.parse(from)) / 86_400_000 + 1;
   const prevFrom = addDays(from, -days);
   return {
     from: prevFrom,

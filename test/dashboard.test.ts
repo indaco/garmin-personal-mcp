@@ -27,7 +27,7 @@ import { filterData } from "../src/dashboard-page";
 import { addDays } from "../src/dates";
 import { digest } from "../src/digest";
 import { log as logMock } from "../src/log";
-import { groupOf, weeksOf } from "../src/page/calc";
+import { groupOf } from "../src/page/calc";
 import { periodWindow } from "../src/page/metrics";
 import { GarminTools, writeAtomically } from "../src/tools";
 import { fitFile } from "./fit-file";
@@ -521,9 +521,25 @@ describe("the period", () => {
     const out = JSON.parse(await dashboard.getDashboardData(2));
     expect(out.activities.map((a: { id: number }) => a.id)).toEqual([1]);
     expect(out.previousActivities.map((a: { id: number }) => a.id)).toEqual([2]);
-    const weeks = weeksOf(out.start, out.end);
-    expect(periodWindow(weeks[0], weeks.at(-1)!, out.prevStart).partial).toBe(false);
+    expect(periodWindow(out.start, out.end, out.prevStart).partial).toBe(false);
     expect(Object.values(digest(out).weekly).some((w) => w.partial)).toBe(false);
+  });
+});
+
+describe("the period comparison", () => {
+  it.each([
+    ["Monday", new Date(2026, 9, 26, 12)],
+    ["Tuesday", new Date(2026, 9, 27, 12)],
+    ["Wednesday", new Date(2026, 9, 28, 12)],
+    ["Thursday", new Date(2026, 9, 29, 12)],
+    ["Friday", new Date(2026, 9, 30, 12)],
+    ["Saturday", new Date(2026, 9, 31, 12)],
+    ["Sunday", new Date(2026, 10, 1, 12)],
+  ])("has the dates of the digest when today is a %s", async (_day, now) => {
+    vi.setSystemTime(now);
+    const out = JSON.parse(await dashboard.getDashboardData(2));
+    const { from, to } = digest(out).period.previousPeriod as { from: string; to: string };
+    expect(periodWindow(out.start, out.end, out.prevStart)).toMatchObject({ from, to });
   });
 });
 
@@ -1523,6 +1539,7 @@ describe("getDashboardData", () => {
       {
         id: 6,
         start: "2026-10-05 07:00:00",
+        name: "A6",
         type: "cycling",
         sport: "cycling",
         km: 5,
@@ -1531,6 +1548,7 @@ describe("getDashboardData", () => {
       {
         id: 5,
         start: "2026-09-25 07:00:00",
+        name: "A5",
         type: "running",
         sport: "running",
         km: 5,
@@ -1539,6 +1557,17 @@ describe("getDashboardData", () => {
         trainingLoad: 80.3,
       },
     ]);
+  });
+
+  it("keeps the name of a previous row, and no name when the activity has none", async () => {
+    garminActivities = [
+      activity(5, "2026-09-25"),
+      { ...activity(6, "2026-09-26"), activityName: undefined },
+    ];
+    const out = JSON.parse(await dashboard.getDashboardData(2));
+    const byId = (id: number) => out.previousActivities.find((r: { id: number }) => r.id === id);
+    expect(byId(5).name).toBe("A5");
+    expect(byId(6)).not.toHaveProperty("name");
   });
 
   describe("a rate limit or a network failure stops the requests", () => {
