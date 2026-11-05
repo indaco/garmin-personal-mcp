@@ -1935,6 +1935,30 @@ describe("overview widgets", () => {
       expect(errors).toEqual([]);
     });
 
+    it("does not say a date for an HRV row without one, readiness", async () => {
+      const hrv = data.hrv.map((r: { date: string }) =>
+        r.date === data.end ? without(r, ["date"]) : r,
+      );
+      const file = pageFile({ data: { ...data, v: DASHBOARD_VERSION, hrv } });
+      const { page, errors } = await open(browser, file);
+      expect((await readinessSubs(page))["HRV status"]).toEqual([]);
+      expect(await page.textContent("[data-id=readiness]")).not.toContain("undefined");
+      expect(errors).toEqual([]);
+    });
+
+    it("does not say a date for a recovery row without one, readiness", async () => {
+      const recovery = data.recovery.map((r: { date: string }) =>
+        r.date === data.end ? without(r, ["date"]) : r,
+      );
+      const file = pageFile({ data: { ...data, v: DASHBOARD_VERSION, recovery } });
+      const { page, errors } = await open(browser, file);
+      const s = await readinessSubs(page);
+      expect(s["Sleep score"]).toEqual([]);
+      expect(s["Resting HR"].some((x) => x.startsWith("from"))).toBe(false);
+      expect(await page.textContent("[data-id=readiness]")).not.toContain("undefined");
+      expect(errors).toEqual([]);
+    });
+
     it("does not say a date for an older row that has no values, readiness", async () => {
       const recovery = oldRecovery.map((r: { date: string }) =>
         r.date === "2026-10-25" ? { date: r.date } : r,
