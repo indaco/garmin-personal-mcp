@@ -230,19 +230,21 @@ Release from an up-to-date `main` with a clean tree.
    the PR with the same title: the squash merge uses the title as the commit message.
 4. After the merge, switch to `main` and pull. The tag must point to the release commit on `main`.
 5. Run `sley tag create --push`.
-6. Deploy the website. No workflow does this, and the What's new page shows only the releases of the
-   last deploy.
+6. After the Release run is green, deploy the website. No workflow does this, and the What's new
+   page shows only the releases of the last deploy.
 
 The first version, 0.1.0, was published by hand. Its notes in `.changes/v0.1.0.md` are written by
 hand, because `sley bump` writes the notes file and 0.1.0 needs no bump.
 
-The Release workflow checks the tag and runs the checks. It publishes to npm with trusted
-publishing and skips a version that is already on npm. It creates the GitHub Release from
-`.changes/<TAG>.md`. As a last check, it installs the published version with `npx`.
+The Release workflow checks the tag and runs the checks on Linux, macOS and Windows. It publishes
+to npm with trusted publishing and skips a version that is already on npm. It creates the GitHub
+Release from `.changes/<TAG>.md`. As a last check, it installs the published version with `npx`.
 
-If `tag-validate` fails, nothing was published. Delete the tag (`git push --delete origin <TAG>`,
-`git tag -d <TAG>`), fix the problem and tag again. After a publish, a version cannot be replaced.
-Fix forward with a new patch version, and use `npm deprecate` for a bad one.
+If a job before `publish` fails (`tag-validate`, `build`, `check` or `os`), nothing was published.
+Delete the tag (`git push --delete origin <TAG>`, `git tag -d <TAG>`), fix the problem and tag
+again. If the cause is not in the code, for example a network error, re-run the failed jobs instead.
+After a publish, a version cannot be replaced. Fix forward with a new patch version, and use
+`npm deprecate` for a bad one.
 
 ### Highlights
 
