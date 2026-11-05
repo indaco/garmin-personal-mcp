@@ -1123,6 +1123,28 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
     }
   });
 
+  it.each<[("names" | "notes")[]]>([[[]], [["names"]]])(
+    "keeps the error text of a failed detail out of the page (exclude %j)",
+    async (exclude) => {
+      const withError = {
+        ...data,
+        activities: [{ ...data.activities[0], detailError: "ENOENT /Users/anna/fit/1.fit" }],
+      };
+      const w = new DashboardWriter(
+        async () => JSON.stringify(withError),
+        dir,
+        async () => templateText,
+      );
+      const r = await w.write({ settings: { exclude } });
+      expect(page()).not.toContain("detailError");
+      expect(page()).not.toContain("anna");
+      const [a] = (readBlock(page(), "data") as Full).activities;
+      expect(a).toMatchObject({ id: 1, km: 10 });
+      expect(a).not.toHaveProperty("detailError");
+      expect(r.digest.totals).toBeDefined();
+    },
+  );
+
   it("keeps a title and headline from the notes call through updates, refreshes and upgrades", async () => {
     // an existing page with its own settings, then the training-dashboard prompt on a preset page
     await writer.write({ settings: { exclude: ["zones"] } });

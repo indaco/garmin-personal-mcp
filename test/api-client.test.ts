@@ -438,6 +438,8 @@ describe("requests", () => {
   it("reports a response that is not JSON", async () => {
     mockFetch(tokenJson({ access_token: "tok" }), { body: "<html>", contentType: "text/html" });
     await expect(client().getJson("/x")).rejects.toThrow("Response is not JSON: <html>");
+    mockFetch(tokenJson({ access_token: "tok" }), { body: "<html>", contentType: "text/html" });
+    await expect(client().getJson("/x")).rejects.toMatchObject({ status: 200 });
   });
 
   it("gives the HTTP status of a failed GET, and none for a network error", async () => {

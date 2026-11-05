@@ -36,7 +36,11 @@ page shows English, and the `dashboard-language` prompt adds the language.
 Finish with two lines in chat: the period that the dashboard covers now, with the number of new
 activities (`sync.newActivities`), and anything that was missing. If `sync.failedDays` is more than
 0, name the dates in `sync.failedDates`. If `sync.failedSections` is not empty, name those sections
-(HR zones, fitness age, HRV) and say that they show as "n/a".
+(HR zones, fitness age, HRV, units). HR zones and units then use the last saved values, if there are
+any; say so. Fitness age and HRV show as "n/a". If `sync.failedDetails` is more than 0, say that
+this many sessions have no laps or sets, so the strength and lap numbers are not complete. If
+`sync.stoppedEarly` is true, say that Garmin stopped answering (a rate limit or the network), and
+that I can run the update again in a few minutes.
 
 Call `scheduleDashboardRefresh` without arguments. If its `pages` do not have this page, add one
 line: you can update the page automatically when I ask, in my own words, for example "update it

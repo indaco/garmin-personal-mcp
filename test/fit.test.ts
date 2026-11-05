@@ -563,15 +563,23 @@ describe("FIT files", () => {
   });
 
   it("reports a zip without a .fit file", () => {
-    expect(() => unzipFit(zipSync({ "a.txt": new Uint8Array([1]) }), 5)).toThrow(
+    const zip = zipSync({ "a.txt": new Uint8Array([1]) });
+    expect(() => unzipFit(zip, 5)).toThrow(
       "The download of activity 5 is a zip without a .fit file",
     );
+    expect(() => unzipFit(zip, 5)).toThrow(expect.objectContaining({ status: 200 }));
+  });
+
+  it("gives the status 200 to a download that is not a .FIT file", () => {
+    const bytes = new Uint8Array(20);
+    expect(() => unzipFit(bytes, 5)).toThrow("The download of activity 5 is not a .FIT file");
+    expect(() => unzipFit(bytes, 5)).toThrow(expect.objectContaining({ status: 200 }));
   });
 
   it("reports a file it cannot decode", () => {
-    expect(() => decodeFit(new TextEncoder().encode("not a fit file"), 6)).toThrow(
-      /^Cannot decode the \.FIT file of 6: /,
-    );
+    const bytes = new TextEncoder().encode("not a fit file");
+    expect(() => decodeFit(bytes, 6)).toThrow(/^Cannot decode the \.FIT file of 6: /);
+    expect(() => decodeFit(bytes, 6)).toThrow(expect.objectContaining({ status: 200 }));
   });
 
   // The SDK returns the messages it read along with the error: a damaged file must give no partial sets.

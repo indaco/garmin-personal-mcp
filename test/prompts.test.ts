@@ -265,6 +265,18 @@ describe("prompts", () => {
     ]) {
       expect(text).toContain("failedDates");
       expect(text).toContain("failedSections");
+      expect(text).toContain("failedDetails");
+      expect(text).toContain("stoppedEarly");
+    }
+  });
+
+  it("tells Claude that the last saved zones and units are used when a call fails", async () => {
+    for (const text of [
+      await render("training-dashboard"),
+      await render("training-dashboard-update"),
+      await render("training-dashboard", { layout: "freeform" }),
+    ]) {
+      expect(text).toContain("last saved");
     }
   });
 

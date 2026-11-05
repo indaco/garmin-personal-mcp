@@ -98,7 +98,10 @@ export function decodeFit(bytes: Uint8Array, activityId: number): Messages {
     convertTypesToStrings: false,
   });
   if (errors.length > 0) {
-    throw new GarminApiError(`Cannot decode the .FIT file of ${activityId}: ${errors[0].message}`);
+    throw new GarminApiError(
+      `Cannot decode the .FIT file of ${activityId}: ${errors[0].message}`,
+      200,
+    );
   }
   return messages as Messages;
 }
@@ -116,12 +119,13 @@ export function unzipFit(data: Uint8Array, activityId: number): Uint8Array {
     if (!entry) {
       throw new GarminApiError(
         `The download of activity ${activityId} is a zip without a .fit file`,
+        200,
       );
     }
     fit = entry;
   }
   if (!isFit(fit)) {
-    throw new GarminApiError(`The download of activity ${activityId} is not a .FIT file`);
+    throw new GarminApiError(`The download of activity ${activityId} is not a .FIT file`, 200);
   }
   return fit;
 }
