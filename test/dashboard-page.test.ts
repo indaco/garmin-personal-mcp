@@ -288,6 +288,54 @@ describe("writeDashboard", () => {
     expect(asked).toEqual([12, 6, 6]);
   });
 
+  describe("a snapshot with gaps", () => {
+    let gappy: DashboardWriter;
+
+    beforeEach(() => {
+      gappy = new DashboardWriter(
+        async (weeks) => {
+          asked.push(weeks);
+          return JSON.stringify({ ...data, sync: { ...data.sync, failedDays: 2 } });
+        },
+        dir,
+        async () => templateText,
+      );
+    });
+
+    it("is not reused by a new update", async () => {
+      await gappy.write({});
+      await gappy.write({});
+      // the second call takes the weeks of the page
+      expect(asked).toEqual([undefined, 12]);
+    });
+
+    it("is reused by the write that adds the notes", async () => {
+      await gappy.write({});
+      await gappy.write({ notes: ["n"] });
+      expect(asked).toEqual([undefined]);
+    });
+
+    it("is reused by the retry inside one write", async () => {
+      await gappy.write({});
+      asked.length = 0;
+      let n = 0;
+      const racing = new DashboardWriter(
+        async (weeks) => {
+          asked.push(weeks);
+          return JSON.stringify({ ...data, sync: { ...data.sync, failedDays: 2 } });
+        },
+        dir,
+        async () => {
+          if (++n === 1) writeFileSync(file, page().replace("</script>", "// edit\n</script>"));
+          return templateText;
+        },
+      );
+      await racing.write({});
+      // the page already has 12 weeks
+      expect(asked).toEqual([12]);
+    });
+  });
+
   it("reuses the snapshot when the first call has no weeks and the page is new", async () => {
     await writer.write({});
     await writer.write({ notes: ["n"] });

@@ -8,6 +8,7 @@ import * as z from "zod/v4";
 import { name } from "../package.json";
 import type { Config } from "./config";
 import { type DashboardWriter, pageTarget, patchDue } from "./dashboard-page";
+import { syncGaps } from "./digest";
 import { LOG_DIR, log } from "./log";
 import { MODEL_ONLY, writeAtomically } from "./tools";
 
@@ -74,6 +75,8 @@ export interface Status {
 export interface LastRun {
   at: string;
   failed: { path: string; error: string }[];
+  /** Pages that were written with gaps (data that Garmin did not give). */
+  partial?: { path: string; gaps: string }[];
 }
 
 interface State {
@@ -663,7 +666,7 @@ export class AutoRefresh {
     } catch {
       // stays null: damaged
     }
-    if (typeof state?.cron !== "string" || !Array.isArray(state.pages)) {
+    if (typeof state?.cron !== "string" || !validCron(state.cron) || !Array.isArray(state.pages)) {
       throw new Error(
         `${this.#stateFile} is damaged: stop the automatic refresh (off), then set it again`,
       );
@@ -681,25 +684,41 @@ export function realEntry(path: string | undefined): string {
   }
 }
 
+const validCron = (text: string): boolean => {
+  try {
+    parseCron(text);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 /** Updates each page; one failure does not stop the others. Returns one log line per page. */
 export async function refreshPages(
   writer: Pick<DashboardWriter, "write">,
   pages: string[],
-): Promise<{ lines: string[]; failed: LastRun["failed"] }> {
+): Promise<{
+  lines: string[];
+  failed: LastRun["failed"];
+  partial: NonNullable<LastRun["partial"]>;
+}> {
   const lines: string[] = [];
   const failed: LastRun["failed"] = [];
+  const partial: NonNullable<LastRun["partial"]> = [];
   for (const path of pages) {
     const at = new Date().toISOString();
     try {
-      await writer.write({ path, onlyExisting: true });
-      lines.push(`${at} updated ${path}`);
+      const report = await writer.write({ path, onlyExisting: true });
+      const gaps = syncGaps(report.digest.sync);
+      if (gaps) partial.push({ path, gaps });
+      lines.push(`${at} updated ${path}${gaps ? `, with gaps: ${gaps}` : ""}`);
     } catch (e) {
       const error = (e as Error).message;
       failed.push({ path, error });
       lines.push(`${at} failed ${path}: ${error}`);
     }
   }
-  return { lines, failed };
+  return { lines, failed, partial };
 }
 
 /** Registers scheduleDashboardRefresh. */
@@ -714,8 +733,9 @@ export function registerSchedule(server: McpServer, auto: AutoRefresh): void {
         "computer (launchd, cron or Task Scheduler) replaces the data of the page at the given times, also",
         "with no assistant open. The refresh removes the coach notes, because old notes do not agree",
         "with new data. The computer must be on at that time. The page must exist (writeDashboard first).",
-        "`last` is the last automatic run: its time and the pages that it could not update, with the",
-        "error. A page shows a note when its update is more than 1 hour late: `last` tells why.",
+        "`last` is the last automatic run: its time, the pages that it could not update, with the error,",
+        "and in `partial` the pages that it updated with gaps. A page shows a note when its update is",
+        "more than 1 hour late: `last` tells why.",
         "`cron`: convert what the user says, in any language, into a 5-field cron expression in local",
         'time: minute hour day-of-month month weekday, numbers only (0 = Sunday), e.g. "0 7 * * 1-5" for',
         "weekdays at 7. Two runs must be at least 1 hour apart. The cron is for all scheduled pages;",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { digest } from "../src/digest";
+import { digest, syncGaps } from "../src/digest";
 import { hms, round } from "../src/fit";
 import { type Activity, sessionSeconds } from "../src/page/calc";
 import { fitnessFatigueFrom, loadRatio, readinessOf } from "../src/page/metrics";
@@ -864,5 +864,28 @@ describe("digest", () => {
     // it grows with weeks, types and exercises, not with the number of sessions
     const many = Array.from({ length: 120 }, (_, i) => ({ ...data.activities[3], id: 100 + i }));
     expect(JSON.stringify(digest({ ...data, activities: many })).length).toBeLessThan(10_000);
+  });
+});
+
+describe("syncGaps", () => {
+  it("gives nothing for no sync, a non-object, an empty object or a clean sync", () => {
+    for (const sync of [undefined, null, "x", 3, [], {}, { failedDays: 0, failedSections: [] }])
+      expect(syncGaps(sync)).toBeUndefined();
+  });
+
+  it("names each kind of gap", () => {
+    expect(syncGaps({ failedDays: 2 })).toBe("days: 2");
+    expect(syncGaps({ failedSections: ["hrv", "sleep"] })).toBe("sections: hrv, sleep");
+    expect(syncGaps({ failedDetails: 3 })).toBe("session details: 3");
+    expect(syncGaps({ stoppedEarly: true })).toBe("Garmin stopped answering");
+  });
+
+  it("joins all the gaps, and ignores values of the wrong type", () => {
+    expect(
+      syncGaps({ failedDays: 1, failedSections: ["hrv"], failedDetails: 4, stoppedEarly: true }),
+    ).toBe("days: 1; sections: hrv; session details: 4; Garmin stopped answering");
+    expect(
+      syncGaps({ failedDays: "2", failedSections: "hrv", failedDetails: NaN, stoppedEarly: 1 }),
+    ).toBeUndefined();
   });
 });

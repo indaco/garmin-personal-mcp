@@ -52,7 +52,7 @@ function fakes() {
     write: async (o: { path?: string }) => {
       written.push(o.path);
       if (o.path === "b.html") throw new Error("gone");
-      return {} as never;
+      return { digest: {} } as never;
     },
   });
   return { auto, writer, written };
@@ -66,11 +66,17 @@ function flaky(errors: Record<string, string[]>) {
       written.push(o.path!);
       const error = errors[o.path!]?.shift();
       if (error) throw new Error(error);
-      return {} as never;
+      return { digest: {} } as never;
     },
   });
   return { writer, written };
 }
+
+/** A writer whose page a.html has gaps. */
+const gappy = () => ({
+  write: async (o: { path?: string }) =>
+    ({ digest: { sync: o.path === "a.html" ? { failedDetails: 1 } : {} } }) as never,
+});
 
 /** A sleep that only records how long it would wait. */
 function sleeper() {
@@ -491,6 +497,38 @@ describe("cli", () => {
     });
   });
 
+  it("saves the pages written with gaps, and exits with 0", async () => {
+    const f = fakes();
+    f.auto.pages.mockResolvedValue(["a.html", "b.html"]);
+    const r = await cli("refresh", ["--auto"], f.auto, gappy);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toMatch(/updated a\.html, with gaps: session details: 1\n.* updated b\.html$/);
+    expect(f.auto.saveRun).toHaveBeenCalledWith({
+      at: expect.any(String),
+      failed: [],
+      partial: [{ path: "a.html", gaps: "session details: 1" }],
+    });
+  });
+
+  it("keeps the gaps of a page that had a network error and then worked with gaps", async () => {
+    const f = fakes();
+    f.auto.pages.mockResolvedValue(["a.html"]);
+    let n = 0;
+    const writer = () => ({
+      write: async () => {
+        if (++n === 1) throw new Error(OFFLINE);
+        return { digest: { sync: { failedSections: ["hrv"] } } } as never;
+      },
+    });
+    const r = await cli("refresh", ["--auto"], f.auto, writer, sleeper().sleep);
+    expect(r.code).toBe(0);
+    expect(f.auto.saveRun).toHaveBeenCalledWith({
+      at: expect.any(String),
+      failed: [],
+      partial: [{ path: "a.html", gaps: "sections: hrv" }],
+    });
+  });
+
   it("waits with a real timer when no sleep is given", async () => {
     vi.useFakeTimers();
     try {
@@ -672,6 +710,13 @@ describe("cli", () => {
     const bad = { ...ok, failed: [{ path: "/d/a.html", error: "HTTP 401" }] };
     expect(summary({ ...on, last: bad })).toContain(
       "Last run: 2026-11-02T06:00:00.000Z, failed:\n  /d/a.html: HTTP 401\nLog:",
+    );
+    const gaps = { ...ok, partial: [{ path: "/d/b.html", gaps: "days: 2" }] };
+    expect(summary({ ...on, last: gaps })).toContain(
+      "Last run: 2026-11-02T06:00:00.000Z, updated with gaps:\n  /d/b.html: days: 2\nLog:",
+    );
+    expect(summary({ ...on, last: { ...bad, partial: gaps.partial } })).toContain(
+      "Last run: 2026-11-02T06:00:00.000Z, failed:\n  /d/a.html: HTTP 401\nupdated with gaps:\n  /d/b.html: days: 2\nLog:",
     );
   });
 });

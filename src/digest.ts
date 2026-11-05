@@ -384,6 +384,19 @@ function typeOf(a: Json): string {
   return typeof a.type === "string" ? a.type : "other";
 }
 
+/** What an update could not fetch, for a log line; undefined when it got everything. */
+export function syncGaps(sync: unknown): string | undefined {
+  if (!isObject(sync)) return undefined;
+  const sections = Array.isArray(sync.failedSections) ? sync.failedSections : [];
+  const gaps = [
+    num(sync.failedDays) > 0 ? `days: ${num(sync.failedDays)}` : "",
+    sections.length > 0 ? `sections: ${sections.join(", ")}` : "",
+    num(sync.failedDetails) > 0 ? `session details: ${num(sync.failedDetails)}` : "",
+    sync.stoppedEarly === true ? "Garmin stopped answering" : "",
+  ].filter(Boolean);
+  return gaps.length > 0 ? gaps.join("; ") : undefined;
+}
+
 function num(v: unknown): number {
   return typeof v === "number" && Number.isFinite(v) ? v : 0;
 }
