@@ -704,6 +704,41 @@ describe("coach prompts", () => {
     );
   });
 
+  it("reviews the last whole week with the page's numbers from one call", async () => {
+    const { prompts } = await client.listPrompts();
+    expect(prompts.find((p) => p.name === "week-review")?.arguments ?? []).toEqual([]);
+    const text = await render("week-review");
+    const flat = text.replace(/\s+/g, " ");
+    expect(text.includes("{{")).toBe(false);
+    expect(text).toContain("Today is 2026-10-28.");
+    // Monday 2026-10-26 is this week's: the last whole week starts one week before
+    expect(text).toContain("`2026-10-19`");
+    expect(text).toContain("Call `writeDashboard` with `preview` = true.");
+    expect(text).not.toContain("listActivities");
+    expect(flat).toContain("without a row had no sessions");
+    expect(flat).toContain("A week before `digest.period.start` has no data");
+    expect(flat).toContain("say that the page does not cover it");
+    expect(flat).toContain(
+      "Do not mention the data or the sports that the `settings` of the reply exclude.",
+    );
+    expect(flat).toContain("not the reviewed week");
+    expect(text).toContain('"n/a"');
+    for (const line of template("week-review").split("\n")) {
+      expect(line.length).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it("starts the last whole week one week before a Monday, and before a Sunday", async () => {
+    vi.setSystemTime(new Date(2026, 9, 26, 12));
+    expect(await render("week-review")).toContain(
+      "The last whole week starts on Monday `2026-10-19`.",
+    );
+    vi.setSystemTime(new Date(2026, 10, 1, 12));
+    expect(await render("week-review")).toContain(
+      "The last whole week starts on Monday `2026-10-19`.",
+    );
+  });
+
   it("keeps a race distance with a dollar pattern or a marker as typed", async () => {
     const text = await render("race-readiness", {
       date: "2026-12-06",

@@ -149,7 +149,9 @@ export function facts(root = ".") {
   // the sport tab of "What you can ask" that each coach prompt goes with
   const coachPrompts = promptTable("## Coach prompts").map((p) => ({
     ...p,
-    sport: { "strength-review": "strength", "train-today": "every" }[p.name] ?? "running",
+    sport:
+      { "strength-review": "strength", "train-today": "every", "week-review": "every" }[p.name] ??
+      "running",
   }));
   const themes = [
     ...read(`${root}/src/page/theme.ts`).matchAll(/\{ id: "(\w+)", group: "(\w+)" \}/g),
