@@ -1,0 +1,22 @@
+<!-- Scaffolded from the 'typescript' preset; used instead of its rules, after the generic ones. -->
+- Idiomatic TypeScript written for the latest release (TypeScript 7, the native `tsc`); use only what the project's `typescript` version supports
+- Strict TypeScript: `strict` is on (the default from 7.0); keep every stricter flag the project sets (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, ...); never loosen `tsconfig.json` to make code compile
+- Modern `tsconfig.json`: `module`/`moduleResolution` `nodenext` or `bundler`; set `rootDir` and `types` explicitly (7.0 defaults them to `./` and `[]`); no `baseUrl`, `target: es5`, `node10` resolution or AMD/UMD modules (removed in 7.0); use `paths` or `package.json` `imports` (`#src/*`) for aliases
+- If a tool still needs the compiler's JavaScript API (some lint rules, codegen), keep its TypeScript 6 pin; do not remove it
+- No `any` (use `unknown` and narrow); no `as` casts to silence errors (narrow with type guards, check literals with `satisfies`); no non-null `!` on values that can be absent
+- No `@ts-ignore`; `@ts-expect-error` only with a comment that says why
+- Model states with discriminated unions; `switch` on them exhaustively, with a `never` check in the default branch
+- Erasable syntax only (`erasableSyntaxOnly`), so Node can strip the types: `as const` objects or string-literal unions, not `enum`, runtime `namespace` or constructor parameter properties
+- Exported functions declare their return types (`isolatedDeclarations` needs it); mark data that does not change as `readonly`
+- `const` by default, never `var`; `===` only; `??` and `?.` instead of `||` and `&&` chains for missing values
+- ES modules with named exports (default exports only where a framework needs them); `import type` for type-only imports (`verbatimModuleSyntax`); `node:` prefix for Node built-ins
+- No floating promises: `await`, return, or `void` them with a comment; run independent work with `Promise.all`; pass an `AbortSignal` to work that can be cancelled; release resources with `using`/`await using` where the runtime supports it
+- Throw only `Error` objects (subclasses for errors callers handle), set `cause` when you rethrow; `catch` values are `unknown` until narrowed
+- Validate external input at the boundary (request bodies, env, files, third-party responses) with the project's schema library (e.g. zod) and derive the types from the schema
+- Money and other exact quantities never use floating point
+- `tsc --noEmit` (or `tsc -b`) is clean
+- Lint and format pass with the repo's tool (`biome check`, or `eslint` with type-aware `typescript-eslint` rules + `prettier --check`)
+- Use the package manager the lockfile names (`pnpm-lock.yaml` -> pnpm); never mix managers; respect `engines` in `package.json`
+- Tests next to the code (`*.test.ts`) with the repo's runner (vitest, jest or `node:test`); integration tests in their own folder
+- Tests use fake timers and stubbed network, never real sleeps or live services
+- Run `npm audit` (or the manager's equivalent) when dependencies change
