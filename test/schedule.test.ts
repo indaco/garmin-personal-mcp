@@ -1,4 +1,5 @@
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -393,6 +394,18 @@ describe("AutoRefresh", () => {
     for (const f of ["node", "npx"]) writeFileSync(join(bin, f), "");
     return bin;
   };
+  /** A saved page in a folder that is made read-only by `lock`; `unlock` restores it for the cleanup. */
+  const lockedPage = () => {
+    const ro = join(dir, "ro");
+    mkdirSync(ro);
+    const page = join(ro, "locked.html");
+    writeFileSync(page, `<script>/* garmin-data:start */{"weeks":4}/* garmin-data:end */</script>`);
+    return {
+      page,
+      lock: () => chmodSync(ro, 0o500),
+      unlock: () => chmodSync(ro, 0o700),
+    };
+  };
   const stateOf = () => JSON.parse(readFileSync(join(config.dataDir, "auto-refresh.json"), "utf8"));
 
   beforeEach(() => {
@@ -454,6 +467,53 @@ describe("AutoRefresh", () => {
     const a = auto("linux");
     await a.set({ cron: "45 5 * * 1-5" });
     expect((await a.set({ path: "coach.html" })).cron).toBe("45 5 * * 1-5");
+  });
+
+  describe("a page that cannot be written", () => {
+    // root ignores the mode of a folder
+    const posixUser = it.skipIf(process.platform === "win32" || process.getuid?.() === 0);
+    posixUser("does not keep `off` from removing the job and the state file", async () => {
+      const { page, lock, unlock } = lockedPage();
+      const a = auto("linux");
+      await a.set({ path: page });
+      lock();
+      try {
+        expect(await a.off()).toEqual({ scheduled: false });
+      } finally {
+        unlock();
+      }
+      expect(crontab).not.toContain("garmin-personal-mcp refresh");
+      expect(existsSync(join(config.dataDir, "auto-refresh.json"))).toBe(false);
+    });
+
+    posixUser("keeps the schedule of the other page when `off` names it", async () => {
+      const { page, lock, unlock } = lockedPage();
+      const a = auto("linux");
+      await a.set({});
+      await a.set({ path: page });
+      lock();
+      try {
+        expect((await a.off(page)).pages).toEqual([join(config.dataDir, "garmin-dashboard.html")]);
+      } finally {
+        unlock();
+      }
+      expect(stateOf().pages).toEqual([join(config.dataDir, "garmin-dashboard.html")]);
+      expect(crontab).toContain("garmin-personal-mcp refresh");
+    });
+
+    posixUser("does not make `set` fail once the job is installed", async () => {
+      const { page, lock, unlock } = lockedPage();
+      lock();
+      try {
+        expect(await auto("linux").set({ path: page })).toMatchObject({
+          scheduled: true,
+          pages: [page],
+        });
+      } finally {
+        unlock();
+      }
+      expect(crontab).toContain("garmin-personal-mcp refresh");
+    });
   });
 
   it("keeps the other lines of the user's crontab", async () => {

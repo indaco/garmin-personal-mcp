@@ -105,8 +105,11 @@ ok      Schedule: Automatic refresh "0 7 * * *" with launchd, next: 2026-11-04 0
 - `Key file` is missing without a problem only when `GARMIN_PERSONAL_API_KEY` is set and no schedule
   is on, because the automatic update reads only the key file. On macOS and Linux, other users must
   not be able to read the file. On Windows, `doctor` does not check this.
-- `API key` sends the key to Garmin in a token request. This is the only network call. `doctor`
-  never shows the key or the token.
+- `API key` sends the key to Garmin in a token request. It is the only network call, except for
+  `Key of the schedule`. `doctor` never shows the key or the token.
+- `Key of the schedule` appears only when a schedule is on, `GARMIN_PERSONAL_API_KEY` is set and the
+  key file exists. The automatic update reads only the key file, so `doctor` also tests this key in
+  a second token request.
 - `Data folder` and `Log folder` make a test folder and remove it. A missing folder is not an error
   when the server can make it.
 - `Schedule` fails when the job is missing from the system scheduler, or when the last run could not
@@ -131,7 +134,8 @@ At the end, it tells how to connect your MCP client.
   each system, an administrator of the computer can still read it. When `icacls` fails, the key is
   saved and the output gives the command to run.
 - When the key file exists, `setup` stops before it asks for the key. Garmin shows a key only one
-  time, so `--force` loses the old key.
+  time, so `--force` loses the old key. A key file that appears while `setup` runs also stays, and
+  the new key is not saved.
 - When Garmin refuses the key (HTTP 401 or 403), the key is not saved and an old key stays.
 - When the test fails for another reason, such as no network, the key is saved so that you do not
   lose it. The exit code is 1. Run [`doctor`](#doctor) later to test it.

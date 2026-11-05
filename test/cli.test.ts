@@ -25,6 +25,7 @@ import {
   setup,
   summary,
 } from "../src/cli";
+import type { Config } from "../src/config";
 import type { LastRun, Status } from "../src/schedule";
 
 const on: Status = {
@@ -117,73 +118,73 @@ describe("cli", () => {
     const write = vi.fn(f.writer);
     expect(await cli(word, [], f.auto, write)).toEqual({
       code: 1,
-      stderr: `Unknown command: ${word}\n\n${HELP}`,
+      stderr: `Unknown command\n\n${HELP}`,
     });
     expect(f.auto.status).not.toHaveBeenCalled();
     expect(f.auto.set).not.toHaveBeenCalled();
     expect(write).not.toHaveBeenCalled();
   });
 
-  it("gives the wrong command, not its arguments, in the error", async () => {
+  it("gives no word of the wrong command in the error", async () => {
     const f = fakes();
     expect(await cli("foo", ["--bar", "a.html"], f.auto, f.writer)).toEqual({
       code: 1,
-      stderr: `Unknown command: foo\n\n${HELP}`,
+      stderr: `Unknown command\n\n${HELP}`,
     });
   });
 
   it.each([
-    ["refresh", ["--foo"], "--foo"],
-    ["refresh", ["-x"], "-x"],
-    ["refresh", ["-"], "-"],
-    ["refresh", ["--"], "--"],
+    ["refresh", ["--foo"]],
+    ["refresh", ["-x"]],
+    ["refresh", ["-"]],
+    ["refresh", ["--"]],
     // --auto is exact, it comes first and only refresh has it
-    ["refresh", ["--AUTO"], "--AUTO"],
-    ["refresh", ["--auto=1"], "--auto=1"],
-    ["refresh", ["-auto"], "-auto"],
-    ["refresh", ["--auto", "--foo"], "--foo"],
-    ["refresh", ["--auto", "--auto"], "--auto"],
-    ["refresh", ["a.html", "--auto"], "--auto"],
-    ["schedule", ["--auto"], "--auto"],
-    ["info", ["--auto"], "--auto"],
-    ["doctor", ["--auto"], "--auto"],
-    ["doctor", ["--foo"], "--foo"],
-    ["doctor", ["--force"], "--force"],
+    ["refresh", ["--AUTO"]],
+    ["refresh", ["--auto=1"]],
+    ["refresh", ["-auto"]],
+    ["refresh", ["--auto", "--foo"]],
+    ["refresh", ["--auto", "--auto"]],
+    ["refresh", ["a.html", "--auto"]],
+    ["schedule", ["--auto"]],
+    ["info", ["--auto"]],
+    ["doctor", ["--auto"]],
+    ["doctor", ["--foo"]],
+    ["doctor", ["--force"]],
     // --force is exact, it comes first and only setup has it
-    ["refresh", ["--force"], "--force"],
-    ["schedule", ["--force"], "--force"],
+    ["refresh", ["--force"]],
+    ["schedule", ["--force"]],
     // the help flag of a command is exact
-    ["refresh", ["--HELP"], "--HELP"],
-    ["schedule", ["-H"], "-H"],
-    ["info", ["--help=1"], "--help=1"],
-    ["info", ["-help"], "-help"],
+    ["refresh", ["--HELP"]],
+    ["schedule", ["-H"]],
+    ["info", ["--help=1"]],
+    ["info", ["-help"]],
     // a flag never reaches the command, and --help and --version have no help of their own
-    ["info", ["--version"], "--version"],
-    ["--help", ["--foo"], "--foo"],
-    ["--help", ["--help"], "--help"],
-    ["-h", ["-x"], "-x"],
-    ["--version", ["--foo"], "--foo"],
-    ["--version", ["--help"], "--help"],
-    ["-v", ["-h"], "-h"],
-    ["-v", ["-x"], "-x"],
+    ["info", ["--version"]],
+    ["--help", ["--foo"]],
+    ["--help", ["--help"]],
+    ["-h", ["-x"]],
+    ["--version", ["--foo"]],
+    ["--version", ["--help"]],
+    ["-v", ["-h"]],
+    ["-v", ["-x"]],
     // a word before the flag does not hide it
-    ["schedule", ["--foo"], "--foo"],
-    ["schedule", ["off", "--foo"], "--foo"],
-    ["schedule", ["off", "a.html", "--foo"], "--foo"],
-    ["schedule", ["weekly", "--day", "monday"], "--day"],
-    // several flags: the first one is in the error
-    ["refresh", ["--foo", "--bar"], "--foo"],
-    ["schedule", ["off", "--page", "a.html", "--foo"], "--page"],
+    ["schedule", ["--foo"]],
+    ["schedule", ["off", "--foo"]],
+    ["schedule", ["off", "a.html", "--foo"]],
+    ["schedule", ["weekly", "--day", "monday"]],
+    // several flags: the first one is refused
+    ["refresh", ["--foo", "--bar"]],
+    ["schedule", ["off", "--page", "a.html", "--foo"]],
     // a path or a cron expression that starts with a dash reads as a flag
-    ["refresh", ["-old.html"], "-old.html"],
-    ["schedule", ["-old.html"], "-old.html"],
-    ["schedule", ["-1 * * * *"], "-1 * * * *"],
-  ])("prints the help on stderr for %s %j", async (command, args, flag) => {
+    ["refresh", ["-old.html"]],
+    ["schedule", ["-old.html"]],
+    ["schedule", ["-1 * * * *"]],
+  ])("prints the help on stderr for %s %j", async (command, args) => {
     const f = fakes();
     const write = vi.fn(f.writer);
     expect(await cli(command, args, f.auto, write)).toEqual({
       code: 1,
-      stderr: `Unknown flag: ${flag}\n\n${HELP}`,
+      stderr: `Unknown flag\n\n${HELP}`,
     });
     // a wrong flag must not stop the schedule: `schedule off --foo` once stopped all of it
     expect(f.auto.off).not.toHaveBeenCalled();
@@ -274,6 +275,48 @@ describe("cli", () => {
     expect(r.stderr).not.toContain("not-a-real-key");
     expect(readFileSync(apiKeyFile, "utf8")).toBe("old-fake-key\n");
   });
+
+  it.each([
+    ["the command", "not-a-real-key", []],
+    ["a command that starts with a dash", "--not-a-real-key", []],
+    ["a flag of info", "info", ["--key=not-a-real-key"]],
+    ["a flag of doctor", "doctor", ["-not-a-real-key"]],
+    ["a flag of refresh", "refresh", ["--key=not-a-real-key"]],
+    ["a flag of schedule", "schedule", ["--key=not-a-real-key"]],
+    ["a flag after a page", "refresh", ["a.html", "--key=not-a-real-key"]],
+    ["the page of refresh", "refresh", ["not-a-real-key"]],
+    ["a word after a page of refresh", "refresh", ["a.html", "not-a-real-key"]],
+    ["the schedule", "schedule", ["not-a-real-key"]],
+    ["a word after schedule off", "schedule", ["off", "not-a-real-key"]],
+  ])("does not print %s, which can be the key", async (_name, command, args) => {
+    const f = fakes();
+    const write = vi.fn(f.writer);
+    const r = await cli(command, args, f.auto, write);
+    expect(r.code).toBe(1);
+    expect(`${r.stdout}${r.stderr}`).not.toContain("not-a-real-key");
+    expect(write).not.toHaveBeenCalled();
+    expect(f.auto.set).not.toHaveBeenCalled();
+    expect(f.auto.off).not.toHaveBeenCalled();
+    expect(f.auto.missed).not.toHaveBeenCalled();
+  });
+
+  it("refuses a page of refresh that is not an .html file, before any work", async () => {
+    const f = fakes();
+    const write = vi.fn(f.writer);
+    expect(await cli("refresh", ["coach"], f.auto, write)).toEqual({
+      code: 1,
+      stderr: `refresh takes one page, a file that ends in .html, or --auto\n\n${HELP}`,
+    });
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it.each([["a.html"], ["A.HTML"], ["./-old.html"], ["~/pages/a.html"], [""]])(
+    "still refreshes the page %j",
+    async (page) => {
+      const f = fakes();
+      expect((await cli("refresh", [page], f.auto, f.writer)).code).toBe(0);
+    },
+  );
 
   it("keeps the working forms of schedule off and refresh", async () => {
     const f = fakes();
@@ -666,6 +709,9 @@ function garmin(status = 200, body = `{"access_token":"t0ken"}`) {
 
 const off = () => ({ ...fakes().auto, status: vi.fn(async () => ({ scheduled: false })) });
 
+const run = (config: Config, home: string, auto = fakes().auto) =>
+  doctor(config, auto, process.platform, home);
+
 describe("doctor", () => {
   const KEY = "s3cret-key";
 
@@ -805,6 +851,152 @@ describe("doctor", () => {
     expect(r.stdout).toContain(
       "the automatic update reads only the key file. Run: npx -y @indaco/garmin-personal-mcp@latest setup",
     );
+  });
+
+  describe("the key of the schedule", () => {
+    const ENV = "env-key-ok";
+    const BAD = "file-key-refused";
+    const GOOD = "file-key-ok";
+    const LINE = /^(ok {4}|failed {2})Key of the schedule:/m;
+    const accepted = new Set<string>();
+
+    /** Garmin accepts the keys in `accepted` and refuses the others. */
+    function stubGarmin() {
+      const fetch = vi.fn(async (_url: string, init: RequestInit) => {
+        const key = (init.headers as Record<string, string>).Authorization.replace("ApiKey ", "");
+        return accepted.has(key)
+          ? new Response(`{"access_token":"t0ken"}`)
+          : new Response(`bad key ${key}`, { status: 401 });
+      });
+      vi.stubGlobal("fetch", fetch);
+      return fetch;
+    }
+    const keysOf = (r: { stdout?: string }) =>
+      [ENV, BAD, GOOD].filter((k) => r.stdout!.includes(k));
+
+    beforeEach(() => {
+      accepted.clear();
+      accepted.add(ENV);
+    });
+
+    it("fails when the key file is refused, though the key in the environment works", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", ENV);
+      const fetch = stubGarmin();
+      const { home, config } = setUp();
+      writeFileSync(config.apiKeyFile, BAD);
+      const r = await run(config, home);
+      expect(r.code).toBe(1);
+      expect(r.stdout).toMatch(/^failed {2}Key of the schedule: Token request failed: HTTP 401/m);
+      expect(r.stdout).toMatch(/^failed {2}Key of the schedule: .*and run setup --force\.$/m);
+      expect(r.stdout).toMatch(/^1 check failed\.$/m);
+      expect(keysOf(r)).toEqual([]);
+      expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("passes when both keys work", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", ENV);
+      accepted.add(GOOD);
+      stubGarmin();
+      const { home, config } = setUp();
+      writeFileSync(config.apiKeyFile, GOOD);
+      const r = await run(config, home);
+      expect(r.stdout).toContain(
+        "ok      Key of the schedule: Garmin accepts the key in the key file",
+      );
+      expect(r.stdout).not.toContain("failed  Key of the schedule");
+      expect(keysOf(r)).toEqual([]);
+    });
+
+    it("is not tested when no schedule is on", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", ENV);
+      const fetch = stubGarmin();
+      const { home, config } = setUp();
+      writeFileSync(config.apiKeyFile, BAD);
+      const r = await run(config, home, off());
+      expect(r.stdout).not.toMatch(LINE);
+      expect(r.code).toBe(0);
+      expect(fetch).toHaveBeenCalledOnce();
+    });
+
+    it("is not tested without a key in the environment: the API key check did it", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+      accepted.add(GOOD);
+      const fetch = stubGarmin();
+      const { home, config } = setUp();
+      writeFileSync(config.apiKeyFile, GOOD);
+      const r = await run(config, home);
+      expect(r.stdout).not.toMatch(LINE);
+      expect(fetch).toHaveBeenCalledOnce();
+    });
+
+    it("is not tested when the key file is missing: the key file check says so", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", ENV);
+      const fetch = stubGarmin();
+      const { home, config } = setUp();
+      const none = { ...config, apiKeyFile: join(home, "no-key") };
+      const r = await run(none, home);
+      expect(r.stdout).not.toMatch(LINE);
+      expect(fetch).toHaveBeenCalledOnce();
+    });
+
+    it("fails on an empty key file, and shows its path with ~", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", ENV);
+      const fetch = stubGarmin();
+      const { home, config } = setUp();
+      writeFileSync(config.apiKeyFile, " \n");
+      const r = await run(config, home);
+      expect(r.stdout).toContain(`failed  Key of the schedule: ${join("~", "api-key")} has no key`);
+      expect(r.stdout).not.toContain(home);
+      expect(fetch).toHaveBeenCalledOnce();
+    });
+
+    it("fails on a key file that cannot be read", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", ENV);
+      const fetch = stubGarmin();
+      const { home, config } = setUp();
+      const asFolder = { ...config, apiKeyFile: join(home, "folder") };
+      mkdirSync(asFolder.apiKeyFile);
+      const r = await run(asFolder, home);
+      expect(r.stdout).toContain(`failed  Key of the schedule: ${join("~", "folder")} has no key`);
+      expect(fetch).toHaveBeenCalledOnce();
+    });
+
+    it("does not count a key of only spaces in the environment", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", "   ");
+      accepted.add(GOOD);
+      const fetch = stubGarmin();
+      const { home, config } = setUp();
+      writeFileSync(config.apiKeyFile, GOOD);
+      const r = await run(config, home);
+      expect(r.stdout).not.toMatch(LINE);
+      expect(fetch).toHaveBeenCalledOnce();
+    });
+
+    it("fails on a key file with a space inside, without a request for it or the key", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", ENV);
+      const fetch = stubGarmin();
+      const { home, config } = setUp();
+      writeFileSync(config.apiKeyFile, "file-key bad");
+      const r = await run(config, home);
+      expect(r.stdout).toMatch(/^failed {2}Key of the schedule: The key has spaces/m);
+      expect(r.stdout).not.toContain("file-key");
+      expect(fetch).toHaveBeenCalledOnce();
+    });
+
+    it("fails on a network error for the key file, without the key", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", ENV);
+      const fetch = vi.fn(async (_url: string, init: RequestInit) => {
+        const key = (init.headers as Record<string, string>).Authorization;
+        if (key.endsWith(BAD)) throw new TypeError(`bad header ${key}`);
+        return new Response(`{"access_token":"t0ken"}`);
+      });
+      vi.stubGlobal("fetch", fetch);
+      const { home, config } = setUp();
+      writeFileSync(config.apiKeyFile, BAD);
+      const r = await run(config, home);
+      expect(r.stdout).toContain("failed  Key of the schedule: Network error obtaining token");
+      expect(keysOf(r)).toEqual([]);
+    });
   });
 
   skipIfNoMode.each([0o644, 0o640, 0o604, 0o666])(
@@ -1048,6 +1240,61 @@ describe("setup", () => {
     expect(statSync(join(home, ".config", "garmin-mcp")).mode & 0o777).toBe(0o700);
   });
 
+  describe("a key file that appears while setup waits at the prompt", () => {
+    const FIRST = "first-key-text";
+    const NEWER = "newer-fake-key";
+    /** A prompt that makes the key file, as a second terminal does, then answers with the new key. */
+    const racing = (file: string) =>
+      vi.fn(async () => {
+        mkdirSync(dirname(file), { recursive: true });
+        writeFileSync(file, FIRST);
+        return NEWER;
+      });
+
+    it("stays as it is, and the new key is not saved", async () => {
+      garmin();
+      const { home, apiKeyFile, config } = newHome();
+      const r = await setup([], config, racing(apiKeyFile), "linux", noExec(), home);
+      expect(r.code).toBe(1);
+      expect(readFileSync(apiKeyFile, "utf8")).toBe(FIRST);
+      expect(r.stderr).toContain("appeared while setup ran");
+      expect(r.stderr).toContain("The new key is not saved.");
+      expect(r.stderr).toContain("setup --force");
+      expect(r.stderr).not.toContain(FIRST);
+      expect(r.stderr).not.toContain(NEWER);
+      expect(readdirSync(dirname(apiKeyFile))).toEqual(["api-key"]);
+    });
+
+    it("is replaced with --force", async () => {
+      garmin();
+      const { home, apiKeyFile, config } = newHome();
+      const r = await setup(["--force"], config, racing(apiKeyFile), "linux", noExec(), home);
+      expect(r.code).toBe(0);
+      expect(readFileSync(apiKeyFile, "utf8")).toBe(`${NEWER}\n`);
+    });
+
+    it("stays as it is when Garmin refuses the new key", async () => {
+      garmin(401, "bad");
+      const { home, apiKeyFile, config } = newHome();
+      const r = await setup([], config, racing(apiKeyFile), "linux", noExec(), home);
+      expect(r.code).toBe(1);
+      expect(r.stderr).toContain("The key is not saved.");
+      expect(r.stderr).not.toContain("appeared");
+      expect(readFileSync(apiKeyFile, "utf8")).toBe(FIRST);
+    });
+
+    it("stays as it is on a network error in the test of the key, and leaves no temporary file", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
+      const { home, apiKeyFile, config } = newHome();
+      const r = await setup([], config, racing(apiKeyFile), "linux", noExec(), home);
+      expect(r.code).toBe(1);
+      expect(r.stderr).toContain("The new key is not saved.");
+      expect(r.stderr).not.toContain(NEWER);
+      expect(readFileSync(apiKeyFile, "utf8")).toBe(FIRST);
+      expect(readdirSync(dirname(apiKeyFile))).toEqual(["api-key"]);
+    });
+  });
+
   it.each([[`  ${KEY}  `], [`${KEY}\r`], [`﻿${KEY}`], [`\t${KEY}\n`]])(
     "saves only the key from %j",
     async (input) => {
@@ -1090,7 +1337,8 @@ describe("setup", () => {
     expect(r.code).toBe(1);
     expect(r.stdout).toBeUndefined();
     expect(r.stderr).toContain("the personal API key is incorrect, expired or revoked");
-    expect(r.stderr).toContain("and run setup again");
+    expect(r.stderr).toContain("and run setup --force.");
+    expect(r.stderr).not.toContain("setup again");
     expect(r.stderr).toContain("The key is not saved.");
     expect(r.stderr).not.toContain(KEY);
     expect(existsSync(apiKeyFile)).toBe(false);
@@ -1104,6 +1352,7 @@ describe("setup", () => {
     const r = await setup(["--force"], config, answer(KEY), "linux", noExec(), home);
     expect(r.code).toBe(1);
     expect(readFileSync(apiKeyFile, "utf8")).toBe("old-key");
+    expect(r.stderr).toContain("and run setup --force.");
   });
 
   // Garmin shows a key only one time: an answer that says nothing about the key must not lose it
@@ -1441,11 +1690,11 @@ describe("the entry point", () => {
 
   // no mock of the command line: an MCP client that passes a wrong argument gets nothing on stdout
   it.each([
-    [["foo"], "Unknown command: foo"],
-    [["--foo"], "Unknown command: --foo"],
-    [[""], "Unknown command: "],
-    [["info", "--foo"], "Unknown flag: --foo"],
-    [["schedule", "off", "--foo"], "Unknown flag: --foo"],
+    [["foo"], "Unknown command"],
+    [["--foo"], "Unknown command"],
+    [[""], "Unknown command"],
+    [["info", "--foo"], "Unknown flag"],
+    [["schedule", "off", "--foo"], "Unknown flag"],
   ])("writes the help only on stderr and exits with 1 for %j", async (args, error) => {
     const serveStdio = vi.fn();
     vi.doMock("@modelcontextprotocol/server/stdio", () => ({ serveStdio }));

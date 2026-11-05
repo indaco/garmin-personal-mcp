@@ -279,7 +279,7 @@ export class GarminApiClient {
 function replaceKey(source: ApiKey): string {
   switch (source.from) {
     case "given":
-      return `Create a new key at ${KEY_PAGE_URL} and run setup again.`;
+      return `Create a new key at ${KEY_PAGE_URL} and run setup --force.`;
     case "file":
       return `Create a new key at ${KEY_PAGE_URL} and save it in ${source.file}: the next call uses it, no restart is necessary.`;
     case "env":

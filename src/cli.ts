@@ -1,5 +1,5 @@
 import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
-import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
@@ -71,7 +71,8 @@ Flags:
   doctor: `Usage: garmin-personal-mcp doctor
 
 Test the setup, and tell how to fix what fails. It tests the key file, the API key with
-a token request to Garmin, the data folder, the log folder and the schedule.
+a token request to Garmin, the data folder, the log folder and the schedule. With a schedule
+and a key in the environment, it also tests the key in the key file.
 It never shows the key. The exit code is 1 when a check fails.
 
 Flags:
@@ -148,15 +149,16 @@ export async function cli(
   sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms)),
   config: Config = loadConfig(),
 ): Promise<CliResult> {
-  if (!COMMANDS.includes(command)) return usage(`Unknown command: ${command}`);
+  // the word can be the key, typed in the wrong place: an error never prints it
+  if (!COMMANDS.includes(command)) return usage("Unknown command");
   const help = COMMAND_HELP[command];
   if (help && (args.includes("--help") || args.includes("-h"))) return { code: 0, stdout: help };
-  // an argument of setup can be the key: setup refuses it without printing it
+  // setup has its own refusal
   const flag =
     command === "setup"
       ? undefined
       : args.find((a, i) => a.startsWith("-") && !(i === 0 && a === FLAGS[command]));
-  if (flag) return usage(`Unknown flag: ${flag}`);
+  if (flag) return usage("Unknown flag");
   if (command === "--version" || command === "-v") return { code: 0, stdout: version };
   if (command === "--help" || command === "-h") return { code: 0, stdout: HELP };
   if (command === "doctor") return doctor(config, auto);
@@ -171,7 +173,11 @@ export async function cli(
   }
   try {
     if (command === "refresh") {
-      if (args.length > 1) return usage("refresh takes one page, or --auto");
+      if (args.length > 1)
+        return usage("refresh takes one page, a file that ends in .html, or --auto");
+      if (args[0] && args[0] !== "--auto" && !/\.html$/i.test(args[0])) {
+        return usage("refresh takes one page, a file that ends in .html, or --auto");
+      }
       const scheduled = args[0] === "--auto";
       const at = new Date().toISOString();
       // the job starts at the run times and at login: nothing to do when no run time was missed
@@ -364,6 +370,17 @@ function scheduleCheck(status: Status | Error): Check {
   return { ok: true, name, text: summary(status).split("\n")[0] };
 }
 
+/** The job reads only the key file: with another key in the environment, the test of the API key says nothing about it. */
+async function scheduleKeyCheck(config: Config): Promise<Check> {
+  const name = "Key of the schedule";
+  const key = (await readFile(config.apiKeyFile, "utf8").catch(() => "")).trim();
+  if (!key) return { ok: false, name, text: `${config.apiKeyFile} has no key` };
+  return new GarminApiClient(config, key).testKey().then(
+    () => ({ ok: true, name, text: "Garmin accepts the key in the key file" }),
+    (e: Error) => ({ ok: false, name, text: e.message }),
+  );
+}
+
 /**
  * The text of `doctor`: each check with `ok` or `failed`, and the fix. It never shows the key.
  * The exit code is 1 when a check fails. It runs on macOS, Linux and Windows.
@@ -387,6 +404,9 @@ export async function doctor(
   const checks = [
     keyFileCheck(config.apiKeyFile, scheduled, platform, home),
     apiKey,
+    ...(scheduled && process.env.GARMIN_PERSONAL_API_KEY?.trim() && existsSync(config.apiKeyFile)
+      ? [await scheduleKeyCheck(config)]
+      : []),
     folderCheck("Data folder", config.dataDir),
     folderCheck("Log folder", join(home, LOG_DIR)),
     scheduleCheck(status),
@@ -495,6 +515,13 @@ export async function setup(
       return { code: 1, stderr: `${e.message}\nThe key is not saved.` };
     }
     untested = (e as Error).message;
+  }
+  // shortcut: a file made in the milliseconds between this check and the rename is still replaced; link() would close it
+  if (args[0] !== "--force" && existsSync(file)) {
+    return {
+      code: 1,
+      stderr: `${shown} appeared while setup ran, and it stays as it is. The new key is not saved. To replace the file, run setup --force.`,
+    };
   }
   let limited: boolean;
   try {
