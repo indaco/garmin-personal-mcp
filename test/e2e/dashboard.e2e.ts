@@ -91,6 +91,17 @@ async function stopsUnder(page: Page, bar: string): Promise<{ hidden: string[]; 
   return { hidden, stops };
 }
 
+/** The scroll listeners on the window, read through the browser's debugger. */
+const scrollListeners = async (page: Page) => {
+  const cdp = await page.context().newCDPSession(page);
+  const { result } = await cdp.send("Runtime.evaluate", { expression: "window" });
+  const { listeners } = await cdp.send("DOMDebugger.getEventListeners", {
+    objectId: result.objectId!,
+  });
+  await cdp.detach();
+  return listeners.filter((l) => l.type === "scroll").length;
+};
+
 /** The sticky offset the page sets for keyboard focus. */
 const stickyOffset = (page: Page) =>
   page.evaluate(() => document.documentElement.style.getPropertyValue("--sticky-h"));
@@ -1236,6 +1247,27 @@ describe("sticky header", () => {
     );
     expect(await stickyOffset(page)).toBe(`${height + 8}px`);
   });
+
+  it("sticky: watches only the bar of the last draw", async () => {
+    const init = `
+      window.watchedBars = new Set();
+      const { observe, disconnect } = ResizeObserver.prototype;
+      ResizeObserver.prototype.observe = function (target, ...rest) {
+        if (target.matches?.(".top, .edit-bar")) window.watchedBars.add(this);
+        return observe.call(this, target, ...rest);
+      };
+      ResizeObserver.prototype.disconnect = function () {
+        window.watchedBars.delete(this);
+        return disconnect.call(this);
+      };`;
+    const file = pageFile({ settings: { languages: ["en", "it"] } });
+    const { page } = await open(browser, file, { viewport: phone, init });
+    await page.click(".account summary");
+    await page.selectOption("#lang", "it");
+    await page.selectOption("#lang", "en");
+    await frames(page);
+    expect(await page.evaluate(() => (window as any).watchedBars.size)).toBe(1);
+  });
 });
 
 describe("accessibility", () => {
@@ -1958,6 +1990,77 @@ describe("overview widgets", () => {
     });
     await frames(page);
     expect(followsCell(await tipGaps(page, cell))).toBe(true);
+  });
+
+  it("leaves no scroll listener once the calendar tip is hidden", async () => {
+    const { page } = await open(browser, pageFile(), { viewport: { width: 390, height: 844 } });
+    const before = await scrollListeners(page);
+    await page.focus("[data-date='2026-10-17']");
+    expect(await scrollListeners(page)).toBe(before + 1);
+    await page.evaluate(() => (document.activeElement as HTMLElement).blur());
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await frames(page);
+    expect(await scrollListeners(page)).toBe(before);
+  });
+
+  it("leaves no scroll listener when the page redraws under the calendar tip", async () => {
+    const file = pageFile({ settings: { languages: ["en", "it"] } });
+    const { page } = await open(browser, file, { viewport: { width: 390, height: 844 } });
+    const before = await scrollListeners(page);
+    await page.hover("[data-date='2026-10-17']");
+    expect(await page.isVisible(".cal-tip")).toBe(true);
+    // the mouse stays on the cell, so no blur hides the tip before the redraw
+    await page.evaluate(() => {
+      (document.querySelector(".account") as HTMLDetailsElement).open = true;
+    });
+    await page.selectOption("#lang", "it");
+    await frames(page);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await frames(page);
+    expect(await scrollListeners(page)).toBe(before);
+  });
+
+  it("keeps the calendar tip inside a viewport too low for it", async () => {
+    const busy = [1, 2, 3, 4, 5].map((i) => row(9300 + i, `Busy day ${i}`, "2026-10-20 07:00:00"));
+    const { page } = await open(
+      browser,
+      pageFile({
+        data: { ...data, v: DASHBOARD_VERSION, activities: [...data.activities, ...busy] },
+      }),
+      { viewport: { width: 390, height: 120 } },
+    );
+    await page.focus("[data-date='2026-10-20']");
+    // the scroll puts the cell in the viewport; the tip follows it
+    await page.evaluate(() => {
+      const top = document.querySelector("[data-date='2026-10-20']")!.getBoundingClientRect().top;
+      window.scrollBy({ top: top - 20, behavior: "instant" });
+    });
+    await frames(page);
+    const { height, view, top } = await page.evaluate(() => {
+      const tip = document.querySelector<HTMLElement>(".cal-tip")!;
+      return {
+        height: tip.getBoundingClientRect().height,
+        view: document.documentElement.clientHeight,
+        top: tip.getBoundingClientRect().top,
+      };
+    });
+    expect(height).toBeGreaterThan(view - 16);
+    expect(top).toBe(8);
+  });
+
+  it("keeps the calendar tip inside a viewport too narrow for it", async () => {
+    const { page } = await open(browser, pageFile(), { viewport: { width: 200, height: 844 } });
+    await page.focus("[data-date='2026-10-17']");
+    const { width, view, left } = await page.evaluate(() => {
+      const tip = document.querySelector<HTMLElement>(".cal-tip")!;
+      return {
+        width: tip.getBoundingClientRect().width,
+        view: document.documentElement.clientWidth,
+        left: tip.getBoundingClientRect().left,
+      };
+    });
+    expect(width).toBeGreaterThan(view - 16);
+    expect(left).toBe(8);
   });
 
   it("keeps one tab stop in the calendar of an older window", async () => {
