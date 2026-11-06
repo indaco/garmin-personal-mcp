@@ -172,28 +172,28 @@ Desktop. In Claude Code, use `/permissions` and add `mcp__garmin-personal`.
 
 ## Tools
 
-| Tool                       | What it gives                                                                                                              |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `listActivities`           | each activity with pace, HR, load and effect, by date, type or name                                                        |
-| `getActivity`              | the details of one activity                                                                                                |
-| `getActivityLaps`          | the laps of an activity, from its .FIT file; for a run also the half split, the HR drift and the fade of each workout step |
-| `getActivitySets`          | the strength sets of an activity, with the muscles, the top set and the e1RM, from its .FIT file                           |
-| `getActivityWorkouts`      | the planned workout of an activity: steps, targets and notes                                                               |
-| `downloadActivityFit`      | saves the .FIT file of an activity in the data folder                                                                      |
-| `getHrvRange`              | HRV during the night                                                                                                       |
-| `getDailyHeartRate`        | the heart rate of a day, with the resting HR                                                                               |
-| `getSleep`                 | the sleep of a night, or of up to 14 nights: hours, phases, score and need                                                 |
-| `getWeight`                | weight and body composition for a range of dates                                                                           |
-| `getBodyBattery`           | how Body Battery charged and drained, for up to 14 days                                                                    |
-| `getHeartRateZones`        | your HR zones                                                                                                              |
-| `getFitnessAge`            | fitness age against actual age                                                                                             |
-| `getDailySummary`          | steps, stress and Body Battery, for a day or a range                                                                       |
-| `getDashboardData`         | all the dashboard data in one call, with the server's totals and a local cache                                             |
-| `writeDashboard`           | writes the dashboard page                                                                                                  |
-| `editDashboard`            | changes the layout, the custom widgets and the languages of the page                                                       |
-| `showDashboard`            | shows the dashboard inside the chat, in Claude Desktop                                                                     |
-| `scheduleDashboardRefresh` | updates a dashboard page automatically, at the times you say in your own words                                             |
-| `garminGet`                | all other GET endpoints of the Personal API                                                                                |
+| Tool                       | What it gives                                                                                                                                                                                      |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `listActivities`           | each activity with pace, HR, load and effect, by date, type or name                                                                                                                                |
+| `getActivity`              | the details of one activity                                                                                                                                                                        |
+| `getActivityLaps`          | the laps of an activity, from its .FIT file; for a run also the half split, the HR drift and the fade of each workout step; for a swim also the pace per 100 m, stroke, lengths, SWOLF and strokes |
+| `getActivitySets`          | the strength sets of an activity, with the muscles, the top set and the e1RM, from its .FIT file                                                                                                   |
+| `getActivityWorkouts`      | the planned workout of an activity: steps, targets and notes                                                                                                                                       |
+| `downloadActivityFit`      | saves the .FIT file of an activity in the data folder                                                                                                                                              |
+| `getHrvRange`              | HRV during the night                                                                                                                                                                               |
+| `getDailyHeartRate`        | the heart rate of a day, with the resting HR                                                                                                                                                       |
+| `getSleep`                 | the sleep of a night, or of up to 14 nights: hours, phases, score and need                                                                                                                         |
+| `getWeight`                | weight and body composition for a range of dates                                                                                                                                                   |
+| `getBodyBattery`           | how Body Battery charged and drained, for up to 14 days                                                                                                                                            |
+| `getHeartRateZones`        | your HR zones                                                                                                                                                                                      |
+| `getFitnessAge`            | fitness age against actual age                                                                                                                                                                     |
+| `getDailySummary`          | steps, stress and Body Battery, for a day or a range                                                                                                                                               |
+| `getDashboardData`         | all the dashboard data in one call, with the server's totals and a local cache                                                                                                                     |
+| `writeDashboard`           | writes the dashboard page                                                                                                                                                                          |
+| `editDashboard`            | changes the layout, the custom widgets and the languages of the page                                                                                                                               |
+| `showDashboard`            | shows the dashboard inside the chat, in Claude Desktop                                                                                                                                             |
+| `scheduleDashboardRefresh` | updates a dashboard page automatically, at the times you say in your own words                                                                                                                     |
+| `garminGet`                | all other GET endpoints of the Personal API                                                                                                                                                        |
 
 [Tools](guide/tools.md) gives the endpoints, the details of each tool and the data that the
 Personal API does not have.

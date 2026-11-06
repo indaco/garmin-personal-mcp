@@ -134,6 +134,7 @@ export function unzipFit(data: Uint8Array, activityId: number): Uint8Array {
 export function lapsOf(fit: Messages, activityId: number) {
   const sport = enumName("sport", fit.sessionMesgs?.[0]?.sport);
   const foot = sport === "running" || sport === "walking" || sport === "hiking";
+  const swim = sport === "swimming";
   const laps = (fit.lapMesgs ?? []).map((lap, i) => {
     const o: Record<string, unknown> = { lap: i + 1 };
     const speed: number | undefined = lap.enhancedAvgSpeed ?? lap.avgSpeed;
@@ -167,6 +168,7 @@ export function lapsOf(fit: Messages, activityId: number) {
     if (trigger) o.trigger = trigger;
     // the step of the planned workout: the reps of one drill share it
     putIfSet(o, "step", lap.wktStepIndex);
+    if (swim) putSwimNumbers(lap, o, speed);
     return o;
   });
   return {
@@ -177,8 +179,25 @@ export function lapsOf(fit: Messages, activityId: number) {
   };
 }
 
+/** What only a swim lap has. A rest lap has no pace, and its 0 strokes and lengths are not a count. */
+function putSwimNumbers(
+  lap: NonNullable<Messages[string]>[number],
+  o: Record<string, unknown>,
+  speed: number | undefined,
+) {
+  if (speed != null && speed > 0) o.swimPace = swimPaceText(100 / speed);
+  const stroke = enumName("swimStroke", lap.swimStroke);
+  if (stroke) o.stroke = stroke;
+  if (lap.numActiveLengths > 0) o.lengths = lap.numActiveLengths;
+  if (lap.avgSwolf > 0) o.swolf = lap.avgSwolf;
+  const strokes = lap.totalStrokes ?? lap.totalCycles;
+  if (strokes > 0) o.strokes = strokes;
+}
+
 /** A pace as the lap pace: "m:ss/km". */
 export const paceText = (sec: number) => `${hms(sec)}/km`;
+/** A swim pace: "m:ss/100 m". */
+export const swimPaceText = (sec: number) => `${hms(sec)}/100 m`;
 /** A percentage with 1 decimal; null when it applies but the data cannot give it. */
 const pctOrNull = (v: number | undefined) => (v === undefined ? null : round(v, 1));
 

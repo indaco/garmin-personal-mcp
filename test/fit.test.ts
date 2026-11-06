@@ -610,3 +610,61 @@ describe("FIT files", () => {
     expect(() => decodeFit(damage(fit), 8)).toThrow(/^Cannot decode the \.FIT file of 8: /);
   });
 });
+
+/** A .FIT file of one lap with this sport, decoded. */
+const swimLap = (sport: string, fields: Record<string, unknown>) =>
+  decodeFit(
+    fitFile(
+      [Profile.MesgNum.SESSION, { sport }],
+      [
+        Profile.MesgNum.LAP,
+        { totalDistance: 100, totalTimerTime: 110, enhancedAvgSpeed: 100 / 110, ...fields },
+      ],
+    ),
+    20,
+  );
+
+describe("lapsOf on a swim", () => {
+  it("gives the pace per 100 m and the swim numbers of an interval", () => {
+    const fit = swimLap("swimming", {
+      swimStroke: "freestyle",
+      numActiveLengths: 4,
+      avgCadence: 30,
+      avgSwolf: 42,
+      totalCycles: 64,
+    });
+    expect(lapsOf(fit, 20).laps).toEqual([
+      {
+        lap: 1,
+        km: 0.1,
+        time: "1:50",
+        kmh: 3.3,
+        swimPace: "1:50/100 m",
+        cadence: 30,
+        stroke: "freestyle",
+        lengths: 4,
+        swolf: 42,
+        strokes: 64,
+      },
+    ]);
+  });
+
+  it("reads the strokes of a lap that names its sport", () => {
+    const fit = swimLap("swimming", { sport: "swimming", totalCycles: 64 });
+    expect(lapsOf(fit, 23).laps[0]).toMatchObject({ strokes: 64 });
+  });
+
+  it("gives a rest lap no pace and no zero strokes", () => {
+    const fit = swimLap("swimming", { totalDistance: 0, enhancedAvgSpeed: 0, totalCycles: 0 });
+    const [rest] = lapsOf(fit, 21).laps;
+    expect(rest).not.toHaveProperty("swimPace");
+    expect(rest).not.toHaveProperty("strokes");
+  });
+
+  it("leaves the laps of another sport as they are", () => {
+    const fit = swimLap("cycling", { swimStroke: "freestyle", avgSwolf: 42, totalCycles: 64 });
+    const [ride] = lapsOf(fit, 22).laps;
+    for (const key of ["swimPace", "stroke", "lengths", "swolf", "strokes"])
+      expect(ride).not.toHaveProperty(key);
+  });
+});

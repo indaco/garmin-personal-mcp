@@ -705,7 +705,7 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
         "ascent/descent, average power, running form (gctMs, vertRatioPct, vertOscCm, strideCm),",
         "intensity (active, interval, rest, recovery, warmup, cooldown; the auto laps of a free run can",
         "be interval), lap trigger, and the step of the planned workout (step: the reps of one drill",
-        "share it).",
+        "share it). A swim lap also has swimPace (per 100 m), stroke, lengths, swolf and strokes.",
         "Use it for intervals and per-km splits; getActivity does not have them.",
         "For a run: split (pace of the first and second half, kind, hrDriftPct) and, for a structured",
         "workout, work (reps, pace, avgHR, and the fade of each step with more than one rep, pct). null is",
