@@ -236,7 +236,7 @@ register({
   render(el, ctx) {
     const { t, fmt, calc } = ctx;
     const badges: HTMLElement[] = [];
-    // the first ones shown: the longest best effort, the longest run and ride, the top 1RM
+    // the first ones shown: the longest best effort, the longest run and ride, the top 1RM, the longest swim
     const top: (HTMLElement | undefined)[] = [];
     const badge = (label: string, value: string, a: Activity) =>
       h(
@@ -268,6 +268,8 @@ register({
     if (run) badges.push((top[1] = badge(t("rec.longestRun"), fmt.dist(run.km), run)));
     const ride = longest("cycling");
     if (ride) badges.push((top[2] = badge(t("rec.longestRide"), fmt.dist(ride.km), ride)));
+    const swim = longest("swimming");
+    if (swim) badges.push((top[4] = badge(t("rec.longestSwim"), fmt.dist(swim.km, 2), swim)));
 
     let heaviest: { kg: number; reps: number; name: string; a: Activity } | undefined;
     const best1rm = new Map<string, { v: number; a: Activity }>();

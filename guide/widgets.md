@@ -47,7 +47,8 @@ it by hand.
 | Daily steps | `steps` | Daily steps against the goal, and floors, for the last 14 days. | - | 1 |
 | Vertical speed | `hikeVertical` | Vertical metres per hour of moving time of each activity with ascent, with a note that the route moves the number. | hiking, walking, running, cycling | 3 |
 | Rides | `bikeDetails` | Weekly speed and ascent, each ride, and indoor against outdoor time; for mountain-bike rides, the grit and flow of each ride. | cycling | 3 |
-| Swims | `swimDetails` | Each swim with pace per 100 m, SWOLF, lengths, strokes and pool length. | swimming | 3 |
+| Swims | `swimDetails` | Each swim with pace per 100 m, SWOLF, lengths, strokes, strokes per length, distance per stroke and pool length. | swimming | 3 |
+| Swim technique trend | `swimTrend` | Pace and strokes per length of the pool swims of one pool length, swim after swim. Needs a pool swim. | swimming | 3 |
 | Sessions and intensity | `racketDetails` | Each racket session: sport, HR, time in Z3+, Z4-5 share, calories per hour, training effect, and its load against a run of the same length. | racket, generic | 3 |
 
 _Types_ are the types that the widget can show. A widget without types shows the same thing on
@@ -63,6 +64,6 @@ every board. _Width_ is the default width in columns.
 | walking | `typeKpis`, `typeWeekly`, `hrZones`, `walkDetails`, `steps`, `activities` |
 | hiking | `typeKpis`, `typeWeekly`, `hrZones`, `hikeVertical`, `activities` |
 | cycling | `typeKpis`, `typeWeekly`, `hrZones`, `bikeDetails`, `hikeVertical`, `intensityShare`, `activities` |
-| swimming | `typeKpis`, `typeWeekly`, `hrZones`, `swimDetails`, `activities` |
+| swimming | `typeKpis`, `typeWeekly`, `hrZones`, `swimTrend`, `records`, `swimDetails`, `activities` |
 | racket | `typeKpis`, `typeWeekly`, `hrZones`, `racketDetails`, `activities` |
 | generic | `typeKpis`, `typeWeekly`, `hrZones`, `activities` |

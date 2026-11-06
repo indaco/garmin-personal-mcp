@@ -303,6 +303,7 @@ out. To add one:
 | `d.marathon` | marathon |
 | `rec.longestRun` | Longest run |
 | `rec.longestRide` | Longest ride |
+| `rec.longestSwim` | Longest swim |
 | `rec.topSet` | Heaviest set |
 | `rec.e1rm` | Best est. 1RM · {name} |
 | `rec.none` | No records in the selected weeks. |
@@ -545,7 +546,15 @@ out. To add one:
 | `sw.pace` | Pace |
 | `sw.lengths` | Lengths |
 | `sw.strokes` | Strokes |
+| `sw.perLength` | Strokes/length |
+| `sw.perStroke` | Distance/stroke |
 | `sw.pool` | Pool |
+| `sw.note` | A stroke is a full cycle of the watch arm. Open water has no lengths, and its distance comes from GPS. |
+| `w.swimTrend` | Swim technique trend |
+| `st.none` | No pool swims with strokes yet. |
+| `st.vsBefore` | vs the {n} swims before |
+| `st.note` | Pool swims of {pool} only: {n} swims from {from}. Whole-swim values include drills and other strokes. Read pace and strokes together: fewer strokes at a slower pace is not progress. |
+| `st.left` | Swims left out: {n} (open water, another pool length, or no strokes). |
 | `w.racketDetails` | Sessions and intensity |
 | `pd.peak` | Peak HR |
 | `pd.z3` | Time in Z3+ |

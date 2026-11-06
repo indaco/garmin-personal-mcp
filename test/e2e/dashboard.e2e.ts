@@ -4170,6 +4170,20 @@ const stepsAxis = (page: Page) =>
     return c.scales.y.ticks.map((t) => t.label as string);
   });
 
+/** A 1 km swim of 40 lengths in 25 m. */
+const poolLap = (n: number, start: string, duration: string, strokes: number) => ({
+  id: 9300 + n,
+  name: "Pool Swim",
+  type: "lap_swimming",
+  sport: "swimming",
+  start: `${start} 07:00:00`,
+  km: 1,
+  duration,
+  lengths: 40,
+  strokes,
+  poolLengthM: 25,
+});
+
 describe("small numbers on the boards", () => {
   const swim = {
     id: 9101,
@@ -4197,6 +4211,176 @@ describe("small numbers on the boards", () => {
     const { page, errors } = await open(browser, withActivities([swim]), { hash: "#swimming" });
     expect((await kpiTexts(page, "typeKpis"))["Average pace"]?.[0]).toBe("2:00/100 m");
     expect(errors).toEqual([]);
+  });
+
+  describe("swim trend", () => {
+    const swims = [
+      poolLap(6, "2026-10-19", "20:00", 720),
+      poolLap(5, "2026-10-12", "20:00", 720),
+      poolLap(4, "2026-10-05", "20:00", 720),
+      poolLap(3, "2026-09-28", "21:40", 800),
+      poolLap(2, "2026-09-21", "21:40", 800),
+      poolLap(1, "2026-09-14", "21:40", 800),
+    ];
+    const openWater = {
+      id: 9310,
+      name: "Lake Swim",
+      type: "open_water_swimming",
+      sport: "swimming",
+      start: "2026-10-20 07:00:00",
+      km: 2.5,
+      duration: "55:00",
+      swolf: 60,
+      strokes: 1500,
+    };
+
+    it("compares pace and strokes of one pool length, and leaves out open water", async () => {
+      const { page, errors } = await open(browser, withActivities([openWater, ...swims]), {
+        hash: "#swimming",
+      });
+      const kpis = await kpiTexts(page, "swimTrend");
+      expect(kpis.Pace?.[0]).toBe("2:00/100 m");
+      expect(kpis.Pace?.[1]).toContain("vs the 3 swims before");
+      expect(kpis.Pace?.[1]).toContain("▼");
+      expect(kpis["Strokes/length"]?.[0]).toBe("18.0");
+      const pace = await chartDataset(page, "swimTrend", "Pace");
+      const strokes = await chartDataset(page, "swimTrend", "Strokes/length");
+      // oldest first, and two colours that differ
+      expect(pace.data).toEqual([130, 130, 130, 120, 120, 120]);
+      expect(strokes.data).toEqual([20, 20, 20, 18, 18, 18]);
+      const colors = await page.evaluate(() =>
+        Object.values(window.Chart!.instances)
+          .filter((c) => c.canvas.closest("[data-widget=swimTrend]"))
+          .flatMap((c) => c.data.datasets.map((d) => d.borderColor)),
+      );
+      expect(new Set(colors).size).toBe(2);
+      const text = await page.innerText("[data-id=swimTrend]");
+      expect(text).toContain("Pool swims of 25 m only: 6 swims from");
+      expect(text).toContain("Swims left out: 1 (");
+      expect(errors).toEqual([]);
+    });
+
+    it("shows one swim without a chart or a comparison", async () => {
+      const { page, errors } = await open(browser, withActivities([swims[0]]), {
+        hash: "#swimming",
+      });
+      expect(await page.locator("[data-id=swimTrend] canvas").count()).toBe(0);
+      const text = await page.innerText("[data-id=swimTrend]");
+      expect(text).toContain("2:00/100 m");
+      expect(text).not.toContain("swims before");
+      expect(text).not.toContain("Swims left out");
+      expect(errors).toEqual([]);
+    });
+
+    it("shows the mean of the recent swims, a faster pace as good, and up as better on both axes", async () => {
+      const { page, errors } = await open(
+        browser,
+        withActivities([
+          poolLap(6, "2026-10-19", "21:00", 760),
+          poolLap(5, "2026-10-12", "20:00", 720),
+          poolLap(4, "2026-10-05", "19:00", 680),
+          ...swims.slice(3),
+        ]),
+        { hash: "#swimming" },
+      );
+      const kpis = await kpiTexts(page, "swimTrend");
+      // the mean of the 3 newest swims, not the newest one
+      expect(kpis.Pace?.[0]).toBe("2:00/100 m");
+      expect(kpis["Strokes/length"]?.[0]).toBe("18.0");
+      const good = await page.$$eval("[data-id=swimTrend] .kpi .delta", (d) =>
+        d.map((x) => x.className),
+      );
+      expect(good).toHaveLength(2);
+      for (const name of good) expect(name).toContain("good");
+      const reversed = await page.evaluate(() =>
+        Object.values(window.Chart!.instances)
+          .filter((c) => c.canvas.closest("[data-id=swimTrend]"))
+          .map((c) => [c.options.scales?.y?.reverse, c.options.scales?.y1?.reverse]),
+      );
+      expect(reversed).toEqual([[true, true]]);
+      expect(errors).toEqual([]);
+    });
+
+    it("reads slower swims with more strokes as bad", async () => {
+      const worse = [
+        ...swims.slice(3).map((s, i) => ({ ...s, id: 9320 + i })),
+        ...swims.slice(0, 3),
+      ];
+      const dated = worse.map((s, i) => ({ ...s, start: swims[i].start }));
+      const { page, errors } = await open(browser, withActivities(dated), { hash: "#swimming" });
+      const bad = await page.$$eval("[data-id=swimTrend] .kpi .delta", (d) =>
+        d.map((x) => x.className),
+      );
+      expect(bad).toHaveLength(2);
+      for (const name of bad) expect(name).toContain("bad");
+      expect(errors).toEqual([]);
+    });
+
+    it("draws 4 swims but compares none: 3 swims against 1 is not like with like", async () => {
+      const { page, errors } = await open(browser, withActivities(swims.slice(0, 4)), {
+        hash: "#swimming",
+      });
+      expect(await page.locator("[data-id=swimTrend] canvas").count()).toBe(1);
+      expect(await page.innerText("[data-id=swimTrend]")).not.toContain("swims before");
+      expect(errors).toEqual([]);
+    });
+
+    it("converts pace, distance per stroke and the longest swim to the units of the profile", async () => {
+      const file = pageFile({
+        data: { ...data, units: "statute_us", activities: [openWater, ...swims] },
+      });
+      const { page, errors } = await open(browser, file, { hash: "#swimming" });
+      const kpis = await kpiTexts(page, "swimTrend");
+      // the newest 3 swims: 120 s per 100 m is 109.7 s per 100 yd
+      expect(kpis.Pace?.[0]).toBe("1:50/100 yd");
+      const pace = await chartDataset(page, "swimTrend", "Pace");
+      expect(pace.data[0]).toBeCloseTo(118.9, 1);
+      const cells = await page.$$eval("[data-id=swimDetails] tbody tr:first-child td", (c) =>
+        c.map((x) => x.textContent),
+      );
+      expect(cells[8]).toBe("5.47 ft");
+      expect(await page.innerText("[data-id=records]")).toContain("1.55 mi");
+      expect(errors).toEqual([]);
+    });
+
+    it("has no longest swim badge without a swim distance", async () => {
+      const { km: _km, ...noKm } = swims[0];
+      const { page, errors } = await open(browser, withActivities([noKm]), { hash: "#swimming" });
+      expect(await page.innerText("[data-id=records]")).not.toContain("Longest swim");
+      expect(errors).toEqual([]);
+    });
+
+    it("says that open water has no trend", async () => {
+      const { page, errors } = await open(browser, withActivities([openWater]), {
+        hash: "#swimming",
+      });
+      expect(await page.innerText("[data-id=swimTrend]")).toContain("No pool swims with strokes");
+      expect(errors).toEqual([]);
+    });
+
+    it("adds strokes per length and distance per stroke, n/a in open water", async () => {
+      const { page, errors } = await open(browser, withActivities([openWater, swims[0]]), {
+        hash: "#swimming",
+      });
+      const cells = await page.$$eval("[data-id=swimDetails] tbody tr", (r) =>
+        r.map((x) => [...x.children].map((c) => c.textContent)),
+      );
+      // Open water first: no strokes per length; 2,500 m over 1,500 strokes
+      expect(cells[0].slice(7, 9)).toEqual(["n/a", "1.67 m"]);
+      expect(cells[1].slice(7, 9)).toEqual(["18.0", "1.39 m"]);
+      expect(errors).toEqual([]);
+    });
+
+    it("names the longest swim in the records of the board", async () => {
+      const { page, errors } = await open(browser, withActivities([openWater, swims[0]]), {
+        hash: "#swimming",
+      });
+      const text = await page.innerText("[data-id=records]");
+      expect(text).toContain("Longest swim");
+      expect(text).toContain("2.50 km");
+      expect(text).toContain("Lake Swim");
+      expect(errors).toEqual([]);
+    });
   });
 
   it("shows the elapsed time of a race, and the moving time without it", async () => {
