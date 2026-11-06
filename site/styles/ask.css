@@ -1,7 +1,7 @@
 /* What you can ask */
 .coach {
   grid-column: 1 / -1;
-  margin-top: 32px;
+  padding-top: 32px;
   overflow-x: auto;
   & p {
     margin: 0 0 12px;
@@ -92,9 +92,18 @@
 }
 .qs-set {
   grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
   visibility: hidden;
   &.on {
     visibility: visible;
+  }
+}
+/* the shared cell is as tall as the longest sport: the coach prompts stay at its bottom. On a phone
+   the gap would read as the end of the section, so they stay right after the questions. */
+@media (min-width: 721px) {
+  .qs-set .coach {
+    margin-top: auto;
   }
 }
 .qs-note {

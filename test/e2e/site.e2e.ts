@@ -329,6 +329,36 @@ describe("site sections", () => {
     }
   });
 
+  it("pins the coach prompts to the bottom on a wide page, and keeps them after the questions on a phone", async () => {
+    const { page } = await site();
+    const place = () =>
+      page.$eval(".qs-set.on", (set) => {
+        const coach = set.querySelector(".coach");
+        if (!coach) return null;
+        const top = coach.querySelector("p")!.getBoundingClientRect().top;
+        return {
+          toBottom: Math.round(
+            set.getBoundingClientRect().bottom - coach.getBoundingClientRect().bottom,
+          ),
+          fromAbove: Math.round(top - coach.previousElementSibling!.getBoundingClientRect().bottom),
+        };
+      });
+    for (const width of [1440, 900]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const sport of ["running", "strength", "every"]) {
+        await page.click(`.picker [data-sport=${sport}]`);
+        const at = await place();
+        expect([width, sport, at?.toBottom]).toEqual([width, sport, 0]);
+        expect(at?.fromAbove).toBeGreaterThanOrEqual(32);
+      }
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    for (const sport of ["running", "strength", "every"]) {
+      await page.click(`.picker [data-sport=${sport}]`);
+      expect([sport, (await place())?.fromAbove]).toEqual([sport, 32]);
+    }
+  });
+
   it("shows the coach prompts of each sport with its questions only", async () => {
     const { page } = await site();
     const shown = () =>
