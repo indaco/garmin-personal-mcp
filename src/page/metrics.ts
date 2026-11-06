@@ -278,7 +278,7 @@ export function readinessOf(
     hrvStatus: typeof night?.status === "string" ? night.status : undefined,
     sleepScore: finite(today?.sleepScore),
     rhr: finite(today?.rhr),
-    rhrAvg: before.length >= MIN_SESSIONS ? (mean(before) ?? undefined) : undefined,
+    rhrAvg: mean(before.length >= MIN_SESSIONS ? before : []) ?? undefined,
     ratio,
   };
   return {
