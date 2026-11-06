@@ -361,6 +361,7 @@ These prompts answer in the chat. They do not change a dashboard.
 | [race-readiness](#race-readiness)   | tells if you are ready for a race, with a plan for its pace | `/mcp__garmin-personal__race-readiness 2026-11-15 half 1:45:00` |
 | [strength-review](#strength-review) | reviews one strength session as a coach                     | `/mcp__garmin-personal__strength-review`                        |
 | [swim-review](#swim-review)         | reviews one swim as a coach                                 | `/mcp__garmin-personal__swim-review`                            |
+| [swim-readiness](#swim-readiness)   | tells if you are ready for a swim event                     | `/mcp__garmin-personal__swim-readiness 2026-08-01 1.9 km`       |
 | [train-today](#train-today)         | tells if you should train hard today, with fitness and form | `/mcp__garmin-personal__train-today`                            |
 | [week-review](#week-review)         | reviews your last whole week against the weeks before       | `/mcp__garmin-personal__week-review`                            |
 
@@ -423,6 +424,27 @@ swim, and a short coach note. It does not judge a swim on heart rate alone.
 
 The prompt needs one .FIT file. A set is laps in a row of one distance, stroke and intensity. Two
 sets of the same distance, stroke and intensity read as one.
+
+### swim-readiness
+
+The assistant reads the server's summary of 12 weeks (a `writeDashboard` preview, which writes
+nothing). It gives the days to the event, the swims and km of each week, the longest swim against
+the event distance, and your recent pace, with pool and open water in separate tables. For the pool
+it compares your last swims with as many before them, in one pool length. It ends with your load,
+HRV and sleep, and a short verdict. It gives no predicted time.
+
+| Argument   | Values                                   | Default                  |
+| ---------- | ---------------------------------------- | ------------------------ |
+| `date`     | the event date, `yyyy-MM-dd`             | none: the assistant asks |
+| `distance` | the event distance, for example `1.9 km` | none: the assistant asks |
+| `tests`    | your 200 m and 400 m times, `3:10 6:40`  | no CSS                   |
+
+CSS (critical swim speed) shows only when you give both test times, from all-out swims on one day. The
+server computes it: (400 m time - 200 m time) / 2. It is never estimated from your swims.
+
+In Claude Code, give the values in any order: a value in the form `yyyy-MM-dd` is the date, values in
+the form `3:10` are the test times (the larger one is the 400 m), and the other words are the
+distance. For example `/mcp__garmin-personal__swim-readiness 1.9 km 2026-08-01 3:10 6:40`.
 
 ### train-today
 

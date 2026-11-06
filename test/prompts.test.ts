@@ -588,6 +588,9 @@ describe("recovery trend", () => {
   });
 });
 
+const check = (tests: string) =>
+  render("swim-readiness", { date: "2026-08-01", distance: "1.9 km", tests });
+
 describe("coach prompts", () => {
   it.each(["run-review", "strength-review", "swim-review"])(
     "%s shows a night without sleep data as n/a",
@@ -868,6 +871,89 @@ describe("coach prompts", () => {
       "The swim is the activity with `activityId` = 21000000789.",
     );
     expect(await render("swim-review", { activity: "Morning" })).toContain('`names` = ["Morning"]');
+  });
+
+  describe("swim-readiness", () => {
+    it("checks one event from the digest, with no prediction", async () => {
+      const text = (await check("")).replace(/\s+/g, " ");
+      expect(text).toContain("Event: 1.9 km on 2026-08-01.");
+      expect(text).toContain("Call `writeDashboard` with `preview` = true and `weeks` = 12.");
+      expect(text).not.toContain("listActivities");
+      expect(text).toContain("`swims.weekly`");
+      expect(text).toContain("`swims.poolTrend`");
+      expect(text).toContain("Pool and open water in two separate tables");
+      expect(text).toContain("Give no predicted time");
+      expect(text).toContain("**Never invent or estimate a missing value**");
+      expect(text).not.toContain("is missing");
+      expect(text.includes("{{")).toBe(false);
+    });
+
+    it("computes CSS from the two test times, in either order", async () => {
+      for (const tests of ["3:10 6:40", "6:40 3:10"]) {
+        const text = await check(tests);
+        expect(text).toContain("My test times are 3:10 for 200 m and 6:40 for 400 m.");
+        expect(text).toContain("= 1:45/100 m.");
+      }
+    });
+
+    it.each([
+      ["no time", "", "I gave no test times"],
+      ["one time", "3:10", "I gave 3:10, not 2 test times"],
+      ["three times", "3:10 6:40 3:20", "I gave 3:10, 6:40, 3:20, not 2 test times"],
+      ["a 400 m at twice the 200 m", "3:20 6:40", "the test is not valid"],
+      ["two equal times", "6:40 6:40", "the test is not valid"],
+      ["a time of zero", "0:00 6:40", "the test is not valid"],
+      ["a 400 m under twice the 200 m", "3:30 6:40", "the test is not valid"],
+    ])("gives no CSS with %s", async (_why, tests, line) => {
+      const text = await check(tests);
+      expect(text).toContain(line);
+      expect(text).toContain('"n/a"');
+      expect(text).not.toContain("CSS = (400 m time");
+    });
+
+    it.each(["3:10, 6:40", "3:10,6:40"])("reads the test times %s", async (tests) => {
+      const text = await check(tests);
+      expect(text).toContain("Event: 1.9 km on 2026-08-01.");
+      expect(text).toContain("= 1:45/100 m.");
+    });
+
+    it("keeps a decimal comma in the distance, and a time that is no time in the event", async () => {
+      const text = await render("swim-readiness", {
+        date: "2026-08-01",
+        distance: "1,9 km",
+        tests: "3:75",
+      });
+      expect(text).toContain("Event: 1,9 km 3:75 on 2026-08-01.");
+      expect(text).toContain("I gave no test times");
+    });
+
+    it("reads the date and the times by their shape from any slot", async () => {
+      // "/mcp__garmin-personal__swim-readiness 1.9 km 2026-08-01 3:10 6:40" fills the slots in order
+      const text = await render("swim-readiness", {
+        date: "1.9",
+        distance: "km",
+        tests: "2026-08-01 3:10 6:40",
+      });
+      expect(text).toContain("Event: 1.9 km on 2026-08-01.");
+      expect(text).toContain("= 1:45/100 m.");
+    });
+
+    it("asks for a missing date or distance", async () => {
+      const noDate = await render("swim-readiness", { distance: "3.8 km" });
+      expect(noDate).toContain("Event: 3.8 km on a date not given.");
+      expect(noDate).toContain("The event date or distance is missing: ask me for it");
+      expect(await render("swim-readiness", { date: "2026-08-01" })).toContain(
+        "Event: distance not given on 2026-08-01.",
+      );
+    });
+
+    it("keeps an event distance with a dollar pattern or a marker as typed", async () => {
+      const text = await render("swim-readiness", {
+        date: "2026-08-01",
+        distance: "$'1k {{today}}",
+      });
+      expect(text).toContain("Event: $'1k {{today}} on 2026-08-01.");
+    });
   });
 
   it("keeps a race distance with a dollar pattern or a marker as typed", async () => {

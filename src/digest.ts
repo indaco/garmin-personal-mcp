@@ -1,5 +1,5 @@
 import { addDays } from "./dates";
-import { hms, paceText, round } from "./fit";
+import { hms, paceText, round, swimPaceText } from "./fit";
 import {
   type Activity,
   dayOf,
@@ -11,6 +11,7 @@ import {
 } from "./page/calc";
 import { fitnessFatigueFrom, loadOf, loadRatio, readinessOf, zonesOf } from "./page/metrics";
 import { racePredictionsOf, type SplitKind, splitOf, workoutOf } from "./page/running";
+import { strokesPerLength, swimPace, swimTrend } from "./page/sports";
 import { completed, type StrengthSet, topSet as pageTopSet } from "./page/strength";
 
 type Json = Record<string, unknown>;
@@ -51,6 +52,34 @@ interface TopSet {
   top: string;
 }
 
+/** The page's swim numbers, so that the coach quotes the page. Open water and pool stay apart. */
+interface Swims {
+  /** The km of the swims with a distance; null when no swim of the week has one. */
+  weekly: Record<string, { sessions: number; km: number | null }>;
+  longest: { date: string; name: unknown; km: number; openWater: boolean } | null;
+  /** The newest first. */
+  recent: {
+    date: string;
+    name: unknown;
+    openWater: boolean;
+    km: number | null;
+    pace: string | null;
+    swolf: number | null;
+    strokesPerLength: number | null;
+    poolLengthM: number | null;
+  }[];
+  /** The Swim technique trend. */
+  poolTrend: {
+    poolLengthM: number;
+    swims: number;
+    from: string;
+    left: number;
+    comparedSwims: number | null;
+    pace: { recent: string; before: string } | null;
+    strokesPerLength: { recent: number; before: number } | null;
+  } | null;
+}
+
 /** What Claude needs for the coach notes, in a few KB instead of the whole getDashboardData result. */
 export interface Digest {
   period: Json;
@@ -79,6 +108,8 @@ export interface Digest {
   }[];
   /** The longest run (board "running") of the period; absent without a run that has a distance. */
   longestRun?: { date: string; name: unknown; km: number };
+  /** Only when the period has swims. */
+  swims?: Swims;
   /** One row per best effort of 5 km or more, fastest first (the first row is the page's prediction). */
   racePredictions: {
     /** The effort distance key: "5k", "10k", "half" or "marathon". */
@@ -200,6 +231,7 @@ export function digest(data: Json): Digest {
   const longestRun = longest
     ? { date: dayOf(longest as Activity)!, name: longest.name, km: round(num(longest.km), 1) }
     : undefined;
+  const swims = swimsOf(acts);
   // the page predicts from the efforts of the runs only
   const runEfforts = fastestEfforts(runs);
   const racePredictions: Digest["racePredictions"] = racePredictionsOf(
@@ -275,6 +307,7 @@ export function digest(data: Json): Digest {
       })),
     longRuns,
     ...(longestRun ? { longestRun } : {}),
+    ...(swims ? { swims } : {}),
     racePredictions,
     repeatedRuns: repeatedRuns(acts),
     strengthExercises,
@@ -324,6 +357,69 @@ function topSet(sets: Json[]): string | undefined {
 }
 
 /** The fastest effort of each distance, with its activity. */
+const RECENT_SWIMS = 8;
+const openWater = (a: Activity) => String(a.type ?? "").includes("open_water");
+const numberOrNull = (v: unknown) => (typeof v === "number" ? v : null);
+
+function swimsOf(acts: Json[]): Swims | undefined {
+  const swims = (acts as Activity[]).filter((a) => groupOf(a) === "swimming" && dayOf(a));
+  if (swims.length === 0) return undefined;
+  const weekly: Swims["weekly"] = {};
+  for (const a of swims) {
+    const w = (weekly[mondayOf(dayOf(a)!)] ??= { sessions: 0, km: null });
+    w.sessions++;
+    if (typeof a.km === "number") w.km = round((w.km ?? 0) + a.km, 2);
+  }
+  const longest = swims
+    .filter((a) => typeof a.km === "number")
+    .reduce<Activity | undefined>((top, a) => (a.km! > (top?.km ?? 0) ? a : top), undefined);
+  const trend = swimTrend(swims);
+  const w = trend?.window;
+  return {
+    weekly,
+    longest: longest
+      ? {
+          date: dayOf(longest)!,
+          name: longest.name,
+          km: round(longest.km!, 2),
+          openWater: openWater(longest),
+        }
+      : null,
+    recent: swims
+      .toSorted((x, y) => dayOf(y)!.localeCompare(dayOf(x)!))
+      .slice(0, RECENT_SWIMS)
+      .map((a) => {
+        const pace = swimPace(a);
+        const perLength = strokesPerLength(a);
+        return {
+          date: dayOf(a)!,
+          name: a.name,
+          openWater: openWater(a),
+          km: numberOrNull(a.km),
+          pace: pace === undefined ? null : swimPaceText(pace),
+          swolf: numberOrNull(a.swolf),
+          strokesPerLength: perLength === undefined ? null : round(perLength, 1),
+          poolLengthM: numberOrNull(a.poolLengthM),
+        };
+      }),
+    poolTrend: trend
+      ? {
+          poolLengthM: trend.poolLengthM,
+          swims: trend.sessions.length,
+          from: trend.sessions[0].date,
+          left: trend.left,
+          comparedSwims: w?.swims ?? null,
+          pace: w
+            ? { recent: swimPaceText(w.pace.recent), before: swimPaceText(w.pace.before) }
+            : null,
+          strokesPerLength: w
+            ? { recent: round(w.strokes.recent, 1), before: round(w.strokes.before, 1) }
+            : null,
+        }
+      : null,
+  };
+}
+
 function fastestEfforts(acts: Json[]): Digest["bestEfforts"] {
   const best: Digest["bestEfforts"] = {};
   for (const a of acts) {

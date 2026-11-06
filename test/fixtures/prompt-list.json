@@ -86,6 +86,27 @@
     ]
   },
   {
+    "name": "swim-readiness",
+    "description": "Check if you are ready for a swim event: training block, longest swim, pace, CSS, recovery",
+    "arguments": [
+      {
+        "name": "date",
+        "description": "The event date, yyyy-MM-dd",
+        "required": false
+      },
+      {
+        "name": "distance",
+        "description": "The event distance, e.g. 1.9 km",
+        "required": false
+      },
+      {
+        "name": "tests",
+        "description": "Your 200 m and 400 m test times, e.g. 3:10 6:40; empty = no CSS",
+        "required": false
+      }
+    ]
+  },
+  {
     "name": "swim-review",
     "description": "Review a swim as a coach: planned workout against the laps, set fade, SWOLF and strokes, recovery",
     "arguments": [

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { addDays, localToday } from "./dates";
+import { hms, swimPaceText } from "./fit";
 import { mondayOf } from "./page/calc";
 import { BUILT_IN } from "./page/i18n/built-in";
 import { en } from "./page/i18n/en";
@@ -31,6 +32,7 @@ export function registerPrompts(server: McpServer): void {
   const readinessPrompt = load("race-readiness.md");
   const strengthPrompt = load("strength-review.md");
   const swimReviewPrompt = load("swim-review.md");
+  const swimReadinessPrompt = load("swim-readiness.md");
   const trainPrompt = load("train-today.md");
   const weekPrompt = load("week-review.md");
 
@@ -295,6 +297,47 @@ export function registerPrompts(server: McpServer): void {
     },
   );
 
+  const swimReadinessDescription =
+    "Check if you are ready for a swim event: training block, longest swim, pace, CSS, recovery";
+  server.registerPrompt(
+    "swim-readiness",
+    {
+      description: swimReadinessDescription,
+      argsSchema: z.object({
+        date: z.string().describe("The event date, yyyy-MM-dd").optional(),
+        distance: z.string().describe("The event distance, e.g. 1.9 km").optional(),
+        tests: z
+          .string()
+          .describe("Your 200 m and 400 m test times, e.g. 3:10 6:40; empty = no CSS")
+          .optional(),
+      }),
+    },
+    (args) => {
+      // Claude Code passes arguments by position: read the date and the times by their shape from any slot
+      // "3:10, 6:40" is two times; the comma of "1,9 km" stays
+      const words = [args.date, args.distance, args.tests]
+        .map(arg)
+        .join(" ")
+        .replace(/(:\d{2}),\s*/g, "$1 ")
+        .split(/\s+/);
+      const date = words.find((w) => /^\d{4}-\d{2}-\d{2}$/.test(w)) ?? "";
+      const times = words.filter((w) => TEST_TIME.test(w));
+      const distance = words.filter((w) => w && w !== date && !times.includes(w)).join(" ");
+      return result(
+        swimReadinessDescription,
+        render(swimReadinessPrompt, {
+          today: localToday(),
+          event: `${distance || "distance not given"} on ${date || "a date not given"}`,
+          missing:
+            date && distance
+              ? ""
+              : "The event date or distance is missing: ask me for it before you call a tool.\n",
+          css: cssLine(times),
+        }),
+      );
+    },
+  );
+
   const trainDescription =
     "Tell if you should train hard today: the dashboard's readiness verdict, its inputs, fitness and form";
   server.registerPrompt("train-today", { description: trainDescription }, () =>
@@ -310,6 +353,29 @@ export function registerPrompts(server: McpServer): void {
       render(weekPrompt, { today, week: addDays(mondayOf(today), -7) }),
     );
   });
+}
+
+/** A swim test time, m:ss. */
+const TEST_TIME = /^\d{1,2}:[0-5]\d$/;
+
+const seconds = (time: string) => {
+  const [m, s] = time.split(":").map(Number);
+  return m * 60 + s;
+};
+
+/**
+ * The CSS part of the swim check. CSS is computed here, never by the assistant: (400 m time - 200 m time) / 2
+ * per 100 m. The larger time is the 400 m. A time of zero, or a 400 m at or under twice the 200 m, is not a valid test.
+ */
+function cssLine(times: string[]): string {
+  const none = `show "n/a". CSS needs one 200 m time and one 400 m time from all-out swims on one day. Do not estimate it from my swims.`;
+  if (times.length === 0) return `I gave no test times: ${none}`;
+  if (times.length !== 2) return `I gave ${times.join(", ")}, not 2 test times: ${none}`;
+  const [t200, t400] = times.map(seconds).toSorted((a, b) => a - b);
+  const given = `My test times are ${hms(t200)} for 200 m and ${hms(t400)} for 400 m.`;
+  if (t200 === 0 || 2 * t200 >= t400)
+    return `${given} No time can be 0:00 and the 400 m must be slower per 100 m than the 200 m, so the test is not valid: show "n/a" and tell me to repeat it.`;
+  return `${given} CSS = (400 m time - 200 m time) / 2 = ${swimPaceText((t400 - t200) / 2)}. Quote this value: it is the pace I can hold over a long set, from this test only. Do not turn it into an event time.`;
 }
 
 /**

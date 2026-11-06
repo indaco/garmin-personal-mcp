@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { filterData } from "../src/dashboard-page";
 import { digest, syncGaps } from "../src/digest";
 import { hms, round } from "../src/fit";
 import { type Activity, sessionSeconds } from "../src/page/calc";
+import type { Settings } from "../src/page/settings";
 import { fitnessFatigueFrom, loadRatio, readinessOf } from "../src/page/metrics";
 import { predictRaces, splitOf } from "../src/page/running";
 
@@ -887,5 +889,138 @@ describe("syncGaps", () => {
     expect(
       syncGaps({ failedDays: "2", failedSections: "hrv", failedDetails: NaN, stoppedEarly: 1 }),
     ).toBeUndefined();
+  });
+});
+
+const swim = (start: string, extra: Record<string, unknown>) => ({
+  sport: "swimming",
+  type: "lap_swimming",
+  start: `${start} 07:00:00`,
+  name: "Pool Swim",
+  km: 1,
+  duration: "20:00",
+  ...extra,
+});
+const week = (d: string, duration: string, strokes: number) =>
+  swim(d, { duration, lengths: 40, strokes, poolLengthM: 25 });
+
+describe("swims", () => {
+  const lake = swim("2026-10-20", {
+    type: "open_water_swimming",
+    name: "Lake Swim",
+    km: 2.5,
+    duration: "55:00",
+    swolf: 60,
+    strokes: 1500,
+  });
+  const pool = (start: string) =>
+    swim(start, { swolf: 38, lengths: 40, strokes: 720, poolLengthM: 25 });
+
+  it("has no swims field without a swim", () => {
+    expect(digest(data)).not.toHaveProperty("swims");
+  });
+
+  it("gives the weeks, the longest swim and the newest swims, with pool and open water apart", () => {
+    const { swims } = digest({
+      ...data,
+      activities: [lake, pool("2026-10-19"), ...data.activities],
+    });
+    expect(swims!.weekly).toEqual({ "2026-10-19": { sessions: 2, km: 3.5 } });
+    expect(swims!.longest).toEqual({
+      date: "2026-10-20",
+      name: "Lake Swim",
+      km: 2.5,
+      openWater: true,
+    });
+    expect(swims!.recent[0]).toEqual({
+      date: "2026-10-20",
+      name: "Lake Swim",
+      openWater: true,
+      km: 2.5,
+      pace: "2:12/100 m",
+      swolf: 60,
+      strokesPerLength: null,
+      poolLengthM: null,
+    });
+    expect(swims!.recent[1]).toMatchObject({
+      openWater: false,
+      pace: "2:00/100 m",
+      strokesPerLength: 18,
+      poolLengthM: 25,
+    });
+    // one pool swim: a trend without a comparison, and the lake left out
+    expect(swims!.poolTrend).toEqual({
+      poolLengthM: 25,
+      swims: 1,
+      from: "2026-10-19",
+      left: 1,
+      comparedSwims: null,
+      pace: null,
+      strokesPerLength: null,
+    });
+  });
+
+  it("has no pool trend in open water only", () => {
+    expect(digest({ ...data, activities: [lake] }).swims!.poolTrend).toBeNull();
+  });
+
+  it("shows a swim without a distance as n/a, and never as the longest", () => {
+    const { km: _km, ...rest } = pool("2026-10-19");
+    const { swims } = digest({ ...data, activities: [rest] });
+    expect(swims!.weekly["2026-10-19"]).toEqual({ sessions: 1, km: null });
+    expect(swims!.longest).toBeNull();
+    expect(swims!.recent[0]).toMatchObject({ km: null, pace: null });
+  });
+
+  it("adds the known km of a week that also has a swim without a distance", () => {
+    const { km: _km, ...noKm } = pool("2026-10-19");
+    for (const activities of [
+      [noKm, pool("2026-10-20")],
+      [pool("2026-10-20"), noKm],
+    ])
+      expect(digest({ ...data, activities }).swims!.weekly["2026-10-19"]).toEqual({
+        sessions: 2,
+        km: 1,
+      });
+  });
+
+  it("has no swims on a page without the sport, and no names on a page without names", () => {
+    const activities = [pool("2026-10-19")];
+    const settings = (s: object) => filterData({ ...data, activities }, s as Settings);
+    expect(digest(settings({ sports: ["running"] }))).not.toHaveProperty("swims");
+    const { swims } = digest(settings({ exclude: ["names"] }));
+    expect(swims!.recent[0].name).toBeUndefined();
+    expect(JSON.stringify(swims)).not.toContain("Pool Swim");
+  });
+
+  it("reads a swim without a type as a pool swim", () => {
+    const { type: _type, ...rest } = pool("2026-10-19");
+    expect(digest({ ...data, activities: [rest] }).swims!.recent[0].openWater).toBe(false);
+  });
+
+  it("keeps the 8 newest swims", () => {
+    const many = Array.from({ length: 10 }, (_, i) => pool(`2026-10-${10 + i}`));
+    const { swims } = digest({ ...data, activities: many });
+    expect(swims!.recent).toHaveLength(8);
+    expect(swims!.recent[0].date).toBe("2026-10-19");
+  });
+
+  it("compares the newest pool swims with as many before them", () => {
+    const { swims } = digest({
+      ...data,
+      activities: [
+        week("2026-10-19", "20:00", 720),
+        week("2026-10-12", "20:00", 720),
+        week("2026-10-05", "20:00", 720),
+        week("2026-09-28", "21:40", 800),
+        week("2026-09-21", "21:40", 800),
+        week("2026-09-14", "21:40", 800),
+      ],
+    });
+    expect(swims!.poolTrend).toMatchObject({
+      comparedSwims: 3,
+      pace: { recent: "2:00/100 m", before: "2:10/100 m" },
+      strokesPerLength: { recent: 18, before: 20 },
+    });
   });
 });
