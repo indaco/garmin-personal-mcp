@@ -275,7 +275,7 @@ function writtenAt(data: Data): string | undefined {
 function footer(data?: Data): HTMLElement {
   const written = data && writtenAt(data);
   const failed = Number(data?.sync?.failedDays) || 0;
-  // the server that wrote the page last, with its release notes
+  // the server that wrote the page last, with its entry on What's new
   const version = /^\d+\.\d+\.\d+$/.test(data?.server ?? "") ? data!.server : undefined;
   return h(
     "footer",
@@ -294,7 +294,11 @@ function footer(data?: Data): HTMLElement {
       h("a", { class: "brand", href: SITE }, logo(), "garmin-personal-mcp"),
       "·",
       version &&
-        h("a", { href: `${REPO}/releases/tag/v${version}`, rel: "noopener" }, `v${version}`),
+        h(
+          "a",
+          { href: `${WHATS_NEW}#v${version.replaceAll(".", "-")}`, rel: "noopener" },
+          `v${version}`,
+        ),
       version && "·",
       h("a", { href: `${REPO}/blob/main/LICENSE`, rel: "noopener" }, t("footer.license")),
     ),

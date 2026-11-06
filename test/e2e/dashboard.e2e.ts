@@ -1,5 +1,4 @@
 import { readFileSync, statSync, writeFileSync } from "node:fs";
-import { version as serverVersion } from "../../package.json";
 import axe from "axe-core";
 import type { Browser, Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -790,7 +789,7 @@ describe("the page", () => {
         data: {
           ...data,
           v: DASHBOARD_VERSION,
-          server: serverVersion,
+          server: "0.10.0",
           notes: [],
           updated: "2026-10-27T05:30:00.000Z",
         },
@@ -807,9 +806,11 @@ describe("the page", () => {
     );
     expect(await page.getAttribute("footer a >> text=MIT License", "href")).toContain("LICENSE");
     // the version of the server that wrote the page, with its release notes
-    expect(await page.getAttribute(`footer a >> text=v${serverVersion}`, "href")).toMatch(
-      new RegExp(`/releases/tag/v${serverVersion}$`),
+    expect(await page.getAttribute("footer a >> text=v0.10.0", "href")).toBe(
+      "https://garmin-personal-mcp.indaco.dev/whats-new.html#v0-10-0",
     );
+    // the website has that place
+    expect(readFileSync("dist-site/whats-new.html", "utf8")).toContain('<article id="v0-10-0">');
 
     const failed = await open(
       browser,
