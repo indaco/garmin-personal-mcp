@@ -846,6 +846,10 @@ describe("the page", () => {
 const saved = (page: Page) =>
   page.evaluate(() => localStorage.getItem(`garmin-layout:${location.pathname}`));
 
+const of = (id: string, span: number, extra = {}) => ({ id, widget: id, span, ...extra });
+const tallBox = (id: string, height: number) =>
+  custom(id, `el.innerHTML = '<div style="height:${height}px"></div>';`);
+
 describe("edit mode", () => {
   const one = {
     rev: "r0",
@@ -1043,6 +1047,136 @@ describe("edit mode", () => {
       expect(await page.innerText(".edit-bar")).not.toContain("Unsaved changes");
       expect(errors).toEqual([]);
     }
+  });
+
+  describe("Auto-arrange", () => {
+    const widgets = [
+      tallBox("x", 100),
+      tallBox("tall2", 400),
+      tallBox("low1", 100),
+      tallBox("low2", 100),
+      tallBox("tall1", 400),
+    ];
+    const scrambled = {
+      rev: "r1",
+      base: "preset",
+      seen: { ...MET, running: preset("running").map((i) => i.widget) },
+      boards: {
+        all: [
+          of("activities", 3),
+          of("x", 1),
+          of("calendar", 1),
+          of("intensityMinutes", 1, { hidden: true }),
+          of("records", 3),
+          of("kpis", 3),
+        ],
+        running: [of("activities", 3), of("typeKpis", 3)],
+      },
+    };
+
+    it("sorts the current board by meaning, as a draft that Discard undoes and Done saves", async () => {
+      const { page, errors } = await open(
+        browser,
+        pageFile({ layout: scrambled, widgets, settings: { languages: ["en", "it"] } }),
+        { locale: "it-IT" },
+      );
+      const startItalianEdit = async () => {
+        await page.click(".account summary");
+        await page.click(".account-panel >> text=Modifica layout");
+      };
+      await startItalianEdit();
+      await page.click(".edit-bar >> text=Disponi automaticamente");
+      const arranged = ["calendar", "kpis", "records", "x", "activities"];
+      expect(await tiles(page)).toEqual(arranged);
+      expect(await page.textContent("#announce")).toBe("Widget disposti");
+      expect(await page.innerText(".edit-bar")).toContain("Modifiche non salvate");
+      expect(await saved(page)).toBeNull();
+      expect(await page.getAttribute("[data-id=x]", "class")).toContain("span-3");
+
+      await page.click(".edit-bar >> text=Annulla");
+      await page.click("dialog >> text=Annulla le modifiche");
+      expect(await tiles(page)).toEqual(["activities", "x", "calendar", "records", "kpis"]);
+
+      await startItalianEdit();
+      await page.click(".edit-bar >> text=Disponi automaticamente");
+      await page.click(".edit-bar >> text=Fine");
+      expect(await tiles(page)).toEqual(arranged);
+      const { boards } = JSON.parse((await saved(page))!).layout;
+      expect(boards.all.map((i: { id: string }) => i.id)).toEqual([
+        ...arranged,
+        "intensityMinutes",
+      ]);
+      expect(boards.all.at(-1)).toEqual(of("intensityMinutes", 1, { hidden: true }));
+      expect(boards.running).toEqual(scrambled.boards.running);
+      expect(errors).toEqual([]);
+    });
+
+    it("pairs tiles by the height of their content, not of the stretched tile", async () => {
+      const board = [of("tall2", 2), of("low1", 1), of("low2", 2), of("tall1", 1)];
+      const layout = { rev: "r1", base: "preset", seen: MET, boards: { all: board } };
+      const { page } = await open(browser, pageFile({ layout, widgets }));
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await tiles(page)).toEqual(["tall2", "tall1", "low2", "low1"]);
+    });
+
+    it("counts a widget's narrowest width", async () => {
+      const board = [of("calendar", 1), of("fitnessAge", 1), of("periodComparison", 1)];
+      const layout = { rev: "r1", base: "preset", seen: MET, boards: { all: board } };
+      const { page } = await open(browser, pageFile({ layout }));
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      const widths = await page.$$eval(".tile", (els) => els.map((e) => e.className));
+      expect(widths.map((c) => c.match(/span-\d/)?.[0]).toSorted()).toEqual([
+        "span-1",
+        "span-2",
+        "span-3",
+      ]);
+    });
+
+    it("shows no unsaved changes on a board that is already arranged", async () => {
+      const listed = { rev: "r1", base: "preset", seen: MET, boards: { all: [of("x", 3)] } };
+      for (const layout of [null, listed]) {
+        const { page, errors } = await open(browser, pageFile({ layout, widgets }));
+        await startEdit(page);
+        await page.click(".edit-bar >> text=Auto-arrange");
+        expect(await page.textContent("#announce")).toBe("Widgets arranged");
+        expect(await page.innerText(".edit-bar")).not.toContain("Unsaved changes");
+        expect(errors).toEqual([]);
+      }
+    });
+
+    it("arranges only the tiles it shows, and keeps a withheld or unknown widget", async () => {
+      const layout = {
+        rev: "r1",
+        base: "preset",
+        seen: MET,
+        boards: { all: [of("readiness", 2), of("calendar", 1), of("gone", 1)] },
+      };
+      const { page, errors } = await open(
+        browser,
+        pageFile({ layout, settings: { exclude: ["recovery"] } }),
+      );
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await tiles(page)).toEqual(["calendar", "gone"]);
+      expect(await page.getAttribute("[data-id=calendar]", "class")).toContain("span-3");
+      await page.click(".edit-bar >> text=Done");
+      const { boards } = JSON.parse((await saved(page))!).layout;
+      expect(boards.all).toEqual([of("calendar", 3), of("gone", 3), of("readiness", 2)]);
+      expect(errors).toEqual([]);
+    });
+
+    it("gives the same board on a second press", async () => {
+      const board = [of("low1", 1), of("tall2", 2), of("tall1", 1), of("x", 1), of("low2", 2)];
+      const layout = { rev: "r1", base: "preset", seen: MET, boards: { all: board } };
+      const { page } = await open(browser, pageFile({ layout, widgets }));
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      const once = await tiles(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await tiles(page)).toEqual(once);
+    });
   });
 
   it("keeps a browser edit after a reload, until the page gets a new layout", async () => {

@@ -189,6 +189,7 @@ out. To add one:
 | `edit.done` | Done |
 | `edit.add` | Add widget |
 | `edit.reset` | Reset board |
+| `edit.arrange` | Auto-arrange |
 | `edit.discard` | Discard |
 | `edit.bar` | Edit layout |
 | `edit.editing` | Editing · {board} |
@@ -218,6 +219,7 @@ out. To add one:
 | `said.added` | {title} added |
 | `said.saved` | Layout saved |
 | `said.unchanged` | No changes to save |
+| `said.arranged` | Widgets arranged |
 | `said.discarded` | Changes discarded |
 | `stale.label` | New layout |
 | `stale.text` | Your assistant wrote a new layout for this dashboard. The layout you made in this browser stays until you choose. |

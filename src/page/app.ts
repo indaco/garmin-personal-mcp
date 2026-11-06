@@ -23,6 +23,7 @@ import {
 } from "./i18n";
 import {
   add,
+  arrange,
   boardOf,
   type Instance,
   type Layout,
@@ -42,7 +43,7 @@ import {
   withPresetWidgets,
 } from "./layout";
 import { type News, parseNews } from "./news";
-import { baseline, preset } from "./presets";
+import { baseline, preset, zoneOf } from "./presets";
 import {
   allWidgets,
   type Ctx,
@@ -1006,6 +1007,31 @@ function saveBoard(board: Instance[]): void {
   setDraft(withBoard(draft ?? layout, view.tab, board, preset));
 }
 
+/** The current board by meaning, in full rows. A draft like every other edit. */
+function autoArrange(): void {
+  const board = currentBoard();
+  // a withheld widget has no tile, so it would leave a gap in a row; it stays on the board
+  const absent = board.filter((i) => withheld.has(i.widget));
+  const present = board.filter((i) => !absent.includes(i));
+  // shortcut: heights are measured at the current window width, measure at 3 columns if phone results are poor
+  const arranged = arrange(present, (i) => ({
+    zone: zoneOf(i.widget),
+    height: contentHeight(i.id),
+    min: widget(i.widget)?.minSpan ?? 1,
+  }));
+  const next = [...arranged, ...absent];
+  // a save lists a preset board, and the bar would show unsaved changes with nothing changed
+  if (JSON.stringify(next) !== JSON.stringify(board)) saveBoard(next);
+  announce(t("said.arranged"));
+}
+
+/** A tile is as tall as its row, so its content ends at the bottom of its body. Whole px, so that sums compare. */
+function contentHeight(id: string): number {
+  const el = [...document.querySelectorAll<HTMLElement>(".tile")].find((x) => x.dataset.id === id)!;
+  const end = el.querySelector(".tile-body")!.getBoundingClientRect().bottom;
+  return Math.round(end - el.getBoundingClientRect().top);
+}
+
 function setDraft(next: Layout): void {
   draft = next;
   render();
@@ -1148,6 +1174,7 @@ function editBar(): HTMLElement {
       },
       t("edit.reset"),
     ),
+    h("button", { class: "btn", onclick: autoArrange }, t("edit.arrange")),
     h("button", { class: "btn", onclick: copyDialog }, t("edit.copy")),
     h("button", { class: "btn", onclick: discard }, t("edit.discard")),
     h("button", { class: "btn primary", onclick: done }, t("edit.done")),

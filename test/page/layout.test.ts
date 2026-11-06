@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   add,
+  arrange,
   boardOf,
   type Instance,
   type Layout,
@@ -656,5 +657,334 @@ describe("loneAtTwoColumns", () => {
     ["the preset of a sport board", [3, 2, 1, 3, 3], [2]],
   ])("%s", (_, spans, lone) => {
     expect(loneAtTwoColumns(spans)).toEqual(lone);
+  });
+});
+
+const shape = (board: Instance[]) => board.map((i) => `${i.id}:${i.span}`).join(" ");
+const placed = (id: string, span: Span, extra: Partial<Instance> = {}): Instance => ({
+  id,
+  widget: id,
+  span,
+  ...extra,
+});
+
+describe("arrange", () => {
+  interface Facts {
+    heights?: Record<string, number>;
+    zones?: Record<string, number>;
+    mins?: Record<string, Span>;
+  }
+  const run = (board: Instance[], { heights = {}, zones = {}, mins = {} }: Facts = {}) =>
+    arrange(board, (i) => ({
+      zone: zones[i.id] ?? 0,
+      height: heights[i.id] ?? 100,
+      min: mins[i.id] ?? 1,
+    }));
+
+  it.each<[string, [string, Span][], Facts, string]>([
+    ["an empty board", [], {}, ""],
+    [
+      "width 3 stays alone",
+      [
+        ["a", 3],
+        ["b", 3],
+      ],
+      {},
+      "a:3 b:3",
+    ],
+    [
+      "the wider tile of a pair goes first",
+      [
+        ["a", 1],
+        ["b", 2],
+      ],
+      {},
+      "b:2 a:1",
+    ],
+    [
+      "three narrow tiles fill a row",
+      [
+        ["a", 1],
+        ["b", 1],
+        ["c", 1],
+      ],
+      {},
+      "a:1 b:1 c:1",
+    ],
+    ["a last single narrow tile takes the row", [["a", 1]], {}, "a:3"],
+    [
+      "a fourth narrow tile takes the next row",
+      [
+        ["a", 1],
+        ["b", 1],
+        ["c", 1],
+        ["d", 1],
+      ],
+      {},
+      "a:1 b:1 c:1 d:3",
+    ],
+    [
+      "of a last two with one height, the first gets width 2",
+      [
+        ["a", 1],
+        ["b", 1],
+      ],
+      {},
+      "a:2 b:1",
+    ],
+    [
+      "of a last two, the taller gets width 2 and goes first",
+      [
+        ["a", 1],
+        ["b", 1],
+      ],
+      { heights: { a: 100, b: 200 } },
+      "b:2 a:1",
+    ],
+    [
+      "the last two stay in the last row",
+      [
+        ["a", 1],
+        ["b", 1],
+        ["c", 1],
+        ["d", 1],
+        ["e", 1],
+      ],
+      { heights: { e: 300 } },
+      "a:1 b:1 c:1 e:2 d:1",
+    ],
+    [
+      "a two without a partner takes the row, the shorter of two",
+      [
+        ["a", 2],
+        ["b", 2],
+        ["c", 1],
+      ],
+      { heights: { a: 300, b: 100, c: 300 } },
+      "a:2 c:1 b:3",
+    ],
+    [
+      "of two wide tiles, the one close to its neighbour keeps the pair",
+      [
+        ["a", 2],
+        ["b", 2],
+        ["c", 1],
+      ],
+      { heights: { a: 300, b: 100, c: 100 } },
+      "a:3 b:2 c:1",
+    ],
+    [
+      "a neighbour does not leave another wide tile without its partner",
+      [
+        ["a", 2],
+        ["b", 1],
+        ["c", 2],
+        ["e", 3],
+        ["d", 1],
+      ],
+      { heights: { a: 100, b: 100, c: 300, d: 300 } },
+      "a:2 b:1 c:2 d:1 e:3",
+    ],
+    [
+      "the pairs have the closest heights",
+      [
+        ["a", 2],
+        ["b", 1],
+        ["c", 2],
+        ["d", 1],
+      ],
+      { heights: { a: 300, b: 100, c: 100, d: 300 } },
+      "a:2 d:1 c:2 b:1",
+    ],
+    [
+      "the tallest narrow tile pairs, the others stay in board order",
+      [
+        ["a", 2],
+        ["b", 1],
+        ["c", 1],
+        ["d", 1],
+        ["e", 1],
+      ],
+      { heights: { a: 100, b: 10, c: 90, d: 50, e: 40 } },
+      "a:2 c:1 b:1 d:1 e:1",
+    ],
+    [
+      "a pair as close as the best one stays",
+      [
+        ["a", 2],
+        ["b", 1],
+        ["c", 2],
+        ["d", 1],
+      ],
+      { heights: { a: 10, b: 5, c: 20, d: 5 } },
+      "a:2 b:1 c:2 d:1",
+    ],
+    [
+      "a pair closer than the tallest narrow tile stays",
+      [
+        ["a", 2],
+        ["b", 1],
+        ["c", 1],
+        ["d", 1],
+        ["e", 1],
+      ],
+      { heights: { c: 500 } },
+      "a:2 b:1 c:1 d:1 e:1",
+    ],
+    [
+      "rows keep the board order of their earliest tile",
+      [
+        ["a", 3],
+        ["b", 2],
+        ["c", 3],
+        ["d", 1],
+      ],
+      {},
+      "a:3 b:2 d:1 c:3",
+    ],
+    [
+      "zones go in order and never share a row",
+      [
+        ["a", 1],
+        ["b", 1],
+        ["c", 3],
+      ],
+      { zones: { a: 5, b: 0, c: 1 } },
+      "b:3 c:3 a:3",
+    ],
+    [
+      "a stored width never shrinks",
+      [
+        ["a", 3],
+        ["b", 1],
+      ],
+      {},
+      "a:3 b:3",
+    ],
+    [
+      "a stored 1 with min 2 counts as 2",
+      [
+        ["a", 1],
+        ["b", 1],
+      ],
+      { mins: { b: 2 } },
+      "b:2 a:1",
+    ],
+    ["a stored 1 with min 3 counts as 3", [["a", 1]], { mins: { a: 3 } }, "a:3"],
+  ])("%s", (_name, tiles, facts, want) => {
+    expect(
+      shape(
+        run(
+          tiles.map(([id, span]) => placed(id, span)),
+          facts,
+        ),
+      ),
+    ).toBe(want);
+  });
+
+  it("puts hidden widgets after the shown ones, unchanged", () => {
+    const hidden = placed("h", 1, { hidden: true });
+    expect(run([hidden, placed("a", 2), placed("b", 1)])).toEqual([
+      placed("a", 2),
+      placed("b", 1),
+      hidden,
+    ]);
+  });
+
+  it("sees a pair across a hidden widget", () => {
+    const board = [
+      placed("a", 2),
+      placed("h", 1, { hidden: true }),
+      placed("b", 1),
+      placed("c", 2),
+      placed("d", 1),
+    ];
+    const heights = { a: 10, b: 5, c: 20, d: 5 };
+    expect(shape(run(board, { heights }))).toBe("a:2 b:1 c:2 d:1 h:1");
+  });
+
+  it("keeps the other fields and each instance of one widget", () => {
+    const board: Instance[] = [
+      { id: "activities", widget: "activities", type: "running", span: 3 },
+      { id: "activities-2", widget: "activities", type: "cycling", span: 3 },
+    ];
+    expect(run(board)).toEqual(board);
+  });
+
+  it("does not change the board it gets", () => {
+    const board = [placed("a", 1), placed("b", 1)];
+    run(board);
+    expect(board).toEqual([placed("a", 1), placed("b", 1)]);
+  });
+
+  // each of these moved a tile again on the second press of a first version of the rule
+  it.each<[string, [string, Span][], Record<string, number>]>([
+    [
+      "narrow tiles of one height, one in a pair",
+      [
+        ["s", 1],
+        ["x", 1],
+        ["y", 1],
+        ["q", 1],
+        ["t", 2],
+      ],
+      { s: 1, x: 10, y: 10, q: 1, t: 10 },
+    ],
+    [
+      "narrow tiles of one height in two pairs",
+      [
+        ["t2", 2],
+        ["b", 1],
+        ["a", 1],
+        ["t1", 2],
+      ],
+      { t2: 20, b: 10, a: 10, t1: 30 },
+    ],
+    [
+      "wide tiles of one height in two pairs",
+      [
+        ["p2", 1],
+        ["t1", 2],
+        ["p1", 1],
+        ["t2", 2],
+      ],
+      { p2: 5, t1: 20, p1: 50, t2: 20 },
+    ],
+    [
+      "a tile that got width 2 is taller than the first pair",
+      [
+        ["t", 2],
+        ["x", 1],
+        ["y", 1],
+        ["z", 1],
+      ],
+      { t: 10, x: 100, y: 50, z: 5 },
+    ],
+    [
+      "only narrow tiles",
+      [
+        ["a", 1],
+        ["b", 1],
+        ["c", 1],
+        ["d", 1],
+        ["e", 1],
+      ],
+      { e: 300 },
+    ],
+    [
+      "two without a partner",
+      [
+        ["a", 2],
+        ["b", 2],
+        ["c", 1],
+      ],
+      { a: 300, b: 100, c: 300 },
+    ],
+  ])("gives the same board on a second press: %s", (_name, tiles, heights) => {
+    const once = run(
+      tiles.map(([id, span]) => placed(id, span)),
+      { heights },
+    );
+    expect(run(once, { heights })).toEqual(once);
   });
 });

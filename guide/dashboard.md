@@ -294,6 +294,9 @@ The edit bar stays at the top of the window while you scroll. It has:
   widgets of the board. Type in the search field to find a widget by its title, in the page
   language or in English.
 - **Reset board**: puts the preset widgets back on the board.
+- **Auto-arrange**: sorts the current board by meaning and fills every row. It keeps your widgets
+  and custom widgets, unlike **Reset board**, and it can make a tile wider. It sets the tiles side by
+  side that have the closest heights. Select **Done** to keep the result, or **Discard** to undo it.
 - **Copy layout**: gives the layout as text.
 - **Discard**: puts the layout back as it was before you selected **Edit layout**, on every board.
   When you have changes, the page asks first. Escape does the same.

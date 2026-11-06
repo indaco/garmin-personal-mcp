@@ -173,6 +173,22 @@ const BASELINE: Record<string, string[]> & { generic: string[] } = {
   generic: ["typeKpis", "typeWeekly", "hrZones", "activities"],
 };
 
+/** The order of meaning on a board. A Map, because a widget name is user data (`constructor`). */
+const ZONES = new Map<string, number>(
+  [
+    ["kpis", "typeKpis", "readiness", "fitnessAge", "calendar", "periodComparison"],
+    ["weeklyVolume", "typeWeekly", "hrZones", "intensityMinutes"],
+    ["records"],
+    [], // analysis: every other widget
+    ["walkDetails", "bikeDetails", "swimDetails", "racketDetails", "exercises"],
+    ["activities", "strengthSessions"],
+    ["coachNotes"],
+  ].flatMap((widgets, zone) => widgets.map((widget): [string, number] => [widget, zone])),
+);
+const ANALYSIS = 3;
+
+export const zoneOf = (widget: string): number => ZONES.get(widget) ?? ANALYSIS;
+
 export const PRESET_BOARDS: readonly string[] = Object.keys(PRESETS);
 
 /** A board name is user data (`constructor`, `__proto__`): only an own key picks a list. */
