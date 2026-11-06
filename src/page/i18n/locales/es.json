@@ -331,6 +331,7 @@
   "act.less": "Mostrar menos",
   "one.session": "Solo una sesión por ahora: las tendencias empiezan con 2 sesiones.",
   "w.typeKpis": "Resumen",
+  "tk.vs4w": "últimos 7 días frente a la media de 4 semanas",
   "tk.sessions": "Sesiones",
   "tk.time": "Tiempo",
   "tk.avg": "{v} por sesión",

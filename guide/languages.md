@@ -387,6 +387,7 @@ out. To add one:
 | `act.less` | Show fewer |
 | `one.session` | One session so far: trends start at 2 sessions. |
 | `w.typeKpis` | Summary |
+| `tk.vs4w` | last 7 days vs 4-week average |
 | `tk.sessions` | Sessions |
 | `tk.time` | Time |
 | `tk.avg` | {v} per session |

@@ -5,6 +5,7 @@ import type { Key } from "../i18n";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
 import type { WorkoutMetric } from "../running";
+import { MIN_SESSIONS } from "../metrics";
 import { oneSession } from "./types";
 import {
   alpha,
@@ -210,21 +211,22 @@ register({
     const z4 = calc.zonesOf(ctx.data.zones).floors[3];
     const aerobic = (a: Activity) =>
       z4 === undefined || (typeof a.avgHR === "number" && a.avgHR < z4);
-    const effOf = (w: Activity[]) =>
-      calc.mean(
-        w
-          .filter(aerobic)
-          .map((a) => calc.efficiency(a))
-          .filter((v): v is number => v !== undefined),
-      );
+    const aerobicValues = (w: Activity[]) =>
+      w
+        .filter(aerobic)
+        .map((a) => calc.efficiency(a))
+        .filter((v): v is number => v !== undefined);
+    const effOf = (w: Activity[]) => calc.mean(aerobicValues(w));
     const eff = weekly.map(effOf);
     const points = runs(ctx)
       .filter((a) => aerobic(a) && calc.efficiency(a) !== undefined && weekOf(ctx, a) >= 0)
       .toReversed();
     // the first and the last weeks of the window; a short window compares its halves
     const n = Math.min(4, Math.floor(ctx.weeks.length / 2));
-    const now = effOf(weekly.slice(-n).flat());
-    const before = effOf(weekly.slice(0, n).flat());
+    const lastWeeks = aerobicValues(weekly.slice(-n).flat());
+    const firstWeeks = aerobicValues(weekly.slice(0, n).flat());
+    const now = calc.mean(lastWeeks);
+    const before = calc.mean(firstWeeks);
     if (n > 0) {
       append(
         el,
@@ -234,6 +236,7 @@ register({
             now === null ? fmt.na : fmt.num(now, 2),
             now !== null &&
               before !== null &&
+              Math.min(lastWeeks.length, firstWeeks.length) >= MIN_SESSIONS &&
               h(
                 "span",
                 {},

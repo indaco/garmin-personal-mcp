@@ -85,6 +85,22 @@ export function delta(ctx: Ctx, pct: number | null, better?: "up" | "down"): HTM
   );
 }
 
+/**
+ * The last 7 days against the mean week of the 4 before them. Nothing when the base is empty or starts
+ * before the data: part of 4 weeks divided by 4 reads as a rise.
+ */
+export function vsFourWeeks(
+  ctx: Ctx,
+  now: number,
+  before: number,
+  end: string,
+  label: Key,
+): HTMLElement | false {
+  const pct = ctx.calc.change(now, before / 4);
+  const whole = !ctx.data.prevStart || addDays(end, -34) >= ctx.data.prevStart;
+  return pct !== null && whole && h("span", {}, delta(ctx, pct), " ", ctx.t(label));
+}
+
 /** A table; numeric columns align right. */
 export function table(
   head: string[],

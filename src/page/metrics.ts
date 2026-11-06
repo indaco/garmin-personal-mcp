@@ -255,9 +255,13 @@ export function readiness(x: ReadinessInputs): "easy" | "push" | "normal" | null
   return "normal";
 }
 
+/** Fewer values than this make no base and no trend, on any board: one good day would decide it. */
+export const MIN_SESSIONS = 3;
+
 /**
  * The readiness inputs as the page reads them, with the dates of their rows, and the verdict: the last
- * HRV row and the last recovery row of any date, and the mean resting HR of the 7 rows before the last.
+ * HRV row and the last recovery row of any date, and the mean resting HR of the 7 rows before the last
+ * (none with under MIN_SESSIONS values).
  */
 export function readinessOf(
   hrv: Record<string, unknown>[],
@@ -274,7 +278,7 @@ export function readinessOf(
     hrvStatus: typeof night?.status === "string" ? night.status : undefined,
     sleepScore: finite(today?.sleepScore),
     rhr: finite(today?.rhr),
-    rhrAvg: mean(before) ?? undefined,
+    rhrAvg: before.length >= MIN_SESSIONS ? (mean(before) ?? undefined) : undefined,
     ratio,
   };
   return {

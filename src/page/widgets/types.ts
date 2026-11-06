@@ -1,11 +1,10 @@
 import { addDays } from "../../dates";
-import { append, h } from "../dom";
+import { append } from "../dom";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
 import { renderVolume } from "./volume";
 import {
   between,
-  delta,
   everyActivity,
   kpi,
   kpiRow,
@@ -16,6 +15,7 @@ import {
   weekLabel,
   windowEnd,
   withUnit,
+  vsFourWeeks,
 } from "./ui";
 
 /** The widgets that every type board has: KPIs, the weekly chart and the time in HR zones. */
@@ -53,8 +53,8 @@ register({
     const every = ctx.ofType(everyActivity(ctx));
     const week = totals(ctx, between(every, addDays(end, -6), end));
     const base = totals(ctx, between(every, addDays(end, -34), addDays(end, -7)));
-    const vs = (now: number, before: number) =>
-      h("span", {}, delta(ctx, calc.change(now, before / 4)), " ", t("kpi.vs4w"));
+    // the big number is the whole window: say what the change compares
+    const vs = (now: number, before: number) => vsFourWeeks(ctx, now, before, end, "tk.vs4w");
     const hasDistance = ctx.type !== "all" && DISTANCE.has(ctx.type);
     // rides without a distance give n/a, not 0 km
     const known = acts.some((a) => typeof a.km === "number");

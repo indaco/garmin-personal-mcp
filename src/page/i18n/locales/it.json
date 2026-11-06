@@ -331,6 +331,7 @@
   "act.less": "Mostra meno",
   "one.session": "Una sola sessione finora: i grafici di tendenza iniziano da 2 sessioni.",
   "w.typeKpis": "Riepilogo",
+  "tk.vs4w": "ultimi 7 giorni rispetto alla media di 4 settimane",
   "tk.sessions": "Sessioni",
   "tk.time": "Tempo",
   "tk.avg": "{v} a sessione",

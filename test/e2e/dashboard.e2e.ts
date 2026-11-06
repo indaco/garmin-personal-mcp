@@ -2616,16 +2616,22 @@ describe("type boards", () => {
   it("shows n/a for the cycling distance without a distance, and keeps a real km", async () => {
     // no ride has a distance: n/a and no "vs 4 weeks" line
     expect(await distanceTile([indoorRide(1, "2026-10-20")])).toEqual({ value: "n/a", sub: 0 });
-    // a real distance, with its line
+    // a real distance with nothing before it: no line, as no change can show
     expect(await distanceTile([indoorRide(2, "2026-10-20", 12)])).toEqual({
       value: "12.0 km",
+      sub: 0,
+    });
+    // a ride in the 4 weeks before: the line
+    const before = indoorRide(5, "2026-10-05", 12);
+    expect(await distanceTile([indoorRide(2, "2026-10-20", 12), before])).toEqual({
+      value: "24.0 km",
       sub: 1,
     });
     // one ride with and one without: the known km, and the line
     expect(
-      await distanceTile([indoorRide(3, "2026-10-20", 12), indoorRide(4, "2026-10-21")]),
+      await distanceTile([indoorRide(3, "2026-10-20", 12), indoorRide(4, "2026-10-21"), before]),
     ).toEqual({
-      value: "12.0 km",
+      value: "24.0 km",
       sub: 1,
     });
   });
@@ -3304,6 +3310,27 @@ describe("strength board", () => {
   });
 });
 
+const summary = async (prevStart: string, activities: unknown[]) => {
+  const { page } = await open(
+    browser,
+    pageFile({ data: { ...data, v: DASHBOARD_VERSION, prevStart, activities } }),
+    { hash: "#hiking" },
+  );
+  return page.innerText("[data-id=typeKpis] .kpi >> nth=0");
+};
+
+const easyRun = (id: number, start: string) => ({
+  id,
+  name: "Easy Run",
+  type: "running",
+  sport: "running",
+  start: `${start} 07:00:00`,
+  km: 8,
+  duration: "48:00",
+  pace: "6:00/km",
+  avgHR: 120,
+});
+
 describe("walk, hike, bike, swim and racket sport boards", () => {
   const hike = {
     id: 9001,
@@ -3440,6 +3467,46 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
       expect([tab, await chartsWithoutTooltip(page)]).toEqual([tab, []]);
     }
     expect(errors).toEqual([]);
+  });
+
+  const hikes = (...back: number[]) =>
+    back.map((n, i) => ({
+      ...hike,
+      id: 30_000 + i,
+      start: `${addDays("2026-10-25", -n)} 09:00:00`,
+    }));
+  it("says that the change of a summary tile is the last 7 days, and needs 4 weeks before them", async () => {
+    // 2 hikes in the last 7 days against 2 in the 4 weeks before: 300% over their mean week
+    const both = hikes(1, 2, 10, 20);
+    const shown = await summary("2026-01-05", both);
+    expect(shown).toContain("300%");
+    expect(shown).toContain("last 7 days vs 4-week average");
+    // the same hikes when the data starts 10 days ago: part of 4 weeks is no average
+    const part = await summary("2026-10-15", both);
+    expect(part).not.toContain("%");
+    expect(part).not.toContain("4-week");
+    // nothing in the 4 weeks before: no number, and no label that names one
+    expect(await summary("2026-01-05", hikes(1))).not.toContain("4-week");
+  });
+
+  it("compares the aerobic efficiency only with 3 runs or more on both sides", async () => {
+    const others = data.activities.filter((a: { sport?: string }) => a.sport !== "running");
+    const sub = async (last: number) => {
+      const first = [0, 1, 2].map((n) => easyRun(40_000 + n, addDays(data.start, n + 1)));
+      const recent = Array.from({ length: last }, (_, n) =>
+        easyRun(41_000 + n, addDays("2026-10-25", -n)),
+      );
+      const { page } = await open(
+        browser,
+        pageFile({
+          data: { ...data, v: DASHBOARD_VERSION, activities: [...recent, ...first, ...others] },
+        }),
+        { hash: "#running" },
+      );
+      return page.$("[data-id=aerobicFitness] .kpi-sub .delta");
+    };
+    expect(await sub(2)).toBeNull();
+    expect(await sub(3)).not.toBeNull();
   });
 
   it("cuts every list at the same length, with Show all, on every board", async () => {

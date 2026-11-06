@@ -13,6 +13,7 @@ import {
   maxHR,
   note,
   showAll,
+  vsFourWeeks,
   table,
   loadText,
   totals,
@@ -56,18 +57,12 @@ register({
         kpi(
           t("kpi.distance"),
           fmt.dist(week.km),
-          h("span", {}, delta(ctx, calc.change(week.km, base.km / 4)), " ", t("kpi.vs4w")),
+          vsFourWeeks(ctx, week.km, base.km, end, "kpi.vs4w"),
         ),
         kpi(
           t("kpi.time"),
           fmt.hours(week.seconds),
-          h(
-            "span",
-            {},
-            delta(ctx, calc.change(week.seconds, base.seconds / 4)),
-            " ",
-            t("kpi.vs4w"),
-          ),
+          vsFourWeeks(ctx, week.seconds, base.seconds, end, "kpi.vs4w"),
         ),
         kpi(
           t("kpi.ratio"),
