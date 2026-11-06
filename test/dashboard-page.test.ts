@@ -1713,7 +1713,7 @@ describe("writeDashboard new preset widgets", () => {
       const r = await writer.write({});
       expect(Object.hasOwn(r.addedWidgets ?? {}, name), name).toBe(true);
       expect(Object.entries(r.addedWidgets ?? {})).toEqual([
-        [name, ["typeKpis", "typeWeekly", "hrZones", "activities"]],
+        [name, ["typeKpis", "typeWeekly", "hrZones", "records", "activities"]],
       ]);
     }
   });

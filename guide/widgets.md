@@ -9,7 +9,7 @@ it by hand.
 | Readiness today | `readiness` | Today's verdict (go easy, normal, ready to push) from HRV status, sleep score, resting HR and the load ratio. The dashboard's own rule. | - | 2 |
 | Fitness age | `fitnessAge` | Garmin fitness age against actual age, the achievable age, and, under Details, its components with Garmin's targets. | - | 1 |
 | Period comparison | `periodComparison` | Sessions, distance, time and load of the window against the same number of days right before it, per type and in total. | all and each type | 3 |
-| Records | `records` | Best efforts, longest run and ride, heaviest set and the best estimated 1RM of each exercise in the window: 4 first, the others under Show all. | all and each type | 3 |
+| Records | `records` | The longest session of each sport (by distance, else by time) and the heaviest set. On the all board also best efforts and the best estimated 1RM of each exercise: 4 first, the others under Show all. | all and each type | 3 |
 | Weekly volume | `weeklyVolume` | Time, distance, sessions or load of each week, stacked by type, with a 4-week average line. | all and each type | 2 |
 | Intensity minutes | `intensityMinutes` | Moderate + 2 x vigorous minutes of the activities each week, against 150 minutes. | all and each type | 1 |
 | Load safety | `loadSafety` | Weekly load with its change against the week before (flagged above +10%), and 7-day monotony and strain (Foster). | - | 3 |
@@ -59,11 +59,11 @@ every board. _Width_ is the default width in columns.
 | Board | Widgets, in order |
 | ----- | ----------------- |
 | all | `kpis`, `readiness`, `calendar`, `periodComparison`, `records`, `weeklyVolume`, `intensityMinutes`, `loadSafety`, `fitnessFatigue`, `loadVsRecovery`, `activities`, `coachNotes` |
-| running | `typeKpis`, `typeWeekly`, `hrZones`, `bestEfforts`, `races`, `aerobicFitness`, `intensityShare`, `runningForm`, `runWalk`, `trainingEffect`, `racePredictor`, `longRuns`, `workoutTrend`, `activities` |
-| strengthTraining | `typeKpis`, `typeWeekly`, `hrZones`, `setsPerCategory`, `muscleBalance`, `exercises`, `strengthSessions` |
-| walking | `typeKpis`, `typeWeekly`, `hrZones`, `walkDetails`, `steps`, `activities` |
-| hiking | `typeKpis`, `typeWeekly`, `hrZones`, `hikeVertical`, `activities` |
-| cycling | `typeKpis`, `typeWeekly`, `hrZones`, `bikeDetails`, `hikeVertical`, `intensityShare`, `activities` |
-| swimming | `typeKpis`, `typeWeekly`, `hrZones`, `swimTrend`, `records`, `swimDetails`, `activities` |
-| racket | `typeKpis`, `typeWeekly`, `hrZones`, `racketDetails`, `activities` |
-| generic | `typeKpis`, `typeWeekly`, `hrZones`, `activities` |
+| running | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `bestEfforts`, `races`, `aerobicFitness`, `intensityShare`, `runningForm`, `runWalk`, `trainingEffect`, `racePredictor`, `longRuns`, `workoutTrend`, `activities` |
+| strengthTraining | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `setsPerCategory`, `muscleBalance`, `exercises`, `strengthSessions` |
+| walking | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `walkDetails`, `steps`, `activities` |
+| hiking | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `hikeVertical`, `activities` |
+| cycling | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `bikeDetails`, `hikeVertical`, `intensityShare`, `activities` |
+| swimming | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `swimTrend`, `swimDetails`, `activities` |
+| racket | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `racketDetails`, `activities` |
+| generic | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `activities` |

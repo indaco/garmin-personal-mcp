@@ -225,6 +225,14 @@ register({
 
 /** The records shown before "Show all". */
 const RECORDS = 4;
+/** Where the longest session of these sports goes in the first records. */
+const FIRST_SESSIONS = new Map([
+  ["running", 1],
+  ["cycling", 2],
+  ["swimming", 4],
+]);
+const longestBy = (rows: Activity[], size: (a: Activity) => number) =>
+  rows.filter((a) => size(a) > 0).toSorted((x, y) => size(y) - size(x))[0];
 
 register({
   id: "records",
@@ -245,7 +253,9 @@ register({
           `${fmt.day(String(a.start).slice(0, 10))} · ${a.name ?? ""}`,
         ),
       );
-    for (const d of ["1k", "mile", "5k", "10k", "half", "marathon"]) {
+    // a sport board has these in its own table: Best efforts, Exercises
+    const summaryOnly = ctx.type === "all";
+    for (const d of summaryOnly ? ["1k", "mile", "5k", "10k", "half", "marathon"] : []) {
       const best = ctx.activities
         .map((a) => ({ a, s: calc.seconds((a.best as Record<string, string> | undefined)?.[d]) }))
         .filter((x) => x.s > 0)
@@ -255,16 +265,18 @@ register({
         top[0] = badges.at(-1);
       }
     }
-    const longest = (g: string) =>
-      ctx.activities
-        .filter((a) => groupOf(a) === g && typeof a.km === "number")
-        .toSorted((x, y) => (y.km ?? 0) - (x.km ?? 0))[0];
-    const run = longest("running");
-    if (run) badges.push((top[1] = badge(t("rec.longestRun"), fmt.dist(run.km), run)));
-    const ride = longest("cycling");
-    if (ride) badges.push((top[2] = badge(t("rec.longestRide"), fmt.dist(ride.km), ride)));
-    const swim = longest("swimming");
-    if (swim) badges.push((top[4] = badge(t("rec.longestSwim"), fmt.dist(swim.km, 2), swim)));
+    for (const g of groupsIn(ctx.activities)) {
+      const rows = of(ctx.activities, g);
+      const far = longestBy(rows, (a) => num(a.km) ?? 0);
+      const long = far ?? longestBy(rows, (a) => calc.seconds(a.duration));
+      if (!long) continue;
+      const value = far
+        ? fmt.dist(far.km, g === "swimming" ? 2 : undefined)
+        : fmt.hms(calc.seconds(long.duration));
+      badges.push(badge(t("rec.longest", { sport: typeName(t, g) }), value, long));
+      const slot = FIRST_SESSIONS.get(g);
+      if (slot) top[slot] = badges.at(-1);
+    }
 
     let heaviest: { kg: number; reps: number; name: string; a: Activity } | undefined;
     const best1rm = new Map<string, { v: number; a: Activity }>();
@@ -290,7 +302,8 @@ register({
           heaviest.a,
         ),
       );
-    for (const [name, { v, a }] of [...best1rm].toSorted((x, y) => y[1].v - x[1].v)) {
+    const lifts = summaryOnly ? [...best1rm].toSorted((x, y) => y[1].v - x[1].v) : [];
+    for (const [name, { v, a }] of lifts) {
       badges.push(badge(t("rec.e1rm", { name }), fmt.mass(v), a));
       top[3] ??= badges.at(-1);
     }
@@ -303,7 +316,7 @@ register({
     append(
       el,
       h("div", { class: "badges" }, ...ordered),
-      best1rm.size > 0 && note(t("rec.estimate")),
+      lifts.length > 0 && note(t("rec.estimate")),
       showAll(ctx, ordered.slice(RECORDS), ordered.length),
     );
   },

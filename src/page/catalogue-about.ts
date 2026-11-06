@@ -8,7 +8,7 @@ export const ABOUT: Record<string, string> = {
   periodComparison:
     "Sessions, distance, time and load of the window against the same number of days right before it, per type and in total.",
   records:
-    "Best efforts, longest run and ride, heaviest set and the best estimated 1RM of each exercise in the window: 4 first, the others under Show all.",
+    "The longest session of each sport (by distance, else by time) and the heaviest set. On the all board also best efforts and the best estimated 1RM of each exercise: 4 first, the others under Show all.",
   weeklyVolume:
     "Time, distance, sessions or load of each week, stacked by type, with a 4-week average line.",
   intensityMinutes:
