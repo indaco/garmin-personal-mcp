@@ -3,7 +3,7 @@
 `dist/index.js` and `dist/dashboard.html` include the packages below. Each package keeps its own license.
 The build writes this file (`scripts/third-party-notices.mjs`). Do not edit it by hand.
 
-## @garmin/fitsdk 21.218.0
+## @garmin/fitsdk 21.221.0
 
 License: SEE LICENSE IN LICENSE.txt
 Source: <https://github.com/garmin/fit-javascript-sdk>
