@@ -150,8 +150,12 @@ export function facts(root = ".") {
   const coachPrompts = promptTable("## Coach prompts").map((p) => ({
     ...p,
     sport:
-      { "strength-review": "strength", "train-today": "every", "week-review": "every" }[p.name] ??
-      "running",
+      {
+        "strength-review": "strength",
+        "swim-review": "swimming",
+        "train-today": "every",
+        "week-review": "every",
+      }[p.name] ?? "running",
   }));
   const themes = [
     ...read(`${root}/src/page/theme.ts`).matchAll(/\{ id: "(\w+)", group: "(\w+)" \}/g),

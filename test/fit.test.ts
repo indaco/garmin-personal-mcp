@@ -624,6 +624,29 @@ const swimLap = (sport: string, fields: Record<string, unknown>) =>
     20,
   );
 
+/** A .FIT file of a swim with these laps, decoded. */
+const swimLaps = (...laps: Record<string, unknown>[]) =>
+  decodeFit(
+    fitFile(
+      [Profile.MesgNum.SESSION, { sport: "swimming" }],
+      ...laps.map((l): [number, Record<string, unknown>] => [Profile.MesgNum.LAP, l]),
+    ),
+    30,
+  );
+const rep = (metres: number, sec: number, swimStroke = "freestyle", avgSwolf = 40) => ({
+  totalDistance: metres,
+  totalTimerTime: sec,
+  enhancedAvgSpeed: metres / sec,
+  swimStroke,
+  avgSwolf,
+});
+
+const plainSpeedRep = (sec: number) => ({
+  totalDistance: 50,
+  totalTimerTime: sec,
+  avgSpeed: 50 / sec,
+});
+
 describe("lapsOf on a swim", () => {
   it("gives the pace per 100 m and the swim numbers of an interval", () => {
     const fit = swimLap("swimming", {
@@ -637,6 +660,7 @@ describe("lapsOf on a swim", () => {
       {
         lap: 1,
         km: 0.1,
+        metres: 100,
         time: "1:50",
         kmh: 3.3,
         swimPace: "1:50/100 m",
@@ -666,5 +690,101 @@ describe("lapsOf on a swim", () => {
     const [ride] = lapsOf(fit, 22).laps;
     for (const key of ["swimPace", "stroke", "lengths", "swolf", "strokes"])
       expect(ride).not.toHaveProperty(key);
+  });
+
+  const rest = { totalDistance: 0, totalTimerTime: 20, enhancedAvgSpeed: 0 };
+
+  it("compares the first and the last repeat of a set, over the rests between them", () => {
+    const { sets } = lapsOf(swimLaps(rep(100, 100), rest, rep(100, 105), rest, rep(100, 110)), 30);
+    expect(sets).toEqual([
+      {
+        reps: 3,
+        metres: 100,
+        stroke: "freestyle",
+        firstPace: "1:40/100 m",
+        lastPace: "1:50/100 m",
+        pct: 10,
+        firstSwolf: 40,
+        lastSwolf: 40,
+      },
+    ]);
+  });
+
+  it("starts a new set at another distance or stroke, and needs 2 repeats", () => {
+    const { sets } = lapsOf(
+      swimLaps(
+        rep(200, 240),
+        rep(50, 50),
+        rep(50, 52),
+        rep(50, 60, "backstroke"),
+        rep(50, 62, "backstroke"),
+      ),
+      31,
+    );
+    expect(sets!.map((x) => [x.metres, x.stroke, x.reps])).toEqual([
+      [50, "freestyle", 2],
+      [50, "backstroke", 2],
+    ]);
+  });
+
+  it("has no sets for a swim without laps, and leaves out a lap without a distance or a speed", () => {
+    expect(lapsOf(swimLaps(), 36).sets).toEqual([]);
+    const { sets } = lapsOf(
+      swimLaps(
+        { totalTimerTime: 20 },
+        { totalDistance: 50, totalTimerTime: 50 },
+        rep(100, 100),
+        rep(100, 110),
+      ),
+      37,
+    );
+    expect(sets).toMatchObject([{ reps: 2, metres: 100 }]);
+  });
+
+  it("reads the speed of a lap that has only the average speed", () => {
+    expect(lapsOf(swimLaps(plainSpeedRep(50), plainSpeedRep(55)), 38).sets).toMatchObject([
+      { firstPace: "1:40/100 m", lastPace: "1:50/100 m", pct: 10 },
+    ]);
+  });
+
+  it("gives a rest 0 metres, and a lap without a distance no metres", () => {
+    const { laps } = lapsOf(
+      swimLaps({ totalDistance: 0, totalTimerTime: 20 }, { totalTimerTime: 20 }),
+      39,
+    );
+    expect(laps[0].metres).toBe(0);
+    expect(laps[1]).not.toHaveProperty("metres");
+  });
+
+  it("keeps a warm-up of the same distance out of the set", () => {
+    const { sets } = lapsOf(
+      swimLaps(
+        { ...rep(100, 130), intensity: "warmup" },
+        { ...rep(100, 100), intensity: "active" },
+        { ...rep(100, 102), intensity: "active" },
+      ),
+      35,
+    );
+    expect(sets).toMatchObject([{ reps: 2, firstPace: "1:40/100 m", lastPace: "1:42/100 m" }]);
+  });
+
+  it("shows a missing SWOLF as null and gives no stroke when the laps have none", () => {
+    const plain = { totalDistance: 50, totalTimerTime: 50, enhancedAvgSpeed: 1 };
+    expect(lapsOf(swimLaps(plain, plain), 32).sets).toEqual([
+      {
+        reps: 2,
+        metres: 50,
+        firstPace: "1:40/100 m",
+        lastPace: "1:40/100 m",
+        pct: 0,
+        firstSwolf: null,
+        lastSwolf: null,
+      },
+    ]);
+  });
+
+  it("gives an empty list without a repeated set, and no sets for another sport", () => {
+    expect(lapsOf(swimLaps(rep(1000, 1200)), 33).sets).toEqual([]);
+    expect(lapsOf(swimLap("cycling", {}), 34)).not.toHaveProperty("sets");
   });
 });

@@ -213,6 +213,7 @@ describe("site facts", () => {
       ["run-review", "running"],
       ["race-readiness", "running"],
       ["strength-review", "strength"],
+      ["swim-review", "swimming"],
       ["train-today", "every"],
       ["week-review", "every"],
     ]);

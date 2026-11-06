@@ -30,6 +30,7 @@ export function registerPrompts(server: McpServer): void {
   const reviewPrompt = load("run-review.md");
   const readinessPrompt = load("race-readiness.md");
   const strengthPrompt = load("strength-review.md");
+  const swimReviewPrompt = load("swim-review.md");
   const trainPrompt = load("train-today.md");
   const weekPrompt = load("week-review.md");
 
@@ -267,6 +268,30 @@ export function registerPrompts(server: McpServer): void {
             : "from the prediction",
         }),
       );
+    },
+  );
+
+  const swimReviewDescription =
+    "Review a swim as a coach: planned workout against the laps, set fade, SWOLF and strokes, recovery";
+  server.registerPrompt(
+    "swim-review",
+    {
+      description: swimReviewDescription,
+      argsSchema: z.object({
+        activity: z
+          .string()
+          .describe("An activity id, or words of its name; empty = the latest swim")
+          .optional(),
+      }),
+    },
+    (args) => {
+      const find = findActivity(
+        arg(args.activity),
+        "swim",
+        "swims",
+        "a type that contains `swimming`",
+      );
+      return result(swimReviewDescription, render(swimReviewPrompt, { today: localToday(), find }));
     },
   );
 

@@ -176,6 +176,7 @@ export function lapsOf(fit: Messages, activityId: number) {
     ...(sport ? { sport } : {}),
     laps,
     ...(sport === "running" ? runNumbers(laps) : {}),
+    ...(swim ? { sets: swimSets(fit.lapMesgs ?? []) } : {}),
   };
 }
 
@@ -185,6 +186,8 @@ function putSwimNumbers(
   o: Record<string, unknown>,
   speed: number | undefined,
 ) {
+  // km is rounded to 10 m, too coarse for one length of 25 m
+  if (lap.totalDistance != null) o.metres = round(lap.totalDistance, 1);
   if (speed != null && speed > 0) o.swimPace = swimPaceText(100 / speed);
   const stroke = enumName("swimStroke", lap.swimStroke);
   if (stroke) o.stroke = stroke;
@@ -192,6 +195,48 @@ function putSwimNumbers(
   if (lap.avgSwolf > 0) o.swolf = lap.avgSwolf;
   const strokes = lap.totalStrokes ?? lap.totalCycles;
   if (strokes > 0) o.strokes = strokes;
+}
+
+/**
+ * The repeats of a swim: laps in a row of one distance, stroke and intensity, with rests between them.
+ * pct is the last repeat's pace against the first, in %: above 0 is slower.
+ */
+function swimSets(raw: NonNullable<Messages[string]>) {
+  const reps = raw
+    .map((lap) => ({
+      metres: round(lap.totalDistance ?? 0, 1),
+      stroke: enumName("swimStroke", lap.swimStroke),
+      intensity: lap.intensity,
+      speed: (lap.enhancedAvgSpeed ?? lap.avgSpeed ?? 0) as number,
+      swolf: lap.avgSwolf > 0 ? (lap.avgSwolf as number) : null,
+    }))
+    .filter((r) => r.metres > 0 && r.speed > 0);
+  const groups: (typeof reps)[] = [];
+  for (const r of reps) {
+    const last = groups.at(-1);
+    const same =
+      last?.[0].metres === r.metres &&
+      last[0].stroke === r.stroke &&
+      last[0].intensity === r.intensity;
+    if (same) last.push(r);
+    else groups.push([r]);
+  }
+  return groups
+    .filter((g) => g.length > 1)
+    .map((g) => {
+      const first = 100 / g[0].speed;
+      const end = 100 / g.at(-1)!.speed;
+      return {
+        reps: g.length,
+        metres: g[0].metres,
+        ...(g[0].stroke ? { stroke: g[0].stroke } : {}),
+        firstPace: swimPaceText(first),
+        lastPace: swimPaceText(end),
+        pct: round(((end - first) / first) * 100, 1),
+        firstSwolf: g[0].swolf,
+        lastSwolf: g.at(-1)!.swolf,
+      };
+    });
 }
 
 /** A pace as the lap pace: "m:ss/km". */

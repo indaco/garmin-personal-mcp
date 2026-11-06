@@ -589,7 +589,7 @@ describe("recovery trend", () => {
 });
 
 describe("coach prompts", () => {
-  it.each(["run-review", "strength-review"])(
+  it.each(["run-review", "strength-review", "swim-review"])(
     "%s shows a night without sleep data as n/a",
     async (name) => {
       const text = (await render(name)).replace(/\s+/g, " ");
@@ -849,6 +849,25 @@ describe("coach prompts", () => {
     expect(await render("week-review")).toContain(
       "The last whole week starts on Monday `2026-10-19`.",
     );
+  });
+
+  it("swim-review quotes the set fade, keeps open water apart and does not judge on HR alone", async () => {
+    const text = (await render("swim-review")).replace(/\s+/g, " ");
+    expect(text).toContain("The swim is open water when its type contains `open_water`.");
+    expect(text).toContain("each row of `sets`");
+    expect(text).toContain("A lap with `metres` 0 or `intensity` `rest` is a rest");
+    expect(text).toContain("Do not judge the swim on heart rate alone");
+    expect(text).toContain("Compare SWOLF only within this swim");
+    expect(text).toContain("**Never invent or estimate a missing value**");
+    expect(text).toContain("the most recent swim (a type that contains `swimming`)");
+    expect(text.includes("{{")).toBe(false);
+  });
+
+  it("swim-review finds a swim by id or by words of its name", async () => {
+    expect(await render("swim-review", { activity: "21000000789" })).toContain(
+      "The swim is the activity with `activityId` = 21000000789.",
+    );
+    expect(await render("swim-review", { activity: "Morning" })).toContain('`names` = ["Morning"]');
   });
 
   it("keeps a race distance with a dollar pattern or a marker as typed", async () => {

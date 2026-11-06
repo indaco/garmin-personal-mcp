@@ -86,6 +86,17 @@
     ]
   },
   {
+    "name": "swim-review",
+    "description": "Review a swim as a coach: planned workout against the laps, set fade, SWOLF and strokes, recovery",
+    "arguments": [
+      {
+        "name": "activity",
+        "description": "An activity id, or words of its name; empty = the latest swim",
+        "required": false
+      }
+    ]
+  },
+  {
     "name": "train-today",
     "description": "Tell if you should train hard today: the dashboard's readiness verdict, its inputs, fitness and form"
   },
