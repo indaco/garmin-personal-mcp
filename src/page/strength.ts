@@ -280,13 +280,13 @@ const pct = (now: number, before: number) => ((now - before) / before) * 100;
 
 /**
  * How many of the newest sessions (oldest first) make the recent window: at least 3, over 14 days or
- * more. A lift done twice a week needs more than 3 sessions for 14 days. Null when no session comes
- * before them; there can be fewer before them than in the window.
+ * more. A lift done twice a week needs more than 3 sessions for 14 days. Null without as many sessions
+ * before them: 3 against 1 is no comparison, one good day would decide it.
  */
 export function recentWindow(m: { date: string }[]): number | null {
   let k = 3;
   while (k < m.length && m.at(-1)!.date < addDays(m.at(-k)!.date, 14)) k++;
-  return m.length > k ? k : null;
+  return m.length >= 2 * k ? k : null;
 }
 
 /**
@@ -297,7 +297,7 @@ function progress(m: { date: string; v: number }[]): ExerciseStats["status"] {
   const k = recentWindow(m);
   if (k === null) return null;
   const recent = Math.max(...m.slice(-k).map((x) => x.v));
-  const before = Math.max(...m.slice(Math.max(0, m.length - 2 * k), -k).map((x) => x.v));
+  const before = Math.max(...m.slice(-2 * k, -k).map((x) => x.v));
   if (recent > before) return "up";
   return recent < before * 0.95 ? "down" : "stalled";
 }
