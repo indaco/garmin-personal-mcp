@@ -1009,6 +1009,15 @@ function saveBoard(board: Instance[]): void {
 
 /** The current board by meaning, in full rows. A draft like every other edit. */
 function autoArrange(): void {
+  // a wider tile can get shorter, and a second press would then see other heights; 3 rounds, because a widget can change its height on each draw
+  for (let round = 0; round < 3; round++) {
+    if (!arrangeOnce()) break;
+  }
+  announce(t("said.arranged"));
+}
+
+/** Whether the board changed. */
+function arrangeOnce(): boolean {
   const board = currentBoard();
   // a withheld widget has no tile, so it would leave a gap in a row; it stays on the board
   const absent = board.filter((i) => withheld.has(i.widget));
@@ -1021,8 +1030,9 @@ function autoArrange(): void {
   }));
   const next = [...arranged, ...absent];
   // a save lists a preset board, and the bar would show unsaved changes with nothing changed
-  if (JSON.stringify(next) !== JSON.stringify(board)) saveBoard(next);
-  announce(t("said.arranged"));
+  if (JSON.stringify(next) === JSON.stringify(board)) return false;
+  saveBoard(next);
+  return true;
 }
 
 /** A tile is as tall as its row, so its content ends at the bottom of its body. Whole px, so that sums compare. */
