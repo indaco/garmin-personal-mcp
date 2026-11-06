@@ -30,7 +30,7 @@ export const ABOUT: Record<string, string> = {
   bedtime: "Bedtimes of the last 14 nights and their spread.",
   bodyBattery: "Body battery high and low of the last 14 days.",
   activities:
-    "The activities of the window, 15 rows first; activities with laps open to show them.",
+    "The activities of the window, 10 rows first; activities with laps open to show them.",
   coachNotes: "The coach notes that the assistant writes for the data.",
   typeKpis:
     "Sessions, time, distance with pace or speed, HR, Garmin load and its share, and the last 7 days against the 4-week average.",
