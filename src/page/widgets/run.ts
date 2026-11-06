@@ -14,6 +14,7 @@ import {
   kpiRow,
   note,
   picker,
+  sessionTable,
   showAll,
   table,
   weekLabel,
@@ -128,7 +129,8 @@ register({
     if (races.length === 0) return ctx.empty(el, t("races.none"));
     append(
       el,
-      table(
+      ...sessionTable(
+        ctx,
         [
           t("col.date"),
           t("col.name"),
@@ -421,7 +423,8 @@ register({
     if (list.length === 0) return ctx.empty(el, t("rw.none"));
     append(
       el,
-      table(
+      ...sessionTable(
+        ctx,
         [t("col.date"), t("rw.runPace"), t("rw.pace"), t("rw.walk")],
         list.map((a) => {
           const rw = a.runWalk as Record<string, unknown>;
@@ -590,34 +593,38 @@ register({
     append(
       el,
       note(t("lr.note")),
-      split.length > 0 &&
-        table(
-          [
-            t("col.date"),
-            t("col.name"),
-            t("lr.first"),
-            t("lr.second"),
-            t("lr.split"),
-            t("lr.drift"),
-            t("lr.gap"),
-          ],
-          split.map(({ a, s }) => [
-            fmt.day(day(a)),
-            a.name ?? "",
-            fmt.pace(s!.first),
-            fmt.pace(s!.second),
-            h(
-              "span",
-              { class: s!.kind === "positive" ? "bad" : s!.kind === "negative" ? "good" : "same" },
-              t(`lr.${s!.kind}` as Key),
-            ),
-            s!.drift === undefined
-              ? fmt.na
-              : h("span", { class: s!.drift > 5 ? "bad" : "good" }, `${fmt.num(s!.drift, 1)}%`),
-            paceText(ctx, a.gap),
-          ]),
-          [2, 3, 5, 6],
-        ),
+      ...(split.length > 0
+        ? sessionTable(
+            ctx,
+            [
+              t("col.date"),
+              t("col.name"),
+              t("lr.first"),
+              t("lr.second"),
+              t("lr.split"),
+              t("lr.drift"),
+              t("lr.gap"),
+            ],
+            split.map(({ a, s }) => [
+              fmt.day(day(a)),
+              a.name ?? "",
+              fmt.pace(s!.first),
+              fmt.pace(s!.second),
+              h(
+                "span",
+                {
+                  class: s!.kind === "positive" ? "bad" : s!.kind === "negative" ? "good" : "same",
+                },
+                t(`lr.${s!.kind}` as Key),
+              ),
+              s!.drift === undefined
+                ? fmt.na
+                : h("span", { class: s!.drift > 5 ? "bad" : "good" }, `${fmt.num(s!.drift, 1)}%`),
+              paceText(ctx, a.gap),
+            ]),
+            [2, 3, 5, 6],
+          )
+        : []),
     );
   },
 });
@@ -637,7 +644,6 @@ const WORKOUT: [WorkoutMetric, Key, unit: string, digits: number, better?: "up" 
 const chosenWorkouts = new Map<string, string[]>();
 const MAX_WORKOUTS = 3;
 /** The sessions in the table before "Show all". */
-const SESSION_ROWS = 8;
 
 register({
   id: "workoutTrend",
@@ -777,7 +783,8 @@ register({
     const first = sessions(chosen[0]).toReversed();
     // a structured workout has reps; the fade only when they are alike
     const intervals = first.some((s) => s.m.reps !== undefined);
-    const sessionTable = table(
+    const [rows, more] = sessionTable(
+      ctx,
       [
         t("col.date"),
         t("col.distance"),
@@ -800,15 +807,11 @@ register({
         ...(intervals ? [shown.length + 2, shown.length + 3] : []),
       ],
     );
-    // the newest sessions first; a year of a weekly workout goes behind "Show all"
-    const older = [...sessionTable.querySelectorAll("tbody tr")].slice(
-      SESSION_ROWS,
-    ) as HTMLElement[];
     append(
       el,
       h("h3", { class: "small" }, chosen[0]),
-      sessionTable,
-      showAll(ctx, older, first.length),
+      rows,
+      more,
       note(t("wt.note")),
       ...chosen
         .filter((name) => of.get(name)!.left > 0)

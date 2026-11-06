@@ -104,6 +104,22 @@ export function table(
   );
 }
 
+/** How many rows of a list show before "Show all", on every board. */
+export const LIST_ROWS = 10;
+
+/** The first LIST_ROWS items stay in view; the button opens the others. */
+export const showRest = (ctx: Ctx, items: HTMLElement[]) =>
+  showAll(ctx, items.slice(LIST_ROWS), items.length);
+
+/** A table with a row for each session, for any board: spread it into `append`. */
+export function sessionTable(
+  ctx: Ctx,
+  ...args: Parameters<typeof table>
+): [HTMLElement, HTMLElement | false] {
+  const tbl = table(...args);
+  return [tbl, showRest(ctx, [...tbl.querySelectorAll<HTMLElement>("tbody tr")])];
+}
+
 /** The type of an activity with its icon (decorative) and label. */
 export function typeCell(ctx: Ctx, a: Activity): HTMLElement {
   const g = groupOf(a);

@@ -2,12 +2,11 @@ import { type Activity, groupOf, seconds } from "../calc";
 import { append, h } from "../dom";
 import type { Fmt } from "../i18n";
 import { register } from "../registry";
-import { garminWord, showAll, table, typeCell } from "./ui";
+import { swimPace } from "../sports";
+import { garminWord, LIST_ROWS, showAll, table, typeCell } from "./ui";
 
 /** Activities whose laps the page shows: the rows can open. */
 const open = new Set<string>();
-/** The rows shown before "Show all". */
-const ROWS = 15;
 
 register({
   id: "activities",
@@ -94,11 +93,13 @@ register({
                   String(l.lap ?? ""),
                   typeof l.km === "number" ? fmt.dist(l.km, 2) : "",
                   String(l.time ?? ""),
-                  seconds(l.pace) > 0
-                    ? fmt.pace(seconds(l.pace))
-                    : typeof l.kmh === "number"
-                      ? fmt.speed(l.kmh)
-                      : "",
+                  typeof l.swimPace === "string"
+                    ? fmt.swimPace(seconds(l.swimPace.split("/")[0]))
+                    : seconds(l.pace) > 0
+                      ? fmt.pace(seconds(l.pace))
+                      : typeof l.kmh === "number"
+                        ? fmt.speed(l.kmh)
+                        : "",
                   typeof l.avgHR === "number" ? fmt.num(l.avgHR) : "",
                   typeof l.intensity === "string" ? garminWord(ctx, "lapType", l.intensity) : "",
                 ]),
@@ -109,7 +110,7 @@ register({
         );
       }
       // the row and its laps
-      if (n >= ROWS) extra.push(...([...body.children].slice(rowsBefore) as HTMLElement[]));
+      if (n >= LIST_ROWS) extra.push(...([...body.children].slice(rowsBefore) as HTMLElement[]));
     }
     append(el, tbl, showAll(ctx, extra, acts.length));
   },
@@ -121,5 +122,9 @@ function pace(a: Activity, fmt: Fmt): string {
   if (g === "strengthTraining" || g === "racket") return "";
   const hours = seconds(a.duration) / 3600;
   if (g === "cycling") return typeof a.km === "number" && hours > 0 ? fmt.speed(a.km / hours) : "";
+  if (g === "swimming") {
+    const per100 = swimPace(a);
+    return per100 === undefined ? "" : fmt.swimPace(per100);
+  }
   return seconds(a.pace) > 0 ? fmt.pace(seconds(a.pace)) : "";
 }
