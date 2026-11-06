@@ -85,6 +85,22 @@ export function delta(ctx: Ctx, pct: number | null, better?: "up" | "down"): HTM
   );
 }
 
+/**
+ * The last 7 days against the mean week of the 4 before them. Nothing when the base is empty or starts
+ * before the data: part of 4 weeks divided by 4 reads as a rise.
+ */
+export function vsFourWeeks(
+  ctx: Ctx,
+  now: number,
+  before: number,
+  end: string,
+  label: Key,
+): HTMLElement | false {
+  const pct = ctx.calc.change(now, before / 4);
+  const whole = !ctx.data.prevStart || addDays(end, -34) >= ctx.data.prevStart;
+  return pct !== null && whole && h("span", {}, delta(ctx, pct), " ", ctx.t(label));
+}
+
 /** A table; numeric columns align right. */
 export function table(
   head: string[],
@@ -102,6 +118,22 @@ export function table(
       ...rows.map((r) => h("tr", {}, ...r.map((c, i) => h("td", { class: cls(i) }, c)))),
     ),
   );
+}
+
+/** How many rows of a list show before "Show all", on every board. */
+export const LIST_ROWS = 10;
+
+/** The first LIST_ROWS items stay in view; the button opens the others. */
+export const showRest = (ctx: Ctx, items: HTMLElement[]) =>
+  showAll(ctx, items.slice(LIST_ROWS), items.length);
+
+/** A table with a row for each session, for any board: spread it into `append`. */
+export function sessionTable(
+  ctx: Ctx,
+  ...args: Parameters<typeof table>
+): [HTMLElement, HTMLElement | false] {
+  const tbl = table(...args);
+  return [tbl, showRest(ctx, [...tbl.querySelectorAll<HTMLElement>("tbody tr")])];
 }
 
 /** The type of an activity with its icon (decorative) and label. */

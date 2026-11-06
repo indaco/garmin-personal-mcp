@@ -4,7 +4,7 @@ import { register } from "../registry";
 import type { Ctx } from "../registry";
 import type { ExerciseStats, MuscleGroup, StrengthSet } from "../strength";
 import { oneSession } from "./types";
-import { kpi, kpiRow, note, showAll, weekLabel } from "./ui";
+import { kpi, kpiRow, note, showRest, weekLabel } from "./ui";
 
 /** The Strength board: sets per movement, muscle-group balance, the exercises with their detail, the sessions. */
 
@@ -503,9 +503,6 @@ function detail(ctx: Ctx, s: ExerciseStats): HTMLElement {
   return panel;
 }
 
-/** The sessions shown before "Show all". */
-const SESSIONS = 6;
-
 register({
   id: "strengthSessions",
   render(el, ctx) {
@@ -541,6 +538,6 @@ register({
       );
     }
     // the activities come newest first: the older sessions go behind "Show all"
-    append(el, ...sessions, showAll(ctx, sessions.slice(SESSIONS), sessions.length));
+    append(el, ...sessions, showRest(ctx, sessions));
   },
 });

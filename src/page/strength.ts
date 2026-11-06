@@ -1,7 +1,7 @@
 import { addDays } from "../dates";
 import type { Activity } from "./calc";
 import { dayOf } from "./calc";
-import { epley, mean } from "./metrics";
+import { epley, MIN_SESSIONS, mean } from "./metrics";
 
 /** Strength sets, muscle groups and the statistics of each exercise. Pure functions. */
 
@@ -284,7 +284,7 @@ const pct = (now: number, before: number) => ((now - before) / before) * 100;
  * before them: 3 against 1 is no comparison, one good day would decide it.
  */
 export function recentWindow(m: { date: string }[]): number | null {
-  let k = 3;
+  let k = MIN_SESSIONS;
   while (k < m.length && m.at(-1)!.date < addDays(m.at(-k)!.date, 14)) k++;
   return m.length >= 2 * k ? k : null;
 }

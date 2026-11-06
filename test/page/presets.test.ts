@@ -70,6 +70,17 @@ describe("preset", () => {
   });
 });
 
+describe("sport boards", () => {
+  it("have the records in one place, right after the HR zones", () => {
+    const sports = PRESET_BOARDS.filter((b) => b !== "all" && b !== "recovery");
+    expect(sports).toContain("generic");
+    for (const board of sports) {
+      const list = names(board);
+      expect(list.indexOf("records"), board).toBe(list.indexOf("hrZones") + 1);
+    }
+  });
+});
+
 describe("baseline", () => {
   // A literal copy on purpose: the baseline must not follow the preset when a release adds a widget.
   it("lists the frozen widgets of every preset board", () => {
@@ -95,15 +106,15 @@ describe("withPresetWidgets with the real preset", () => {
   it("gives a Bike board from an older release the new widgets once", () => {
     const cycling = preset("cycling").filter((i) => baseline("cycling").includes(i.widget));
     const r = withPresetWidgets(parseLayout({ boards: { cycling } }), preset, baseline);
-    expect(r.added).toEqual({ cycling: ["hikeVertical", "intensityShare"] });
+    expect(r.added).toEqual({ cycling: ["records", "hikeVertical", "intensityShare"] });
     expect(withPresetWidgets(r.layout, preset, baseline).added).toEqual({});
   });
 
-  it("does not throw and adds nothing new for an inherited board name", () => {
+  it("does not throw on an inherited board name, and adds only what a release added", () => {
     for (const board of INHERITED) {
       const layout = parseLayout(JSON.parse(`{"boards":{"${board}":[]}}`));
       const r = withPresetWidgets(layout, preset, baseline);
-      expect(r.added).toEqual({});
+      expect(Object.entries(r.added)).toEqual([[board, ["records"]]]);
     }
   });
 

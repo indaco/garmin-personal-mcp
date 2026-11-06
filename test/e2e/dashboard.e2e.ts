@@ -3,6 +3,7 @@ import { version as serverVersion } from "../../package.json";
 import axe from "axe-core";
 import type { Browser, Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { addDays } from "../../src/dates";
 import { THEMES } from "../../src/page/theme";
 import { digest } from "../../src/digest";
 import { en as enTexts } from "../../src/page/i18n/en";
@@ -105,6 +106,16 @@ const scrollListeners = async (page: Page) => {
 /** The sticky offset the page sets for keyboard focus. */
 const stickyOffset = (page: Page) =>
   page.evaluate(() => document.documentElement.style.getPropertyValue("--sticky-h"));
+
+/** The text of the Records tile on the Hike tab of a page with these activities. */
+const hikeRecords = async (activities: object[]) => {
+  const { page } = await open(
+    browser,
+    pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }),
+    { hash: "#hiking" },
+  );
+  return page.innerText("[data-id=records]");
+};
 
 /** A record that the all board met the whole preset, so a test layout of few widgets stays small. */
 const MET = { all: preset("all").map((i) => i.widget) };
@@ -1253,7 +1264,7 @@ describe("sticky header", () => {
     const { page } = await open(browser, pageFile(), { viewport: phone });
     const { hidden, stops } = await stopsUnder(page, ".top");
     expect(hidden).toEqual([]);
-    expect(stops).toBeGreaterThan(20);
+    expect(stops).toBeGreaterThan(15);
   });
 
   it("sticky: keeps keyboard focus clear of the edit bar on a desktop", async () => {
@@ -2282,7 +2293,7 @@ describe("overview widgets", () => {
         "[data-id=activities] table.data > tbody > tr:not(.laps-row):not([hidden])",
         (r) => r.length,
       );
-    expect(await rows()).toBe(15);
+    expect(await rows()).toBe(10);
     await page.click("text=Show all 75");
     expect(await rows()).toBe(75);
     // the browser keeps the choice
@@ -2290,7 +2301,7 @@ describe("overview widgets", () => {
     await page.waitForSelector(".page");
     expect(await rows()).toBe(75);
     await page.click("text=Show fewer");
-    expect(await rows()).toBe(15);
+    expect(await rows()).toBe(10);
     const button = "[data-id=activities] button[aria-expanded]";
     await page.click(button);
     expect(await page.$$eval(".laps-row", (r) => r.length)).toBe(1);
@@ -2322,12 +2333,12 @@ describe("overview widgets", () => {
       );
     expect(await shown()).toEqual([
       "Fastest half marathon",
-      "Longest run",
-      "Longest ride",
+      "Longest session · Run",
+      "Longest session · Bike",
       "Best est. 1RM · Barbell Back Squat",
     ]);
-    await page.click("[data-id=records] >> text=Show all 16");
-    expect(await shown()).toHaveLength(16);
+    await page.click("[data-id=records] >> text=Show all 19");
+    expect(await shown()).toHaveLength(19);
     expect(await page.getAttribute("[data-id=records] .more", "aria-expanded")).toBe("true");
   });
 
@@ -2508,6 +2519,7 @@ describe("type boards", () => {
       "typeKpis",
       "typeWeekly",
       "hrZones",
+      "records",
       "bestEfforts",
       "races",
       "aerobicFitness",
@@ -2615,16 +2627,22 @@ describe("type boards", () => {
   it("shows n/a for the cycling distance without a distance, and keeps a real km", async () => {
     // no ride has a distance: n/a and no "vs 4 weeks" line
     expect(await distanceTile([indoorRide(1, "2026-10-20")])).toEqual({ value: "n/a", sub: 0 });
-    // a real distance, with its line
+    // a real distance with nothing before it: no line, as no change can show
     expect(await distanceTile([indoorRide(2, "2026-10-20", 12)])).toEqual({
       value: "12.0 km",
+      sub: 0,
+    });
+    // a ride in the 4 weeks before: the line
+    const before = indoorRide(5, "2026-10-05", 12);
+    expect(await distanceTile([indoorRide(2, "2026-10-20", 12), before])).toEqual({
+      value: "24.0 km",
       sub: 1,
     });
     // one ride with and one without: the known km, and the line
     expect(
-      await distanceTile([indoorRide(3, "2026-10-20", 12), indoorRide(4, "2026-10-21")]),
+      await distanceTile([indoorRide(3, "2026-10-20", 12), indoorRide(4, "2026-10-21"), before]),
     ).toEqual({
-      value: "12.0 km",
+      value: "24.0 km",
       sub: 1,
     });
   });
@@ -2849,9 +2867,11 @@ describe("type boards", () => {
       await page.$$eval(`${tile} .chip`, (b) => b.slice(0, 4).map((x) => x.textContent)),
     ).toEqual(["Long Run (10)", "Track Intervals (6)", "Easy Run (12)", "Tempo Run (6)"]);
     expect(await pressed()).toEqual(["Long Run (10)", "Pace / speed"]);
-    // the 8 newest sessions, the others behind "Show all"
-    expect(await page.$$eval(`${tile} table.data tbody tr:not([hidden])`, (r) => r.length)).toBe(8);
-    expect(await page.textContent(`${tile} .btn.more`)).toBe("Show all 10");
+    // all 10 sessions: the list ends at 10, so no "Show all"
+    expect(await page.$$eval(`${tile} table.data tbody tr:not([hidden])`, (r) => r.length)).toBe(
+      10,
+    );
+    expect(await page.$(`${tile} .btn.more`)).toBeNull();
     await page.click(`${tile} >> text=Track Intervals (6)`);
     expect(await kpis()).toEqual(["Long Run", "Track Intervals"]);
     await page.click(`${tile} >> text=Easy Run (12)`);
@@ -3059,6 +3079,7 @@ describe("strength board", () => {
       "typeKpis",
       "typeWeekly",
       "hrZones",
+      "records",
       "setsPerCategory",
       "muscleBalance",
       "exercises",
@@ -3294,11 +3315,32 @@ describe("strength board", () => {
         s.map((x) => x.textContent),
       );
     const shown = await summaries();
-    expect(shown).toHaveLength(6);
+    expect(shown).toHaveLength(10);
     expect(shown[0]).toMatch(/^Oct 23/);
     await page.click("[data-id=strengthSessions] >> text=Show all 24");
     expect(await summaries()).toHaveLength(24);
   });
+});
+
+const summary = async (prevStart: string, activities: unknown[]) => {
+  const { page } = await open(
+    browser,
+    pageFile({ data: { ...data, v: DASHBOARD_VERSION, prevStart, activities } }),
+    { hash: "#hiking" },
+  );
+  return page.innerText("[data-id=typeKpis] .kpi >> nth=0");
+};
+
+const easyRun = (id: number, start: string) => ({
+  id,
+  name: "Easy Run",
+  type: "running",
+  sport: "running",
+  start: `${start} 07:00:00`,
+  km: 8,
+  duration: "48:00",
+  pace: "6:00/km",
+  avgHR: 120,
 });
 
 describe("walk, hike, bike, swim and racket sport boards", () => {
@@ -3329,6 +3371,36 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     poolLengthM: 25,
     avgHR: 130,
     trainingLoad: 40,
+  };
+
+  /** The sessions of every kind of board: `count` of each, one hour long. */
+  const everySport = (count: number) => {
+    const sessions = [
+      { name: "Easy Run", type: "running", sport: "running", km: 8, pace: "6:00/km" },
+      { name: "Night Walk", type: "walking", sport: "walking", km: 3, steps: 4000 },
+      { name: "Ridge Hike", type: "hiking", sport: "hiking", km: 12, ascentM: 900 },
+      { name: "Road Ride", type: "road_biking", sport: "cycling", km: 40, ascentM: 300 },
+      { ...swim, id: undefined, start: undefined },
+      { name: "Club Tennis", type: "tennis", sport: "racket" },
+      // a sport without widgets of its own, and one with no known SDK sport
+      { name: "Ski Day", type: "resort_skiing", sport: "alpineSkiing", km: 30 },
+      { name: "Yoga", type: "yoga" },
+      {
+        name: "Strength A",
+        type: "strength_training",
+        sport: "fitnessEquipment",
+        exercises: [{ exercise: "Push Up", category: "Push Up", sets: [{ reps: 10 }] }],
+      },
+    ];
+    return sessions.flatMap((s, i) =>
+      Array.from({ length: count }, (_, n) => ({
+        duration: "1:00:00",
+        avgHR: 130,
+        ...s,
+        id: 20_000 + i * 100 + n,
+        start: `${addDays("2026-10-25", -n)} 0${i}:00:00`,
+      })),
+    );
   };
   const tennis = {
     id: 9004,
@@ -3394,7 +3466,13 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
 
   it("gives a new sport the board of the Other tab", async () => {
     const { page, errors } = await open(browser, more(), { hash: "#alpineSkiing" });
-    expect(await tiles(page)).toEqual(["typeKpis", "typeWeekly", "hrZones", "activities"]);
+    expect(await tiles(page)).toEqual([
+      "typeKpis",
+      "typeWeekly",
+      "hrZones",
+      "records",
+      "activities",
+    ]);
     expect(await page.textContent("[data-tab=alpineSkiing] .count")).toBe("1");
     expect(await chartsWithoutTooltip(page)).toEqual([]);
     expect(errors).toEqual([]);
@@ -3439,6 +3517,179 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     expect(errors).toEqual([]);
   });
 
+  const hikes = (...back: number[]) =>
+    back.map((n, i) => ({
+      ...hike,
+      id: 30_000 + i,
+      start: `${addDays("2026-10-25", -n)} 09:00:00`,
+    }));
+  it("says that the change of a summary tile is the last 7 days, and needs 4 weeks before them", async () => {
+    // 2 hikes in the last 7 days against 2 in the 4 weeks before: 300% over their mean week
+    const both = hikes(1, 2, 10, 20);
+    const shown = await summary("2026-01-05", both);
+    expect(shown).toContain("300%");
+    expect(shown).toContain("last 7 days vs 4-week average");
+    // the same hikes when the data starts 10 days ago: part of 4 weeks is no average
+    const part = await summary("2026-10-15", both);
+    expect(part).not.toContain("%");
+    expect(part).not.toContain("4-week");
+    // nothing in the 4 weeks before: no number, and no label that names one
+    expect(await summary("2026-01-05", hikes(1))).not.toContain("4-week");
+  });
+
+  it("compares the aerobic efficiency only with 3 runs or more on both sides", async () => {
+    const others = data.activities.filter((a: { sport?: string }) => a.sport !== "running");
+    const sub = async (last: number) => {
+      const first = [0, 1, 2].map((n) => easyRun(40_000 + n, addDays(data.start, n + 1)));
+      const recent = Array.from({ length: last }, (_, n) =>
+        easyRun(41_000 + n, addDays("2026-10-25", -n)),
+      );
+      const { page } = await open(
+        browser,
+        pageFile({
+          data: { ...data, v: DASHBOARD_VERSION, activities: [...recent, ...first, ...others] },
+        }),
+        { hash: "#running" },
+      );
+      return page.$("[data-id=aerobicFitness] .kpi-sub .delta");
+    };
+    expect(await sub(2)).toBeNull();
+    expect(await sub(3)).not.toBeNull();
+  });
+
+  it("gives every sport its longest session, by distance or else by time", async () => {
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: everySport(2) } }),
+    );
+    const longest = async (tab: string) => {
+      await page.click(`[data-tab=${tab}]`);
+      return page.$$eval("[data-id=records] .badge", (found) =>
+        found.map((b) => [
+          b.querySelector(".kpi-label")?.textContent,
+          b.querySelector(".badge-value")?.textContent,
+        ]),
+      );
+    };
+    expect(await longest("running")).toEqual([["Longest session · Run", "8.0 km"]]);
+    expect(await longest("walking")).toEqual([["Longest session · Walk", "3.0 km"]]);
+    expect(await longest("hiking")).toEqual([["Longest session · Hike", "12.0 km"]]);
+    expect(await longest("cycling")).toEqual([["Longest session · Bike", "40.0 km"]]);
+    expect(await longest("swimming")).toEqual([["Longest session · Swim", "1.50 km"]]);
+    // no distance: the time, on a board with its own widgets, a generic one and a strength one
+    expect((await longest("racket"))[0][1]).toBe("1:00:00");
+    expect((await longest("generic"))[0][1]).toBe("1:00:00");
+    expect((await longest("strengthTraining"))[0][1]).toBe("1:00:00");
+    // a sport without widgets of its own has the tile too
+    expect((await longest("alpineSkiing"))[0]).toEqual([
+      "Longest session · Alpine skiing",
+      "30.0 km",
+    ]);
+    expect(errors).toEqual([]);
+  });
+
+  it("takes the time when a session has distance 0, and shows no record without both", async () => {
+    const trek = { name: "Hike", type: "hiking", sport: "hiking", start: "2026-10-20 08:00:00" };
+    const withTime = { ...trek, id: 1, km: 0, duration: "2:00:00" };
+    expect(await hikeRecords([withTime])).toContain("2:00:00");
+    expect(await hikeRecords([{ ...trek, id: 1 }])).toContain("No records");
+  });
+
+  it("repeats no table of its board: efforts and 1RM records are on the all board", async () => {
+    const labels = async (tab: string) => {
+      const { page } = await open(browser, pageFile(), { hash: tab });
+      return page.$$eval("[data-id=records] .badge .kpi-label", (b) =>
+        b.map((x) => x.textContent ?? ""),
+      );
+    };
+    expect(await labels("#running")).toEqual(["Longest session · Run"]);
+    const lifts = await labels("#strengthTraining");
+    expect(lifts).toContain("Heaviest set");
+    expect(lifts.filter((l) => l.startsWith("Best est."))).toEqual([]);
+    const { page } = await open(browser, pageFile(), { hash: "#strengthTraining" });
+    expect(await page.innerText("[data-id=records]")).not.toContain("1RM values");
+  });
+
+  it("cuts every list at the same length, with Show all, on every board", async () => {
+    const activities = everySport(14);
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }),
+    );
+    const lists = () =>
+      page.$$eval("[data-id]", (found) =>
+        found
+          // a table of exercises is grouped and has its own search
+          .filter((t) => (t as HTMLElement).dataset.id !== "exercises")
+          .map((t) => {
+            const items = [
+              ...t.querySelectorAll(
+                ":scope table.data > tbody > tr:not(.laps-row), :scope details.session",
+              ),
+            ] as HTMLElement[];
+            return {
+              id: (t as HTMLElement).dataset.id,
+              all: items.length,
+              shown: items.filter((r) => !r.hidden).length,
+              button: t.querySelector(".btn.more")?.textContent,
+            };
+          })
+          .filter((l) => l.all > 0),
+      );
+    const cut = new Set<string>();
+    const boards = await page.$$eval("[data-tab]", (b) =>
+      b.map((x) => (x as HTMLElement).dataset.tab),
+    );
+    for (const tab of boards) {
+      await page.click(`[data-tab=${tab}]`);
+      for (const { id, all, shown, button } of await lists()) {
+        if (all > 10) cut.add(`${tab}:${id}`);
+        expect([tab, id, shown]).toEqual([tab, id, Math.min(all, 10)]);
+        if (all > 10) expect([tab, id, button]).toEqual([tab, id, `Show all ${all}`]);
+      }
+    }
+    // the check above saw the lists of each sport, on the boards that have no list of their own too
+    for (const list of [
+      "running:activities",
+      "strengthTraining:strengthSessions",
+      "walking:walkDetails",
+      "hiking:hikeVertical",
+      "cycling:bikeDetails",
+      "swimming:swimDetails",
+      "racket:racketDetails",
+      "alpineSkiing:activities",
+      "generic:activities",
+    ]) {
+      expect(cut).toContain(list);
+    }
+    // the same button opens them: all rows, on a board with its own widget
+    await page.click("[data-tab=hiking]");
+    await page.click("[data-id=hikeVertical] >> text=Show all 14");
+    expect(
+      await page.$$eval("[data-id=hikeVertical] tbody tr:not([hidden])", (r) => r.length),
+    ).toBe(14);
+    expect(errors).toEqual([]);
+  });
+
+  it("gives a swim its pace per 100 m in the activity list and its laps", async () => {
+    const laps = [{ lap: 1, km: 0.1, time: "1:50", kmh: 3.3, swimPace: "1:50/100 m" }];
+    const { page } = await open(
+      browser,
+      pageFile({
+        data: {
+          ...data,
+          v: DASHBOARD_VERSION,
+          activities: [{ ...swim, pace: "20:00/km", laps }, ...data.activities],
+        },
+      }),
+      { hash: "#swimming" },
+    );
+    const newest = page.locator("[data-id=activities] table.data > tbody > tr").first();
+    expect(await newest.locator("td").nth(5).textContent()).toBe("2:00/100 m");
+    await newest.locator(".linkish").click();
+    expect(await page.textContent("[data-id=activities] .laps-row table")).toContain("1:50/100 m");
+  });
+
   it("gives the numbers of each sport", async () => {
     const { page } = await open(browser, more(), { hash: "#hiking" });
     expect(await page.textContent("[data-id=hikeVertical]")).toContain("300 m/h");
@@ -3473,6 +3724,7 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
       "typeKpis",
       "typeWeekly",
       "hrZones",
+      "records",
       "walkDetails",
       "steps",
       "activities",
@@ -3909,6 +4161,7 @@ describe("new preset widgets on edited boards", () => {
   });
 
   describe("a layout from before the record", () => {
+    // records: a release added it to the preset, so it arrives; what the page left out does not
     const old = {
       base: "preset",
       boards: { running: [{ id: "typeKpis", widget: "typeKpis", span: 3 }] },
@@ -3925,7 +4178,7 @@ describe("new preset widgets on edited boards", () => {
 
     it("gives the page layout nothing back that it left out", async () => {
       const { page } = await openRunning({ rev: "r0", ...old });
-      expect(await tiles(page)).toEqual(["typeKpis"]);
+      expect(await tiles(page)).toEqual(["typeKpis", "records"]);
     });
 
     it("gives a browser layout of the same rev nothing back", async () => {
@@ -3933,7 +4186,7 @@ describe("new preset widgets on edited boards", () => {
       await store(page, "r0");
       await page.reload();
       await page.waitForSelector(".page");
-      expect(await tiles(page)).toEqual(["typeKpis"]);
+      expect(await tiles(page)).toEqual(["typeKpis", "records"]);
     });
 
     it("gives the browser layout of the banner nothing back", async () => {
@@ -3942,7 +4195,7 @@ describe("new preset widgets on edited boards", () => {
       await page.reload();
       await page.waitForSelector(".banner");
       await page.click(".banner >> text=Keep mine");
-      expect(await tiles(page)).toEqual(["typeKpis"]);
+      expect(await tiles(page)).toEqual(["typeKpis", "records"]);
     });
   });
 
@@ -4343,13 +4596,6 @@ describe("small numbers on the boards", () => {
       expect(errors).toEqual([]);
     });
 
-    it("has no longest swim badge without a swim distance", async () => {
-      const { km: _km, ...noKm } = swims[0];
-      const { page, errors } = await open(browser, withActivities([noKm]), { hash: "#swimming" });
-      expect(await page.innerText("[data-id=records]")).not.toContain("Longest swim");
-      expect(errors).toEqual([]);
-    });
-
     it("says that open water has no trend", async () => {
       const { page, errors } = await open(browser, withActivities([openWater]), {
         hash: "#swimming",
@@ -4376,7 +4622,7 @@ describe("small numbers on the boards", () => {
         hash: "#swimming",
       });
       const text = await page.innerText("[data-id=records]");
-      expect(text).toContain("Longest swim");
+      expect(text).toContain("Longest session · Swim");
       expect(text).toContain("2.50 km");
       expect(text).toContain("Lake Swim");
       expect(errors).toEqual([]);

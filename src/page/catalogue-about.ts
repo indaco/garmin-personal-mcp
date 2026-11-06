@@ -8,7 +8,7 @@ export const ABOUT: Record<string, string> = {
   periodComparison:
     "Sessions, distance, time and load of the window against the same number of days right before it, per type and in total.",
   records:
-    "Best efforts, longest run and ride, heaviest set and the best estimated 1RM of each exercise in the window: 4 first, the others under Show all.",
+    "The longest session of each sport (by distance, else by time) and the heaviest set. On the all board also best efforts and the best estimated 1RM of each exercise: 4 first, the others under Show all.",
   weeklyVolume:
     "Time, distance, sessions or load of each week, stacked by type, with a 4-week average line.",
   intensityMinutes:
@@ -30,7 +30,7 @@ export const ABOUT: Record<string, string> = {
   bedtime: "Bedtimes of the last 14 nights and their spread.",
   bodyBattery: "Body battery high and low of the last 14 days.",
   activities:
-    "The activities of the window, 15 rows first; activities with laps open to show them.",
+    "The activities of the window, 10 rows first; activities with laps open to show them.",
   coachNotes: "The coach notes that the assistant writes for the data.",
   typeKpis:
     "Sessions, time, distance with pace or speed, HR, Garmin load and its share, and the last 7 days against the 4-week average.",

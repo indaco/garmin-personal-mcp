@@ -5,7 +5,7 @@ import type { Key } from "../i18n";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
 import { oneSession } from "./types";
-import { delta, everyActivity, kpi, kpiRow, note, table, weekLabel, withUnit } from "./ui";
+import { delta, everyActivity, kpi, kpiRow, note, sessionTable, weekLabel, withUnit } from "./ui";
 
 /** The extras of the Walk, Hike, Bike, Swim and Racket sports boards. */
 
@@ -85,7 +85,8 @@ register({
     );
     append(
       el,
-      table(
+      ...sessionTable(
+        ctx,
         [t("col.date"), t("col.name"), t("wd.steps"), t("form.cadence"), t("wd.battery")],
         ctx.activities.map((a) => [
           fmt.day(day(a)),
@@ -156,7 +157,8 @@ register({
     if (list.length === 0) return ctx.empty(el);
     append(
       el,
-      table(
+      ...sessionTable(
+        ctx,
         [
           t("col.date"),
           t("col.name"),
@@ -295,7 +297,8 @@ register({
     const dynamics = trails.length > 0;
     append(
       el,
-      table(
+      ...sessionTable(
+        ctx,
         [
           t("col.date"),
           t("col.name"),
@@ -328,7 +331,8 @@ register({
     if (ctx.activities.length === 0) return ctx.empty(el);
     append(
       el,
-      table(
+      ...sessionTable(
+        ctx,
         [
           t("col.date"),
           t("col.name"),
@@ -478,7 +482,8 @@ register({
     });
     append(
       el,
-      table(
+      ...sessionTable(
+        ctx,
         [
           t("col.date"),
           t("col.name"),

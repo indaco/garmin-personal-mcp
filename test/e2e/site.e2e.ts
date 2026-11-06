@@ -420,8 +420,10 @@ describe("site demo", () => {
     });
     while ((await others.count()) > 0) await others.first().click();
     expect(await page.textContent(`${tile} h3`)).toBe("Track Intervals");
-    // the 8 newest sessions, the others behind "Show all"
-    expect(await page.$$eval(`${tile} table.data tbody tr:not([hidden])`, (r) => r.length)).toBe(8);
+    // the 10 newest sessions, the others behind "Show all"
+    expect(await page.$$eval(`${tile} table.data tbody tr:not([hidden])`, (r) => r.length)).toBe(
+      10,
+    );
     expect(await page.textContent(`${tile} .btn.more`)).toMatch(/^Show all \d+$/);
     // the running form of the reps, from the laps
     const head = await page.$$eval(`${tile} table.data th`, (h) => h.map((x) => x.textContent));

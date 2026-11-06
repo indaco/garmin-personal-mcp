@@ -396,8 +396,12 @@ describe("readiness inputs", () => {
     // the first of 9 rows is out of the 7 days; the second is in them
     const r = readinessOf(balanced, recoveryRows([100, 64, 50, 50, 50, 50, 50, 50]), 1);
     expect(r.rhrAvg).toBe(52);
-    const few = readinessOf(balanced, recoveryRows([54, undefined, 50]), 1);
-    expect(few.rhrAvg).toBe(52);
+    const three = readinessOf(balanced, recoveryRows([54, undefined, 50, 52]), 1);
+    expect(three.rhrAvg).toBe(52);
+    // 2 values are no average: one bad night would turn the verdict to "easy"
+    const few = readinessOf(balanced, recoveryRows([40, 40], { rhr: 60 }), 1);
+    expect(few.rhrAvg).toBeUndefined();
+    expect(few.verdict).toBe("normal");
     expect(readinessOf(balanced, recoveryRows([undefined, undefined]), 1).rhrAvg).toBeUndefined();
     expect(readinessOf(balanced, recoveryRows([]), 1).rhrAvg).toBeUndefined();
   });

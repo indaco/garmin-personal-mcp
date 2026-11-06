@@ -301,9 +301,7 @@ out. To add one:
 | `d.10k` | 10 km |
 | `d.half` | half marathon |
 | `d.marathon` | marathon |
-| `rec.longestRun` | Longest run |
-| `rec.longestRide` | Longest ride |
-| `rec.longestSwim` | Longest swim |
+| `rec.longest` | Longest session · {sport} |
 | `rec.topSet` | Heaviest set |
 | `rec.e1rm` | Best est. 1RM · {name} |
 | `rec.none` | No records in the selected weeks. |
@@ -387,6 +385,7 @@ out. To add one:
 | `act.less` | Show fewer |
 | `one.session` | One session so far: trends start at 2 sessions. |
 | `w.typeKpis` | Summary |
+| `tk.vs4w` | last 7 days vs 4-week average |
 | `tk.sessions` | Sessions |
 | `tk.time` | Time |
 | `tk.avg` | {v} per session |

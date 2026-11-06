@@ -278,33 +278,34 @@ function ride(i, distance) {
   });
 }
 
-function swim(i) {
-  const km = round(pick([1.5, 1.75, 2, 2.25, 2.5]), 2);
-  const per100 = r(118, 130) - fitness(i) * 8;
+function swim(i, openWater) {
+  const km = round(pick([1.5, 1.75, 2, 2.25, 2.5]) * (openWater ? 1.4 : 1), 2);
+  const per100 = r(120, 128) - fitness(i) * 9 + (openWater ? 6 : 0);
   const sec = per100 * km * 10;
   const rests = r(240, 480);
   const hr = Math.round(r(128, 142));
   const { zones, load } = steady(i, sec, hr);
+  // the technique improves with the year: fewer strokes at a faster pace
+  const strokesPerLength = r(16.2, 17.4) - fitness(i) * 2;
   const lengths = km * 40;
-  const strokesPerLength = r(15, 18);
   const a = {
-    name: pick(["Pool Swim", "Lap Swimming", "Morning Swim"]),
-    type: "lap_swimming",
+    name: openWater ? "Open Water Swim" : pick(["Pool Swim", "Lap Swimming", "Morning Swim"]),
+    type: openWater ? "open_water_swimming" : "lap_swimming",
     sport: "swimming",
     km,
     duration: hms(sec),
     pace: `${hms(sec / km)}/km`,
     avgHR: hr,
     maxHR: hr + ri(10, 20),
-    elapsed: hms(sec + rests),
+    ...(openWater ? {} : { elapsed: hms(sec + rests) }),
   };
   effort(a, zones, load, sec, r(0.3, 1.2), "aerobic_base");
   return Object.assign(a, {
     calories: Math.round((sec / 60) * 9.5),
     swolf: Math.round(per100 / 4 + strokesPerLength),
-    poolLengthM: 25,
-    lengths,
     strokes: Math.round(lengths * strokesPerLength),
+    // open water has no pool, so no lengths
+    ...(openWater ? {} : { poolLengthM: 25, lengths }),
   });
 }
 
@@ -399,6 +400,7 @@ const EXERCISES = {
   "Lat Pulldown": ["Pull Up", ["Lats"], ["Biceps", "Shoulders"], 42.5, 2.5],
   "Dumbbell Biceps Curl": ["Curl", ["Biceps"], ["Forearm", "Shoulders"], 9, 1],
   "Dumbbell Lunge": ["Lunge", ["Quads"], ["Glutes", "Hamstrings"], 10, 1],
+  "Hip Thrust": ["Hip Thrust", ["Glutes"], ["Hamstrings"], 40, 2.5],
   "Push Up": ["Push Up", ["Chest"], ["Triceps", "Shoulders"]],
   Plank: ["Plank", ["Abs"], ["Shoulders", "Obliques"]],
 };
@@ -417,7 +419,9 @@ const SESSIONS = {
 function strength(i, name, light) {
   const exercises = [];
   let work = 0;
-  for (const ex of SESSIONS[name]) {
+  // a lift added 6 weeks ago: too few sessions for a tag, so its row shows none
+  const added = name === "Strength B" && i >= DAYS - 45 ? ["Hip Thrust"] : [];
+  for (const ex of [...SESSIONS[name], ...added]) {
     const [category, primaryMuscles, secondaryMuscles, startKg, step] = EXERCISES[ex];
     const sets = [];
     for (let n = ri(3, 4); n > 0; n--) {
@@ -429,8 +433,12 @@ function strength(i, name, light) {
         sets.push({ reps, seconds: Math.round(reps * 2.2), restSec });
       } else {
         // progressive overload over the year, a lighter session in a deload week
+        // the bench press falls in the last weeks, so the page has a lift tagged "down"
+        const injured = ex === "Barbell Bench Press" && i >= DAYS - 45;
         const kg =
-          Math.round((startKg * (1 + 0.22 * fitness(i)) * (light ? 0.85 : 1)) / step) * step;
+          Math.round(
+            (startKg * (1 + 0.22 * fitness(i)) * (light ? 0.85 : 1) * (injured ? 0.88 : 1)) / step,
+          ) * step;
         const reps = pick([8, 8, 10, 10, 12]);
         sets.push({ reps, seconds: Math.round(reps * r(3, 4.2)), restSec, kg });
       }
@@ -530,8 +538,12 @@ for (let i = 0; i < DAYS; i++) {
       add(ride(i, r(35, 75) * scale), 9, 0);
     }
     const swimSeason = month(day) >= 11 || month(day) <= 3;
-    if (dow === 1 && (swimSeason ? chance(0.8) : chance(0.25))) add(swim(i), 12, 30);
+    if (dow === 1 && (swimSeason ? chance(0.8) : chance(0.25))) {
+      add(swim(i, month(day) >= 6 && month(day) <= 9), 12, 30);
+    }
     if (holiday && dow !== 6 && chance(0.85)) add(hike(i, r(8, 18)), 9, 0);
+    if (dow === 6 && month(day) >= 5 && month(day) <= 10 && chance(0.35))
+      add(hike(i, r(8, 16)), 9, 0);
     if (chance(holiday ? 0.3 : 0.35)) add(walk(i), 19, 15);
   } else if (chance(0.4)) {
     add(walk(i), 17, 0);
