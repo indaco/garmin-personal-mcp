@@ -1,11 +1,11 @@
 import { addDays } from "../../dates";
 import { type Activity, isIndoor, seconds, sessionSeconds, sportOf } from "../calc";
-import { append } from "../dom";
+import { append, h } from "../dom";
 import type { Key } from "../i18n";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
 import { oneSession } from "./types";
-import { everyActivity, kpi, kpiRow, note, table, weekLabel, withUnit } from "./ui";
+import { delta, everyActivity, kpi, kpiRow, note, table, weekLabel, withUnit } from "./ui";
 
 /** The extras of the Walk, Hike, Bike, Swim and Racket sports boards. */
 
@@ -13,8 +13,8 @@ const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : u
 const day = (a: Activity) => String(a.start).slice(0, 10);
 /** km/h over moving time. */
 function speed(a: Activity): number | undefined {
-  const h = seconds(a.duration) / 3600;
-  return typeof a.km === "number" && h > 0 ? a.km / h : undefined;
+  const hours = seconds(a.duration) / 3600;
+  return typeof a.km === "number" && hours > 0 ? a.km / hours : undefined;
 }
 
 const weekOf = (ctx: Ctx, a: Activity) =>
@@ -337,6 +337,8 @@ register({
           "SWOLF",
           t("sw.lengths"),
           t("sw.strokes"),
+          t("sw.perLength"),
+          t("sw.perStroke"),
           t("sw.pool"),
         ],
         ctx.activities.map((a) => [
@@ -347,10 +349,100 @@ register({
           fmt.num(num(a.swolf)),
           fmt.num(num(a.lengths)),
           fmt.num(num(a.strokes)),
+          fmt.num(calc.strokesPerLength(a), 1),
+          fmt.elev(calc.distancePerStroke(a), 2),
           withUnit(ctx, fmt.num(num(a.poolLengthM)), " m"),
         ]),
-        [2, 3, 4, 5, 6, 7],
+        [2, 3, 4, 5, 6, 7, 8, 9],
       ),
+      note(t("sw.note")),
+    );
+  },
+});
+
+register({
+  id: "swimTrend",
+  render(el, ctx) {
+    const { t, fmt, calc } = ctx;
+    const trend = calc.swimTrend(ctx.activities);
+    if (!trend) return ctx.empty(el, t("st.none"));
+    const { sessions, window: w } = trend;
+    const last = sessions.at(-1)!;
+    const versus = (now: number, before: number) =>
+      h(
+        "span",
+        {},
+        delta(ctx, calc.change(now, before), "down"),
+        " ",
+        t("st.vsBefore", { n: fmt.num(w?.swims) }),
+      );
+    append(
+      el,
+      kpiRow(
+        kpi(
+          t("sw.pace"),
+          fmt.swimPace(w ? w.pace.recent : last.pace),
+          w ? versus(w.pace.recent, w.pace.before) : undefined,
+        ),
+        kpi(
+          t("sw.perLength"),
+          fmt.num(w ? w.strokes.recent : last.strokes, 1),
+          w ? versus(w.strokes.recent, w.strokes.before) : undefined,
+        ),
+      ),
+    );
+    if (sessions.length > 1) {
+      ctx.chart(
+        el,
+        {
+          type: "line",
+          data: {
+            labels: sessions.map((s) => fmt.day(s.date)),
+            datasets: [
+              {
+                label: t("sw.pace"),
+                data: sessions.map((s) => fmt.to.swim(s.pace)),
+                borderColor: ctx.color("swimming"),
+                yAxisID: "y",
+              },
+              {
+                label: t("sw.perLength"),
+                data: sessions.map((s) => s.strokes),
+                borderColor: ctx.color("warn"),
+                yAxisID: "y1",
+              },
+            ],
+          },
+          options: {
+            scales: {
+              y: {
+                // a faster pace is a smaller number: up is better on both axes
+                reverse: true,
+                title: { display: true, text: t("af.pace", { unit: fmt.unit.swim }) },
+                ticks: { callback: (v: string | number) => fmt.hms(Number(v)) },
+              },
+              y1: {
+                reverse: true,
+                position: "right",
+                grid: { drawOnChartArea: false },
+                title: { display: true, text: t("sw.perLength") },
+              },
+            },
+          },
+        },
+        200,
+      );
+    }
+    append(
+      el,
+      note(
+        t("st.note", {
+          pool: withUnit(ctx, fmt.num(trend.poolLengthM), " m"),
+          n: fmt.num(sessions.length),
+          from: fmt.day(sessions[0].date),
+        }),
+      ),
+      trend.left > 0 && note(t("st.left", { n: fmt.num(trend.left) })),
     );
   },
 });

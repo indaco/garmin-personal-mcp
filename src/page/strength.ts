@@ -279,14 +279,23 @@ export function exerciseStats(acts: Activity[]): ExerciseStats[] {
 const pct = (now: number, before: number) => ((now - before) / before) * 100;
 
 /**
- * The last sessions, at least 3 and over 14 days or more, against as many sessions just before them:
- * up when they set a new best, down when their best is more than 5% under, else stalled. A lift done
- * twice a week needs more than 3 sessions for 14 days; one lucky day long ago does not count.
+ * How many of the newest sessions (oldest first) make the recent window: at least 3, over 14 days or
+ * more. A lift done twice a week needs more than 3 sessions for 14 days. Null when no session comes
+ * before them; there can be fewer before them than in the window.
  */
-function progress(m: { date: string; v: number }[]): ExerciseStats["status"] {
+export function recentWindow(m: { date: string }[]): number | null {
   let k = 3;
   while (k < m.length && m.at(-1)!.date < addDays(m.at(-k)!.date, 14)) k++;
-  if (m.length <= k) return null;
+  return m.length > k ? k : null;
+}
+
+/**
+ * The recent window against the one before it: up when it sets a new best, down when its best is more
+ * than 5% under, else stalled. One lucky day long ago does not count.
+ */
+function progress(m: { date: string; v: number }[]): ExerciseStats["status"] {
+  const k = recentWindow(m);
+  if (k === null) return null;
   const recent = Math.max(...m.slice(-k).map((x) => x.v));
   const before = Math.max(...m.slice(Math.max(0, m.length - 2 * k), -k).map((x) => x.v));
   if (recent > before) return "up";

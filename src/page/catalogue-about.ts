@@ -67,7 +67,10 @@ export const ABOUT: Record<string, string> = {
     "Vertical metres per hour of moving time of each activity with ascent, with a note that the route moves the number.",
   bikeDetails:
     "Weekly speed and ascent, each ride, and indoor against outdoor time; for mountain-bike rides, the grit and flow of each ride.",
-  swimDetails: "Each swim with pace per 100 m, SWOLF, lengths, strokes and pool length.",
+  swimDetails:
+    "Each swim with pace per 100 m, SWOLF, lengths, strokes, strokes per length, distance per stroke and pool length.",
+  swimTrend:
+    "Pace and strokes per length of the pool swims of one pool length, swim after swim. Needs a pool swim.",
   racketDetails:
     "Each racket session: sport, HR, time in Z3+, Z4-5 share, calories per hour, training effect, and its load against a run of the same length.",
 };

@@ -279,6 +279,12 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
     span: 3,
   },
   {
+    id: "swimTrend",
+    title: "w.swimTrend",
+    types: ["swimming"],
+    span: 3,
+  },
+  {
     id: "racketDetails",
     title: "w.racketDetails",
     types: ["racket", "generic"],
