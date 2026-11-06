@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseLayout, withPresetWidgets } from "../../src/page/layout";
-import { baseline, PRESET_BOARDS, preset } from "../../src/page/presets";
+import { arrange, parseLayout, withPresetWidgets } from "../../src/page/layout";
+import { baseline, PRESET_BOARDS, preset, zoneOf } from "../../src/page/presets";
 
 const FROZEN: Record<string, string[]> = {
   all: [
@@ -81,6 +81,18 @@ describe("sport boards", () => {
   });
 });
 
+describe("preset rows", () => {
+  it.each(PRESET_BOARDS.map((b) => [b]))("%s fills each row of 3 columns", (board) => {
+    let used = 0;
+    for (const { id, span } of preset(board)) {
+      used += span;
+      expect(used, `${board}: ${id} passes the row end`).toBeLessThanOrEqual(3);
+      if (used === 3) used = 0;
+    }
+    expect(used, `${board}: the last row`).toBe(0);
+  });
+});
+
 describe("baseline", () => {
   // A literal copy on purpose: the baseline must not follow the preset when a release adds a widget.
   it("lists the frozen widgets of every preset board", () => {
@@ -106,7 +118,7 @@ describe("withPresetWidgets with the real preset", () => {
   it("gives a Bike board from an older release the new widgets once", () => {
     const cycling = preset("cycling").filter((i) => baseline("cycling").includes(i.widget));
     const r = withPresetWidgets(parseLayout({ boards: { cycling } }), preset, baseline);
-    expect(r.added).toEqual({ cycling: ["records", "hikeVertical", "intensityShare"] });
+    expect(r.added).toEqual({ cycling: ["records", "intensityShare", "hikeVertical"] });
     expect(withPresetWidgets(r.layout, preset, baseline).added).toEqual({});
   });
 
@@ -139,5 +151,48 @@ describe("withPresetWidgets with the real preset", () => {
     expect(r.added).toEqual(added);
     expect(r.layout.boards.running?.map((i) => i.widget)).toEqual(later("running", []));
     expect(r.layout.seen?.running).toEqual(names("running"));
+  });
+});
+
+describe("zoneOf", () => {
+  it.each([
+    ["kpis", 0],
+    ["typeKpis", 0],
+    ["readiness", 0],
+    ["fitnessAge", 0],
+    ["calendar", 0],
+    ["periodComparison", 0],
+    ["weeklyVolume", 1],
+    ["typeWeekly", 1],
+    ["hrZones", 1],
+    ["intensityMinutes", 1],
+    ["records", 2],
+    ["runningForm", 3],
+    ["walkDetails", 4],
+    ["bikeDetails", 4],
+    ["swimDetails", 4],
+    ["racketDetails", 4],
+    ["exercises", 4],
+    ["activities", 5],
+    ["strengthSessions", 5],
+    ["coachNotes", 6],
+    // a custom widget, and names that a plain object has by inheritance
+    ["myWidget", 3],
+    ["constructor", 3],
+    ["toString", 3],
+    ["__proto__", 3],
+  ])("%s is in zone %d", (widget, zone) => {
+    expect(zoneOf(widget)).toBe(zone);
+  });
+});
+
+describe("arrange and the presets", () => {
+  it.each(PRESET_BOARDS)("%s stays as it is", (board) => {
+    const arranged = arrange(preset(board), (i) => ({
+      zone: zoneOf(i.widget),
+      height: 100,
+      min: 1,
+    }));
+    expect(arranged).toEqual(preset(board));
   });
 });

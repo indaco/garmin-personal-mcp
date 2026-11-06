@@ -1,5 +1,4 @@
 import { readFileSync, statSync, writeFileSync } from "node:fs";
-import { version as serverVersion } from "../../package.json";
 import axe from "axe-core";
 import type { Browser, Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -117,6 +116,24 @@ const hikeRecords = async (activities: object[]) => {
   return page.innerText("[data-id=records]");
 };
 
+/** The shown tiles of the board by row: their heights, and the space left at the right of the grid. */
+const gridRows = (page: Page) =>
+  page.$eval(".grid", (grid) => {
+    const box = grid.getBoundingClientRect();
+    const rows = new Map<number, { id?: string; height: number; right: number }[]>();
+    for (const el of grid.querySelectorAll<HTMLElement>(":scope > .tile")) {
+      const r = el.getBoundingClientRect();
+      const row = rows.get(Math.round(r.top)) ?? [];
+      row.push({ id: el.dataset.id, height: Math.round(r.height), right: r.right });
+      rows.set(Math.round(r.top), row);
+    }
+    return [...rows.values()].map((row) => ({
+      ids: row.map((t) => t.id).join("+"),
+      heights: new Set(row.map((t) => t.height)).size,
+      gap: Math.round(box.right - Math.max(...row.map((t) => t.right))),
+    }));
+  });
+
 /** A record that the all board met the whole preset, so a test layout of few widgets stays small. */
 const MET = { all: preset("all").map((i) => i.widget) };
 
@@ -125,9 +142,9 @@ const ALL_PRESET = [
   "readiness",
   "calendar",
   "periodComparison",
-  "records",
   "weeklyVolume",
   "intensityMinutes",
+  "records",
   "loadSafety",
   "fitnessFatigue",
   "loadVsRecovery",
@@ -772,7 +789,7 @@ describe("the page", () => {
         data: {
           ...data,
           v: DASHBOARD_VERSION,
-          server: serverVersion,
+          server: "0.10.0",
           notes: [],
           updated: "2026-10-27T05:30:00.000Z",
         },
@@ -784,11 +801,16 @@ describe("the page", () => {
       "Data from Garmin Connect, updated Oct 27, 2026, 6:30 AM",
     );
     expect(await page.$("footer .gap")).toBeNull();
+    expect(await page.getAttribute("footer a.brand", "href")).toBe(
+      "https://garmin-personal-mcp.indaco.dev",
+    );
     expect(await page.getAttribute("footer a >> text=MIT License", "href")).toContain("LICENSE");
     // the version of the server that wrote the page, with its release notes
-    expect(await page.getAttribute(`footer a >> text=v${serverVersion}`, "href")).toMatch(
-      new RegExp(`/releases/tag/v${serverVersion}$`),
+    expect(await page.getAttribute("footer a >> text=v0.10.0", "href")).toBe(
+      "https://garmin-personal-mcp.indaco.dev/whats-new.html#v0-10-0",
     );
+    // the website has that place
+    expect(readFileSync("dist-site/whats-new.html", "utf8")).toContain('<article id="v0-10-0">');
 
     const failed = await open(
       browser,
@@ -827,6 +849,10 @@ describe("the page", () => {
 /** The layout that this browser saved, or null. */
 const saved = (page: Page) =>
   page.evaluate(() => localStorage.getItem(`garmin-layout:${location.pathname}`));
+
+const of = (id: string, span: number, extra = {}) => ({ id, widget: id, span, ...extra });
+const tallBox = (id: string, height: number) =>
+  custom(id, `el.innerHTML = '<div style="height:${height}px"></div>';`);
 
 describe("edit mode", () => {
   const one = {
@@ -1025,6 +1051,252 @@ describe("edit mode", () => {
       expect(await page.innerText(".edit-bar")).not.toContain("Unsaved changes");
       expect(errors).toEqual([]);
     }
+  });
+
+  describe("Auto-arrange", () => {
+    const widgets = [
+      tallBox("x", 100),
+      tallBox("tall2", 400),
+      tallBox("low1", 100),
+      tallBox("low2", 100),
+      tallBox("tall1", 400),
+    ];
+    const scrambled = {
+      rev: "r1",
+      base: "preset",
+      seen: { ...MET, running: preset("running").map((i) => i.widget) },
+      boards: {
+        all: [
+          of("activities", 3),
+          of("x", 1),
+          of("calendar", 1),
+          of("intensityMinutes", 1, { hidden: true }),
+          of("records", 3),
+          of("kpis", 3),
+        ],
+        running: [of("activities", 3), of("typeKpis", 3)],
+      },
+    };
+
+    it("sorts the current board by meaning, as a draft that Discard undoes and Done saves", async () => {
+      const { page, errors } = await open(
+        browser,
+        pageFile({ layout: scrambled, widgets, settings: { languages: ["en", "it"] } }),
+        { locale: "it-IT" },
+      );
+      const startItalianEdit = async () => {
+        await page.click(".account summary");
+        await page.click(".account-panel >> text=Modifica layout");
+      };
+      await startItalianEdit();
+      await page.click(".edit-bar >> text=Disponi automaticamente");
+      const arranged = ["calendar", "kpis", "records", "x", "activities"];
+      expect(await tiles(page)).toEqual(arranged);
+      expect(await page.textContent("#announce")).toBe("Widget disposti");
+      expect(await page.innerText(".edit-bar")).toContain("Modifiche non salvate");
+      expect(await saved(page)).toBeNull();
+      expect(await page.getAttribute("[data-id=x]", "class")).toContain("span-3");
+
+      await page.click(".edit-bar >> text=Annulla");
+      await page.click("dialog >> text=Annulla le modifiche");
+      expect(await tiles(page)).toEqual(["activities", "x", "calendar", "records", "kpis"]);
+
+      await startItalianEdit();
+      await page.click(".edit-bar >> text=Disponi automaticamente");
+      await page.click(".edit-bar >> text=Fine");
+      expect(await tiles(page)).toEqual(arranged);
+      const { boards } = JSON.parse((await saved(page))!).layout;
+      expect(boards.all.map((i: { id: string }) => i.id)).toEqual([
+        ...arranged,
+        "intensityMinutes",
+      ]);
+      expect(boards.all.at(-1)).toEqual(of("intensityMinutes", 1, { hidden: true }));
+      expect(boards.running).toEqual(scrambled.boards.running);
+      expect(errors).toEqual([]);
+    });
+
+    it("pairs tiles by the height of their content, not of the stretched tile", async () => {
+      const board = [of("tall2", 2), of("low1", 1), of("low2", 2), of("tall1", 1)];
+      const layout = { rev: "r1", base: "preset", seen: MET, boards: { all: board } };
+      const { page } = await open(browser, pageFile({ layout, widgets }));
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await tiles(page)).toEqual(["tall2", "tall1", "low2", "low1"]);
+    });
+
+    it("counts a widget's narrowest width", async () => {
+      const board = [of("calendar", 1), of("fitnessAge", 1), of("periodComparison", 1)];
+      const layout = { rev: "r1", base: "preset", seen: MET, boards: { all: board } };
+      const { page } = await open(browser, pageFile({ layout }));
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      const widths = await page.$$eval(".tile", (els) => els.map((e) => e.className));
+      expect(widths.map((c) => c.match(/span-\d/)?.[0]).toSorted()).toEqual([
+        "span-1",
+        "span-2",
+        "span-3",
+      ]);
+    });
+
+    it("shows no unsaved changes on a board that is already arranged", async () => {
+      const boards = [[of("x", 3)], [], [of("x", 1, { hidden: true })]].map((all) => ({
+        rev: "r1",
+        base: "preset",
+        seen: MET,
+        boards: { all },
+      }));
+      for (const layout of [null, ...boards]) {
+        const { page, errors } = await open(browser, pageFile({ layout, widgets }));
+        await startEdit(page);
+        await page.click(".edit-bar >> text=Auto-arrange");
+        expect(await page.textContent("#announce")).toBe("Widgets arranged");
+        expect(await page.innerText(".edit-bar")).not.toContain("Unsaved changes");
+        expect(errors).toEqual([]);
+      }
+    });
+
+    it("arranges only the tiles it shows, and keeps a withheld or unknown widget", async () => {
+      const layout = {
+        rev: "r1",
+        base: "preset",
+        seen: MET,
+        boards: {
+          all: [
+            of("readiness", 2),
+            of("hrv", 1, { hidden: true }),
+            of("calendar", 1),
+            of("gone", 1),
+          ],
+        },
+      };
+      const { page, errors } = await open(
+        browser,
+        pageFile({ layout, settings: { exclude: ["recovery"] } }),
+      );
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await tiles(page)).toEqual(["calendar", "gone"]);
+      expect(await page.getAttribute("[data-id=calendar]", "class")).toContain("span-3");
+      await page.click(".edit-bar >> text=Done");
+      const { boards } = JSON.parse((await saved(page))!).layout;
+      expect(boards.all).toEqual([
+        of("calendar", 3),
+        of("gone", 3),
+        of("readiness", 2),
+        of("hrv", 1, { hidden: true }),
+      ]);
+      expect(errors).toEqual([]);
+    });
+
+    it("gives the same board on a second press", async () => {
+      const board = [of("low1", 1), of("tall2", 2), of("tall1", 1), of("x", 1), of("low2", 2)];
+      const layout = { rev: "r1", base: "preset", seen: MET, boards: { all: board } };
+      const { page } = await open(browser, pageFile({ layout, widgets }));
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      const once = await tiles(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await tiles(page)).toEqual(once);
+    });
+
+    it("gives the same board on a second press when a wider tile gets shorter", async () => {
+      // nine boxes in 3 rows at width 1, in 2 rows at width 2
+      const wraps = custom(
+        "wraps",
+        `el.innerHTML = '<div style="display:inline-block;width:100px;height:130px"></div>'.repeat(9);`,
+      );
+      const board = [of("wide", 2), of("top", 1), of("wraps", 1), of("low", 1)];
+      const layout = { rev: "r1", base: "preset", seen: MET, boards: { all: board } };
+      const { page } = await open(
+        browser,
+        pageFile({
+          layout,
+          widgets: [tallBox("wide", 300), tallBox("top", 420), tallBox("low", 250), wraps],
+        }),
+        { viewport: { width: 1280, height: 800 } },
+      );
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      const once = await tiles(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await tiles(page)).toEqual(once);
+      expect(once).toEqual(["wide", "top", "wraps", "low"]);
+    });
+
+    it("stops after 3 rounds on a tile whose height changes on each draw", async () => {
+      const flips = custom(
+        "flips",
+        `window.draws = (window.draws ?? 0) + 1;
+         el.innerHTML = '<div style="height:' + (window.draws % 2 ? 400 : 100) + 'px"></div>';`,
+      );
+      const board = [of("flips", 2), of("top", 1), of("steady", 2), of("low", 1)];
+      const layout = { rev: "r1", base: "preset", seen: MET, boards: { all: board } };
+      const { page, errors } = await open(
+        browser,
+        pageFile({
+          layout,
+          widgets: [tallBox("steady", 250), tallBox("top", 400), tallBox("low", 100), flips],
+        }),
+      );
+      await startEdit(page);
+      const draws = () => page.evaluate(() => (window as unknown as { draws: number }).draws);
+      // an even count: the tile is at 100 px now, so the first round changes the board
+      const before = await draws();
+      expect(before % 2).toBe(0);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect((await draws()) - before).toBe(3);
+      expect(errors).toEqual([]);
+    });
+
+    it("keeps keyboard focus on the button when the board changes", async () => {
+      const { page } = await open(
+        browser,
+        pageFile({
+          layout: {
+            rev: "r1",
+            base: "preset",
+            seen: MET,
+            boards: { all: [of("x", 1), of("kpis", 3)] },
+          },
+          widgets,
+        }),
+      );
+      await startEdit(page);
+      await page.focus(".edit-bar >> text=Auto-arrange");
+      await page.keyboard.press("Enter");
+      expect(await tiles(page)).toEqual(["kpis", "x"]);
+      expect(await page.evaluate(() => document.activeElement?.textContent)).toBe("Auto-arrange");
+    });
+
+    it("reads the height of an instance by its own id, also with a quote in it", async () => {
+      const board = [
+        { id: 'tall"2', widget: "tall2", span: 2 },
+        of("low1", 1),
+        of("low2", 2),
+        of("tall1", 1),
+      ];
+      const layout = { rev: "r1", base: "preset", seen: MET, boards: { all: board } };
+      const { page, errors } = await open(browser, pageFile({ layout, widgets }));
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await tiles(page)).toEqual(['tall"2', "tall1", "low2", "low1"]);
+      expect(errors).toEqual([]);
+    });
+
+    it.each([390, 1000])("pairs by height and stays the same at %d px", async (width) => {
+      const board = [of("tall2", 2), of("low1", 1), of("low2", 2), of("tall1", 1)];
+      const layout = { rev: "r1", base: "preset", seen: MET, boards: { all: board } };
+      const { page, errors } = await open(browser, pageFile({ layout, widgets }), {
+        viewport: { width, height: 844 },
+      });
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      const paired = ["tall2", "tall1", "low2", "low1"];
+      expect(await tiles(page)).toEqual(paired);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await tiles(page)).toEqual(paired);
+      expect(errors).toEqual([]);
+    });
   });
 
   it("keeps a browser edit after a reload, until the page gets a new layout", async () => {
@@ -1464,11 +1736,11 @@ describe("focus", () => {
     await page.focus("[aria-label='Move Weekly volume']");
     for (const key of ["Space", "ArrowRight", "Space"]) await page.keyboard.press(key);
     expect(await focused(page)).toBe("Move Weekly volume");
-    expect(await page.textContent("#announce")).toBe("Weekly volume moved to position 7 of 12");
+    expect(await page.textContent("#announce")).toBe("Weekly volume moved to position 6 of 12");
     // a hidden tile gives focus to the tile in its place
     await page.focus("[aria-label='Hide Weekly volume']");
     await page.keyboard.press("Enter");
-    expect(await focused(page)).toBe("Hide Load safety");
+    expect(await focused(page)).toBe("Hide Records");
     expect(await page.textContent("#announce")).toBe("Weekly volume hidden");
   });
 
@@ -2520,15 +2792,15 @@ describe("type boards", () => {
       "typeWeekly",
       "hrZones",
       "records",
-      "bestEfforts",
       "races",
+      "racePredictor",
       "aerobicFitness",
+      "bestEfforts",
+      "trainingEffect",
       "intensityShare",
       "runningForm",
-      "runWalk",
-      "trainingEffect",
-      "racePredictor",
       "longRuns",
+      "runWalk",
       "activities",
     ]);
     const races = await page.$$eval("[data-id=races] tbody tr", (r) =>
@@ -3725,8 +3997,8 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
       "typeWeekly",
       "hrZones",
       "records",
-      "walkDetails",
       "steps",
+      "walkDetails",
       "activities",
     ]);
   });
@@ -4869,5 +5141,75 @@ describe("chart table", () => {
       `{ type: "scatter", data: { datasets: [{ label: "x", data: [{ x: 1 }] }] } }`,
     );
     expect(got).toEqual([["1", ""]]);
+  });
+});
+
+describe("board rows", () => {
+  it.each([1280, 1000])("are full and of one height on every tab at %d px", async (width) => {
+    const { page, errors } = await open(browser, pageFile(), {
+      viewport: { width, height: 900 },
+    });
+    const list = await page.$$eval("[role=tab]", (els) =>
+      els.map((e) => e.getAttribute("data-tab")!),
+    );
+    expect(list.length).toBeGreaterThan(3);
+    for (const tab of list) {
+      await page.click(`[data-tab=${tab}]`);
+      await page.waitForSelector(`[role=tabpanel][aria-labelledby=tab-${tab}]`);
+      for (const shownRow of await gridRows(page)) {
+        expect({ tab, ...shownRow }).toEqual({ tab, ids: shownRow.ids, heights: 1, gap: 0 });
+      }
+    }
+    expect(errors).toEqual([]);
+  });
+
+  it("finds a lone tile by the shown tiles and their shown width on a tablet", async () => {
+    const boards = {
+      all: [
+        { id: "activities", widget: "activities", span: 1 },
+        { id: "hrv", widget: "hrv", span: 1 },
+        { id: "sleep", widget: "sleep", span: 1, hidden: true },
+        { id: "bedtime", widget: "bedtime", span: 1 },
+        { id: "stress", widget: "bodyBattery", span: 1 },
+      ],
+    };
+    const { page, errors } = await open(
+      browser,
+      pageFile({ layout: { rev: "w", base: "preset", seen: MET, boards } }),
+      { viewport: { width: 1000, height: 900 } },
+    );
+    // Activities needs 2 columns, so HRV pairs with Bedtime past the hidden tile; the last is alone
+    expect(
+      await page.$$eval(".wide-tablet", (els) => els.map((e) => (e as HTMLElement).dataset.id)),
+    ).toEqual(["stress"]);
+    expect((await gridRows(page)).map((r) => r.gap)).toEqual([0, 0, 0]);
+    expect(errors).toEqual([]);
+  });
+
+  it("gives a lone tile its width back in edit mode, so the width slider stays true", async () => {
+    const { page, errors } = await open(browser, pageFile(), {
+      viewport: { width: 1000, height: 900 },
+      hash: "#running",
+    });
+    const zones = "[data-id=hrZones]";
+    expect(await page.getAttribute(zones, "class")).toContain("wide-tablet");
+    await startEdit(page);
+    expect(await page.getAttribute(zones, "class")).not.toContain("wide-tablet");
+    expect(await page.getAttribute(`${zones} .resize`, "aria-valuenow")).toBe("1");
+    expect(errors).toEqual([]);
+  });
+
+  it("stacks a lone tile in one column on a phone", async () => {
+    const { page, errors } = await open(browser, pageFile(), {
+      viewport: { width: 390, height: 800 },
+      hash: "#running",
+    });
+    expect(await page.getAttribute("[data-id=hrZones]", "class")).toContain("wide-tablet");
+    const grid = await page.$eval(".grid", (e) => e.getBoundingClientRect().width);
+    const widths = await page.$$eval(".grid > .tile", (els) =>
+      els.map((e) => e.getBoundingClientRect().width),
+    );
+    expect(new Set(widths)).toEqual(new Set([grid]));
+    expect(errors).toEqual([]);
   });
 });

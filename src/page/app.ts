@@ -23,10 +23,12 @@ import {
 } from "./i18n";
 import {
   add,
+  arrange,
   boardOf,
   type Instance,
   type Layout,
   type LocalLayout,
+  loneAtTwoColumns,
   merge,
   moveBefore,
   parseLayout,
@@ -41,7 +43,7 @@ import {
   withPresetWidgets,
 } from "./layout";
 import { type News, parseNews } from "./news";
-import { baseline, preset } from "./presets";
+import { baseline, preset, zoneOf } from "./presets";
 import {
   allWidgets,
   type Ctx,
@@ -255,8 +257,9 @@ function render(): void {
 // ------------------------------------------------------------------ footer
 
 const REPO = "https://github.com/indaco/garmin-personal-mcp";
+const SITE = "https://garmin-personal-mcp.indaco.dev";
 // the Highlights of each release, for readers who do not use GitHub
-const WHATS_NEW = "https://garmin-personal-mcp.indaco.dev/whats-new.html";
+const WHATS_NEW = `${SITE}/whats-new.html`;
 
 /** When the server wrote the page, in the viewer's time zone; an older page has only the date. */
 function writtenAt(data: Data): string | undefined {
@@ -272,7 +275,7 @@ function writtenAt(data: Data): string | undefined {
 function footer(data?: Data): HTMLElement {
   const written = data && writtenAt(data);
   const failed = Number(data?.sync?.failedDays) || 0;
-  // the server that wrote the page last, with its release notes
+  // the server that wrote the page last, with its entry on What's new
   const version = /^\d+\.\d+\.\d+$/.test(data?.server ?? "") ? data!.server : undefined;
   return h(
     "footer",
@@ -288,10 +291,14 @@ function footer(data?: Data): HTMLElement {
     h(
       "p",
       { class: "made" },
-      h("a", { class: "brand", href: REPO }, logo(), "garmin-personal-mcp"),
+      h("a", { class: "brand", href: SITE }, logo(), "garmin-personal-mcp"),
       "·",
       version &&
-        h("a", { href: `${REPO}/releases/tag/v${version}`, rel: "noopener" }, `v${version}`),
+        h(
+          "a",
+          { href: `${WHATS_NEW}#v${version.replaceAll(".", "-")}`, rel: "noopener" },
+          `v${version}`,
+        ),
       version && "·",
       h("a", { href: `${REPO}/blob/main/LICENSE`, rel: "noopener" }, t("footer.license")),
     ),
@@ -735,12 +742,18 @@ function tabBar(data: Data): HTMLElement {
 function boardView(data: Data): HTMLElement {
   const board = boardOf(draft ?? layout, view.tab, preset);
   const grid = h("div", { class: `grid${editing ? " editing" : ""}` });
-  for (const inst of board) {
-    const def = widget(inst.widget);
-    // a hidden widget leaves the grid; Add widget lists it to show it again
-    if (inst.hidden || (!def && (!editing || withheld.has(inst.widget)))) continue;
-    grid.append(tile(data, inst, def));
+  // a hidden widget leaves the grid; Add widget lists it to show it again
+  const shown = board.filter(
+    (inst) => !inst.hidden && (widget(inst.widget) || (editing && !withheld.has(inst.widget))),
+  );
+  const tiles = shown.map((inst) => tile(data, inst, widget(inst.widget)));
+  // not in edit mode, where the width slider must show the width that is saved
+  if (!editing) {
+    for (const at of loneAtTwoColumns(shown.map((i) => shownSpan(i, widget(i.widget))))) {
+      tiles[at].classList.add("wide-tablet");
+    }
   }
+  grid.append(...tiles);
   if (grid.childElementCount === 0) {
     // an empty board offers edit mode itself: the menu is not the only way in
     grid.append(
@@ -879,6 +892,10 @@ function titleOf(inst: Instance, def: WidgetDef | undefined): string {
   return def.title(t) + own;
 }
 
+/** Never narrower than the widget fits in, also for a layout that Claude wrote. */
+const shownSpan = (inst: Instance, def: WidgetDef | undefined) =>
+  Math.max(inst.span, def?.minSpan ?? 1) as Span;
+
 function tile(data: Data, inst: Instance, def: WidgetDef | undefined): HTMLElement {
   const title = titleOf(inst, def);
   const headingId = `h-${inst.id}`;
@@ -886,8 +903,7 @@ function tile(data: Data, inst: Instance, def: WidgetDef | undefined): HTMLEleme
   const el = h(
     "section",
     {
-      // never narrower than the widget fits in, also for a layout that Claude wrote
-      class: `tile span-${Math.max(inst.span, def?.minSpan ?? 1)}`,
+      class: `tile span-${shownSpan(inst, def)}`,
       "data-id": inst.id,
       "data-widget": inst.widget,
       "aria-labelledby": headingId,
@@ -994,6 +1010,41 @@ function currentBoard(): Instance[] {
 /** An edit changes the draft only; Done saves it. */
 function saveBoard(board: Instance[]): void {
   setDraft(withBoard(draft ?? layout, view.tab, board, preset));
+}
+
+/** The current board by meaning, in full rows. A draft like every other edit. */
+function autoArrange(): void {
+  // a wider tile can get shorter, and a second press would then see other heights; 3 rounds, because a widget can change its height on each draw
+  for (let round = 0; round < 3; round++) {
+    if (!arrangeOnce()) break;
+  }
+  announce(t("said.arranged"));
+}
+
+/** Whether the board changed. */
+function arrangeOnce(): boolean {
+  const board = currentBoard();
+  // a withheld widget has no tile, so it would leave a gap in a row; it stays on the board
+  const absent = board.filter((i) => withheld.has(i.widget));
+  const present = board.filter((i) => !absent.includes(i));
+  // shortcut: heights are measured at the current window width, measure at 3 columns if phone results are poor
+  const arranged = arrange(present, (i) => ({
+    zone: zoneOf(i.widget),
+    height: contentHeight(i.id),
+    min: widget(i.widget)?.minSpan ?? 1,
+  }));
+  const next = [...arranged, ...absent];
+  // a save lists a preset board, and the bar would show unsaved changes with nothing changed
+  if (JSON.stringify(next) === JSON.stringify(board)) return false;
+  saveBoard(next);
+  return true;
+}
+
+/** A tile is as tall as its row, so its content ends at the bottom of its body. Whole px, so that sums compare. */
+function contentHeight(id: string): number {
+  const el = [...document.querySelectorAll<HTMLElement>(".tile")].find((x) => x.dataset.id === id)!;
+  const end = el.querySelector(".tile-body")!.getBoundingClientRect().bottom;
+  return Math.round(end - el.getBoundingClientRect().top);
 }
 
 function setDraft(next: Layout): void {
@@ -1138,6 +1189,7 @@ function editBar(): HTMLElement {
       },
       t("edit.reset"),
     ),
+    h("button", { class: "btn", onclick: autoArrange }, t("edit.arrange")),
     h("button", { class: "btn", onclick: copyDialog }, t("edit.copy")),
     h("button", { class: "btn", onclick: discard }, t("edit.discard")),
     h("button", { class: "btn primary", onclick: done }, t("edit.done")),

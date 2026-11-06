@@ -53,7 +53,7 @@ A page from the template works offline. It has Chart.js inside, and its own code
 requests. Its footer tells the date and
 time when the server wrote the data, in the time zone of the browser. When Garmin did not give some days, the footer also gives their number: their
 values show "n/a". The footer also shows the version of the server that wrote the page, with a link
-to its release notes. Give this version when you report a problem. A freeform page loads Chart.js
+to that version on the What's new page of the website. Give this version when you report a problem. A freeform page loads Chart.js
 from the web.
 
 ## Update the dashboard
@@ -286,12 +286,17 @@ board has its own **Edit layout** button. Each widget then has these controls:
 
 Some widgets have a narrowest width: Activities and Period comparison need 2 columns.
 
+The tiles of one row have the same height. On a tablet, a tile with no neighbour in its row fills the row.
+
 The edit bar stays at the top of the window while you scroll. It has:
 
 - **Add widget**: opens the catalogue: the built-in widgets, your custom widgets and the hidden
   widgets of the board. Type in the search field to find a widget by its title, in the page
   language or in English.
 - **Reset board**: puts the preset widgets back on the board.
+- **Auto-arrange**: sorts the current board by meaning and fills every row. It keeps your widgets
+  and custom widgets, unlike **Reset board**, and it can make a tile wider. It sets the tiles side by
+  side that have the closest heights. Select **Done** to keep the result, or **Discard** to undo it.
 - **Copy layout**: gives the layout as text.
 - **Discard**: puts the layout back as it was before you selected **Edit layout**, on every board.
   When you have changes, the page asks first. Escape does the same.

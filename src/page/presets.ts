@@ -8,9 +8,9 @@ const PRESETS: Record<string, Row> & { generic: Row } = {
     ["readiness", 2],
     ["calendar", 1],
     ["periodComparison", 3],
-    ["records", 3],
     ["weeklyVolume", 2],
     ["intensityMinutes", 1],
+    ["records", 3],
     ["loadSafety", 3],
     ["fitnessFatigue", 3],
     ["loadVsRecovery", 3],
@@ -35,15 +35,15 @@ const PRESETS: Record<string, Row> & { generic: Row } = {
     ["typeWeekly", 2],
     ["hrZones", 1],
     ["records", 3],
-    ["bestEfforts", 1],
     ["races", 2],
+    ["racePredictor", 1],
     ["aerobicFitness", 2],
+    ["bestEfforts", 1],
+    ["trainingEffect", 2],
     ["intensityShare", 1],
     ["runningForm", 3],
-    ["runWalk", 1],
-    ["trainingEffect", 2],
-    ["racePredictor", 1],
     ["longRuns", 2],
+    ["runWalk", 1],
     ["workoutTrend", 3],
     ["activities", 3],
   ],
@@ -62,8 +62,8 @@ const PRESETS: Record<string, Row> & { generic: Row } = {
     ["typeWeekly", 2],
     ["hrZones", 1],
     ["records", 3],
-    ["walkDetails", 2],
-    ["steps", 1],
+    ["steps", 3],
+    ["walkDetails", 3],
     ["activities", 3],
   ],
   hiking: [
@@ -79,9 +79,9 @@ const PRESETS: Record<string, Row> & { generic: Row } = {
     ["typeWeekly", 2],
     ["hrZones", 1],
     ["records", 3],
+    ["intensityShare", 3],
+    ["hikeVertical", 3],
     ["bikeDetails", 3],
-    ["hikeVertical", 2],
-    ["intensityShare", 1],
     ["activities", 3],
   ],
   swimming: [
@@ -172,6 +172,22 @@ const BASELINE: Record<string, string[]> & { generic: string[] } = {
   racket: ["typeKpis", "typeWeekly", "hrZones", "racketDetails", "activities"],
   generic: ["typeKpis", "typeWeekly", "hrZones", "activities"],
 };
+
+/** The order of meaning on a board. A Map, because a widget name is user data (`constructor`). */
+const ZONES = new Map<string, number>(
+  [
+    ["kpis", "typeKpis", "readiness", "fitnessAge", "calendar", "periodComparison"],
+    ["weeklyVolume", "typeWeekly", "hrZones", "intensityMinutes"],
+    ["records"],
+    [], // analysis: every other widget
+    ["walkDetails", "bikeDetails", "swimDetails", "racketDetails", "exercises"],
+    ["activities", "strengthSessions"],
+    ["coachNotes"],
+  ].flatMap((widgets, zone) => widgets.map((widget): [string, number] => [widget, zone])),
+);
+const ANALYSIS = 3;
+
+export const zoneOf = (widget: string): number => ZONES.get(widget) ?? ANALYSIS;
 
 export const PRESET_BOARDS: readonly string[] = Object.keys(PRESETS);
 
