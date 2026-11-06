@@ -802,6 +802,9 @@ describe("the page", () => {
       "Data from Garmin Connect, updated Oct 27, 2026, 6:30 AM",
     );
     expect(await page.$("footer .gap")).toBeNull();
+    expect(await page.getAttribute("footer a.brand", "href")).toBe(
+      "https://garmin-personal-mcp.indaco.dev",
+    );
     expect(await page.getAttribute("footer a >> text=MIT License", "href")).toContain("LICENSE");
     // the version of the server that wrote the page, with its release notes
     expect(await page.getAttribute(`footer a >> text=v${serverVersion}`, "href")).toMatch(

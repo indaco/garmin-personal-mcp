@@ -257,8 +257,9 @@ function render(): void {
 // ------------------------------------------------------------------ footer
 
 const REPO = "https://github.com/indaco/garmin-personal-mcp";
+const SITE = "https://garmin-personal-mcp.indaco.dev";
 // the Highlights of each release, for readers who do not use GitHub
-const WHATS_NEW = "https://garmin-personal-mcp.indaco.dev/whats-new.html";
+const WHATS_NEW = `${SITE}/whats-new.html`;
 
 /** When the server wrote the page, in the viewer's time zone; an older page has only the date. */
 function writtenAt(data: Data): string | undefined {
@@ -290,7 +291,7 @@ function footer(data?: Data): HTMLElement {
     h(
       "p",
       { class: "made" },
-      h("a", { class: "brand", href: REPO }, logo(), "garmin-personal-mcp"),
+      h("a", { class: "brand", href: SITE }, logo(), "garmin-personal-mcp"),
       "·",
       version &&
         h("a", { href: `${REPO}/releases/tag/v${version}`, rel: "noopener" }, `v${version}`),
