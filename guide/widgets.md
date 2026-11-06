@@ -58,12 +58,12 @@ every board. _Width_ is the default width in columns.
 
 | Board | Widgets, in order |
 | ----- | ----------------- |
-| all | `kpis`, `readiness`, `calendar`, `periodComparison`, `records`, `weeklyVolume`, `intensityMinutes`, `loadSafety`, `fitnessFatigue`, `loadVsRecovery`, `activities`, `coachNotes` |
-| running | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `bestEfforts`, `races`, `aerobicFitness`, `intensityShare`, `runningForm`, `runWalk`, `trainingEffect`, `racePredictor`, `longRuns`, `workoutTrend`, `activities` |
+| all | `kpis`, `readiness`, `calendar`, `periodComparison`, `weeklyVolume`, `intensityMinutes`, `records`, `loadSafety`, `fitnessFatigue`, `loadVsRecovery`, `activities`, `coachNotes` |
+| running | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `races`, `racePredictor`, `aerobicFitness`, `bestEfforts`, `trainingEffect`, `intensityShare`, `runningForm`, `longRuns`, `runWalk`, `workoutTrend`, `activities` |
 | strengthTraining | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `setsPerCategory`, `muscleBalance`, `exercises`, `strengthSessions` |
-| walking | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `walkDetails`, `steps`, `activities` |
+| walking | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `steps`, `walkDetails`, `activities` |
 | hiking | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `hikeVertical`, `activities` |
-| cycling | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `bikeDetails`, `hikeVertical`, `intensityShare`, `activities` |
+| cycling | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `intensityShare`, `hikeVertical`, `bikeDetails`, `activities` |
 | swimming | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `swimTrend`, `swimDetails`, `activities` |
 | racket | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `racketDetails`, `activities` |
 | generic | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `activities` |

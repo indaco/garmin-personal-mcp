@@ -27,6 +27,7 @@ import {
   type Instance,
   type Layout,
   type LocalLayout,
+  loneAtTwoColumns,
   merge,
   moveBefore,
   parseLayout,
@@ -735,12 +736,18 @@ function tabBar(data: Data): HTMLElement {
 function boardView(data: Data): HTMLElement {
   const board = boardOf(draft ?? layout, view.tab, preset);
   const grid = h("div", { class: `grid${editing ? " editing" : ""}` });
-  for (const inst of board) {
-    const def = widget(inst.widget);
-    // a hidden widget leaves the grid; Add widget lists it to show it again
-    if (inst.hidden || (!def && (!editing || withheld.has(inst.widget)))) continue;
-    grid.append(tile(data, inst, def));
+  // a hidden widget leaves the grid; Add widget lists it to show it again
+  const shown = board.filter(
+    (inst) => !inst.hidden && (widget(inst.widget) || (editing && !withheld.has(inst.widget))),
+  );
+  const tiles = shown.map((inst) => tile(data, inst, widget(inst.widget)));
+  // not in edit mode, where the width slider must show the width that is saved
+  if (!editing) {
+    for (const at of loneAtTwoColumns(shown.map((i) => shownSpan(i, widget(i.widget))))) {
+      tiles[at].classList.add("wide-tablet");
+    }
   }
+  grid.append(...tiles);
   if (grid.childElementCount === 0) {
     // an empty board offers edit mode itself: the menu is not the only way in
     grid.append(
@@ -879,6 +886,10 @@ function titleOf(inst: Instance, def: WidgetDef | undefined): string {
   return def.title(t) + own;
 }
 
+/** Never narrower than the widget fits in, also for a layout that Claude wrote. */
+const shownSpan = (inst: Instance, def: WidgetDef | undefined) =>
+  Math.max(inst.span, def?.minSpan ?? 1) as Span;
+
 function tile(data: Data, inst: Instance, def: WidgetDef | undefined): HTMLElement {
   const title = titleOf(inst, def);
   const headingId = `h-${inst.id}`;
@@ -886,8 +897,7 @@ function tile(data: Data, inst: Instance, def: WidgetDef | undefined): HTMLEleme
   const el = h(
     "section",
     {
-      // never narrower than the widget fits in, also for a layout that Claude wrote
-      class: `tile span-${Math.max(inst.span, def?.minSpan ?? 1)}`,
+      class: `tile span-${shownSpan(inst, def)}`,
       "data-id": inst.id,
       "data-widget": inst.widget,
       "aria-labelledby": headingId,

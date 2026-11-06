@@ -117,6 +117,24 @@ const hikeRecords = async (activities: object[]) => {
   return page.innerText("[data-id=records]");
 };
 
+/** The shown tiles of the board by row: their heights, and the space left at the right of the grid. */
+const gridRows = (page: Page) =>
+  page.$eval(".grid", (grid) => {
+    const box = grid.getBoundingClientRect();
+    const rows = new Map<number, { id?: string; height: number; right: number }[]>();
+    for (const el of grid.querySelectorAll<HTMLElement>(":scope > .tile")) {
+      const r = el.getBoundingClientRect();
+      const row = rows.get(Math.round(r.top)) ?? [];
+      row.push({ id: el.dataset.id, height: Math.round(r.height), right: r.right });
+      rows.set(Math.round(r.top), row);
+    }
+    return [...rows.values()].map((row) => ({
+      ids: row.map((t) => t.id).join("+"),
+      heights: new Set(row.map((t) => t.height)).size,
+      gap: Math.round(box.right - Math.max(...row.map((t) => t.right))),
+    }));
+  });
+
 /** A record that the all board met the whole preset, so a test layout of few widgets stays small. */
 const MET = { all: preset("all").map((i) => i.widget) };
 
@@ -125,9 +143,9 @@ const ALL_PRESET = [
   "readiness",
   "calendar",
   "periodComparison",
-  "records",
   "weeklyVolume",
   "intensityMinutes",
+  "records",
   "loadSafety",
   "fitnessFatigue",
   "loadVsRecovery",
@@ -1464,11 +1482,11 @@ describe("focus", () => {
     await page.focus("[aria-label='Move Weekly volume']");
     for (const key of ["Space", "ArrowRight", "Space"]) await page.keyboard.press(key);
     expect(await focused(page)).toBe("Move Weekly volume");
-    expect(await page.textContent("#announce")).toBe("Weekly volume moved to position 7 of 12");
+    expect(await page.textContent("#announce")).toBe("Weekly volume moved to position 6 of 12");
     // a hidden tile gives focus to the tile in its place
     await page.focus("[aria-label='Hide Weekly volume']");
     await page.keyboard.press("Enter");
-    expect(await focused(page)).toBe("Hide Load safety");
+    expect(await focused(page)).toBe("Hide Records");
     expect(await page.textContent("#announce")).toBe("Weekly volume hidden");
   });
 
@@ -2520,15 +2538,15 @@ describe("type boards", () => {
       "typeWeekly",
       "hrZones",
       "records",
-      "bestEfforts",
       "races",
+      "racePredictor",
       "aerobicFitness",
+      "bestEfforts",
+      "trainingEffect",
       "intensityShare",
       "runningForm",
-      "runWalk",
-      "trainingEffect",
-      "racePredictor",
       "longRuns",
+      "runWalk",
       "activities",
     ]);
     const races = await page.$$eval("[data-id=races] tbody tr", (r) =>
@@ -3725,8 +3743,8 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
       "typeWeekly",
       "hrZones",
       "records",
-      "walkDetails",
       "steps",
+      "walkDetails",
       "activities",
     ]);
   });
@@ -4869,5 +4887,75 @@ describe("chart table", () => {
       `{ type: "scatter", data: { datasets: [{ label: "x", data: [{ x: 1 }] }] } }`,
     );
     expect(got).toEqual([["1", ""]]);
+  });
+});
+
+describe("board rows", () => {
+  it.each([1280, 1000])("are full and of one height on every tab at %d px", async (width) => {
+    const { page, errors } = await open(browser, pageFile(), {
+      viewport: { width, height: 900 },
+    });
+    const list = await page.$$eval("[role=tab]", (els) =>
+      els.map((e) => e.getAttribute("data-tab")!),
+    );
+    expect(list.length).toBeGreaterThan(3);
+    for (const tab of list) {
+      await page.click(`[data-tab=${tab}]`);
+      await page.waitForSelector(`[role=tabpanel][aria-labelledby=tab-${tab}]`);
+      for (const shownRow of await gridRows(page)) {
+        expect({ tab, ...shownRow }).toEqual({ tab, ids: shownRow.ids, heights: 1, gap: 0 });
+      }
+    }
+    expect(errors).toEqual([]);
+  });
+
+  it("finds a lone tile by the shown tiles and their shown width on a tablet", async () => {
+    const boards = {
+      all: [
+        { id: "activities", widget: "activities", span: 1 },
+        { id: "hrv", widget: "hrv", span: 1 },
+        { id: "sleep", widget: "sleep", span: 1, hidden: true },
+        { id: "bedtime", widget: "bedtime", span: 1 },
+        { id: "stress", widget: "bodyBattery", span: 1 },
+      ],
+    };
+    const { page, errors } = await open(
+      browser,
+      pageFile({ layout: { rev: "w", base: "preset", seen: MET, boards } }),
+      { viewport: { width: 1000, height: 900 } },
+    );
+    // Activities needs 2 columns, so HRV pairs with Bedtime past the hidden tile; the last is alone
+    expect(
+      await page.$$eval(".wide-tablet", (els) => els.map((e) => (e as HTMLElement).dataset.id)),
+    ).toEqual(["stress"]);
+    expect((await gridRows(page)).map((r) => r.gap)).toEqual([0, 0, 0]);
+    expect(errors).toEqual([]);
+  });
+
+  it("gives a lone tile its width back in edit mode, so the width slider stays true", async () => {
+    const { page, errors } = await open(browser, pageFile(), {
+      viewport: { width: 1000, height: 900 },
+      hash: "#running",
+    });
+    const zones = "[data-id=hrZones]";
+    expect(await page.getAttribute(zones, "class")).toContain("wide-tablet");
+    await startEdit(page);
+    expect(await page.getAttribute(zones, "class")).not.toContain("wide-tablet");
+    expect(await page.getAttribute(`${zones} .resize`, "aria-valuenow")).toBe("1");
+    expect(errors).toEqual([]);
+  });
+
+  it("stacks a lone tile in one column on a phone", async () => {
+    const { page, errors } = await open(browser, pageFile(), {
+      viewport: { width: 390, height: 800 },
+      hash: "#running",
+    });
+    expect(await page.getAttribute("[data-id=hrZones]", "class")).toContain("wide-tablet");
+    const grid = await page.$eval(".grid", (e) => e.getBoundingClientRect().width);
+    const widths = await page.$$eval(".grid > .tile", (els) =>
+      els.map((e) => e.getBoundingClientRect().width),
+    );
+    expect(new Set(widths)).toEqual(new Set([grid]));
+    expect(errors).toEqual([]);
   });
 });

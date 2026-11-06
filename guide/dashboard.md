@@ -286,6 +286,8 @@ board has its own **Edit layout** button. Each widget then has these controls:
 
 Some widgets have a narrowest width: Activities and Period comparison need 2 columns.
 
+The tiles of one row have the same height. On a tablet, a tile with no neighbour in its row fills the row.
+
 The edit bar stays at the top of the window while you scroll. It has:
 
 - **Add widget**: opens the catalogue: the built-in widgets, your custom widgets and the hidden

@@ -81,6 +81,18 @@ describe("sport boards", () => {
   });
 });
 
+describe("preset rows", () => {
+  it.each(PRESET_BOARDS.map((b) => [b]))("%s fills each row of 3 columns", (board) => {
+    let used = 0;
+    for (const { id, span } of preset(board)) {
+      used += span;
+      expect(used, `${board}: ${id} passes the row end`).toBeLessThanOrEqual(3);
+      if (used === 3) used = 0;
+    }
+    expect(used, `${board}: the last row`).toBe(0);
+  });
+});
+
 describe("baseline", () => {
   // A literal copy on purpose: the baseline must not follow the preset when a release adds a widget.
   it("lists the frozen widgets of every preset board", () => {
@@ -106,7 +118,7 @@ describe("withPresetWidgets with the real preset", () => {
   it("gives a Bike board from an older release the new widgets once", () => {
     const cycling = preset("cycling").filter((i) => baseline("cycling").includes(i.widget));
     const r = withPresetWidgets(parseLayout({ boards: { cycling } }), preset, baseline);
-    expect(r.added).toEqual({ cycling: ["records", "hikeVertical", "intensityShare"] });
+    expect(r.added).toEqual({ cycling: ["records", "intensityShare", "hikeVertical"] });
     expect(withPresetWidgets(r.layout, preset, baseline).added).toEqual({});
   });
 

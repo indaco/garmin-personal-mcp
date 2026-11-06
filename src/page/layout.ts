@@ -104,6 +104,27 @@ export function storedSpan(target: number, old: Span, cols: number): Span {
   return (target === cols ? Math.max(old, target) : target) as Span;
 }
 
+/**
+ * The places in this list of tile widths whose tile has no neighbour on a grid of 2 columns: it leaves
+ * a gap beside it, so the page shows it wider there.
+ */
+export function loneAtTwoColumns(spans: Span[]): number[] {
+  const lone: number[] = [];
+  let open = -1;
+  for (const [at, span] of spans.entries()) {
+    if (span > 1) {
+      if (open >= 0) lone.push(open);
+      open = -1;
+    } else if (open >= 0) {
+      open = -1;
+    } else {
+      open = at;
+    }
+  }
+  if (open >= 0) lone.push(open);
+  return lone;
+}
+
 export function setSpan(board: Instance[], id: string, span: Span): Instance[] {
   return board.map((i) => (i.id === id ? { ...i, span } : i));
 }

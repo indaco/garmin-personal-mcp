@@ -5,6 +5,7 @@ import {
   type Instance,
   type Layout,
   type Span,
+  loneAtTwoColumns,
   merge,
   moveBefore,
   parseLayout,
@@ -637,5 +638,23 @@ describe("withPresetWidgets across releases", () => {
     ).layout;
     expect(a.seen).toHaveProperty("cycling");
     expect(JSON.stringify(resetBoard(a, "running", preset))).toBe(JSON.stringify(a));
+  });
+});
+
+describe("loneAtTwoColumns", () => {
+  it.each<[string, Span[], number[]]>([
+    ["no tile", [], []],
+    ["one tile of width 1", [1], [0]],
+    ["a pair", [1, 1], []],
+    ["three of width 1: the last is alone", [1, 1, 1], [2]],
+    ["four of width 1", [1, 1, 1, 1], []],
+    ["2 then 1: the 2 takes the whole row", [2, 1], [1]],
+    ["1 then 2: the 1 is alone before it", [1, 2], [0]],
+    ["1 then 3: a 3 is 2 columns wide here", [1, 3], [0]],
+    ["2 then 1 then 1: a pair after the wide tile", [2, 1, 1], []],
+    ["only wide tiles", [3, 2, 3], []],
+    ["the preset of a sport board", [3, 2, 1, 3, 3], [2]],
+  ])("%s", (_, spans, lone) => {
+    expect(loneAtTwoColumns(spans)).toEqual(lone);
   });
 });
