@@ -8,6 +8,7 @@ import {
   muscleGroup,
   muscleSets,
   pushPull,
+  recentWindow,
   setsByCategory,
   slug,
   topSet,
@@ -58,6 +59,8 @@ const acts = [
     exercises: [squat([{ reps: 8, kg: 55, restSec: 60 }]), pushUp],
   },
 ];
+
+const inSeptember = (...d: string[]) => d.map((x) => ({ date: `2026-09-${x}` }));
 
 /** Pull-up sessions, one each `days` days from 1 Sep, with these max reps. */
 const pullUps = (reps: number[], days = 7) =>
@@ -300,19 +303,20 @@ describe("exercise stats", () => {
   });
 
   it("marks a lift progressing, stalled or down against the sessions just before the last ones", () => {
-    expect(pullUps([8, 9, 10, 11]).status).toBe("up");
-    expect(pullUps([8, 10, 9, 10, 10]).status).toBe("stalled");
+    expect(pullUps([8, 8, 8, 9, 9, 11]).status).toBe("up");
+    expect(pullUps([8, 10, 9, 9, 10, 10]).status).toBe("stalled");
     // more than 5% under the best of the sessions before
-    expect(pullUps([8, 10, 9, 9, 9]).status).toBe("down");
-    expect(pullUps([20, 20, 19, 19, 19]).status).toBe("stalled");
+    expect(pullUps([8, 10, 9, 9, 9, 9]).status).toBe("down");
+    expect(pullUps([20, 20, 20, 19, 19, 19]).status).toBe("stalled");
     // one lucky day long ago does not block a new best: only as many sessions before count
     expect(pullUps([14, 8, 8, 8, 9, 9, 9, 10, 10, 10]).status).toBe("up");
   });
 
   it("takes the sessions of 14 days or more, so a lift done twice a week gets a status too", () => {
-    // every 3 days: the last 6 sessions span 15 days, against the 4 before them
-    expect(pullUps([8, 9, 10, 10, 10, 10, 10, 10, 10, 10], 3).status).toBe("stalled");
-    expect(pullUps([8, 9, 10, 10, 10, 10, 10, 10, 10, 11], 3).status).toBe("up");
+    // every 3 days: the last 6 sessions span 15 days, against the 6 before them
+    const flat = [8, 9, 10, 10, 10, 10];
+    expect(pullUps([...flat, 10, 10, 10, 10, 10, 10], 3).status).toBe("stalled");
+    expect(pullUps([...flat, 10, 10, 10, 10, 10, 11], 3).status).toBe("up");
   });
 
   it("gives no status to a timed exercise: its set time follows the lap button, not strength", () => {
@@ -326,11 +330,24 @@ describe("exercise stats", () => {
     expect(hold.status).toBeNull();
   });
 
-  it("gives no status without sessions before the last 14 days, or before 4 sessions", () => {
+  it("gives no status with fewer sessions before the last ones than in them", () => {
     expect(pullUps([8, 9, 10]).status).toBeNull();
-    // 4 sessions over 18 days: all of them are the last 14 days or more
-    expect(pullUps([10, 9, 10, 10], 6).status).toBeNull();
-    expect(pullUps([10, 9, 10, 10], 7).status).toBe("stalled");
+    // 3 sessions against 1 or 2: one good day would decide the tag
+    expect(pullUps([8, 9, 10, 11]).status).toBeNull();
+    expect(pullUps([8, 10, 9, 9, 9]).status).toBeNull();
+    expect(pullUps([8, 9, 10, 10, 10, 10]).status).toBe("stalled");
+    // every 6 days: the last 3 span 12 days, so 4 sessions against as many
+    expect(pullUps([9, 9, 9, 10, 10, 10, 10], 6).status).toBeNull();
+    expect(pullUps([9, 9, 9, 10, 10, 10, 10, 10], 6).status).toBe("stalled");
+  });
+
+  it("takes the recent window from the newest sessions, at 14 days exactly", () => {
+    expect(recentWindow([])).toBeNull();
+    // 14 days from the third newest to the newest: 3 sessions are enough
+    expect(recentWindow(inSeptember("01", "02", "03", "10", "17", "24"))).toBe(3);
+    // 13 days: one session more, and then too few before them
+    expect(recentWindow(inSeptember("01", "02", "03", "11", "17", "24"))).toBeNull();
+    expect(recentWindow(inSeptember("01", "02", "03", "04", "05", "11", "17", "24"))).toBe(4);
   });
 
   it("makes a URL name of the exercise", () => {

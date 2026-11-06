@@ -67,8 +67,6 @@ export function swimTrend(acts: Activity[]): SwimTrend | undefined {
   if (!best) return undefined;
   const { sessions } = best;
   const k = recentWindow(sessions);
-  // like with like: the page says "the 3 swims before", so 3 against 1 is no comparison
-  const compares = k !== null && sessions.length >= 2 * k;
   const means = (v: (s: SwimTrend["sessions"][number]) => number) => ({
     recent: mean(sessions.slice(-k!).map(v))!,
     before: mean(sessions.slice(-2 * k!, -k!).map(v))!,
@@ -76,9 +74,7 @@ export function swimTrend(acts: Activity[]): SwimTrend | undefined {
   return {
     ...best,
     left: swims.length - sessions.length,
-    window: compares
-      ? { swims: k, pace: means((s) => s.pace), strokes: means((s) => s.strokes) }
-      : null,
+    window: k ? { swims: k, pace: means((s) => s.pace), strokes: means((s) => s.strokes) } : null,
   };
 }
 
