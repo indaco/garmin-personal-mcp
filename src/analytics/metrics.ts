@@ -1,5 +1,5 @@
 import { addDays } from "../dates";
-import { type Activity, dayOf, mondayOf, seconds } from "./calc";
+import { type Activity, dayOf, mondayOf, seconds, weekIndex } from "./calc";
 
 /**
  * Training and recovery numbers that the widgets share. Pure functions; the dashboard labels every
@@ -193,9 +193,7 @@ export function weekly(
 ): number[] {
   const out = weeks.map(() => 0);
   for (const a of acts) {
-    const d = dayOf(a);
-    if (!d) continue;
-    const i = weeks.findIndex((w) => d >= w && d <= addDays(w, 6));
+    const i = weekIndex(a, weeks);
     if (i >= 0) out[i] += value(a);
   }
   return out;

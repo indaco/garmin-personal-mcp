@@ -1,5 +1,4 @@
-import { type Activity, dayOf, isRunning, seconds } from "./calc";
-import { addDays } from "../dates";
+import { type Activity, dayOf, isRunning, seconds, weekIndex } from "./calc";
 import { change, MIN_SESSIONS, mean, riegel } from "./metrics";
 import type { PlanStep } from "./strength";
 
@@ -39,18 +38,16 @@ export interface AerobicTrend {
  * raise HR for other reasons. Without zones (`z4` undefined) every run with HR counts.
  */
 export function aerobicTrend(runs: Activity[], weeks: string[], z4?: number): AerobicTrend {
-  const weekOf = (a: Activity) => {
-    const day = String(a.start).slice(0, 10);
-    return weeks.findIndex((w) => day >= w && day <= addDays(w, 6));
-  };
   const aerobic = runs.filter(
     (a) =>
       (z4 === undefined || (typeof a.avgHR === "number" && a.avgHR < z4)) &&
       efficiency(a) !== undefined &&
-      weekOf(a) >= 0,
+      weekIndex(a, weeks) >= 0,
   );
   const values = (from: number, to: number) =>
-    aerobic.filter((a) => weekOf(a) >= from && weekOf(a) < to).map((a) => efficiency(a)!);
+    aerobic
+      .filter((a) => weekIndex(a, weeks) >= from && weekIndex(a, weeks) < to)
+      .map((a) => efficiency(a)!);
   const n = Math.min(4, Math.floor(weeks.length / 2));
   const first = values(0, n);
   const last = values(weeks.length - n, weeks.length);
@@ -528,8 +525,7 @@ export function runPlanAdherence(acts: Activity[], weeks: string[]) {
   const unreadWeeks = new Set<number>();
   const stats = new Map<string, RunPlanMiss>();
   for (const a of acts) {
-    const d = dayOf(a);
-    const i = d ? weeks.findIndex((w) => d >= w && d <= addDays(w, 6)) : -1;
+    const i = weekIndex(a, weeks);
     if (i < 0 || !isRunning(a)) continue;
     out.runs++;
     const rows = a.planVerdicts;

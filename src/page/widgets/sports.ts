@@ -1,4 +1,3 @@
-import { addDays } from "../../dates";
 import { type Activity, isIndoor, seconds, sessionSeconds, sportOf } from "../../analytics/calc";
 import { append, h } from "../dom";
 import type { Key } from "../i18n";
@@ -17,8 +16,7 @@ function speed(a: Activity): number | undefined {
   return typeof a.km === "number" && hours > 0 ? a.km / hours : undefined;
 }
 
-const weekOf = (ctx: Ctx, a: Activity) =>
-  ctx.weeks.findIndex((w) => day(a) >= w && day(a) <= addDays(w, 6));
+const weekOf = (ctx: Ctx, a: Activity) => ctx.calc.weekIndex(a, ctx.weeks);
 
 register({
   id: "walkDetails",

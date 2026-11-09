@@ -1,4 +1,3 @@
-import { addDays } from "../../dates";
 import { type Activity, groupOf } from "../../analytics/calc";
 import { append, h } from "../dom";
 import type { Key } from "../i18n";
@@ -37,8 +36,7 @@ const FORM: [field: string, key: Key, unit: string, digits: number][] = [
 const runs = (ctx: Ctx) => ctx.activities.filter((a) => groupOf(a) === "running");
 const day = (a: Activity) => String(a.start).slice(0, 10);
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
-const weekOf = (ctx: Ctx, a: Activity) =>
-  ctx.weeks.findIndex((w) => day(a) >= w && day(a) <= addDays(w, 6));
+const weekOf = (ctx: Ctx, a: Activity) => ctx.calc.weekIndex(a, ctx.weeks);
 
 /** The fastest of each best-effort distance in the window, with its activity (the digest's best). */
 function bestEfforts(ctx: Ctx) {

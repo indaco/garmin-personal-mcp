@@ -134,6 +134,12 @@ export function dayOf(a: Activity): string | undefined {
     : undefined;
 }
 
+/** The index in `weeks` (Mondays) of the week that holds the activity; -1 when none does. */
+export function weekIndex(a: Activity, weeks: string[]): number {
+  const d = dayOf(a);
+  return d ? weeks.findIndex((w) => d >= w && d <= addDays(w, 6)) : -1;
+}
+
 export function mondayOf(day: string): string {
   return addDays(day, -((new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7));
 }
