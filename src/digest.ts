@@ -168,7 +168,8 @@ export interface Digest {
   /**
    * The page's Aerobic fitness: metres per heartbeat of the runs below zone 4, the first and the
    * last `comparedWeeks` of the period, 2 decimals; null without such a run on that side. The change
-   * in % needs 3 runs on each side. Absent without runs.
+   * in % needs 3 runs on each side. Absent without runs, and without a zone 4 floor (no zones, or
+   * zones that the settings leave out): the page's value then counts every run, not the aerobic ones.
    */
   aerobicEfficiency?: {
     comparedWeeks: number;
@@ -260,7 +261,8 @@ export function digest(data: Json): Digest {
       };
     });
   const weeks = start ? weeksOf(start, end) : [];
-  const trend = aerobicTrend(runs as Activity[], weeks, zonesOf(data.zones).floors[3]);
+  const z4 = zonesOf(data.zones).floors[3];
+  const trend = aerobicTrend(runs as Activity[], weeks, z4);
   // the page's Load safety
   const safety = loadSafety(acts as Activity[], weeks, end, maxHR);
   // a partial week before (or no week before: undefined) gives no ramp
@@ -357,7 +359,7 @@ export function digest(data: Json): Digest {
     longRuns,
     ...(longestRun ? { longestRun } : {}),
     ...(swims ? { swims } : {}),
-    ...(runs.length > 0
+    ...(runs.length > 0 && z4 !== undefined
       ? {
           aerobicEfficiency: {
             comparedWeeks: trend.n,

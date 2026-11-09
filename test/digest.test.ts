@@ -635,6 +635,14 @@ describe("digest", () => {
     );
   });
 
+  it.each([
+    ["no HR zones", undefined],
+    ["a zones row without floors", [{ sport: "DEFAULT", maxHeartRateUsed: 190 }]],
+  ])("has no aerobic efficiency with %s: the value would count every run", (_name, zones) => {
+    const activities = [easyRun("2026-10-20", 100), easyRun("2026-08-04", 125)];
+    expect(digest({ ...data, zones, activities })).not.toHaveProperty("aerobicEfficiency");
+  });
+
   it("gives the longest run of the period", () => {
     const out = digest({
       ...data,
