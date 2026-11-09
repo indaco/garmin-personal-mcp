@@ -466,6 +466,7 @@ const squatRow = (more: Record<string, unknown>) => ({
   steps: [0],
   plannedSets: 3,
   plannedReps: { low: 8, high: 12 },
+  plannedRestSec: [90],
   doneSets: 3,
   reps: [10, 10, 10],
   verdict: "hit",
@@ -588,7 +589,14 @@ describe("plan of the sets", () => {
       step(4, { intensity: "cooldown", exercise: "Stretch" }),
     ];
     const out = planOfSets(steps, [done(0, 10, "Push Up"), done(4, 1, "Stretch")]);
-    const none = { plannedReps: null, verdict: null, why: [], over: 0, extra: 0 };
+    const none = {
+      plannedReps: null,
+      plannedRestSec: [],
+      verdict: null,
+      why: [],
+      over: 0,
+      extra: 0,
+    };
     expect(out).toEqual([
       {
         ...none,
@@ -808,6 +816,93 @@ describe("plan of the sets", () => {
       step(3, { intensity: undefined }),
     ];
     expect(planOfSets(steps, [])).toEqual([]);
+  });
+
+  describe("planned rest", () => {
+    const row = (more: Partial<PlanStep> = {}) => ({ exercise: "Row", ...range(8, 12), ...more });
+    it.each<[string, PlanStep[], (number | null)[][]]>([
+      ["straight sets", block(), [[90]]],
+      [
+        "rest-pause: the short and the long rest",
+        [step(0, range(8, 12)), restOf(1, 20_000), repeat(2, 0, 2), restOf(3, 120_000)],
+        [[20, 120]],
+      ],
+      [
+        "rest-pause inside an outer repeat",
+        [
+          step(0, range(8, 12)),
+          restOf(1, 20_000),
+          repeat(2, 0, 2),
+          restOf(3, 120_000),
+          repeat(4, 0, 3),
+        ],
+        [[20, 120]],
+      ],
+      ["an open rest is null", [step(0, range(8, 12)), restOf(1), repeat(2, 0, 3)], [[null]]],
+      [
+        "an open rest with a value is null",
+        [
+          step(0, range(8, 12)),
+          { index: 1, intensity: "rest", durationType: "open", durationValue: 30_000 },
+          repeat(2, 0, 3),
+        ],
+        [[null]],
+      ],
+      [
+        "a timed rest without its time is null",
+        [
+          step(0, range(8, 12)),
+          { index: 1, intensity: "rest", durationType: "time" },
+          repeat(2, 0, 3),
+        ],
+        [[null]],
+      ],
+      [
+        "superset: no rest after the first exercise",
+        [step(0, range(8, 12)), step(1, row()), rest(2), repeat(3, 0, 3)],
+        [[], [90]],
+      ],
+      [
+        "superset: a rest after the block is for the last exercise only",
+        [step(0, range(8, 12)), step(1, row()), rest(2), repeat(3, 0, 3), restOf(4, 120_000)],
+        [[], [90, 120]],
+      ],
+      ["a rest only after the block", [step(0, range(8, 12)), repeat(1, 0, 3), rest(2)], [[90]]],
+      [
+        "an exercise after the block is no rest",
+        [step(0, range(8, 12)), repeat(1, 0, 3), step(2, row())],
+        [[], []],
+      ],
+      ["no repeat and no rest", [step(0, range(8, 12)), step(1, row())], [[], []]],
+      [
+        "one rest of two blocks of one row, once",
+        [
+          step(0, range(8, 12)),
+          rest(1),
+          repeat(2, 0, 2),
+          step(3, range(8, 12)),
+          rest(4),
+          repeat(5, 3, 2),
+        ],
+        [[90]],
+      ],
+      [
+        "only the closest repeat counts",
+        [step(0, range(8, 12)), rest(1), repeat(2, 0, 2), repeat(3, 0, 3), restOf(4, 120_000)],
+        [[90]],
+      ],
+      [
+        "a repeat without a first step is not around the exercise",
+        [step(0, range(8, 12)), rest(1), repeat(2, undefined, 3), restOf(3, 120_000)],
+        [[90]],
+      ],
+    ])("%s", (_name, steps, expected) => {
+      expect(planOfSets(steps, []).map((r) => r.plannedRestSec)).toEqual(expected);
+    });
+
+    it("gives a row not in the plan no planned rest", () => {
+      expect(planOfSets(block(), [done(9, 5, "Curl")])[1]).not.toHaveProperty("plannedRestSec");
+    });
   });
 });
 

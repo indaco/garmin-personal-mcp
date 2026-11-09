@@ -710,15 +710,19 @@ describe("coach prompts", () => {
     expect(text).toContain("The plan has no weights: do not show a planned weight.");
     expect(text).toContain("A set with 0 reps was not done");
     expect(text).toContain("the previous session when it has that exercise");
-    // a short rest inside the block is the condition: straight sets with a long rest after them are no group
+    // a group starts after a rest over 20 s: the first value of plannedRestSec is the short rest
     expect(text).toContain(
-      "a repeat block whose rest inside it is 20 s or less or OPEN, with a longer rest step right after the block",
+      "a group starts at the first set and at each set after a `restSec` over 20",
     );
     expect(text).toContain("compare only the first set of each group");
-    // two exercises in one block share the rest step after the second one, inside the block
     expect(text).toContain(
-      "Two exercises in one repeat block with one rest step after the second, inside the block, are a superset",
+      'When it is empty, the plan has no rest right after the exercise (for example the first exercise of a superset): show "n/a (no planned rest)".',
     );
+    expect(text).toContain("`plannedRestSec` of its rows in `plan.exercises`");
+    const call = text.slice(text.indexOf("2. Call"), text.indexOf("3. When"));
+    // the planned rest comes from the .FIT file: no getActivityWorkouts call
+    expect(call).toBe("2. Call `getActivitySets` with its `activityId`. ");
+    expect(text).not.toContain("getActivityWorkouts");
     expect(text).toContain("compare each with the rests after the sets it follows");
     expect(text).toContain("The warm-up and cool-down stay out of Sets and Rest.");
     // the time of a timed set follows the lap button: it is no gain or loss
