@@ -854,6 +854,17 @@ describe("coach prompts", () => {
     }
   });
 
+  it("quotes the page's load ramp, monotony and strain of the digest", async () => {
+    const text = (await render("week-review")).replace(/\s+/g, " ");
+    const part = text.slice(
+      text.indexOf("- **Against the weeks before**"),
+      text.indexOf("- **Coach note**"),
+    );
+    expect(part).toBe(
+      '- **Against the weeks before**: how the week\'s load and hours compare with the mean of the weeks before it in the table, as a percent. Without an earlier week or with a null load, write "n/a". Then the page\'s load ramp of the week (`rampPct`): its load against the week before, in %. A ramp of more than 10% is the page\'s warning level: say so. A null `rampPct` is "n/a". - **Now**: the load ratio of 7 to 28 days (`load.acuteToChronic`), the monotony and strain of the last 7 days (`load.monotony`, `load.strain`), and `fitnessFatigue.form` (below 0 you carry fatigue). A monotony above 2 is the page\'s flag: the days are too alike. Say that these describe today, not the reviewed week. A null value is "n/a". If `fitnessFatigue` is null, write "n/a". ',
+    );
+  });
+
   it("starts the last whole week one week before a Monday, and before a Sunday", async () => {
     vi.setSystemTime(new Date(2026, 9, 26, 12));
     expect(await render("week-review")).toContain(

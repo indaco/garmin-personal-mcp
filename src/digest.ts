@@ -10,7 +10,14 @@ import {
   seconds,
   weeksOf,
 } from "./analytics/calc";
-import { fitnessFatigueFrom, loadOf, loadRatio, readinessOf, zonesOf } from "./analytics/metrics";
+import {
+  fitnessFatigueFrom,
+  loadOf,
+  loadRatio,
+  loadSafety,
+  readinessOf,
+  zonesOf,
+} from "./analytics/metrics";
 import {
   aerobicTrend,
   racePredictionsOf,
@@ -39,6 +46,12 @@ interface Week {
   hours: number;
   load: number | null;
   estimatedLoads?: number;
+  /**
+   * The page's Load safety ramp: the load in % against the week before, 1 decimal; above 10 is the
+   * page's warning level. Null when the week before has no load or is partial, and for a week in
+   * progress.
+   */
+  rampPct: number | null;
   /** The period starts after this Monday: the week is not whole. */
   partial?: true;
 }
@@ -98,6 +111,9 @@ export interface Digest {
     weeklyAvgLast28Days: number | null;
     acuteToChronic: number | null;
     estimatedLoads: number;
+    /** The page's Foster monotony (2 decimals) and strain (1 decimal) of the last 7 days; null: n/a. */
+    monotony: number | null;
+    strain: number | null;
   };
   bestEfforts: Record<string, { time: string; date: string; name: unknown }>;
   races: Json[];
@@ -243,11 +259,16 @@ export function digest(data: Json): Digest {
         hrDriftPct: s?.drift === undefined ? null : round(s.drift, 1),
       };
     });
-  const trend = aerobicTrend(
-    runs as Activity[],
-    start ? weeksOf(start, end) : [],
-    zonesOf(data.zones).floors[3],
-  );
+  const weeks = start ? weeksOf(start, end) : [];
+  const trend = aerobicTrend(runs as Activity[], weeks, zonesOf(data.zones).floors[3]);
+  // the page's Load safety
+  const safety = loadSafety(acts as Activity[], weeks, end, maxHR);
+  // a partial week before (or no week before: undefined) gives no ramp
+  const rampOf = (monday: string) => {
+    const i = weeks.indexOf(monday);
+    const r = weeks[i - 1] >= start ? safety.ramp[i] : null;
+    return r === null ? null : round(r, 1);
+  };
   // the first one wins a tie
   const longest = runs.reduce<Json | undefined>(
     (top, a) => (num(a.km) > num(top?.km) ? a : top),
@@ -313,7 +334,7 @@ export function digest(data: Json): Digest {
         // the period starts after this Monday: the week is not whole
         .map(([k, w]) => [
           k,
-          { ...roundWeek(w), ...(k < start ? { partial: true as const } : {}) },
+          { ...roundWeek(w, rampOf(k)), ...(k < start ? { partial: true as const } : {}) },
         ]),
     ),
     load: {
@@ -322,6 +343,9 @@ export function digest(data: Json): Digest {
         ratio.chronic === null || unknown(month) ? null : round(ratio.chronic, 1),
       acuteToChronic,
       estimatedLoads: month.filter((l) => l?.estimate).length,
+      // 7 days without a known load have no spread, so no monotony: n/a
+      monotony: r2(safety.monotony),
+      strain: safety.strain === null ? null : round(safety.strain, 1),
     },
     bestEfforts,
     races: acts
@@ -496,13 +520,14 @@ function loadPart(s: Sum): Pick<Totals, "load" | "estimatedLoads"> {
   };
 }
 
-function roundWeek(w: Sum): Week {
+function roundWeek(w: Sum, rampPct: number | null): Week {
   return {
     sessions: w.sessions,
     km: round(w.km, 1),
     runKm: round(w.runKm, 1),
     hours: round(w.hours, 1),
     ...loadPart(w),
+    rampPct,
   };
 }
 
