@@ -8,6 +8,7 @@ import { digest } from "./digest";
 import { log } from "./log";
 import { type Activity, isRunning, mondayOf } from "./analytics/calc";
 import { workoutOf } from "./analytics/running";
+import type { PlanRow } from "./analytics/strength";
 import {
   type GarminTools,
   MODEL_ONLY,
@@ -374,7 +375,14 @@ export class GarminDashboard {
       const type = typeof a.type === "string" ? a.type : "";
       try {
         if (type.includes("strength") && (strength++ < 30 || (await this.tools.hasFit(id)))) {
-          a.exercises = JSON.parse(await fit(id, (n) => this.tools.getActivitySets(n))).exercises;
+          const sets = JSON.parse(await fit(id, (n) => this.tools.getActivitySets(n)));
+          a.exercises = sets.exercises;
+          // the rows that count: warm-up, cool-down and sets not in the plan have no verdict
+          a.planVerdicts =
+            sets.plan &&
+            (sets.plan.exercises as PlanRow[])
+              .filter((r) => r.verdict !== null)
+              .map(({ exercise, verdict, why }) => ({ exercise, verdict, why }));
         }
         const longRun = isRun(a) && typeof a.km === "number" && a.km > 15;
         let repeated = false;
@@ -701,8 +709,10 @@ export function registerDashboard(server: McpServer, dashboard: GarminDashboard)
       _meta: MODEL_ONLY,
       description: [
         "All the data of the training dashboard in one call: HR zones, fitness age, the activities of the",
-        "last `weeks` weeks (compact summaries, with strength sets and laps where they apply), the activities",
-        "of the weeks before for the period comparison, daily HRV, the last 14 days of sleep and daily",
+        "last `weeks` weeks (compact summaries, with strength sets and laps where they apply; a strength",
+        "session with sets also has `planVerdicts`: hit or miss for each exercise of the plan that the",
+        "watch ran, null without a plan), the activities of the weeks before for the period comparison,",
+        "daily HRV, the last 14 days of sleep and daily",
         "summaries (with `recoveryHistory`, also short rows of the older days: date, sleep hours, sleep",
         "score and resting HR), and `units`: the measurement system of the Garmin profile (metric, statute_us or",
         "statute_uk) that the page shows; the data itself is always metric; `locale`: the language of",
@@ -712,7 +722,8 @@ export function registerDashboard(server: McpServer, dashboard: GarminDashboard)
         "(fitDownloads) and new activities.",
         "`digest`, first in the result: the server's totals for the whole period and for each",
         "Monday-Sunday week (sessions, km, hours, load), the training load of the last 7 and 28 days,",
-        "best efforts, races and strength top sets, the long runs with their half split and HR drift, the",
+        "best efforts, races and strength top sets, the plan verdicts of the strength sessions done",
+        "(`strengthPlan`), the long runs with their half split and HR drift, the",
         "longest run and the race predictions (Riegel), the page's readiness verdict for today with its",
         "inputs (`readiness`), and today's fitness, fatigue and form (`fitnessFatigue`); quote them",
         "instead of your own sums. For another date range, use the activities: each one is on its own",

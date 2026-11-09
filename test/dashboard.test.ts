@@ -1742,6 +1742,67 @@ describe("getDashboardData", () => {
         expect(out.sync).toMatchObject({ failedDetails: 1, stoppedEarly: false });
         expect(out.activities[0].detailError).toEqual(expect.any(String));
         expect(out.activities[1]).not.toHaveProperty("detailError");
+        // sets not read: no plan verdicts, not even null
+        expect(out.activities[0]).not.toHaveProperty("planVerdicts");
+        expect(out.activities[1].planVerdicts).toBeNull();
+      });
+
+      it("gives each strength session the verdicts of its plan, from the file it has", async () => {
+        garminActivities = fiveSessions().slice(0, 2);
+        const ok = await api.getBytes();
+        const M = Profile.MesgNum;
+        const squat = { category: [28], categorySubtype: [6], wktStepIndex: 1 };
+        const planned = fitFile(
+          [M.WORKOUT, { wktName: "Legs" }],
+          // a warm-up (no verdict), 2 sets of 5 back squats, then 1 set of bench press
+          [
+            M.WORKOUT_STEP,
+            { messageIndex: 0, intensity: 2, durationType: 5, exerciseCategory: 28 },
+          ],
+          [
+            M.WORKOUT_STEP,
+            {
+              messageIndex: 1,
+              intensity: 0,
+              durationType: 29,
+              durationValue: 5,
+              exerciseCategory: 28,
+              exerciseName: 6,
+            },
+          ],
+          [M.WORKOUT_STEP, { messageIndex: 2, durationType: 6, durationValue: 1, targetValue: 2 }],
+          [
+            M.WORKOUT_STEP,
+            {
+              messageIndex: 3,
+              intensity: 0,
+              durationType: 29,
+              durationValue: 10,
+              exerciseCategory: 0,
+            },
+          ],
+          [M.SET, { setType: 1, repetitions: 5, weight: 60, ...squat }],
+          [M.SET, { setType: 1, repetitions: 5, weight: 60, ...squat }],
+          // the lap of the default file, so both sessions have the same fields
+          [M.LAP, { totalDistance: 1000, totalTimerTime: 300 }],
+        );
+        api.getBytes.mockClear();
+        api.getBytes.mockResolvedValueOnce(planned).mockResolvedValue(ok);
+        const out = JSON.parse(await dashboard.getDashboardData(1));
+        const [withPlan, without] = out.activities;
+        expect(withPlan.planVerdicts).toEqual([
+          { exercise: "Barbell Back Squat", verdict: "hit", why: [] },
+          { exercise: "Bench Press", verdict: "miss", why: ["sets"] },
+        ]);
+        expect(without.planVerdicts).toBeNull();
+        // the sets are as in getActivitySets, and only the new field is added
+        const tools = new GarminTools(api as unknown as GarminApiClient, dataDir);
+        expect(withPlan.exercises).toEqual(JSON.parse(await tools.getActivitySets(1)).exercises);
+        expect(Object.keys(withPlan).toSorted()).toEqual(Object.keys(without).toSorted());
+        // like the sets, the verdicts are read again on each update, never cached
+        expect(readFileSync(join(dataDir, "dashboard-cache.json"), "utf8")).not.toContain(
+          "planVerdicts",
+        );
       });
     });
 
