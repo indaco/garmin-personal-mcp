@@ -151,7 +151,7 @@ pnpm exec playwright-core install --only-shell chromium
 ```
 
 `pnpm test:coverage` fails when the unit coverage goes below the floor in `vitest.config.ts`: 100%
-of statements, functions and lines, and 96% of branches. Test new code in the same change. When the
+of statements, functions and lines, and 98% of branches. Test new code in the same change. When the
 coverage goes up, raise the floor in that change too.
 
 `pnpm fmt` corrects the format. `pnpm guide` writes the generated parts of `guide/` and the tool and prompt lists in `test/fixtures/`.

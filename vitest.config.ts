@@ -14,7 +14,7 @@ export default defineConfig({
       reporter: ["text-summary", "lcov"],
       // a floor at today's numbers: a change that leaves new code untested fails the run.
       // Raise it when coverage goes up, in the same change.
-      thresholds: { statements: 100, functions: 100, lines: 100, branches: 96 },
+      thresholds: { statements: 100, functions: 100, lines: 100, branches: 98 },
     },
   },
 });
