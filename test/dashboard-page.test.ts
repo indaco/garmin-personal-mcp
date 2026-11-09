@@ -1699,6 +1699,15 @@ describe("writeDashboard new preset widgets", () => {
     expect(widgetsOf("all")).toHaveLength(1);
   });
 
+  it("keeps the width from before Auto-arrange through an edit and the next update", async () => {
+    const [first] = preset("all");
+    const tile = { ...first, span: 3, baseSpan: 1 };
+    await writer.edit({ layout: { base: "preset", boards: { all: [tile] } } });
+    await writer.write({});
+    const { boards } = readBlock(page(), "layout") as { boards: { all: unknown[] } };
+    expect(boards.all).toEqual([tile]);
+  });
+
   it("does not throw on a board named like a property of Object", async () => {
     for (const name of ["constructor", "__proto__", "toString"]) {
       const layout = `{"rev":"r1","base":"preset","boards":{"${name}":[]},"seen":{"${name}":[]}}`;

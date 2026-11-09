@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { arrange, parseLayout, withPresetWidgets } from "../../src/page/layout";
-import { baseline, PRESET_BOARDS, preset, zoneOf } from "../../src/page/presets";
+import { baseline, PRESET_BOARDS, preset } from "../../src/page/presets";
 
 const FROZEN: Record<string, string[]> = {
   all: [
@@ -170,46 +170,31 @@ describe("withPresetWidgets with the real preset", () => {
   });
 });
 
-describe("zoneOf", () => {
-  it.each([
-    ["kpis", 0],
-    ["typeKpis", 0],
-    ["readiness", 0],
-    ["fitnessAge", 0],
-    ["calendar", 0],
-    ["periodComparison", 0],
-    ["weeklyVolume", 1],
-    ["typeWeekly", 1],
-    ["hrZones", 1],
-    ["intensityMinutes", 1],
-    ["records", 2],
-    ["runningForm", 3],
-    ["planAdherence", 3],
-    ["walkDetails", 4],
-    ["bikeDetails", 4],
-    ["swimDetails", 4],
-    ["racketDetails", 4],
-    ["exercises", 4],
-    ["activities", 5],
-    ["strengthSessions", 5],
-    ["coachNotes", 6],
-    // a custom widget, and names that a plain object has by inheritance
-    ["myWidget", 3],
-    ["constructor", 3],
-    ["toString", 3],
-    ["__proto__", 3],
-  ])("%s is in zone %d", (widget, zone) => {
-    expect(zoneOf(widget)).toBe(zone);
-  });
-});
+// the order of meaning a preset follows; every widget not named here is analysis
+const ZONES = [
+  ["kpis", "typeKpis", "readiness", "fitnessAge", "calendar", "periodComparison"],
+  ["weeklyVolume", "typeWeekly", "hrZones", "intensityMinutes"],
+  ["records"],
+  [],
+  ["walkDetails", "bikeDetails", "swimDetails", "racketDetails", "exercises"],
+  ["activities", "strengthSessions"],
+  ["coachNotes"],
+];
+const zoneOf = (widget: string) => {
+  const zone = ZONES.findIndex((list) => list.includes(widget));
+  return zone === -1 ? 3 : zone;
+};
 
-describe("arrange and the presets", () => {
-  it.each(PRESET_BOARDS)("%s stays as it is", (board) => {
-    const arranged = arrange(preset(board), (i) => ({
-      zone: zoneOf(i.widget),
-      height: 100,
-      min: 1,
-    }));
-    expect(arranged).toEqual(preset(board));
+describe("the presets", () => {
+  it.each(PRESET_BOARDS)(
+    "%s lists summary, volume, records, analysis, details, lists, notes",
+    (board) => {
+      const zones = preset(board).map((i) => zoneOf(i.widget));
+      expect(zones).toEqual(zones.toSorted((a, b) => a - b));
+    },
+  );
+
+  it.each(PRESET_BOARDS)("%s has full rows, so Auto-arrange keeps it as it is", (board) => {
+    expect(arrange(preset(board), () => ({ height: 100, min: 1 }))).toEqual(preset(board));
   });
 });

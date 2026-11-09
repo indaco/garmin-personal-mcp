@@ -32,6 +32,7 @@ import {
 import {
   add,
   arrange,
+  arrangeTip,
   boardOf,
   type Instance,
   type Layout,
@@ -51,7 +52,7 @@ import {
   withPresetWidgets,
 } from "./layout";
 import { type News, parseNews } from "./news";
-import { baseline, preset, zoneOf } from "./presets";
+import { baseline, preset } from "./presets";
 import {
   allWidgets,
   type Ctx,
@@ -105,6 +106,8 @@ let view: View;
 let editing = false;
 // edit mode works on a copy: Done saves it, Discard drops it
 let draft: Layout | null = null;
+/** The tip of the last Auto-arrange press, for its board; any other edit drops it. */
+let tip: { tab: string; swap: [string, string]; board: Instance[] } | undefined;
 let accountOpen = false;
 // on a phone the week window folds into one control
 let windowOpen = false;
@@ -471,6 +474,7 @@ function dirty(): boolean {
 function leaveEdit(): void {
   editing = false;
   draft = null;
+  tip = undefined;
   render();
   document.querySelector<HTMLElement>(".account summary")?.focus();
 }
@@ -1016,36 +1020,54 @@ function currentBoard(): Instance[] {
 }
 
 /** An edit changes the draft only; Done saves it. */
-function saveBoard(board: Instance[]): void {
-  setDraft(withBoard(draft ?? layout, view.tab, board, preset));
+function saveBoard(board: Instance[], nextTip?: typeof tip): void {
+  setDraft(withBoard(draft ?? layout, view.tab, board, preset), nextTip);
 }
 
-/** The current board by meaning, in full rows. A draft like every other edit. */
+/** The current board in full rows, in its own order, and a tip when a swap would do better. A draft like every other edit. */
 function autoArrange(): void {
-  // a wider tile can get shorter, and a second press would then see other heights; 3 rounds, because a widget can change its height on each draw
-  for (let round = 0; round < 3; round++) {
-    if (!arrangeOnce()) break;
+  const board = currentBoard();
+  const saved = draft;
+  // heights are measured at the user's widths, so a tile that a press made wider is drawn at its own width first
+  const own = board.map(({ baseSpan, ...i }) => (baseSpan ? { ...i, span: baseSpan } : i));
+  const drawnOwn = own.some((i, n) => i.span !== board[n].span);
+  if (drawnOwn) {
+    draft = withBoard(draft ?? layout, view.tab, own, preset);
+    render();
   }
-  announce(t("said.arranged"));
+  const next = arrange(board, tileInfo);
+  const found = arrangeTip(board, tileInfo);
+  const nextTip = found && { tab: view.tab, ...found };
+  // a save lists a preset board, and the bar would show unsaved changes with nothing changed
+  if (JSON.stringify(next) !== JSON.stringify(board)) saveBoard(next, nextTip);
+  else if (drawnOwn || tip || nextTip) {
+    draft = saved;
+    tip = nextTip;
+    render();
+  }
+  announce(nextTip ? `${t("said.arranged")}. ${tipText(nextTip.swap)}` : t("said.arranged"));
 }
 
-/** Whether the board changed. */
-function arrangeOnce(): boolean {
-  const board = currentBoard();
-  // a withheld widget has no tile, so it would leave a gap in a row; it stays on the board
-  const absent = board.filter((i) => withheld.has(i.widget));
-  const present = board.filter((i) => !absent.includes(i));
-  // shortcut: heights are measured at the current window width, measure at 3 columns if phone results are poor
-  const arranged = arrange(present, (i) => ({
-    zone: zoneOf(i.widget),
-    height: contentHeight(i.id),
-    min: widget(i.widget)?.minSpan ?? 1,
-  }));
-  const next = [...arranged, ...absent];
-  // a save lists a preset board, and the bar would show unsaved changes with nothing changed
-  if (JSON.stringify(next) === JSON.stringify(board)) return false;
-  saveBoard(next);
-  return true;
+/** What Auto-arrange needs of a tile. */
+const tileInfo = (i: Instance) =>
+  // a withheld widget has no tile, so it takes no column; it stays on the board
+  withheld.has(i.widget)
+    ? undefined
+    : // shortcut: heights are measured at the current window width, measure at 3 columns if phone results are poor
+      { height: contentHeight(i.id), min: widget(i.widget)?.minSpan ?? 1 };
+
+const titleOfId = (id: string) => {
+  const inst = currentBoard().find((i) => i.id === id)!;
+  return titleOf(inst, widget(inst.widget));
+};
+const swapNames = ([a, b]: [string, string]) => ({ a: titleOfId(a), b: titleOfId(b) });
+const tipText = (swap: [string, string]) => t("edit.tip", swapNames(swap));
+
+function applyTip(): void {
+  const { swap, board } = tip!;
+  const names = swapNames(swap);
+  saveBoard(board);
+  announce(t("said.swapped", names));
 }
 
 /** A tile is as tall as its row, so its content ends at the bottom of its body. Whole px, so that sums compare. */
@@ -1055,8 +1077,9 @@ function contentHeight(id: string): number {
   return Math.round(end - el.getBoundingClientRect().top);
 }
 
-function setDraft(next: Layout): void {
+function setDraft(next: Layout, nextTip?: typeof tip): void {
   draft = next;
+  tip = nextTip;
   render();
 }
 
@@ -1201,6 +1224,13 @@ function editBar(): HTMLElement {
     h("button", { class: "btn", onclick: copyDialog }, t("edit.copy")),
     h("button", { class: "btn", onclick: discard }, t("edit.discard")),
     h("button", { class: "btn primary", onclick: done }, t("edit.done")),
+    tip?.tab === view.tab &&
+      h(
+        "p",
+        { class: "edit-tip small" },
+        h("span", {}, tipText(tip.swap)),
+        h("button", { class: "btn", onclick: applyTip }, t("edit.tipApply")),
+      ),
   );
 }
 
