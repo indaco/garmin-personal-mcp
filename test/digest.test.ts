@@ -445,6 +445,33 @@ describe("digest", () => {
     });
   });
 
+  it.each([
+    ["after", ["2026-10-20", "25:00"], ["2026-10-13", "fast"]],
+    ["before", ["2026-10-20", "fast"], ["2026-10-13", "25:00"]],
+  ])("never lets an unreadable best time %s a real one win", (_name, ...efforts) => {
+    const activities = efforts.map(([day, time]) => ({ ...run(day), best: { "5k": time } }));
+    const real = efforts.find(([, time]) => time === "25:00")!;
+    expect(digest({ ...data, activities }).bestEfforts).toEqual({
+      "5k": { time: "25:00", date: real[0], name: "Easy Run" },
+    });
+  });
+
+  it("gives the progression of each run best, oldest first, with the time it beat", () => {
+    expect(d.recordProgression).toEqual({
+      "5k": [
+        { date: "2026-10-20", time: "25:10", previous: null, id: 3, name: "Easy Run" },
+        { date: "2026-10-25", time: "24:00", previous: "25:10", id: 5, name: "City 10K" },
+      ],
+      "10k": [{ date: "2026-10-25", time: "49:30", previous: null, id: 5, name: "City 10K" }],
+    });
+  });
+
+  it("gives the progression of runs only, and none without a run best", () => {
+    const walk = { ...run("2026-10-24", "walking"), best: { "5k": "20:00" } };
+    expect(digest({ ...data, activities: [walk] }).recordProgression).toEqual({});
+    expect(digest({ ...data, activities: [] }).recordProgression).toEqual({});
+  });
+
   it("lists the races", () => {
     expect(d.races).toEqual([
       {

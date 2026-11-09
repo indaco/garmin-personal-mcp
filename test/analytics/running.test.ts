@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   aerobicTrend,
+  bestProgression,
   efficiency,
   paceSeconds,
   predictRaces,
@@ -529,5 +530,109 @@ describe("race predictor", () => {
     expect(predictRaces(best)).toEqual(all[0]);
     expect(racePredictionsOf({})).toEqual([]);
     expect(racePredictionsOf({ mile: 400 })).toEqual([]);
+  });
+});
+
+/** A run on a day with its best efforts. */
+const withBest = (id: number, day: string, best: unknown) => ({
+  id,
+  type: "running",
+  start: `${day} 07:00:00`,
+  best,
+});
+
+/** The progression as [id, seconds, time] rows, per distance. */
+const rows = (acts: Record<string, unknown>[]) =>
+  Object.fromEntries(
+    Object.entries(bestProgression(acts)).map(([d, list]) => [
+      d,
+      list.map((b) => [b.a.id, b.s, b.time]),
+    ]),
+  );
+
+describe("best effort progression", () => {
+  it("lists each run that set a new best, oldest first, whatever the input order", () => {
+    const acts = [
+      withBest(5, "2026-10-20", { "5k": "24:00" }), // equals the best: the first run holds it
+      withBest(4, "2026-10-13", { "5k": "24:30" }), // slower: not listed
+      withBest(3, "2026-10-06", { "5k": "24:00" }),
+      withBest(2, "2026-09-29", { "5k": "25:10" }),
+      withBest(1, "2026-09-22", { "5k": "26:00" }),
+    ];
+    expect(rows(acts)).toEqual({
+      "5k": [
+        [1, 1560, "26:00"],
+        [2, 1510, "25:10"],
+        [3, 1440, "24:00"],
+      ],
+    });
+    // the same runs, oldest first
+    expect(rows(acts.toReversed())).toEqual(rows(acts));
+  });
+
+  it("orders two runs of one day by their start time", () => {
+    const morning = {
+      ...withBest(1, "2026-10-06", { "1k": "4:10" }),
+      start: "2026-10-06 07:00:00",
+    };
+    const evening = {
+      ...withBest(2, "2026-10-06", { "1k": "4:00" }),
+      start: "2026-10-06 18:30:00",
+    };
+    expect(rows([evening, morning])["1k"].map((r) => r[0])).toEqual([1, 2]);
+    // a tie on the same day: the earlier run holds the best
+    const tie = { ...evening, best: { "1k": "4:10" } };
+    expect(rows([tie, morning])["1k"].map((r) => r[0])).toEqual([1]);
+  });
+
+  it("follows each distance on its own", () => {
+    const acts = [
+      withBest(2, "2026-10-13", { "5k": "25:00", "10k": "50:00" }),
+      withBest(1, "2026-10-06", { "5k": "24:00", "10k": "52:00" }),
+    ];
+    expect(rows(acts)).toEqual({
+      "5k": [[1, 1440, "24:00"]],
+      "10k": [
+        [1, 3120, "52:00"],
+        [2, 3000, "50:00"],
+      ],
+    });
+  });
+
+  it.each([
+    ["an unreadable time", "fast"],
+    ["a zero time", "0:00"],
+    ["a number", 1440],
+    ["no time", null],
+  ])("skips %s, so it never blocks a real time", (_name, bad) => {
+    const acts = [
+      withBest(2, "2026-10-13", { "5k": "25:00" }),
+      withBest(1, "2026-10-06", { "5k": bad }),
+    ];
+    expect(rows(acts)).toEqual({ "5k": [[2, 1500, "25:00"]] });
+  });
+
+  it.each([
+    ["no best", undefined],
+    ["a best that is text", "24:00"],
+    ["a best that is a list", ["24:00"]],
+    ["a best that is null", null],
+  ])("gives nothing for %s", (_name, best) => {
+    expect(bestProgression([withBest(1, "2026-10-06", best)])).toEqual({});
+  });
+
+  it("skips an activity without a day", () => {
+    const acts = [withBest(1, "2026-10-06", { "5k": "25:00" }), { id: 2, best: { "5k": "20:00" } }];
+    expect(rows(acts)).toEqual({ "5k": [[1, 1500, "25:00"]] });
+  });
+
+  it("keeps a distance named like an object property as a distance", () => {
+    const acts = [
+      withBest(1, "2026-10-06", JSON.parse('{"constructor":"4:00","__proto__":"5:00"}')),
+    ];
+    const out = bestProgression(acts);
+    expect(Object.keys(out).toSorted()).toEqual(["__proto__", "constructor"]);
+    const key: string = "constructor";
+    expect(out[key].map((b) => b.time)).toEqual(["4:00"]);
   });
 });
