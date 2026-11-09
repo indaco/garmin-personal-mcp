@@ -110,6 +110,9 @@ let editing = false;
 let draft: Layout | null = null;
 /** The tip of the last Auto-arrange press, for its board; any other edit drops it. `failed`: Swap was tried and kept nothing. */
 let tip: { tab: string; swap: [string, string]; board: Instance[]; failed?: true } | undefined;
+// the swaps that Swap tried and kept nothing, until edit mode ends: a press does not suggest them again
+let refused = new Set<string>();
+const swapKey = (tab: string, a: string, b: string) => JSON.stringify([tab, a, b]);
 let accountOpen = false;
 // on a phone the week window folds into one control
 let windowOpen = false;
@@ -477,6 +480,7 @@ function leaveEdit(): void {
   editing = false;
   draft = null;
   tip = undefined;
+  refused = new Set();
   render();
   document.querySelector<HTMLElement>(".account summary")?.focus();
 }
@@ -1038,7 +1042,7 @@ function autoArrange(): void {
     render();
   }
   const next = arrange(board, tileInfo);
-  const found = arrangeTip(board, tileInfo);
+  const found = arrangeTip(board, tileInfo, (a, b) => refused.has(swapKey(view.tab, a, b)));
   const nextTip = found && { tab: view.tab, ...found };
   // a save lists a preset board, and the bar would show unsaved changes with nothing changed
   if (JSON.stringify(next) !== JSON.stringify(board)) saveBoard(next, nextTip);
@@ -1078,6 +1082,7 @@ function applyTip(): void {
     announce(t("said.swapped", names));
   } else {
     draft = saved;
+    refused.add(swapKey(tip!.tab, ...swap));
     tip = { ...tip!, failed: true };
     render();
     announce(t("edit.tipFailed", names));

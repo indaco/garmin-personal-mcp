@@ -1321,29 +1321,32 @@ describe("edit mode", () => {
       expect(errors).toEqual([]);
     });
 
-    it("keeps the board when the swap, drawn, does not even out the rows", async () => {
-      // sq is as tall as it is wide: the tip counts it at width 1, but in its new row it gets width 2
-      const square = custom("sq", `el.innerHTML = '<div style="aspect-ratio:1"></div>';`);
-      const library = [
-        square,
-        tallBox("a", 300),
-        tallBox("b", 100),
-        tallBox("c", 100),
-        tallBox("d", 100),
-      ];
-      const board = [of("sq", 1), of("b", 1), of("a", 1), of("c", 1), of("d", 1)];
-      const { page, errors } = await open(
+    // sq is as tall as it is wide: the tip counts it at width 1, but in its new row it gets width 2
+    const squareBoard = [of("sq", 1), of("b", 1), of("a", 1), of("c", 1), of("d", 1)];
+    const openSquare = (layout: object) =>
+      open(
         browser,
-        pageFile({ layout: onAll(board), widgets: library }),
-        {
-          viewport: { width: 1280, height: 800 },
-        },
+        pageFile({
+          layout,
+          widgets: [
+            custom("sq", `el.innerHTML = '<div style="aspect-ratio:1"></div>';`),
+            tallBox("a", 300),
+            tallBox("b", 100),
+            tallBox("c", 100),
+            tallBox("d", 100),
+          ],
+        }),
+        { viewport: { width: 1280, height: 800 } },
       );
+    const squareTip = "swap Custom b and Custom a";
+
+    it("keeps the board when the swap, drawn, does not even out the rows", async () => {
+      const { page, errors } = await openSquare(onAll(squareBoard));
       await startEdit(page);
       await page.click(".edit-bar >> text=Auto-arrange");
       const pressed = "sq:1 b:1 a:1 c:2 d:1";
       expect(await spans(page)).toBe(pressed);
-      expect(await page.innerText(".edit-tip")).toContain("swap Custom b and Custom a");
+      expect(await page.innerText(".edit-tip")).toContain(squareTip);
       await page.click(".edit-tip button");
       expect(await spans(page)).toBe(pressed);
       const failed =
@@ -1354,6 +1357,28 @@ describe("edit mode", () => {
       await page.click(".edit-bar >> text=Done");
       const { boards } = JSON.parse((await saved(page))!).layout;
       expect(boards.all.map((i: { id: string }) => i.id)).toEqual(["sq", "b", "a", "c", "d"]);
+      expect(errors).toEqual([]);
+    });
+
+    it("does not suggest a refused swap again on that board until edit mode ends", async () => {
+      const layout = { ...onAll(squareBoard), boards: { all: squareBoard, running: squareBoard } };
+      const { page, errors } = await openSquare(layout);
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      await page.click(".edit-tip button");
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await page.$(".edit-tip")).toBeNull();
+      expect(await page.textContent("#announce")).toBe("Widgets arranged");
+      // another board has its own refused swaps
+      await page.click("[role=tab][data-tab=running]");
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await page.innerText(".edit-tip")).toContain(squareTip);
+      await page.click("[role=tab][data-tab=all]");
+      await page.click(".edit-bar >> text=Discard");
+      await page.click("dialog >> text=Discard changes");
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await page.innerText(".edit-tip")).toContain(squareTip);
       expect(errors).toEqual([]);
     });
 

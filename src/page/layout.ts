@@ -214,11 +214,13 @@ const TIP_GAIN = 40;
 /**
  * The swap of two neighbouring tiles that `arrange` would turn into fewer rows, or into rows with
  * heights at least TIP_GAIN px closer in all; the best one, with the board it gives. The swap is
- * done on this board, so a tile that the press made wider is not wider yet.
+ * done on this board, so a tile that the press made wider is not wider yet. `skip` names the swaps
+ * not to suggest, by the ids of the tiles in board order.
  */
 export function arrangeTip(
   board: Instance[],
   info: TileInfo,
+  skip: (a: string, b: string) => boolean = () => false,
 ): { swap: [string, string]; board: Instance[] } | undefined {
   const tiles = tilesOf(board, info);
   const now = splitsOf(tiles)[tiles.length];
@@ -228,7 +230,8 @@ export function arrangeTip(
     const split = splitsOf(swapped)[tiles.length];
     const gains =
       split.rows < now.rows || (split.rows === now.rows && now.gap - split.gap >= TIP_GAIN);
-    if (gains && better(split, found?.split)) found = { at, split };
+    const skipped = skip(tiles[at].item.id, tiles[at + 1].item.id);
+    if (gains && !skipped && better(split, found?.split)) found = { at, split };
   }
   if (!found) return undefined;
   const [a, b] = [tiles[found.at].item, tiles[found.at + 1].item];

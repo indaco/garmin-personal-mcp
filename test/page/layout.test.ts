@@ -965,6 +965,31 @@ describe("arrangeTip", () => {
     expect(tipOf(spans, heights)).toBeUndefined();
   });
 
+  it("suggests the next best swap when the best one is skipped", () => {
+    const board = narrow("abcdefg").map(([id, span]) => placed(id, span));
+    const heights = [100, 400, 100, 100, 400, 100, 400];
+    const info = (i: Instance) => ({ height: heights["abcdefg".indexOf(i.id)], min: 1 as Span });
+    expect(arrangeTip(board, info)?.swap).toEqual(["a", "b"]);
+    const asked: string[] = [];
+    const tip = arrangeTip(board, info, (a, b) => {
+      asked.push(a + b);
+      return a + b === "ab";
+    });
+    expect(asked).toEqual(["ab", "bc", "cd", "de", "ef", "fg"]);
+    expect(tip?.swap).toEqual(["e", "f"]);
+    expect(shape(tip!.board)).toBe("a:1 b:1 c:1 d:2 f:1 e:2 g:1");
+  });
+
+  it("gives no tip when every gaining swap is skipped", () => {
+    expect(
+      arrangeTip(
+        narrow("abcd").map(([id, span]) => placed(id, span)),
+        (i) => ({ height: { a: 100, b: 400, c: 100, d: 400 }[i.id]!, min: 1 }),
+        () => true,
+      ),
+    ).toBeUndefined();
+  });
+
   it("gives a tip for a gain of 40 px", () => {
     expect(tipOf(narrow("abcd"), { a: 100, b: 140, c: 100, d: 140 })?.swap).toEqual(["b", "c"]);
   });
