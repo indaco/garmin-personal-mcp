@@ -3868,6 +3868,41 @@ describe("plan adherence", () => {
     expect(errors).toEqual([]);
   });
 
+  it("leaves a planned session of a week without sets out of the KPIs and the table", async () => {
+    const { page, errors } = await planPage(
+      planned({
+        "2026-10-12": [miss("Plank", "sets")],
+        "2026-10-16": "no sets",
+        "2026-10-19": [hit("Plank")],
+      }),
+    );
+    expect(await kpiTexts(page, "planAdherence")).toEqual({
+      "Planned sessions": ["1", null],
+      "Exercises hit": ["1", null],
+      "Exercises missed": ["0", null],
+      "Hit share": ["100%", null],
+    });
+    expect(await page.$$("[data-id=planAdherence] table")).toHaveLength(0);
+    expect(await page.innerText("[data-id=planAdherence]")).toContain(
+      "1 strength session has no sets",
+    );
+    expect(errors).toEqual([]);
+  });
+
+  it("shows the empty state and the no-sets note when every planned session is in a week without sets", async () => {
+    const { page, errors } = await planPage(
+      planned({ "2026-10-12": [hit("Plank")], "2026-10-16": "no sets" }),
+    );
+    expect(await page.innerText("[data-id=planAdherence] .empty")).toBe(
+      "No planned strength session in this period.",
+    );
+    const text = await page.innerText("[data-id=planAdherence]");
+    expect(text).toContain(SKIPPED);
+    expect(text).toContain("1 strength session has no sets");
+    expect(await page.$$("[data-id=planAdherence] .kpi")).toHaveLength(0);
+    expect(errors).toEqual([]);
+  });
+
   it.each([
     ["no session has plan verdicts", {}],
     ["every session had no plan", { "2026-10-19": null, "2026-10-23": null }],

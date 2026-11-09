@@ -2,7 +2,7 @@ Review one of my strength sessions as a strength coach. Use the tools of the `ga
 server. Today is {{today}}.
 
 1. {{find}}
-2. Call `getActivitySets` and `getActivityWorkouts` with its `activityId`.
+2. Call `getActivitySets` with its `activityId`.
 3. When step 1 called `listActivities` with `names`, use its rows; otherwise call `listActivities`
    with `names` = [the session's name] and `limit` = 100 (`getActivity` gives the name when you have
    only the id). Its row of this session is the summary. The previous session is the most recent
@@ -38,16 +38,16 @@ Then answer in chat, in this order, short:
   "n/a". For an exercise without weight, the most
   reps in a set; for a timed one, the longest set in seconds, without a change: its time follows the
   lap button or the plan, not strength. The rep drop: the reps of the last set against the first set
-  at the same weight, when the exercise has 2 or more of them. A rest-pause or cluster group is a
-  repeat block whose rest inside it is 20 s or less or OPEN, with a longer rest step right after the
-  block. A drop inside a group is the plan: compare only the first set of each group.
-- **Rest**: for each exercise, the median `restSec` of its done sets against its planned rest (the
-  `REST` steps with `durationType` TIME after its sets, in seconds; an OPEN rest step has no planned
-  time). When an exercise has more than one planned rest (a short one inside a rest-pause group and
-  a longer one between groups), compare each with the rests after the sets it follows. Two exercises
-  in one repeat block with one rest step after the second, inside the block, are a superset: the
-  first one has no rest of its own, so show "n/a (superset)" for it. Without a plan, the median
-  rest only.
+  at the same weight, when the exercise has 2 or more of them. When the first value of the
+  exercise's `plannedRestSec` is 20 or less or null and a later value is over 20, the exercise is
+  done in rest-pause or cluster groups: a group starts at the first set and at each set after a
+  `restSec` over 20. A drop inside a group is the plan: compare only the first set of each group.
+- **Rest**: for each exercise, the median `restSec` of its done sets against its planned rest:
+  `plannedRestSec` of its rows in `plan.exercises`, in seconds (null is an OPEN rest step, with no
+  planned time). When it has more than one value (a short rest inside a rest-pause group and a
+  longer one between groups), compare each with the rests after the sets it follows. When it is
+  empty, the plan has no rest right after the exercise (for example the first exercise of a
+  superset): show "n/a (no planned rest)". Without a plan, the median rest only.
 - **Recovery**: the sleep score and hours of the night after the session, and its HRV
   (`lastNightAvg`) against Garmin's 7-day average of that night (`weeklyAvg`).
   A `getSleep` row with only the `date` means that night has no sleep data: show its sleep as "n/a".
