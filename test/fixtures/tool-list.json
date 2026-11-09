@@ -1,7 +1,7 @@
 [
   {
     "name": "downloadActivityFit",
-    "description": "Download the ORIGINAL .FIT file of an activity and save it on the user's computer.\nReturns the absolute path of the saved .fit file (second-by-second HR, cadence, speed, laps).",
+    "description": "Download the ORIGINAL .FIT file of an activity and save it on the user's computer.\nReturns the absolute path of the saved .fit file (second-by-second HR, cadence, speed, laps).\nThe file is saved once in the fit folder of the data dir; a later call does not download it\nagain. Use it only when the user wants the file itself: getActivityLaps and getActivitySets\nalready read it.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -191,7 +191,7 @@
   },
   {
     "name": "getActivity",
-    "description": "Get the full detail of one activity (summary, metadata and segments by type) as JSON.",
+    "description": "Garmin's full JSON for one activity: summaryDTO (start time, distance in metres, duration and\nmovingDuration in seconds, averageSpeed in m/s, HR, calories, training effect and load,\nintensity minutes, Body Battery change, sets and reps of a strength session), splitSummaries\n(one total per split type, such as the run and walk segments), the activity type and\nmetadataDTO (device maker, lap count, personal record flag). Private ids are left out.\nUse it for a field that listActivities does not give: listActivities gives the common fields\nin km and min/km, for many activities in one call. It has no laps, sets or samples: use\ngetActivityLaps, getActivitySets or downloadActivityFit for them.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -221,7 +221,7 @@
   },
   {
     "name": "getActivitySets",
-    "description": "Strength training sets of an activity, read from the original .FIT file. One entry per\nexercise, in the order first done, with its movement category, its primary and secondary\nmuscles (from Garmin's exercise catalogue) and its active sets: reps,\nweight (kg, absent when none was recorded), set time in seconds and the rest after the set\n(restSec). Each exercise with weight also has top (the heaviest set of 1 to 12 reps, then the\nmost reps; without one, the heaviest set) and e1rmKg (the best estimated 1RM, Epley, of its\nsets of 1 to 12 reps; null when it has none). Exercise names are stable across sessions, so\nthey can be used for per-exercise trends. Edits made later in Garmin Connect (renamed\nexercises, corrected reps or weights) are not in the .FIT file.\nplan is the planned workout that the watch ran (null without one): its name and, per planned\nexercise and rep plan (a pyramid gives a row per rep plan) in plan order, plannedSets,\nplannedReps (low to high; high null is at least low),\ndoneSets, reps, and verdict (hit or miss, why: sets or reps; extra and over count the done sets\nabove the plan and above the high end); a warm-up or cool-down row (part) and a notInPlan row\nhave verdict null. In a rest-pause group (a repeat of one exercise with a rest of 20 s or less\ninside it and a longer rest after it), only the first set of each pass is judged on reps.\nEach planned row also has plannedRestSec: the planned rests right after its sets,\nin seconds and plan order (null: an open rest, ended with the lap button; empty: no\nrest right after it, such as the first exercise of a superset).",
+    "description": "Strength training sets of an activity, read from the original .FIT file. One entry per\nexercise, in the order first done, with its movement category, its primary and secondary\nmuscles (from Garmin's exercise catalogue) and its active sets: reps,\nweight (kg, absent when none was recorded), set time in seconds and the rest after the set\n(restSec). Each exercise with weight also has top (the heaviest set of 1 to 12 reps, then the\nmost reps; without one, the heaviest set) and e1rmKg (the best estimated 1RM, Epley, of its\nsets of 1 to 12 reps; null when it has none). Exercise names are stable across sessions, so\nthey can be used for per-exercise trends. Edits made later in Garmin Connect (renamed\nexercises, corrected reps or weights) are not in the .FIT file. Use it for strength sessions;\nfor runs, rides and swims use getActivityLaps.\nplan is the planned workout that the watch ran (null without one): its name and, per planned\nexercise and rep plan (a pyramid gives a row per rep plan) in plan order, plannedSets,\nplannedReps (low to high; high null is at least low),\ndoneSets, reps, and verdict (hit or miss, why: sets or reps; extra and over count the done sets\nabove the plan and above the high end); a warm-up or cool-down row (part) and a notInPlan row\nhave verdict null. In a rest-pause group (a repeat of one exercise with a rest of 20 s or less\ninside it and a longer rest after it), only the first set of each pass is judged on reps.\nEach planned row also has plannedRestSec: the planned rests right after its sets,\nin seconds and plan order (null: an open rest, ended with the lap button; empty: no\nrest right after it, such as the first exercise of a superset).",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -236,7 +236,7 @@
   },
   {
     "name": "getActivityWorkouts",
-    "description": "The planned workout that an activity followed, as created in Garmin Connect: its steps in\norder, each with its intensity (warmup/active/rest/recovery/cooldown), its duration (time in\nseconds, reps, or open), its target (cadence, heart rate, pace, or open, with low and high\nvalues), the exercise for strength steps, and the coach's notes. A step with durationType\nREPEAT_UNTIL_STEPS_CMPLT repeats the steps from stepIndex durationValue up to it, targetValue\ntimes in all. For plan against done, read the plan field of getActivitySets (strength)\nor getActivityLaps (runs); a swim has no plan field.\nAn empty list means the activity followed no planned workout. Null fields are left out.",
+    "description": "The planned workout that an activity followed, as created in Garmin Connect: its steps in\norder, each with its intensity (warmup/active/rest/recovery/cooldown), its duration (time in\nseconds, reps, or open), its target (cadence, heart rate, pace, or open, with low and high\nvalues), the exercise for strength steps, and the coach's notes. A step with durationType\nREPEAT_UNTIL_STEPS_CMPLT repeats the steps from stepIndex durationValue up to it, targetValue\ntimes in all. Use it for the whole plan and its notes. For plan against done (hit or miss),\nread the plan field of getActivitySets (strength) or getActivityLaps (runs) instead; a swim\nhas no plan field.\nAn empty list means the activity followed no planned workout. Null fields are left out.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -251,7 +251,7 @@
   },
   {
     "name": "getBodyBattery",
-    "description": "Body Battery for up to 14 days, yyyy-MM-dd: for each day how much it charged and drained,\nits readings through the day, and the events that changed it (sleep, activities, stress,\nnaps) with their impact.",
+    "description": "Body Battery for up to 14 days, yyyy-MM-dd: for each day how much it charged and drained,\nits readings through the day as [timestamp, level] pairs, and the events that changed it\n(sleep, activities, stress, naps) with their start, duration and impact, and Garmin's\nfeedback. Use it to see why Body Battery went up or down. For one number per day with steps\nand stress use getDailySummary; for the change of one activity, listActivities.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -270,7 +270,7 @@
   },
   {
     "name": "getDailyHeartRate",
-    "description": "Daily heart rate for one date (includes resting heart rate), yyyy-MM-dd.",
+    "description": "Heart rate of one day, yyyy-MM-dd: restingHeartRate, minHeartRate and maxHeartRate (bpm),\nlastSevenDaysAvgRestingHeartRate, and heartRateValues, the samples of the day as [timestamp,\nbpm] pairs (several hundred, so the answer is about 13 KB). Use it for the HR curve of a day.\nFor resting HR over several days use getDailySummary with fromDate and toDate; for the zone\nlimits use getHeartRateZones.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -285,7 +285,7 @@
   },
   {
     "name": "getDailySummary",
-    "description": "Daily user summary (steps, calories, stress, body battery, resting HR) for one date, or for up to 14 days (fromDate and toDate; the range answer has Garmin's v2 field names), yyyy-MM-dd.",
+    "description": "Daily user summary (steps, calories, stress, body battery, resting HR) for one date, or for up to 14 days (fromDate and toDate; the range answer has Garmin's v2 field names), yyyy-MM-dd. Use it for the totals of each day; for sleep use getSleep, for the Body Battery events getBodyBattery, and for the HR samples getDailyHeartRate.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -329,7 +329,7 @@
   },
   {
     "name": "getFitnessAge",
-    "description": "Garmin fitness age for a date, yyyy-MM-dd: fitness age vs chronological age, the achievable\nfitness age, and its components (body fat, vigorous days and minutes per week, resting HR)\nwith the targets Garmin suggests.",
+    "description": "Garmin fitness age for a date, yyyy-MM-dd: fitnessAge, chronologicalAge, achievableFitnessAge\nand previousFitnessAge, and components: bodyFat, vigorousDaysAvg and vigorousMinutesAvg (per\nweek) and rhr (resting HR), each with its value and, when Garmin suggests one, targetValue and\npotentialAge (the fitness age at the target). stale is Garmin's flag for an old value. Use it\nfor fitness age; for the body fat trend use getWeight.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -344,7 +344,7 @@
   },
   {
     "name": "getHeartRateZones",
-    "description": "Heart rate zones currently configured in Garmin Connect.",
+    "description": "The heart rate zones set in Garmin Connect: a list with one entry per sport that has its own\nzones (sport DEFAULT for the others), each with trainingMethod (how Garmin sets the zones),\nzone1Floor to zone5Floor (the lowest bpm of each zone; a zone ends where the next one\nstarts, zone 5 at maxHeartRateUsed), maxHeartRateUsed, restingHeartRateUsed and\nlactateThresholdHeartRateUsed. It takes no parameters. It gives the limits only: the time in\neach zone of an activity is hrZonesSec in listActivities.",
     "inputSchema": {
       "type": "object",
       "properties": {},
@@ -353,7 +353,7 @@
   },
   {
     "name": "getHrvRange",
-    "description": "Daily HRV (overnight) summaries for a date range, yyyy-MM-dd.",
+    "description": "Overnight HRV for a date range, yyyy-MM-dd: hrvSummaries, one row per night with HRV data\n(a night without data has no row), with calendarDate, lastNightAvg (ms, the average of the\nnight), lastNight5MinHigh, weeklyAvg (the 7-night average), status (BALANCED, UNBALANCED or\nLOW) and baseline (balancedLow to balancedUpper: the normal range). Ask at most 28 days in\none call: Garmin may refuse a longer range. Use it for the HRV trend; for the sleep of a\nnight use getSleep, and for resting HR use getDailyHeartRate or getDailySummary.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -398,7 +398,7 @@
   },
   {
     "name": "getWeight",
-    "description": "Weight for a date range, yyyy-MM-dd: the latest weight of each day (with body fat, muscle\nand bone mass, BMI and body water when a scale records them), the average of the range, and\nthe last weight before and the first after the range. Set includeAll=true for every entry\nof each day. Weight, muscle mass and bone mass are in grams.",
+    "description": "Weight for a date range, yyyy-MM-dd: the latest weight of each day (with body fat, muscle\nand bone mass, BMI and body water when a scale records them), the average of the range, and\nthe last weight before and the first after the range. Set includeAll=true for every entry\nof each day. Weight, muscle mass and bone mass are in grams. The range has no day cap: ask a\ntrend of months in one call.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -421,7 +421,7 @@
   },
   {
     "name": "listActivities",
-    "description": "List the user's Garmin activities (most recent first) as a compact summary: id, name, type,\nlocal start time, distance (km), moving duration, average pace, average/max heart rate,\ncadence, ascent; when Garmin has them: elapsed time (if longer than moving time), race flag,\nGarmin training load, aerobic/anaerobic training effect and label, seconds in HR zones 1-5,\ncalories, moderate/vigorous intensity minutes, body battery change, steps, swim SWOLF, pool\nlength, lengths and strokes, power, mountain-bike grit and flow, running form (stride, ground\ncontact, vertical oscillation and ratio), grade-adjusted pace, best efforts (1k, mile, 5k,\n10k, half, marathon) and run/walk segments. Dates are yyyy-MM-dd. Set raw=true for Garmin's\nfull JSON.",
+    "description": "List the user's Garmin activities (most recent first) as a compact summary: id, name, type,\nlocal start time, distance (km), moving duration, average pace, average/max heart rate,\ncadence, ascent; when Garmin has them: elapsed time (if longer than moving time), race flag,\nGarmin training load, aerobic/anaerobic training effect and label, seconds in HR zones 1-5,\ncalories, moderate/vigorous intensity minutes, body battery change, steps, swim SWOLF, pool\nlength, lengths and strokes, power, mountain-bike grit and flow, running form (stride, ground\ncontact, vertical oscillation and ratio), grade-adjusted pace, best efforts (1k, mile, 5k,\n10k, half, marathon) and run/walk segments. Dates are yyyy-MM-dd. Set raw=true for Garmin's\nfull JSON. limit is at most 200; names filters the last 200 activities of the date window.\nUse it to find activity ids and to compare many activities. For the laps, sets or plan of one\nactivity, give its id to getActivityLaps, getActivitySets or getActivityWorkouts.",
     "inputSchema": {
       "type": "object",
       "properties": {

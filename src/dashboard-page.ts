@@ -28,7 +28,7 @@ import { WIDGET_API } from "./page/widget-api";
 import { version } from "../package.json";
 import { log } from "./log";
 import { DASHBOARD_VERSION } from "./prompts";
-import { MODEL_ONLY, writeAtomically } from "./tools";
+import { MODEL_ONLY, READ_ONLY, writeAtomically } from "./tools";
 
 /**
  * The dashboard page file: the server writes it from the built-in template (or from a page that Claude
@@ -1545,6 +1545,7 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
   server.registerTool(
     "showDashboard",
     {
+      annotations: READ_ONLY,
       description: [
         "Shows the training dashboard in the chat, in assistants that show MCP Apps: the page of `path`",
         "(default <data-dir>/garmin-dashboard.html) with its layout, custom widgets, languages and settings,",
