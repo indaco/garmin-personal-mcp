@@ -1338,6 +1338,72 @@ describe("edit mode", () => {
       expect(await spans(page)).toBe(paired);
     });
 
+    const pressed = async (board = byHeight, file = {}) => {
+      const { page, errors } = await open(
+        browser,
+        pageFile({ layout: onAll(board), widgets, ...file }),
+      );
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      return { page, errors };
+    };
+
+    describe("a width that a press added", () => {
+      it("goes back on a later press in the same edit session", async () => {
+        const { page, errors } = await pressed();
+        expect(await spans(page)).toBe(paired);
+        await page.click("[aria-label='Hide Custom low2']");
+        await page.click(".edit-bar >> text=Auto-arrange");
+        expect(await spans(page)).toBe("low1:1 tall1:1 tall2:1");
+        expect(errors).toEqual([]);
+      });
+
+      it("gives way to a width the user sets after the press", async () => {
+        const { page, errors } = await pressed();
+        await page.locator("[aria-label='Width of Custom tall2']").focus();
+        await page.keyboard.press("End");
+        await page.click(".edit-bar >> text=Auto-arrange");
+        expect(await spans(page)).toBe("low1:1 low2:1 tall1:1 tall2:3");
+        expect(errors).toEqual([]);
+      });
+
+      it("is the user's width after Done", async () => {
+        const { page, errors } = await pressed();
+        await page.click(".edit-bar >> text=Done");
+        await startEdit(page);
+        await page.click("[aria-label='Hide Custom low2']");
+        await page.click(".edit-bar >> text=Auto-arrange");
+        expect(await spans(page)).toBe("low1:3 tall1:2 tall2:1");
+        expect(errors).toEqual([]);
+      });
+
+      it("is forgotten by Reset board", async () => {
+        // the press keeps calendar at 2; the preset has it at 1, beside readiness at 2
+        const { page, errors } = await pressed([of("calendar", 2), of("x", 1)]);
+        expect(await spans(page)).toBe("calendar:2 x:1");
+        await page.click(".edit-bar >> text=Reset board");
+        const reset = await spans(page);
+        expect(reset).toContain("readiness:2 calendar:1");
+        await page.click(".edit-bar >> text=Auto-arrange");
+        expect(await spans(page)).toBe(reset);
+        expect(errors).toEqual([]);
+      });
+
+      it("is forgotten for a removed widget that comes back", async () => {
+        const { page, errors } = await pressed([of("records", 1), of("low1", 1), of("low2", 1)]);
+        expect(await spans(page)).toBe("records:1 low1:1 low2:1");
+        await page.click("[aria-label='Hide Records']");
+        await page.click(".edit-bar >> text=Add widget");
+        await page.click("dialog >> text=Remove Records");
+        await page.click(".edit-bar >> text=Add widget");
+        await page.click(".catalogue li:has-text('Records') button");
+        expect(await spans(page)).toBe("low1:1 low2:1 records:3");
+        await page.click(".edit-bar >> text=Auto-arrange");
+        expect(await spans(page)).toBe("low1:2 low2:1 records:3");
+        expect(errors).toEqual([]);
+      });
+    });
+
     it.each([390, 1000])("splits by height and stays the same at %d px", async (width) => {
       const { page, errors } = await open(browser, pageFile({ layout: onAll(byHeight), widgets }), {
         viewport: { width, height: 844 },
