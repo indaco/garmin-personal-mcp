@@ -1,6 +1,7 @@
 import { type Activity, dayOf, seconds } from "./calc";
 import { addDays } from "../dates";
 import { change, MIN_SESSIONS, mean, riegel } from "./metrics";
+import type { PlanStep } from "./strength";
 
 /** Pace, zones, splits and race predictions. Pure functions over the embedded data. */
 
@@ -339,4 +340,137 @@ export function bestProgression(acts: Activity[]): Record<string, Best[]> {
     }
   }
   return Object.fromEntries(out);
+}
+
+/** A lap of a run, in FIT units, for the plan step it was run for. */
+export interface PlanLap {
+  lap: number;
+  step?: number;
+  intensity?: string;
+  metres?: number;
+  /** m/s */
+  speed?: number;
+  /** raw strides per minute */
+  cadence?: number;
+  hr?: number;
+  power?: number;
+}
+
+export type LapTarget =
+  | { type: string; low: number; high: number; unit: string }
+  | { type: string; zone: number };
+
+export interface LapPlanRow {
+  lap: number;
+  step: number;
+  intensity?: string;
+  target: LapTarget | null;
+  /** the lap in the unit of the target; a pace in s/km */
+  done: number | null;
+  verdict: "hit" | "miss" | null;
+  /** the signed distance outside the target, in its unit: 0 on a hit */
+  off: number | null;
+}
+
+/** A lap shorter than this is an open step ended by the lap button: no verdict. */
+const MIN_PLAN_METRES = 10;
+const NAMES: Record<string, string> = {
+  speed: "pace",
+  heart_rate: "heart_rate",
+  cadence: "cadence",
+  power: "power",
+};
+/** The plausible range of a target in the unit shown; outside it the conversion is likely wrong. */
+const PLAUSIBLE: Record<string, [number, number]> = {
+  "/km": [120, 900],
+  bpm: [30, 230],
+  W: [1, 2000],
+  spm: [60, 250],
+};
+
+const positive = (v: number | undefined) => (v !== undefined && v > 0 ? v : undefined);
+/** s/km of a speed in m/s, in whole seconds, as the pace shows: the verdict uses this value. */
+const pace = (speed: number) => Math.round(1000 / speed);
+
+/**
+ * The target of a plan step in the unit shown, and the lap's value in that unit. FIT gives speed in
+ * mm/s (low is the slower pace), cadence in strides per minute (shown doubled, as steps), heart rate
+ * 1-100 as % of max and above 100 as bpm + 100, power 1-1000 as % of FTP and above 1000 as W + 1000.
+ * shortcut: the pace, heart rate and power units follow the FIT profile and are not checked on real
+ * data (only cadence targets were seen); check them on a real run with such a target.
+ */
+function targetOf(
+  s: PlanStep,
+  l: PlanLap,
+): { target: LapTarget; done: number | null; value?: number } | null {
+  const type = s.targetType === undefined ? undefined : NAMES[s.targetType];
+  if (!type) return null;
+  if (s.targetValue) return { target: { type, zone: s.targetValue }, done: null };
+  const { targetLow: lo, targetHigh: hi } = s;
+  if (lo === undefined || hi === undefined) return null;
+  if (type === "pace") {
+    const speed = positive(l.speed);
+    return {
+      target: { type, low: pace(lo / 1000), high: pace(hi / 1000), unit: "/km" },
+      done: speed === undefined ? null : pace(speed),
+    };
+  }
+  if (type === "cadence") {
+    const raw = positive(l.cadence);
+    const spm = raw === undefined ? undefined : raw * 2;
+    // judged on the value before rounding: the shown spm is rounded
+    return {
+      target: { type, low: lo * 2, high: hi * 2, unit: "spm" },
+      done: spm === undefined ? null : Math.round(spm),
+      value: spm,
+    };
+  }
+  const [offset, pct, unit, lapValue] =
+    type === "heart_rate" ? [100, "%max", "bpm", l.hr] : [1000, "%ftp", "W", l.power];
+  if (lo <= offset || hi <= offset)
+    return { target: { type, low: lo, high: hi, unit: pct }, done: null };
+  return {
+    target: { type, low: lo - offset, high: hi - offset, unit },
+    done: positive(lapValue) ?? null,
+  };
+}
+
+/**
+ * One row per lap that has a plan step, in lap order: the step's target, the lap's value, and hit
+ * (inside the target, ends included) or miss with the signed distance outside it. No verdict for an
+ * open or zone target, a target in % of max HR or FTP, a target outside the plausible range, a lap
+ * under 10 m, or a lap without the value of its target.
+ */
+export function planOfLaps(steps: PlanStep[], laps: PlanLap[]): LapPlanRow[] {
+  const byIndex = new Map(steps.map((s) => [s.index, s]));
+  return laps.flatMap((l) => {
+    if (l.step === undefined) return [];
+    const row: LapPlanRow = {
+      lap: l.lap,
+      step: l.step,
+      intensity: l.intensity,
+      target: null,
+      done: null,
+      verdict: null,
+      off: null,
+    };
+    const s = byIndex.get(l.step);
+    const t = s && targetOf(s, l);
+    if (!t) return [row];
+    row.target = t.target;
+    row.done = t.done;
+    if (!("unit" in t.target) || t.done === null) return [row];
+    const { low, high, unit } = t.target;
+    const [min, max] = PLAUSIBLE[unit];
+    if ((l.metres ?? 0) < MIN_PLAN_METRES || [low, high].some((v) => v < min || v > max)) {
+      return [row];
+    }
+    // a pace range runs from slow (low) to fast (high)
+    const [a, b] = [Math.min(low, high), Math.max(low, high)];
+    const v = t.value ?? t.done;
+    const off = v < a ? v - a : v > b ? v - b : 0;
+    row.verdict = off === 0 ? "hit" : "miss";
+    row.off = Math.round(off * 10) / 10;
+    return [row];
+  });
 }

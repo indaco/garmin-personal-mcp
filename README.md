@@ -176,9 +176,9 @@ Desktop. In Claude Code, use `/permissions` and add `mcp__garmin-personal`.
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `listActivities`           | each activity with pace, HR, load and effect, by date, type or name                                                                                                                                                                                   |
 | `getActivity`              | the details of one activity                                                                                                                                                                                                                           |
-| `getActivityLaps`          | the laps of an activity, from its .FIT file; for a run also the half split, the HR drift and the fade of each workout step; for a swim also the distance in metres, pace per 100 m, stroke, lengths, SWOLF, strokes and the fade of each repeated set |
+| `getActivityLaps`          | the laps of an activity, from its .FIT file; for a run also the half split, HR drift, the fade of each step, and hit or miss per plan step; for a swim also metres, pace per 100 m, stroke, lengths, SWOLF, strokes and the fade of each repeated set |
 | `getActivitySets`          | the strength sets of an activity, with the muscles, the top set and the e1RM, and the planned workout against the done sets, from its .FIT file                                                                                                       |
-| `getActivityWorkouts`      | the planned workout of an activity: steps, targets and notes                                                                                                                                                                                          |
+| `getActivityWorkouts`      | the planned workout of an activity as it is now in Garmin Connect: steps, targets and notes                                                                                                                                                           |
 | `downloadActivityFit`      | saves the .FIT file of an activity in the data folder                                                                                                                                                                                                 |
 | `getHrvRange`              | HRV during the night                                                                                                                                                                                                                                  |
 | `getDailyHeartRate`        | the heart rate of a day, with the resting HR                                                                                                                                                                                                          |
@@ -369,10 +369,12 @@ A missing value shows as "n/a": the assistant does not estimate it.
 
 ### run-review
 
-The assistant compares the steps of the planned workout with the laps of the run: the target, what
-the lap did, and hit or miss. For intervals, it gives the fade from the first rep to the last. For a
-steady run, it gives the HR drift: the drop in distance per heartbeat from the first half to the
-second half. It ends with the sleep and HRV of the night after the run, and a short coach note.
+The assistant compares the planned workout that your watch ran with the laps of the run: the target,
+what the lap did, and hit or miss. The server finds hit or miss from the run's .FIT file, so two
+reviews of one run give the same result. For intervals, it gives the fade from the first rep to the
+last. For a steady run, it gives the HR drift: the drop in distance per heartbeat from the first
+half to the second half. It ends with the sleep and HRV of the night after the run, and a short
+coach note.
 
 | Argument   | Values                                                     | Default      |
 | ---------- | ---------------------------------------------------------- | ------------ |

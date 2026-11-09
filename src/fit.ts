@@ -1,7 +1,7 @@
 import { Decoder, Profile, Stream } from "@garmin/fitsdk";
 import { unzipSync } from "fflate";
 import { GarminApiError } from "./api-client";
-import { splitOf, workOf } from "./analytics/running";
+import { planOfLaps, splitOf, workOf } from "./analytics/running";
 import { bestE1rm, type PlanStep, planOfSets, topSet } from "./analytics/strength";
 
 /** The fields of a FIT set message the tools read; enums are raw values (decoded without strings). */
@@ -176,9 +176,41 @@ export function lapsOf(fit: Messages, activityId: number) {
     activityId,
     ...(sport ? { sport } : {}),
     laps,
-    ...(sport === "running" ? runNumbers(laps) : {}),
+    ...(sport === "running" ? { ...runNumbers(laps), plan: runPlan(fit) } : {}),
     ...(swim ? { sets: swimSets(fit.lapMesgs ?? []) } : {}),
   };
+}
+
+/** A number of a decoded message; undefined for any other type. */
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+
+/** The plan of a run against its laps, with a pace as "m:ss"; null without a plan. */
+function runPlan(fit: Messages) {
+  const plan = planSteps(fit);
+  if (!plan) return null;
+  const laps = (fit.lapMesgs ?? []).map((l, i) => {
+    const cadence = num(l.avgCadence);
+    return {
+      lap: i + 1,
+      step: Number.isInteger(l.wktStepIndex) ? (l.wktStepIndex as number) : undefined,
+      intensity: enumName("intensity", l.intensity),
+      metres: num(l.totalDistance),
+      speed: num(l.enhancedAvgSpeed ?? l.avgSpeed),
+      cadence: cadence === undefined ? undefined : cadence + (num(l.avgFractionalCadence) ?? 0),
+      hr: num(l.avgHeartRate),
+      power: num(l.avgPower),
+    };
+  });
+  const rows = planOfLaps(plan.steps, laps).map((r) =>
+    r.target && "unit" in r.target && r.target.type === "pace"
+      ? {
+          ...r,
+          target: { ...r.target, low: hms(r.target.low), high: hms(r.target.high) },
+          done: r.done === null ? null : hms(r.done),
+        }
+      : r,
+  );
+  return { name: plan.name, laps: rows };
 }
 
 /** What only a swim lap has. A rest lap has no pace, and its 0 strokes and lengths are not a count. */

@@ -620,21 +620,25 @@ describe("coach prompts", () => {
     expect(text).not.toContain("The halves split at half the distance");
   });
 
-  it("run-review matches the laps to the planned steps by step index, not in order", async () => {
+  it("run-review quotes the plan of getActivityLaps as the plan against execution", async () => {
     const text = (await render("run-review")).replace(/\s+/g, " ");
+    const call = text.slice(text.indexOf("2. Call"), text.indexOf("3. Call"));
+    // the plan comes from the .FIT file: no getActivityWorkouts call
+    expect(call).toBe("2. Call `getActivity` and `getActivityLaps` with its `activityId`. ");
     const plan = text.slice(
       text.indexOf("- **Plan against execution**"),
       text.indexOf("- **Reps**"),
     );
-    // auto-lap splits one step into several laps, so the order of the laps is not the order of the steps
     expect(plan).toBe(
-      "- **Plan against execution**: when the run followed a planned workout, a table with one row per " +
-        "lap that has a `step`: the step, its target (pace, HR or cadence, low to high), what the lap did, " +
-        "and hit or miss. A lap's `step` is the `stepIndex` of its plan step. Match by it, not in order: " +
-        "auto-lap splits a long step into several laps, and each rep of a repeat is its own lap with the " +
-        "same `step`. For a step with an OPEN target, show its planned time or distance (open when it ends " +
-        "with the lap button) and what the lap did, with no hit or miss. Leave out the laps without a " +
-        "`step`. Without a planned workout, say so in one line. ",
+      [
+        "- **Plan against execution**: when `plan` of `getActivityLaps` is not null, a table with one row",
+        "per row of `plan.laps`, in lap order: the lap, its `step`, the target (`type`, `low` to `high` in",
+        "its `unit`, or its `zone`), what the lap did (`done`), and the `verdict` (hit or miss) with `off`",
+        "(how far outside the target, in its unit; for a pace, above 0 is slower). Quote the verdict: do",
+        "not judge a lap yourself. A row with a null `verdict` has no hit or miss, and a row with a null",
+        '`target` has no target. A null value shows as "n/a". When `plan` is null, say "no planned',
+        'workout" in one line. ',
+      ].join(" "),
     );
   });
 

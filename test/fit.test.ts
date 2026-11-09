@@ -624,6 +624,7 @@ describe("laps", () => {
       ],
       // one lap: no half split
       split: null,
+      plan: null,
     });
   });
 
@@ -1111,5 +1112,232 @@ describe("lapsOf on a swim", () => {
   it("gives an empty list without a repeated set, and no sets for another sport", () => {
     expect(lapsOf(swimLaps(rep(1000, 1200)), 33).sets).toEqual([]);
     expect(lapsOf(swimLap("cycling", {}), 34)).not.toHaveProperty("sets");
+  });
+});
+
+/** The FIT speed of a pace, in mm/s. */
+const mms = (secPerKm: number) => Math.round(1e6 / secPerKm);
+/** The plan rows of a run: a lap of 85 strides per minute on a cadence step of 80-90, then a lap with more. */
+const cadenceRows = (more: Record<string, unknown>) =>
+  lapsOf(
+    {
+      sessionMesgs: [{ sport: value("sport", "running") }],
+      workoutMesgs: [{ wktName: "Cadence" }],
+      workoutStepMesgs: [
+        {
+          messageIndex: 1,
+          intensity: 0,
+          targetType: value("wktStepTarget", "cadence"),
+          customTargetValueLow: 80,
+          customTargetValueHigh: 90,
+        },
+      ],
+      lapMesgs: [
+        { wktStepIndex: 1, totalDistance: 1000, avgCadence: 85 },
+        {
+          wktStepIndex: 1,
+          totalDistance: 1000,
+          avgCadence: 85,
+          avgFractionalCadence: 0.5,
+          ...more,
+        },
+      ],
+    },
+    1,
+  ).plan?.laps ?? [];
+
+describe("plan of the laps", () => {
+  const LAP = Profile.MesgNum.LAP;
+  const steps: [number, Record<string, unknown>][] = [
+    [M.WORKOUT_STEP, { messageIndex: 0, intensity: "warmup", targetType: "open" }],
+    [
+      M.WORKOUT_STEP,
+      {
+        messageIndex: 1,
+        intensity: "active",
+        targetType: "cadence",
+        customTargetValueLow: 80,
+        customTargetValueHigh: 90,
+      },
+    ],
+    [
+      M.WORKOUT_STEP,
+      {
+        messageIndex: 2,
+        intensity: "active",
+        targetType: "speed",
+        customTargetValueLow: mms(330),
+        customTargetValueHigh: mms(300),
+      },
+    ],
+  ];
+  const laps: [number, Record<string, unknown>][] = [
+    [LAP, { totalDistance: 1000, totalTimerTime: 400, intensity: "warmup", wktStepIndex: 0 }],
+    [
+      LAP,
+      {
+        totalDistance: 1000,
+        totalTimerTime: 300,
+        enhancedAvgSpeed: 1000 / 300,
+        avgCadence: 85,
+        avgFractionalCadence: 0.5,
+        intensity: "active",
+        wktStepIndex: 1,
+      },
+    ],
+    [
+      LAP,
+      {
+        totalDistance: 1000,
+        totalTimerTime: 331,
+        enhancedAvgSpeed: 1000 / 331,
+        intensity: "active",
+        wktStepIndex: 2,
+      },
+    ],
+    // the lap that ends the session: no step
+    [LAP, { totalDistance: 50, totalTimerTime: 20 }],
+  ];
+  const run = (withPlan: boolean, sport = "running") =>
+    lapsOf(
+      decodeFit(
+        fitFile(
+          ...(withPlan
+            ? [[M.WORKOUT, { wktName: "Cadence" }] as [number, Record<string, unknown>], ...steps]
+            : []),
+          ...laps,
+          [M.SESSION, { sport }],
+        ),
+        1,
+      ),
+      1,
+    );
+
+  it("matches the laps of a run to the steps of the plan the watch ran", () => {
+    expect(run(true).plan).toEqual({
+      name: "Cadence",
+      laps: [
+        {
+          lap: 1,
+          step: 0,
+          intensity: "warmup",
+          target: null,
+          done: null,
+          verdict: null,
+          off: null,
+        },
+        {
+          lap: 2,
+          step: 1,
+          intensity: "active",
+          target: { type: "cadence", low: 160, high: 180, unit: "spm" },
+          done: 171,
+          verdict: "hit",
+          off: 0,
+        },
+        {
+          lap: 3,
+          step: 2,
+          intensity: "active",
+          target: { type: "pace", low: "5:30", high: "5:00", unit: "/km" },
+          done: "5:31",
+          verdict: "miss",
+          off: 1,
+        },
+      ],
+    });
+  });
+
+  it("gives a planned run without lap messages a plan without laps", () => {
+    const fit = {
+      sessionMesgs: [{ sport: value("sport", "running") }],
+      workoutMesgs: [{ wktName: "Cadence" }],
+      workoutStepMesgs: [{ messageIndex: 0, intensity: 0, targetType: 2 }],
+    };
+    expect(lapsOf(fit, 1).plan).toEqual({ name: "Cadence", laps: [] });
+  });
+
+  it("gives a run without a plan a null plan", () => {
+    expect(run(false).plan).toBeNull();
+  });
+
+  it.each(["swimming", "cycling"])("gives a %s activity no plan key", (sport) => {
+    expect(run(true, sport)).not.toHaveProperty("plan");
+  });
+
+  it("adds plan and changes no other field of the answer", () => {
+    const { plan, ...rest } = run(true);
+    expect(plan).not.toBeNull();
+    expect({ ...rest, plan: null }).toEqual(run(false));
+  });
+
+  it.each([["1"], [0.5]])("gives no row to a lap whose step index is %j", (bad) => {
+    expect(cadenceRows({ wktStepIndex: bad }).map((r) => r.lap)).toEqual([1]);
+  });
+
+  it.each([
+    ["avgCadence", "85", { done: null, verdict: null }],
+    ["avgFractionalCadence", "0.5", { done: 170, verdict: "hit" }],
+    ["totalDistance", "1000", { done: 171, verdict: null }],
+  ])("reads a lap whose %s is %j as a lap without it", (field, bad, expected) => {
+    // the control: the same lap with numbers
+    expect(cadenceRows({})[1]).toMatchObject({ done: 171, verdict: "hit" });
+    expect(cadenceRows({ [field]: bad })[1]).toMatchObject(expected);
+  });
+
+  it.each([[Number.NaN], [Number.POSITIVE_INFINITY]])(
+    "reads a lap whose avgCadence is %s as a lap without it",
+    (bad) => {
+      expect(cadenceRows({ avgCadence: bad })[1]).toMatchObject({ done: null, verdict: null });
+    },
+  );
+
+  it.each([
+    ["enhancedAvgSpeed", "3", "speed"],
+    ["avgHeartRate", "150", "heart_rate"],
+    ["avgPower", "250", "power"],
+  ])("gives no done value when the lap's %s is %j", (field, bad, targetType) => {
+    const range: Record<string, [number, number]> = {
+      speed: [mms(330), mms(300)],
+      heart_rate: [245, 265],
+      power: [1250, 1300],
+    };
+    const t = value("wktStepTarget", targetType === "heart_rate" ? "heartRate" : targetType);
+    const out = lapsOf(
+      {
+        sessionMesgs: [{ sport: value("sport", "running") }],
+        workoutMesgs: [{}],
+        workoutStepMesgs: [
+          {
+            messageIndex: 0,
+            intensity: 0,
+            targetType: t,
+            customTargetValueLow: range[targetType][0],
+            customTargetValueHigh: range[targetType][1],
+          },
+        ],
+        lapMesgs: [
+          {
+            wktStepIndex: 0,
+            totalDistance: 1000,
+            enhancedAvgSpeed: 3.2,
+            avgHeartRate: 150,
+            avgPower: 260,
+          },
+          {
+            wktStepIndex: 0,
+            totalDistance: 1000,
+            enhancedAvgSpeed: 3.2,
+            avgHeartRate: 150,
+            avgPower: 260,
+            [field]: bad,
+          },
+        ],
+      },
+      1,
+    );
+    // the control: the same lap with a number is judged
+    expect(out.plan?.laps[0].verdict).toBe("hit");
+    expect(out.plan?.laps[1]).toMatchObject({ done: null, verdict: null });
   });
 });
