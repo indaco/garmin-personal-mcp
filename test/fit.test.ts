@@ -350,8 +350,12 @@ function planned(withPlan: boolean): Uint8Array {
 
 const noVerdict = { verdict: null, why: [], over: 0, extra: 0 };
 
+/** The rows of the hand-built plan when its one set has the step index setStep. */
+const rows = (setStep: unknown) =>
+  handBuilt({}, setStep)?.exercises.map((r) => [r.exercise, r.steps, r.doneSets, r.notInPlan]);
+
 /** A plan of a box squat of 10 reps (step 0) and a plank (step 1), with a set of the squat. */
-function handBuilt(squatStep: Record<string, unknown>) {
+function handBuilt(squatStep: Record<string, unknown>, setStep: unknown = 0) {
   return setsOf(
     {
       workoutMesgs: [{ wktName: 5 }],
@@ -367,7 +371,7 @@ function handBuilt(squatStep: Record<string, unknown>) {
         },
         { messageIndex: 1, intensity: 0, exerciseCategory: PLANK },
       ],
-      setMesgs: [set(ACTIVE, 10, 60, 30)].map((s) => ({ ...s, wktStepIndex: 0 })),
+      setMesgs: [set(ACTIVE, 10, 60, 30)].map((s) => ({ ...s, wktStepIndex: setStep })),
     },
     1,
     undefined,
@@ -536,6 +540,22 @@ describe("plan of the sets", () => {
       ["Barbell Box Squat", [], true],
     ]);
   });
+
+  it.each([["0"], [0.5], [-1], [null]])(
+    "lists a set whose step index is %j as not in the plan",
+    (bad) => {
+      // the control: step index 0 is the squat step
+      expect(rows(0)).toEqual([
+        ["Barbell Box Squat", [0], 1, undefined],
+        ["Plank", [1], 0, undefined],
+      ]);
+      expect(rows(bad)).toEqual([
+        ["Barbell Box Squat", [0], 0, undefined],
+        ["Plank", [1], 0, undefined],
+        ["Barbell Box Squat", [], 1, true],
+      ]);
+    },
+  );
 
   it.each([
     [7, 3],
