@@ -613,6 +613,7 @@ const WORKOUT: [WorkoutMetric, Key, unit: string, digits: number, better?: "up" 
   ["vertRatio", "form.vertRatio", "%", 1, "down"],
   ["stride", "form.stride", " cm", 0],
   ["power", "form.power", " W", 0],
+  ["plan", "wt.plan", "%", 0, "up"],
 ];
 /** The workouts chosen in each workout trend, by board and widget, until a reload. */
 const chosenWorkouts = new Map<string, string[]>();
@@ -695,7 +696,16 @@ register({
             first !== undefined &&
               last !== undefined &&
               list.length > 1 &&
-              h("span", {}, delta(ctx, calc.change(last, first), better), " ", t("wt.vsFirst")),
+              h(
+                "span",
+                {},
+                // a share of laps changes in points: 50% to 75% is 25, not 50%
+                metric === "plan"
+                  ? delta(ctx, last - first, better, true)
+                  : delta(ctx, calc.change(last, first), better),
+                " ",
+                t("wt.vsFirst"),
+              ),
           );
         }),
       ),

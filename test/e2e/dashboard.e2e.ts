@@ -334,6 +334,9 @@ const barLabels = (page: Page, widget: string) =>
     widget,
   );
 
+/** A lap row of `planVerdicts` with the given verdict. */
+const planRow = (verdict: unknown) => ({ step: 1, type: "cadence", verdict, why: "" });
+
 /** The values and the gap setting of the dataset `label` of the chart in the tile of `widget`. */
 const chartDataset = (page: Page, widget: string, label: string) =>
   page.evaluate(
@@ -3235,6 +3238,70 @@ describe("type boards", () => {
     await page.click(`${tile} >> text=Track Intervals (6)`);
     expect(await kpis()).toEqual(["Track Intervals"]);
   });
+
+  it.each([
+    ["50%", ["hit", "miss"], "▲ 25 pts (better) vs first session"],
+    // a relative change has no base at 0%: the points still show the change
+    ["0%", ["miss", "miss"], "▲ 75 pts (better) vs first session"],
+    ["100%", ["hit", "hit"], "▼ 25 pts (worse) vs first session"],
+    // no change: no arrow, no colour
+    ["75%", ["hit", "hit", "hit", "miss"], "0 pts vs first session"],
+    // one planned session: nothing to compare with
+    ["n/a", null, null],
+  ])(
+    "shows the laps on target of a planned workout, its change in points from %s",
+    async (from: string, oldest: string[] | null, change: string | null) => {
+      // newest first: the newest session 3 of 4 laps on target, one with no plan, one not read
+      const intervals = data.activities.filter(
+        (a: { name: string }) => a.name === "Track Intervals",
+      );
+      const verdicts = (i: number) =>
+        i === 0
+          ? ["hit", "hit", "hit", "miss"].map(planRow)
+          : i === intervals.length - 1
+            ? (oldest?.map(planRow) ?? null)
+            : i === 2
+              ? undefined
+              : null;
+      const activities = data.activities.map((a: object) =>
+        intervals.includes(a) ? { ...a, planVerdicts: verdicts(intervals.indexOf(a)) } : a,
+      );
+      const { page, errors } = await open(
+        browser,
+        pageFile({
+          data: { ...data, activities, v: DASHBOARD_VERSION },
+          settings: { workouts: true },
+        }),
+        { hash: "#running" },
+      );
+      const tile = "[data-id=workoutTrend]";
+      const buttons = () =>
+        page.$$eval(`${tile} .picker button`, (b) => b.map((x) => x.textContent));
+      // Long Run has no planned session: no metric for it
+      expect(await buttons()).not.toContain("Laps on target");
+      await page.click(`${tile} >> text=Track Intervals (6)`);
+      await page.click(`${tile} >> text=Long Run (10)`);
+      expect(await buttons()).toContain("Laps on target");
+      await page.click(`${tile} >> text=Laps on target`);
+      expect(await kpiTexts(page, "workoutTrend")).toEqual({
+        "Track Intervals": ["75%", change],
+      });
+      // a session without a verdict lap is a gap in the line, never 0
+      const line = await chartDataset(page, "workoutTrend", "Track Intervals");
+      expect(line.data.filter((v) => v !== null)).toEqual(
+        oldest ? [Number(from.slice(0, -1)), 75] : [75],
+      );
+      expect(line.spanGaps).toBe(true);
+      const head = await page.$$eval(`${tile} table.data th`, (h) => h.map((x) => x.textContent));
+      expect(head.slice(-3)).toEqual(["Laps on target", "Reps", "Fade"]);
+      expect(
+        await page.$$eval(`${tile} table.data tbody tr`, (r) =>
+          r.map((x) => x.children[x.children.length - 3].textContent),
+        ),
+      ).toEqual(["75%", "n/a", "n/a", "n/a", "n/a", from]);
+      expect(errors).toEqual([]);
+    },
+  );
 
   it("covers the edge cases of the run widgets", async () => {
     // without HR zones, the efficiency counts every run, and says so

@@ -475,6 +475,27 @@ describe("workout metrics", () => {
     expect(m.gct).toBeUndefined();
     expect(m.efficiency).toBeCloseTo(60_000 / 240 / 160, 6);
   });
+
+  it.each([
+    ["3 hits and 1 miss", ["hit", "hit", "hit", "miss"], 75],
+    ["2 hits of 3, rounded", ["hit", "miss", "hit"], 67],
+    ["1 hit of 3, rounded", ["hit", "miss", "miss"], 33],
+    ["all missed", ["miss", "miss"], 0],
+    ["a row without a verdict is not counted", ["hit", null, "x"], 100],
+  ])("gives the laps on target: %s", (_, verdicts, plan) => {
+    const planVerdicts = verdicts.map((verdict) => ({ step: 1, type: "cadence", verdict }));
+    expect(workoutMetrics({ ...run, planVerdicts }).plan).toBe(plan);
+  });
+
+  it.each([
+    ["no verdict lap", []],
+    ["no plan", null],
+    ["laps not read", undefined],
+    ["not a list", "hit"],
+    ["rows without a verdict", [null, "hit", { verdict: null }, { verdict: "Hit" }]],
+  ])("has no laps on target with %s", (_, planVerdicts) => {
+    expect(workoutMetrics({ ...run, planVerdicts })).not.toHaveProperty("plan");
+  });
 });
 
 describe("workout name", () => {

@@ -389,8 +389,10 @@ of each repeated name. It downloads the .FIT file of each of those runs once, so
 takes longer, and keeps it in the data folder. An older run whose file is already there keeps its
 laps. The history grows with each update, but an update downloads at most 8 files for each workout.
 The Workout trend widget compares those sessions: pace, HR, efficiency and running form, and for
-intervals the work laps, the reps and the fade. Without `workouts`, the page has no Workout trend
-widget.
+intervals the work laps, the reps and the fade. Laps on target is the share of the laps with a
+planned target that were inside it, on a run from a planned workout; a lap without a target does not
+count, and its change against the first session is in points. Without `workouts`, the page has no
+Workout trend widget.
 
 `recoveryHistory` keeps the date, sleep hours, sleep score and resting HR of each day of the period
 in the page. The Recovery trend widget draws them as weekly averages, and it follows the week window.
