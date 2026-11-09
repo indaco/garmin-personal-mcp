@@ -614,12 +614,15 @@ const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 /** Registers the 15 tools. */
 /** MCP Apps visibility: only the model calls a tool. The page in the chat calls none, so code in it cannot. */
 export const MODEL_ONLY = { ui: { visibility: ["model"] } };
+/** A tool that reads Garmin and writes nothing: a tool that saves a .FIT file or a cache does not get it. */
+export const READ_ONLY = { readOnlyHint: true, openWorldHint: true };
 
 export function registerTools(server: McpServer, tools: GarminTools): void {
   server.registerTool(
     "listActivities",
     {
       _meta: MODEL_ONLY,
+      annotations: READ_ONLY,
       description: [
         "List the user's Garmin activities (most recent first) as a compact summary: id, name, type,",
         "local start time, distance (km), moving duration, average pace, average/max heart rate,",
@@ -629,7 +632,9 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
         "length, lengths and strokes, power, mountain-bike grit and flow, running form (stride, ground",
         "contact, vertical oscillation and ratio), grade-adjusted pace, best efforts (1k, mile, 5k,",
         "10k, half, marathon) and run/walk segments. Dates are yyyy-MM-dd. Set raw=true for Garmin's",
-        "full JSON.",
+        "full JSON. limit is at most 200; names filters the last 200 activities of the date window.",
+        "Use it to find activity ids and to compare many activities. For the laps, sets or plan of one",
+        "activity, give its id to getActivityLaps, getActivitySets or getActivityWorkouts.",
       ].join("\n"),
       inputSchema: z.object({
         startDate: z.string().describe("Start date yyyy-MM-dd (optional)").optional(),
@@ -659,8 +664,17 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
     "getActivity",
     {
       _meta: MODEL_ONLY,
-      description:
-        "Get the full detail of one activity (summary, metadata and segments by type) as JSON.",
+      annotations: READ_ONLY,
+      description: [
+        "Garmin's full JSON for one activity: summaryDTO (start time, distance in metres, duration and",
+        "movingDuration in seconds, averageSpeed in m/s, HR, calories, training effect and load,",
+        "intensity minutes, Body Battery change, sets and reps of a strength session), splitSummaries",
+        "(one total per split type, such as the run and walk segments), the activity type and",
+        "metadataDTO (device maker, lap count, personal record flag). Private ids are left out.",
+        "Use it for a field that listActivities does not give: listActivities gives the common fields",
+        "in km and min/km, for many activities in one call. It has no laps, sets or samples: use",
+        "getActivityLaps, getActivitySets or downloadActivityFit for them.",
+      ].join("\n"),
       inputSchema: z.object({ activityId }),
     },
     async (a) => text(await tools.getActivity(a.activityId)),
@@ -669,14 +683,16 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
     "getActivityWorkouts",
     {
       _meta: MODEL_ONLY,
+      annotations: READ_ONLY,
       description: [
         "The planned workout that an activity followed, as created in Garmin Connect: its steps in",
         "order, each with its intensity (warmup/active/rest/recovery/cooldown), its duration (time in",
         "seconds, reps, or open), its target (cadence, heart rate, pace, or open, with low and high",
         "values), the exercise for strength steps, and the coach's notes. A step with durationType",
         "REPEAT_UNTIL_STEPS_CMPLT repeats the steps from stepIndex durationValue up to it, targetValue",
-        "times in all. For plan against done, read the plan field of getActivitySets (strength)",
-        "or getActivityLaps (runs); a swim has no plan field.",
+        "times in all. Use it for the whole plan and its notes. For plan against done (hit or miss),",
+        "read the plan field of getActivitySets (strength) or getActivityLaps (runs) instead; a swim",
+        "has no plan field.",
         "An empty list means the activity followed no planned workout. Null fields are left out.",
       ].join("\n"),
       inputSchema: z.object({ activityId }),
@@ -690,6 +706,9 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
       description: [
         "Download the ORIGINAL .FIT file of an activity and save it on the user's computer.",
         "Returns the absolute path of the saved .fit file (second-by-second HR, cadence, speed, laps).",
+        "The file is saved once in the fit folder of the data dir; a later call does not download it",
+        "again. Use it only when the user wants the file itself: getActivityLaps and getActivitySets",
+        "already read it.",
       ].join("\n"),
       inputSchema: z.object({ activityId }),
     },
@@ -736,7 +755,8 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
         "most reps; without one, the heaviest set) and e1rmKg (the best estimated 1RM, Epley, of its",
         "sets of 1 to 12 reps; null when it has none). Exercise names are stable across sessions, so",
         "they can be used for per-exercise trends. Edits made later in Garmin Connect (renamed",
-        "exercises, corrected reps or weights) are not in the .FIT file.",
+        "exercises, corrected reps or weights) are not in the .FIT file. Use it for strength sessions;",
+        "for runs, rides and swims use getActivityLaps.",
         "plan is the planned workout that the watch ran (null without one): its name and, per planned",
         "exercise and rep plan (a pyramid gives a row per rep plan) in plan order, plannedSets,",
         "plannedReps (low to high; high null is at least low),",
@@ -756,7 +776,15 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
     "getHrvRange",
     {
       _meta: MODEL_ONLY,
-      description: "Daily HRV (overnight) summaries for a date range, yyyy-MM-dd.",
+      annotations: READ_ONLY,
+      description: [
+        "Overnight HRV for a date range, yyyy-MM-dd: hrvSummaries, one row per night with HRV data",
+        "(a night without data has no row), with calendarDate, lastNightAvg (ms, the average of the",
+        "night), lastNight5MinHigh, weeklyAvg (the 7-night average), status (BALANCED, UNBALANCED or",
+        "LOW) and baseline (balancedLow to balancedUpper: the normal range). Ask at most 28 days in",
+        "one call: Garmin may refuse a longer range. Use it for the HRV trend; for the sleep of a",
+        "night use getSleep, and for resting HR use getDailyHeartRate or getDailySummary.",
+      ].join("\n"),
       inputSchema: z.object({
         fromDate: z.string().describe("From date yyyy-MM-dd"),
         toDate: z.string().describe("To date yyyy-MM-dd"),
@@ -768,7 +796,14 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
     "getDailyHeartRate",
     {
       _meta: MODEL_ONLY,
-      description: "Daily heart rate for one date (includes resting heart rate), yyyy-MM-dd.",
+      annotations: READ_ONLY,
+      description: [
+        "Heart rate of one day, yyyy-MM-dd: restingHeartRate, minHeartRate and maxHeartRate (bpm),",
+        "lastSevenDaysAvgRestingHeartRate, and heartRateValues, the samples of the day as [timestamp,",
+        "bpm] pairs (several hundred, so the answer is about 13 KB). Use it for the HR curve of a day.",
+        "For resting HR over several days use getDailySummary with fromDate and toDate; for the zone",
+        "limits use getHeartRateZones.",
+      ].join("\n"),
       inputSchema: z.object({ date }),
     },
     async (a) => text(await tools.getDailyHeartRate(a.date)),
@@ -777,6 +812,7 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
     "getSleep",
     {
       _meta: MODEL_ONLY,
+      annotations: READ_ONLY,
       description: [
         "Sleep for one night (date: the morning you woke up), or for up to 14 nights (fromDate and",
         "toDate), yyyy-MM-dd, as one compact row per night: bedtime and wake (local HH:mm), hours of",
@@ -802,11 +838,13 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
     "getWeight",
     {
       _meta: MODEL_ONLY,
+      annotations: READ_ONLY,
       description: [
         "Weight for a date range, yyyy-MM-dd: the latest weight of each day (with body fat, muscle",
         "and bone mass, BMI and body water when a scale records them), the average of the range, and",
         "the last weight before and the first after the range. Set includeAll=true for every entry",
-        "of each day. Weight, muscle mass and bone mass are in grams.",
+        "of each day. Weight, muscle mass and bone mass are in grams. The range has no day cap: ask a",
+        "trend of months in one call.",
       ].join("\n"),
       inputSchema: z.object({
         fromDate: z.string().describe("From date yyyy-MM-dd"),
@@ -823,10 +861,13 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
     "getBodyBattery",
     {
       _meta: MODEL_ONLY,
+      annotations: READ_ONLY,
       description: [
         "Body Battery for up to 14 days, yyyy-MM-dd: for each day how much it charged and drained,",
-        "its readings through the day, and the events that changed it (sleep, activities, stress,",
-        "naps) with their impact.",
+        "its readings through the day as [timestamp, level] pairs, and the events that changed it",
+        "(sleep, activities, stress, naps) with their start, duration and impact, and Garmin's",
+        "feedback. Use it to see why Body Battery went up or down. For one number per day with steps",
+        "and stress use getDailySummary; for the change of one activity, listActivities.",
       ].join("\n"),
       inputSchema: z.object({
         fromDate: z.string().describe("From date yyyy-MM-dd"),
@@ -839,7 +880,15 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
     "getHeartRateZones",
     {
       _meta: MODEL_ONLY,
-      description: "Heart rate zones currently configured in Garmin Connect.",
+      annotations: READ_ONLY,
+      description: [
+        "The heart rate zones set in Garmin Connect: a list with one entry per sport that has its own",
+        "zones (sport DEFAULT for the others), each with trainingMethod (how Garmin sets the zones),",
+        "zone1Floor to zone5Floor (the lowest bpm of each zone; a zone ends where the next one",
+        "starts, zone 5 at maxHeartRateUsed), maxHeartRateUsed, restingHeartRateUsed and",
+        "lactateThresholdHeartRateUsed. It takes no parameters. It gives the limits only: the time in",
+        "each zone of an activity is hrZonesSec in listActivities.",
+      ].join("\n"),
       inputSchema: z.object({}),
     },
     async () => text(await tools.getHeartRateZones()),
@@ -848,10 +897,13 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
     "getFitnessAge",
     {
       _meta: MODEL_ONLY,
+      annotations: READ_ONLY,
       description: [
-        "Garmin fitness age for a date, yyyy-MM-dd: fitness age vs chronological age, the achievable",
-        "fitness age, and its components (body fat, vigorous days and minutes per week, resting HR)",
-        "with the targets Garmin suggests.",
+        "Garmin fitness age for a date, yyyy-MM-dd: fitnessAge, chronologicalAge, achievableFitnessAge",
+        "and previousFitnessAge, and components: bodyFat, vigorousDaysAvg and vigorousMinutesAvg (per",
+        "week) and rhr (resting HR), each with its value and, when Garmin suggests one, targetValue and",
+        "potentialAge (the fitness age at the target). stale is Garmin's flag for an old value. Use it",
+        "for fitness age; for the body fat trend use getWeight.",
       ].join("\n"),
       inputSchema: z.object({ date }),
     },
@@ -861,8 +913,9 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
     "getDailySummary",
     {
       _meta: MODEL_ONLY,
+      annotations: READ_ONLY,
       description:
-        "Daily user summary (steps, calories, stress, body battery, resting HR) for one date, or for up to 14 days (fromDate and toDate; the range answer has Garmin's v2 field names), yyyy-MM-dd.",
+        "Daily user summary (steps, calories, stress, body battery, resting HR) for one date, or for up to 14 days (fromDate and toDate; the range answer has Garmin's v2 field names), yyyy-MM-dd. Use it for the totals of each day; for sleep use getSleep, for the Body Battery events getBodyBattery, and for the HR samples getDailyHeartRate.",
       inputSchema: dayOrRangeInput,
     },
     async (a) =>
@@ -878,6 +931,7 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
     "garminGet",
     {
       _meta: MODEL_ONLY,
+      annotations: READ_ONLY,
       description: [
         "Generic read-only GET on the Garmin Connect Personal API, for endpoints not covered by the",
         "other tools or when a query parameter name has to be adjusted. 'path' is relative and starts",

@@ -1086,6 +1086,26 @@ describe("MCP tools", () => {
     }
   });
 
+  it("marks each tool read-only, except the ones that write a file", async () => {
+    const { tools: listed } = await (await connect()).listTools();
+    // a saved .FIT file or cache is a write too: readOnlyHint would contradict it
+    const writers = [
+      "downloadActivityFit",
+      "editDashboard",
+      "getActivityLaps",
+      "getActivitySets",
+      "getDashboardData",
+      "scheduleDashboardRefresh",
+      "writeDashboard",
+    ];
+    for (const t of listed) {
+      const expected = writers.includes(t.name)
+        ? undefined
+        : { readOnlyHint: true, openWorldHint: true };
+      expect(t.annotations, t.name).toEqual(expected);
+    }
+  });
+
   it("returns the tool result as JSON text, and errors as tool errors", async () => {
     const client = await connect();
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
