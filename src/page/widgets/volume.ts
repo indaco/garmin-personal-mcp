@@ -1,5 +1,5 @@
 import { addDays } from "../../dates";
-import { type Activity, dayOf, groupOf, groupsIn, sessionSeconds } from "../calc";
+import { type Activity, dayOf, groupOf, groupsIn, sessionSeconds } from "../../analytics/calc";
 import { append, h } from "../dom";
 import { register } from "../registry";
 import type { Ctx } from "../registry";

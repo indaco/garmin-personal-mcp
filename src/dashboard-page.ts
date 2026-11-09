@@ -7,7 +7,7 @@ import * as z from "zod/v4";
 import { weeksCovered } from "./dashboard";
 import { type Digest, digest, syncGaps } from "./digest";
 import { Profile } from "@garmin/fitsdk";
-import { type Activity, GROUPS, groupOf, tabsFor } from "./page/calc";
+import { type Activity, GROUPS, groupOf, tabsFor } from "./analytics/calc";
 import { CATALOGUE, inPage } from "./page/catalogue";
 import { ABOUT } from "./page/catalogue-about";
 import { BUILT_IN } from "./page/i18n/built-in";

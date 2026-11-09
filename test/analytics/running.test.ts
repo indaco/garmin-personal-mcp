@@ -11,7 +11,7 @@ import {
   workoutSessions,
   zoneOf,
   zoneSeconds,
-} from "../../src/page/running";
+} from "../../src/analytics/running";
 
 const floors = [94, 113, 132, 150, 169];
 

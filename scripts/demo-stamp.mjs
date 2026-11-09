@@ -8,6 +8,7 @@ import { existsSync, readFileSync } from "node:fs";
 export const STAMP_FILE = "assets/dashboard.gif.sha256";
 const INPUTS = [
   "src/page",
+  "src/analytics",
   "scripts/build-template.mjs",
   "scripts/demo-dashboard.mjs",
   "scripts/demo-gif.mjs",

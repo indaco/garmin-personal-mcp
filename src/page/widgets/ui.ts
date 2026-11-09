@@ -1,5 +1,5 @@
 import { addDays } from "../../dates";
-import { type Activity, groupOf, mondayOf, sessionSeconds } from "../calc";
+import { type Activity, groupOf, mondayOf, sessionSeconds } from "../../analytics/calc";
 import { h } from "../dom";
 import { en } from "../i18n/en";
 import type { Key, T } from "../i18n";

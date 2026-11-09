@@ -1,5 +1,5 @@
 import { addDays } from "../../dates";
-import { type Activity, groupOf, groupsIn } from "../calc";
+import { type Activity, groupOf, groupsIn } from "../../analytics/calc";
 import { append, h } from "../dom";
 import type { Key } from "../i18n";
 import { register } from "../registry";

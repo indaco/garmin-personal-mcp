@@ -1,10 +1,10 @@
 import type { Chart, ChartConfiguration } from "chart.js";
-import type * as calc from "./calc";
-import type * as metrics from "./metrics";
-import type * as running from "./running";
-import type * as strength from "./strength";
-import type * as sports from "./sports";
-import type { Activity } from "./calc";
+import type * as calc from "../analytics/calc";
+import type * as metrics from "../analytics/metrics";
+import type * as running from "../analytics/running";
+import type * as strength from "../analytics/strength";
+import type * as sports from "../analytics/sports";
+import type { Activity } from "../analytics/calc";
 import type { Fmt, T, Units } from "./i18n";
 import { CATALOGUE, inPage } from "./catalogue";
 import type { Settings } from "./settings";

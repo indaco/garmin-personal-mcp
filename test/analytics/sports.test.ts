@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Activity } from "../../src/page/calc";
+import type { Activity } from "../../src/analytics/calc";
 import {
   distancePerStroke,
   perHour,
@@ -9,7 +9,7 @@ import {
   swimTrend,
   verticalPerHour,
   zoneShare,
-} from "../../src/page/sports";
+} from "../../src/analytics/sports";
 
 /** A 1 km swim on this day: 40 lengths of 25 m in `sec` seconds, with this many strokes per length. */
 const poolSwim = (date: string, sec: number, perLength: number, poolLengthM = 25): Activity => ({

@@ -23,7 +23,7 @@ import {
   weeklyKnown,
   weeklyMeans,
   zonesOf,
-} from "../../src/page/metrics";
+} from "../../src/analytics/metrics";
 
 const act = (start: string, extra: Record<string, unknown> = {}) => ({
   type: "running",

@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { GROUPS } from "../src/page/calc";
+import { GROUPS } from "../src/analytics/calc";
 import { CATALOGUE } from "../src/page/catalogue";
 import { ABOUT } from "../src/page/catalogue-about";
 import { en } from "../src/page/i18n/en";

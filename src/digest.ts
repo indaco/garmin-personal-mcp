@@ -8,11 +8,11 @@ import {
   mondayOf,
   sessionSeconds,
   seconds,
-} from "./page/calc";
-import { fitnessFatigueFrom, loadOf, loadRatio, readinessOf, zonesOf } from "./page/metrics";
-import { racePredictionsOf, type SplitKind, splitOf, workoutOf } from "./page/running";
-import { strokesPerLength, swimPace, swimTrend } from "./page/sports";
-import { completed, type StrengthSet, topSet as pageTopSet } from "./page/strength";
+} from "./analytics/calc";
+import { fitnessFatigueFrom, loadOf, loadRatio, readinessOf, zonesOf } from "./analytics/metrics";
+import { racePredictionsOf, type SplitKind, splitOf, workoutOf } from "./analytics/running";
+import { strokesPerLength, swimPace, swimTrend } from "./analytics/sports";
+import { completed, type StrengthSet, topSet as pageTopSet } from "./analytics/strength";
 
 type Json = Record<string, unknown>;
 

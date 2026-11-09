@@ -2,7 +2,7 @@ import { append, h, keepFocus } from "../dom";
 import type { Key } from "../i18n";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
-import type { ExerciseStats, MuscleGroup, StrengthSet } from "../strength";
+import type { ExerciseStats, MuscleGroup, StrengthSet } from "../../analytics/strength";
 import { oneSession } from "./types";
 import { kpi, kpiRow, note, showRest, weekLabel } from "./ui";
 
