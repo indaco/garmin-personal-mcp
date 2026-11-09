@@ -4,6 +4,84 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The changelog is generated and managed by [sley](https://github.com/indaco/sley).
 
+## v0.12.0 - 2026-11-09
+
+### Highlights
+
+This release compares your workouts with your plan, adds coach analytics for swimming, and makes your dashboard tidier and more reliable.
+
+- **Follow your plan.** Run and strength reviews, `week-review` and a new Strength board widget show which planned exercises and laps you hit or missed.
+- **Get a coach's view of your swims.** The Swim board shows a technique trend, and the new `swim-review` and `swim-readiness` prompts review a swim and check event readiness.
+- **Get tidier boards.** Rows have one height, every sport tab has a Records tile, and Auto-arrange in edit mode fills the rows in your widget order.
+- **Trust your numbers.** A lift's status now compares recent sessions with the sessions before them, and your assistant gives the same numbers as your page.
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
+
+### 🚀 Enhancements
+
+- **tools:** say what each tool returns and when to use it, and mark the read-only tools ([49f20b5](https://github.com/indaco/garmin-personal-mcp/commit/49f20b5)) ([#249](https://github.com/indaco/garmin-personal-mcp/pull/249))
+- **page:** keep the user's widget order in Auto-arrange ([d3c958c](https://github.com/indaco/garmin-personal-mcp/commit/d3c958c)) ([#241](https://github.com/indaco/garmin-personal-mcp/pull/241))
+- **page:** show the laps on the planned target in the workout trend ([b4faa4d](https://github.com/indaco/garmin-personal-mcp/commit/b4faa4d)) ([#238](https://github.com/indaco/garmin-personal-mcp/pull/238))
+- **digest:** add the run plan verdicts to the dashboard data, the digest and week-review ([d03319a](https://github.com/indaco/garmin-personal-mcp/commit/d03319a)) ([#237](https://github.com/indaco/garmin-personal-mcp/pull/237))
+- **page:** add the plan adherence widget to the Strength board ([b7020a4](https://github.com/indaco/garmin-personal-mcp/commit/b7020a4)) ([#236](https://github.com/indaco/garmin-personal-mcp/pull/236))
+- **digest:** add the strength plan verdicts to the dashboard data, the digest and week-review ([9b4b637](https://github.com/indaco/garmin-personal-mcp/commit/9b4b637)) ([#235](https://github.com/indaco/garmin-personal-mcp/pull/235))
+- **tools:** add the planned-against-done verdict of a run to getActivityLaps ([02982bf](https://github.com/indaco/garmin-personal-mcp/commit/02982bf)) ([#233](https://github.com/indaco/garmin-personal-mcp/pull/233))
+- **tools:** add the planned-against-done verdict of a strength session to getActivitySets ([922c399](https://github.com/indaco/garmin-personal-mcp/commit/922c399)) ([#232](https://github.com/indaco/garmin-personal-mcp/pull/232))
+- **digest:** add the record progression of the runs to the digest and week-review ([b5854f0](https://github.com/indaco/garmin-personal-mcp/commit/b5854f0)) ([#230](https://github.com/indaco/garmin-personal-mcp/pull/230))
+- **digest:** add the page's aerobic efficiency and load safety numbers to the digest ([065055b](https://github.com/indaco/garmin-personal-mcp/commit/065055b)) ([#229](https://github.com/indaco/garmin-personal-mcp/pull/229))
+- **dashboard:** align the rows, use one widget order and add Auto-arrange ([b36c896](https://github.com/indaco/garmin-personal-mcp/commit/b36c896)) ([#225](https://github.com/indaco/garmin-personal-mcp/pull/225))
+- **dashboard:** add coach analytics for swimming ([9b7a3a4](https://github.com/indaco/garmin-personal-mcp/commit/9b7a3a4)) ([#220](https://github.com/indaco/garmin-personal-mcp/pull/220))
+
+### 🩹 Fixes
+
+- **page:** one rule for the records, the previous period and the long run, with the widget math in analytics ([d910d06](https://github.com/indaco/garmin-personal-mcp/commit/d910d06)) ([#247](https://github.com/indaco/garmin-personal-mcp/pull/247))
+- **prompts:** bound the activity search and show a swim plan without verdicts ([4f8f59f](https://github.com/indaco/garmin-personal-mcp/commit/4f8f59f)) ([#246](https://github.com/indaco/garmin-personal-mcp/pull/246))
+- **run:** judge a planned lap only from 15 m and 8 s, and drop a pace target of 0 ([4e5c8b5](https://github.com/indaco/garmin-personal-mcp/commit/4e5c8b5)) ([#245](https://github.com/indaco/garmin-personal-mcp/pull/245))
+- **strength:** judge planned sessions fairly and give each exercise its planned rest ([3169f60](https://github.com/indaco/garmin-personal-mcp/commit/3169f60)) ([#244](https://github.com/indaco/garmin-personal-mcp/pull/244))
+- **page:** keep a Swap only when the drawn rows are more even ([ff9fa05](https://github.com/indaco/garmin-personal-mcp/commit/ff9fa05)) ([#242](https://github.com/indaco/garmin-personal-mcp/pull/242))
+- **site:** give the pages descriptive titles and own descriptions ([9ddcac7](https://github.com/indaco/garmin-personal-mcp/commit/9ddcac7)) ([#239](https://github.com/indaco/garmin-personal-mcp/pull/239))
+- **dashboard:** make every sport tab work the same way ([1f1beac](https://github.com/indaco/garmin-personal-mcp/commit/1f1beac)) ([#222](https://github.com/indaco/garmin-personal-mcp/pull/222))
+- **dashboard:** compare a lift's recent sessions with as many before them ([eb8889a](https://github.com/indaco/garmin-personal-mcp/commit/eb8889a)) ([#221](https://github.com/indaco/garmin-personal-mcp/pull/221))
+
+### 💅 Refactors
+
+- move the shared calculations to src/analytics ([a87729e](https://github.com/indaco/garmin-personal-mcp/commit/a87729e)) ([#228](https://github.com/indaco/garmin-personal-mcp/pull/228))
+
+### 📖 Documentation
+
+- list the ways to update the dashboard ([c04a76c](https://github.com/indaco/garmin-personal-mcp/commit/c04a76c)) ([#240](https://github.com/indaco/garmin-personal-mcp/pull/240))
+
+### 🏡 Chores
+
+- raise the branch floor, gate coverage locally and test the analytics purity ([d5a6ebe](https://github.com/indaco/garmin-personal-mcp/commit/d5a6ebe)) ([#243](https://github.com/indaco/garmin-personal-mcp/pull/243))
+- bump deps to latest versions ([d9396ac](https://github.com/indaco/garmin-personal-mcp/commit/d9396ac)) ([#226](https://github.com/indaco/garmin-personal-mcp/pull/226))
+- **site:** keep the coach prompts at the bottom of the ask section ([cb174c4](https://github.com/indaco/garmin-personal-mcp/commit/cb174c4)) ([#224](https://github.com/indaco/garmin-personal-mcp/pull/224))
+
+### ❤️ Contributors
+
+- [@indaco](https://github.com/indaco)
+
 ## v0.11.0 - 2026-11-05
 
 ### Highlights
