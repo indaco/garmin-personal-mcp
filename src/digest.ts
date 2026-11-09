@@ -27,7 +27,13 @@ import {
   workoutOf,
 } from "./analytics/running";
 import { strokesPerLength, swimPace, swimTrend } from "./analytics/sports";
-import { completed, type StrengthSet, topSet as pageTopSet } from "./analytics/strength";
+import {
+  completed,
+  planAdherence,
+  type PlanMiss,
+  type StrengthSet,
+  topSet as pageTopSet,
+} from "./analytics/strength";
 
 type Json = Record<string, unknown>;
 
@@ -158,6 +164,18 @@ export interface Digest {
   /** The run names with more than one session: the workouts that the workout trend compares. */
   repeatedRuns: Record<string, number>;
   strengthExercises: Record<string, { sessions: number; first?: TopSet; last?: TopSet }>;
+  /**
+   * The plan verdicts of the strength sessions done (a skipped session has no file and is not seen):
+   * one count per exercise per session. `weeks` by Monday: the weeks with a counted exercise, and null
+   * for a week that holds a session without sets. `mostMissed`: the first 5 exercises with a miss.
+   * Absent without a planned session.
+   */
+  strengthPlan?: {
+    sessions: number;
+    unplanned: number;
+    weeks: Record<string, { hit: number; miss: number } | null>;
+    mostMissed: PlanMiss[];
+  };
   /**
    * The page's readiness verdict for today and its inputs; null when the data cannot back a value.
    * Absent without HRV and recovery rows (also when the page leaves out the recovery data).
@@ -325,6 +343,21 @@ export function digest(data: Json): Digest {
     }
   }
 
+  const plan = planAdherence(acts as Activity[], weeks);
+  const strengthPlan =
+    plan.sessions > plan.unplanned
+      ? {
+          sessions: plan.sessions,
+          unplanned: plan.unplanned,
+          weeks: Object.fromEntries(
+            weeks
+              .map((w, i) => [w, plan.weeks[i]] as const)
+              .filter(([, v]) => v === null || v.hit + v.miss > 0),
+          ),
+          mostMissed: plan.exercises.slice(0, 5),
+        }
+      : undefined;
+
   // the page's readiness and fitness: the verdict from the exact ratio, only the shown values rounded
   const hrv = list(data.hrv);
   const recovery = list(data.recovery);
@@ -393,6 +426,7 @@ export function digest(data: Json): Digest {
     racePredictions,
     repeatedRuns: repeatedRuns(acts),
     strengthExercises,
+    ...(strengthPlan ? { strengthPlan } : {}),
     ...(hrv.length > 0 || recovery.length > 0
       ? {
           readiness: {

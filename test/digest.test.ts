@@ -24,6 +24,12 @@ const strength = (day: string, exercises: unknown[]) => ({
   exercises,
 });
 
+/** A strength session with sets and these plan verdicts. */
+const planned = (day: string, planVerdicts: unknown) => ({ ...strength(day, []), planVerdicts });
+const missedSets = (exercise: string) => ({ exercise, verdict: "miss", why: ["sets"] });
+/** A most-missed row of an exercise missed once, for too few sets. */
+const missedOnce = (exercise: string) => ({ exercise, sessions: 1, misses: 1, sets: 1, reps: 0 });
+
 /** A run of the Run board (SDK sport "running") on a day, with its km and more fields. */
 const onBoard = (day: string, name: string, km: number, more: Record<string, unknown> = {}) => ({
   ...run(day),
@@ -523,6 +529,61 @@ describe("digest", () => {
       achievableFitnessAge: 31.2,
     });
     expect(d.sync).toEqual(data.sync);
+  });
+
+  it("gives the plan verdicts of the planned weeks and the 5 most missed exercises", () => {
+    const out = digest({
+      ...data,
+      activities: [
+        planned("2026-10-21", [
+          missedSets("A"),
+          missedSets("B"),
+          missedSets("C"),
+          { exercise: "F", verdict: "hit", why: [] },
+        ]),
+        planned("2026-10-14", [
+          missedSets("A"),
+          missedSets("B"),
+          missedSets("D"),
+          missedSets("E"),
+          missedSets("F"),
+        ]),
+        // a session without a plan: its week has no count
+        planned("2026-09-30", null),
+        // a session without sets: its week is n/a
+        run("2026-10-07", "strength_training"),
+      ],
+    });
+    expect(out.strengthPlan).toEqual({
+      sessions: 3,
+      unplanned: 1,
+      weeks: {
+        "2026-10-05": null,
+        "2026-10-12": { hit: 0, miss: 5 },
+        "2026-10-19": { hit: 1, miss: 3 },
+      },
+      // F (1 miss of 2 sessions) is the sixth
+      mostMissed: [
+        { exercise: "A", sessions: 2, misses: 2, sets: 2, reps: 0 },
+        { exercise: "B", sessions: 2, misses: 2, sets: 2, reps: 0 },
+        missedOnce("C"),
+        missedOnce("D"),
+        missedOnce("E"),
+      ],
+    });
+  });
+
+  it("has no strength plan without a planned session", () => {
+    expect(d).not.toHaveProperty("strengthPlan");
+    const unplanned = planned("2026-10-21", null);
+    expect(digest({ ...data, activities: [unplanned] })).not.toHaveProperty("strengthPlan");
+    // the control: one planned session gives the field
+    expect(digest({ ...data, activities: [planned("2026-10-21", [])] }).strengthPlan).toEqual({
+      sessions: 1,
+      unplanned: 0,
+      weeks: {},
+      mostMissed: [],
+    });
   });
 
   it("leaves out an exercise without a name", () => {

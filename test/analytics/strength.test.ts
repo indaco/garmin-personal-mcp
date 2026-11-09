@@ -7,6 +7,7 @@ import {
   missingSets,
   muscleGroup,
   muscleSets,
+  planAdherence,
   planOfSets,
   type PlanStep,
   pushPull,
@@ -661,5 +662,111 @@ describe("plan of the sets", () => {
       step(3, { intensity: undefined }),
     ];
     expect(planOfSets(steps, [])).toEqual([]);
+  });
+});
+
+const hit = (exercise: string) => ({ exercise, verdict: "hit", why: [] });
+const miss = (exercise: string, ...why: string[]) => ({ exercise, verdict: "miss", why });
+/** A strength session with sets and these plan verdicts. */
+const planned = (id: number, day: string, planVerdicts: unknown) => ({
+  id,
+  type: "strength_training",
+  start: `${day} 18:00:00`,
+  exercises: [],
+  planVerdicts,
+});
+
+describe("plan adherence", () => {
+  const weeks = ["2026-10-12", "2026-10-19", "2026-10-26"];
+
+  it("counts each exercise once per session, a miss when any of its rows misses", () => {
+    const sessions = [
+      // a pyramid of 3 rows of one exercise
+      planned(1, "2026-10-13", [
+        hit("Squat"),
+        hit("Squat"),
+        miss("Squat", "reps"),
+        miss("Bench", "sets"),
+        hit("Row"),
+      ]),
+      // a hit row after a miss row: the exercise stays a miss
+      planned(2, "2026-10-20", [
+        miss("Squat", "sets"),
+        miss("Squat", "reps"),
+        hit("Squat"),
+        hit("Bench"),
+      ]),
+    ];
+    expect(planAdherence(sessions, weeks)).toEqual({
+      weeks: [
+        { hit: 1, miss: 2 },
+        { hit: 1, miss: 1 },
+        { hit: 0, miss: 0 },
+      ],
+      exercises: [
+        { exercise: "Squat", sessions: 2, misses: 2, sets: 1, reps: 2 },
+        { exercise: "Bench", sessions: 2, misses: 1, sets: 1, reps: 0 },
+      ],
+      sessions: 2,
+      unplanned: 0,
+    });
+  });
+
+  it("counts nothing for a row without a verdict, an exercise name or a known reason", () => {
+    const rows = [
+      { exercise: "Plank", verdict: null, why: [] },
+      null,
+      { verdict: "hit", why: [] },
+      { exercise: 5, verdict: "miss", why: ["sets"] },
+      { exercise: "Row", verdict: "x", why: [] },
+      { exercise: "Curl", verdict: "miss", why: ["sets", "x"] },
+      // a miss without a known reason is still a miss
+      { exercise: "Dip", verdict: "miss" },
+    ];
+    expect(planAdherence([planned(1, "2026-10-27", rows)], weeks)).toEqual({
+      weeks: [
+        { hit: 0, miss: 0 },
+        { hit: 0, miss: 0 },
+        { hit: 0, miss: 2 },
+      ],
+      exercises: [
+        { exercise: "Curl", sessions: 1, misses: 1, sets: 1, reps: 0 },
+        { exercise: "Dip", sessions: 1, misses: 1, sets: 0, reps: 0 },
+      ],
+      sessions: 1,
+      unplanned: 0,
+    });
+  });
+
+  it("counts the sessions without a plan, and leaves a week with a session without sets out", () => {
+    const sessions = [
+      planned(1, "2026-10-12", null),
+      // sets not read: no exercises and no plan verdicts
+      { id: 2, type: "strength_training", start: "2026-10-21 18:00:00" },
+      planned(3, "2026-10-22", [hit("Squat")]),
+      // the Sunday before the first week, and the last day of the last week
+      planned(4, "2026-10-11", [miss("Squat", "sets")]),
+      planned(5, "2026-11-01", [hit("Bench")]),
+      // not a list
+      planned(6, "2026-10-28", "x"),
+    ];
+    expect(planAdherence(sessions, weeks)).toEqual({
+      weeks: [{ hit: 0, miss: 0 }, null, { hit: 1, miss: 0 }],
+      exercises: [],
+      sessions: 3,
+      unplanned: 1,
+    });
+  });
+
+  it("lists the most missed exercises first, then by name", () => {
+    const sessions = [
+      planned(1, "2026-10-13", [miss("Curl", "reps"), miss("Squat", "sets"), hit("Row")]),
+      planned(2, "2026-10-20", [miss("Bench", "reps", "sets"), miss("Squat", "sets")]),
+    ];
+    expect(planAdherence(sessions, weeks).exercises).toEqual([
+      { exercise: "Squat", sessions: 2, misses: 2, sets: 2, reps: 0 },
+      { exercise: "Bench", sessions: 1, misses: 1, sets: 1, reps: 1 },
+      { exercise: "Curl", sessions: 1, misses: 1, sets: 0, reps: 1 },
+    ]);
   });
 });

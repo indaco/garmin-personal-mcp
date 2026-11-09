@@ -883,9 +883,17 @@ describe("coach prompts", () => {
 
   it("lists the new run bests of the week from the digest's progression", async () => {
     const text = (await render("week-review")).replace(/\s+/g, " ");
-    const part = text.slice(text.indexOf("- **New bests**"), text.indexOf("- **Coach note**"));
+    const part = text.slice(text.indexOf("- **New bests**"), text.indexOf("- **Strength plan**"));
     expect(part).toBe(
       '- **New bests**: the run bests of the week of `2026-10-19`: each entry of `recordProgression` with a date in that week, with the distance, the time and the `previous` time it beat. These are bests since `digest.period.start` only: an older, faster run can sit before that date, so name each one "best since" that date, never a personal record. A null `previous` means no earlier effort of that distance since that date, not a first ever. Without such an entry, write "none". ',
+    );
+  });
+
+  it("quotes the plan verdicts of the strength sessions done, and says that skipped ones are not seen", async () => {
+    const text = (await render("week-review")).replace(/\s+/g, " ");
+    const part = text.slice(text.indexOf("- **Strength plan**"), text.indexOf("- **Coach note**"));
+    expect(part).toBe(
+      '- **Strength plan**: the exercises hit and missed in the strength sessions of the week of `2026-10-19`, from its key in `strengthPlan.weeks`. These count only the sessions done: a planned session that was skipped leaves no file and is not seen, so never read "all hit" as "every planned session done". Then the exercises that miss most in the page period (`strengthPlan.mostMissed`), each with its misses of its sessions and the reason (`sets`: too few sets, `reps`: reps under the plan); an empty list is "none". A week without a key is "no planned strength session", and a null week is "n/a" (sets not read). Without `strengthPlan`, write "no planned strength session" in one line. ',
     );
   });
 

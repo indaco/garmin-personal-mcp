@@ -449,3 +449,65 @@ export function planOfSets(steps: PlanStep[], sets: PlanSet[]): PlanRow[] {
   }
   return [...planned.values(), ...notInPlan.values()];
 }
+
+/** An exercise of a session that missed its plan: the planned sessions with it, and the misses by reason. */
+export interface PlanMiss {
+  exercise: string;
+  sessions: number;
+  misses: number;
+  sets: number;
+  reps: number;
+}
+
+/**
+ * The plan verdicts of the strength sessions in the weeks (`planVerdicts`: null is a session with no
+ * plan, absent is a session whose sets were not read). One count per exercise per session: a miss
+ * when any of its rows misses, else a hit. A week that holds a session without sets is null.
+ */
+export function planAdherence(acts: Activity[], weeks: string[]) {
+  const out = {
+    weeks: weeks.map((): { hit: number; miss: number } | null => ({ hit: 0, miss: 0 })),
+    exercises: [] as PlanMiss[],
+    sessions: 0,
+    unplanned: 0,
+  };
+  const stats = new Map<string, PlanMiss>();
+  for (const a of acts) {
+    const rows = a.planVerdicts;
+    const i = weekIndex(a, weeks);
+    if (i < 0 || (rows !== null && !Array.isArray(rows))) continue;
+    out.sessions++;
+    if (rows === null) {
+      out.unplanned++;
+      continue;
+    }
+    // the reasons of each exercise that misses; an empty set is a hit
+    const seen = new Map<string, Set<unknown> | undefined>();
+    for (const r of rows as Record<string, unknown>[]) {
+      if (typeof r?.exercise !== "string" || (r.verdict !== "hit" && r.verdict !== "miss"))
+        continue;
+      if (r.verdict === "hit") {
+        if (!seen.has(r.exercise)) seen.set(r.exercise, undefined);
+        continue;
+      }
+      const why = seen.get(r.exercise) ?? new Set();
+      for (const w of Array.isArray(r.why) ? r.why : []) why.add(w);
+      seen.set(r.exercise, why);
+    }
+    for (const [exercise, why] of seen) {
+      out.weeks[i]![why ? "miss" : "hit"]++;
+      const x = stats.get(exercise) ?? { exercise, sessions: 0, misses: 0, sets: 0, reps: 0 };
+      stats.set(exercise, x);
+      x.sessions++;
+      if (!why) continue;
+      x.misses++;
+      if (why.has("sets")) x.sets++;
+      if (why.has("reps")) x.reps++;
+    }
+  }
+  for (const i of missingSets(acts, weeks).weeks) out.weeks[i] = null;
+  out.exercises = [...stats.values()]
+    .filter((x) => x.misses > 0)
+    .toSorted((x, y) => y.misses - x.misses || (x.exercise < y.exercise ? -1 : 1));
+  return out;
+}
