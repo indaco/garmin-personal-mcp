@@ -38,6 +38,16 @@ Then answer in chat, in this order, short:
   plan); an empty list is "none". A week without a key is "no planned strength session", and a null
   week is "n/a" (sets not read). Without `strengthPlan`, write "no planned strength session" in one
   line.
+- **Run plan**: the laps on the planned target (hit) and off it (miss) in the runs of the week of
+  `{{week}}`, from its key in `runPlan.weeks`. These count only the runs whose laps the page read: a
+  planned run that was skipped leaves no file and is not seen. Then the drills that miss most in the
+  page period (`runPlan.mostMissed`), each with its workout, its target type, its misses of its
+  laps, and how many laps were under (`low`) and over (`high`) the range; for a pace, under is
+  faster. An empty list is "none". Then the planned runs with no target to check
+  (`runPlan.untargeted`), and "N of M runs not read" with `runPlan.unread` and `runPlan.runs`. When
+  `runPlan.unread` is above 0, add one sentence: the page setting `workouts` reads the laps of the
+  runs whose workout name repeats. A week without a key is "no planned run with a target", and a
+  null week is "n/a" (laps not read). Without `runPlan`, write "no run" in one line.
 - **Coach note**: 2 or 3 sentences: what the week did well, and what to change next week. Base each
   sentence on a number above. Do not mention the data or the sports that the `settings` of the
   reply exclude.

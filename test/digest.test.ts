@@ -30,6 +30,19 @@ const missedSets = (exercise: string) => ({ exercise, verdict: "miss", why: ["se
 /** A most-missed row of an exercise missed once, for too few sets. */
 const missedOnce = (exercise: string) => ({ exercise, sessions: 1, misses: 1, sets: 1, reps: 0 });
 
+/** A run plan verdict of step 1. */
+const lapVerdict = (type: string, verdict: string, why: string | null = null) => ({
+  step: 1,
+  type,
+  verdict,
+  why,
+});
+/** A run with a name and, when given, its plan verdicts. */
+const ranRun = (day: string, name: string, planVerdicts?: unknown) => ({
+  ...run(day),
+  name,
+  ...(planVerdicts === undefined ? {} : { planVerdicts }),
+});
 /** A run of the Run board (SDK sport "running") on a day, with its km and more fields. */
 const onBoard = (day: string, name: string, km: number, more: Record<string, unknown> = {}) => ({
   ...run(day),
@@ -582,6 +595,69 @@ describe("digest", () => {
       sessions: 1,
       unplanned: 0,
       weeks: {},
+      mostMissed: [],
+    });
+  });
+
+  it("gives the run plan of the period: laps, weeks and the drills that miss most", () => {
+    const out = digest({
+      ...data,
+      activities: [
+        ranRun("2026-10-21", "Park - W1", [
+          lapVerdict("cadence", "miss", "low"),
+          lapVerdict("cadence", "miss", "high"),
+          lapVerdict("cadence", "hit"),
+          lapVerdict("pace", "miss", "high"),
+        ]),
+        ranRun("2026-10-14", "W2", [lapVerdict("cadence", "miss", "low")]),
+        ranRun("2026-10-14", "W3", [lapVerdict("cadence", "miss", "high")]),
+        ranRun("2026-10-13", "W4", [lapVerdict("heart_rate", "miss", "high")]),
+        ranRun("2026-10-13", "W5", [lapVerdict("cadence", "hit")]),
+        // the sixth drill with a miss: cut
+        ranRun("2026-10-12", "W6", [lapVerdict("power", "miss", "low")]),
+        // laps not read: the week is n/a
+        ranRun("2026-10-07", "W7"),
+        // a planned run with no target, a free run: weeks with no lap are left out
+        ranRun("2026-09-30", "W8", []),
+        ranRun("2026-09-23", "W9", null),
+        // a week with misses only is kept
+        ranRun("2026-09-16", "W99", [lapVerdict("pace", "miss", "low")]),
+        // not a run: not counted
+        planned("2026-10-20", [missedSets("A")]),
+      ],
+    });
+    expect(out.runPlan).toEqual({
+      runs: 10,
+      untargeted: 1,
+      unread: 1,
+      weeks: {
+        "2026-09-14": { hit: 0, miss: 1 },
+        "2026-10-05": null,
+        "2026-10-12": { hit: 1, miss: 4 },
+        "2026-10-19": { hit: 1, miss: 3 },
+      },
+      mostMissed: [
+        { workout: "W1", type: "cadence", laps: 3, misses: 2, low: 1, high: 1 },
+        { workout: "W1", type: "pace", laps: 1, misses: 1, low: 0, high: 1 },
+        { workout: "W2", type: "cadence", laps: 1, misses: 1, low: 1, high: 0 },
+        { workout: "W3", type: "cadence", laps: 1, misses: 1, low: 0, high: 1 },
+        { workout: "W4", type: "heart_rate", laps: 1, misses: 1, low: 0, high: 1 },
+      ],
+    });
+  });
+
+  it("has a run plan when the period has a run of any kind, and none without", () => {
+    const strengthOnly = { ...data, activities: [planned("2026-10-21", [])] };
+    expect(digest(strengthOnly)).not.toHaveProperty("runPlan");
+    // a run before the period's first Monday is not in it
+    const before = { ...data, activities: [run("2026-08-02")] };
+    expect(digest(before)).not.toHaveProperty("runPlan");
+    // one run whose laps were not read, on the first day of the period
+    expect(digest({ ...data, activities: [run("2026-08-03")] }).runPlan).toEqual({
+      runs: 1,
+      untargeted: 0,
+      unread: 1,
+      weeks: { "2026-08-03": null },
       mostMissed: [],
     });
   });

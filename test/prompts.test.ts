@@ -891,9 +891,17 @@ describe("coach prompts", () => {
 
   it("quotes the plan verdicts of the strength sessions done, and says that skipped ones are not seen", async () => {
     const text = (await render("week-review")).replace(/\s+/g, " ");
-    const part = text.slice(text.indexOf("- **Strength plan**"), text.indexOf("- **Coach note**"));
+    const part = text.slice(text.indexOf("- **Strength plan**"), text.indexOf("- **Run plan**"));
     expect(part).toBe(
       '- **Strength plan**: the exercises hit and missed in the strength sessions of the week of `2026-10-19`, from its key in `strengthPlan.weeks`. These count only the sessions done: a planned session that was skipped leaves no file and is not seen, so never read "all hit" as "every planned session done". Then the exercises that miss most in the page period (`strengthPlan.mostMissed`), each with its misses of its sessions and the reason (`sets`: too few sets, `reps`: reps under the plan); an empty list is "none". A week without a key is "no planned strength session", and a null week is "n/a" (sets not read). Without `strengthPlan`, write "no planned strength session" in one line. ',
+    );
+  });
+
+  it("quotes the lap verdicts of the runs read, and says how many runs were not read", async () => {
+    const text = (await render("week-review")).replace(/\s+/g, " ");
+    const part = text.slice(text.indexOf("- **Run plan**"), text.indexOf("- **Coach note**"));
+    expect(part).toBe(
+      '- **Run plan**: the laps on the planned target (hit) and off it (miss) in the runs of the week of `2026-10-19`, from its key in `runPlan.weeks`. These count only the runs whose laps the page read: a planned run that was skipped leaves no file and is not seen. Then the drills that miss most in the page period (`runPlan.mostMissed`), each with its workout, its target type, its misses of its laps, and how many laps were under (`low`) and over (`high`) the range; for a pace, under is faster. An empty list is "none". Then the planned runs with no target to check (`runPlan.untargeted`), and "N of M runs not read" with `runPlan.unread` and `runPlan.runs`. When `runPlan.unread` is above 0, add one sentence: the page setting `workouts` reads the laps of the runs whose workout name repeats. A week without a key is "no planned run with a target", and a null week is "n/a" (laps not read). Without `runPlan`, write "no run" in one line. ',
     );
   });
 

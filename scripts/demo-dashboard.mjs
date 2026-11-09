@@ -234,6 +234,19 @@ function run(i, name, km, pace, kind, race = false) {
       walkTime: hms(walkSec),
     };
   }
+  // the server's plan verdicts: the intervals ran a plan with a cadence target of 178-185 spm on
+  // the reps, a tempo run a plan with no target, the other runs no plan
+  a.planVerdicts =
+    kind === "intervals"
+      ? laps
+          .filter((l) => l.intensity === "interval")
+          .map((l) => {
+            const why = l.cadenceSpm < 178 ? "low" : l.cadenceSpm > 185 ? "high" : null;
+            return { step: 1, type: "cadence", verdict: why ? "miss" : "hit", why };
+          })
+      : kind === "tempo"
+        ? []
+        : null;
   for (const l of laps) delete l.sec;
   a.laps = laps;
   return a;

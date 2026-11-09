@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -299,5 +300,45 @@ describe("site page", () => {
       "SoftwareApplication",
       "SoftwareSourceCode",
     ]);
+  });
+});
+
+describe("demo data", () => {
+  it("gives the runs the plan verdicts of the server: cadence laps on intervals, [] on tempo runs, else null", () => {
+    const dir = mkdtempSync(join(tmpdir(), "demo-data-"));
+    try {
+      execFileSync("node", ["scripts/demo-dashboard.mjs", join(dir, "d.json"), "--weeks", "12"], {
+        stdio: "ignore",
+      });
+      type Run = {
+        name: string;
+        type: string;
+        laps: { intensity: string; cadenceSpm: number }[];
+        planVerdicts: unknown;
+      };
+      const runs = (
+        JSON.parse(readFileSync(join(dir, "d.json"), "utf8")).activities as Run[]
+      ).filter((a) => a.type.endsWith("running"));
+      const kinds = new Set<string>();
+      for (const a of runs) {
+        if (a.name === "Track Intervals") {
+          const reps = a.laps.filter((l) => l.intensity === "interval");
+          expect(a.planVerdicts).toEqual(
+            reps.map((l) => {
+              const why = l.cadenceSpm < 178 ? "low" : l.cadenceSpm > 185 ? "high" : null;
+              return { step: 1, type: "cadence", verdict: why ? "miss" : "hit", why };
+            }),
+          );
+          for (const r of a.planVerdicts as { verdict: string }[]) kinds.add(r.verdict);
+        } else {
+          expect([a.name, a.planVerdicts]).toEqual([a.name, a.name === "Tempo Run" ? [] : null]);
+          kinds.add(a.name === "Tempo Run" ? "untargeted" : "free");
+        }
+      }
+      // the demo shows each case
+      expect([...kinds].toSorted()).toEqual(["free", "hit", "miss", "untargeted"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
