@@ -475,6 +475,21 @@ const squatRow = (more: Record<string, unknown>) => ({
   ...more,
 });
 
+/** A rest step of `ms` milliseconds; none is an open rest (lap button). */
+const restOf = (index: number, ms?: number): PlanStep => ({
+  index,
+  intensity: "rest",
+  durationType: ms === undefined ? "open" : "time",
+  ...(ms === undefined ? {} : { durationValue: ms }),
+});
+/** Back Squat sets of these reps, on step 0. */
+const squatSets = (...reps: number[]) => reps.map((r) => done(0, r));
+
+const verdictOf = (steps: PlanStep[], reps: number[]) => {
+  const row = planOfSets(steps, squatSets(...reps))[0];
+  return [row.verdict, row.why, row.over];
+};
+
 describe("plan of the sets", () => {
   it("plans the active steps times the repeats of the block around them", () => {
     expect(planOfSets(block(), [done(0, 10), done(0, 10), done(0, 10)])).toEqual([squatRow({})]);
@@ -632,6 +647,137 @@ describe("plan of the sets", () => {
   ])("counts a repeat with %s as one pass", (_, from, times) => {
     const steps = [step(0, range(8, 12)), rest(1), repeat(2, from, times)];
     expect(planOfSets(steps, [])[0].plannedSets).toBe(1);
+  });
+
+  describe("rest-pause", () => {
+    /** Back Squat 8-12 as rest-pause: a set and a mini set 20 s apart, 2 min after the group; null: no rest after. */
+    const restPause = (
+      inner: PlanStep = restOf(1, 20_000),
+      after: PlanStep | null = restOf(3, 120_000),
+    ) => [step(0, range(8, 12)), inner, repeat(2, 0, 2), ...(after ? [after] : [])];
+    const outer = [...restPause(), repeat(4, 0, 3)];
+
+    it("does not count a mini set under the plan as a miss, and shows every set", () => {
+      const [row] = planOfSets(restPause(), squatSets(10, 4));
+      expect([row.verdict, row.why, row.over, row.reps, row.doneSets]).toEqual([
+        "hit",
+        [],
+        0,
+        [10, 4],
+        2,
+      ]);
+    });
+
+    it("judges the first set of the group", () => {
+      expect(verdictOf(restPause(), [7, 4])).toEqual(["miss", ["reps"], 0]);
+    });
+
+    it("takes an open inner rest as a rest-pause", () => {
+      expect(verdictOf(restPause(restOf(1)), [10, 4])).toEqual(["hit", [], 0]);
+    });
+
+    it.each([
+      ["an inner rest of 21 s", restPause(restOf(1, 21_000))],
+      ["no rest after the block", restPause(undefined, null)],
+      ["a rest of 20 s after the block", restPause(undefined, restOf(3, 20_000))],
+      ["an open rest after the block", restPause(undefined, restOf(3))],
+      [
+        "a timed inner rest without a duration",
+        restPause({ index: 1, intensity: "rest", durationType: "time" }),
+      ],
+      [
+        "a timed rest after the block without a duration",
+        restPause(undefined, { index: 3, intensity: "rest", durationType: "time" }),
+      ],
+      [
+        "a block without an exercise step",
+        [
+          step(0, range(8, 12)),
+          restOf(1, 20_000),
+          restOf(2, 20_000),
+          repeat(3, 1, 2),
+          restOf(4, 120_000),
+        ],
+      ],
+      [
+        "an exercise step right after the block",
+        restPause(undefined, {
+          index: 3,
+          intensity: "active",
+          exercise: "Plank",
+          durationType: "time",
+          durationValue: 60_000,
+        }),
+      ],
+      [
+        "a short step inside the block that is not a rest",
+        restPause({ index: 1, intensity: "active", durationType: "time", durationValue: 10_000 }),
+      ],
+      [
+        "a repeat without a first step",
+        [step(0, range(8, 12)), restOf(1, 20_000), repeat(2, undefined, 2), restOf(3, 120_000)],
+      ],
+      [
+        "a repeat count of 1",
+        [step(0, range(8, 12)), restOf(1, 20_000), repeat(2, 0, 1), restOf(3, 120_000)],
+      ],
+      [
+        "a repeat count of 2.5",
+        [step(0, range(8, 12)), restOf(1, 20_000), repeat(2, 0, 2.5), restOf(3, 120_000)],
+      ],
+    ])("judges %s as straight sets", (_, steps) => {
+      const [verdict, why] = verdictOf(steps, [10, 4]);
+      expect(verdict).toBe("miss");
+      expect(why).toContain("reps");
+    });
+
+    it("judges the first set of each group inside an outer repeat", () => {
+      const [row] = planOfSets(outer, squatSets(10, 4, 10, 4, 10, 4));
+      expect([row.verdict, row.why, row.plannedSets]).toEqual(["hit", [], 6]);
+      expect(verdictOf(outer, [10, 4, 7, 4, 10, 4])).toEqual(["miss", ["reps"], 0]);
+    });
+
+    it("counts over on the judged sets only", () => {
+      expect(verdictOf(restPause(), [13, 13])).toEqual(["hit", [], 1]);
+    });
+
+    it("keeps the positions when a mini set is skipped", () => {
+      const steps = [...restPause(), repeat(4, 0, 2)];
+      expect(verdictOf(steps, [10, 0, 9, 4])).toEqual(["miss", ["sets"], 0]);
+    });
+
+    it("does not judge a set of a timed row or a set without reps", () => {
+      const timedRange = [
+        step(0, { durationType: "time", durationValue: 30_000, ...range(8, 12) }),
+      ];
+      expect(planOfSets(timedRange, [done(0, 4)])[0].why).toEqual([]);
+      expect(planOfSets(restPause(), [done(0, undefined)])[0].why).toEqual(["sets"]);
+    });
+
+    it("does not treat a superset as a rest-pause", () => {
+      const steps = [
+        step(0, range(8, 12)),
+        step(1, { exercise: "Row", ...range(8, 12) }),
+        restOf(2, 20_000),
+        repeat(3, 0, 2),
+        restOf(4, 120_000),
+      ];
+      const out = planOfSets(steps, [
+        done(0, 10),
+        done(0, 4),
+        done(1, 10, "Row"),
+        done(1, 10, "Row"),
+      ]);
+      expect(out.map((r) => [r.exercise, r.verdict, r.why])).toEqual([
+        ["Back Squat", "miss", ["reps"]],
+        ["Row", "hit", []],
+      ]);
+    });
+
+    it("judges a set that points at no step as before", () => {
+      const out = planOfSets(restPause(), [done(undefined, 4)]);
+      expect(out.find((r) => r.notInPlan)?.reps).toEqual([4]);
+    });
   });
 
   it("multiplies the repeats of a block inside a block", () => {

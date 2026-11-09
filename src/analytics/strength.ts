@@ -369,11 +369,43 @@ function plannedReps(s: PlanStep): PlanRow["plannedReps"] {
   return { low: s.targetLow, high: top > 0 && top >= s.targetLow ? top : null };
 }
 
+/** The longest rest inside a rest-pause group, in ms: a longer one makes straight sets. */
+const PAUSE_MS = 20_000;
+
+/**
+ * The exercise steps done as rest-pause, with the sets of one group: a repeat block of one exercise step
+ * and one rest of 20 s or less (or open), with a longer timed rest right after the block. Only the first
+ * set of each group is judged on reps: the mini sets are short on purpose.
+ */
+function restPauseSteps(steps: PlanStep[]): Map<number, number> {
+  const byIndex = new Map(steps.map((s) => [s.index, s]));
+  const out = new Map<number, number>();
+  for (const r of steps) {
+    const n = r.targetValue ?? 0;
+    if (r.durationType !== REPEAT || !Number.isInteger(n) || n < 2) continue;
+    const from = r.durationValue ?? r.index;
+    const inner = steps.filter((s) => s.index >= from && s.index < r.index);
+    const work = inner.find((s) => s.intensity === "active" && s.exercise);
+    const pause = inner.find((s) => s.intensity === "rest");
+    const after = byIndex.get(r.index + 1);
+    const short =
+      pause?.durationType === "open" ||
+      (pause?.durationType === "time" && (pause.durationValue ?? Infinity) <= PAUSE_MS);
+    const long =
+      after?.intensity === "rest" &&
+      after.durationType === "time" &&
+      (after.durationValue ?? 0) > PAUSE_MS;
+    if (inner.length === 2 && work && short && long) out.set(work.index, n);
+  }
+  return out;
+}
+
 /**
  * One row per planned exercise, in plan order, with the planned and done sets and reps, then one row
  * per done exercise whose sets point at no exercise step. A row has the steps of one exercise with one
  * rep plan. A set is done when completed; a set under the low end is a miss, above the high end a hit
- * counted in over. A warm-up or cool-down step has its part and no verdict.
+ * counted in over. A warm-up or cool-down step has its part and no verdict. In a rest-pause group
+ * only the first set of each pass is judged on reps.
  */
 export function planOfSets(steps: PlanStep[], sets: PlanSet[]): PlanRow[] {
   // the times each step runs: the repeats of every block around it
@@ -414,7 +446,12 @@ export function planOfSets(steps: PlanStep[], sets: PlanSet[]): PlanRow[] {
     rowOf.set(s.index, row);
   }
   const notInPlan = new Map<string, PlanRow>();
+  const groups = restPauseSteps(steps);
+  const position = new Map<number | undefined, number>();
+  const judged = new Map<PlanRow, number[]>();
   for (const set of sets) {
+    const at = position.get(set.step) ?? 0;
+    position.set(set.step, at + 1);
     if (!completed(set)) continue;
     let row = rowOf.get(set.step);
     if (!row) {
@@ -435,10 +472,14 @@ export function planOfSets(steps: PlanStep[], sets: PlanSet[]): PlanRow[] {
     }
     row.doneSets++;
     row.reps?.push(set.reps ?? null);
+    // a rest-pause mini set is short on purpose: only the first set of each group is judged on reps
+    const n = set.step === undefined ? undefined : groups.get(set.step);
+    if (typeof set.reps === "number" && (n === undefined || at % n === 0))
+      judged.set(row, [...(judged.get(row) ?? []), set.reps]);
   }
   for (const row of planned.values()) {
     if (row.part) continue;
-    const done = (row.reps ?? []).filter((r): r is number => r !== null);
+    const done = row.reps === null ? [] : (judged.get(row) ?? []);
     const low = row.plannedReps?.low;
     const high = row.plannedReps?.high;
     if (row.doneSets < row.plannedSets) row.why.push("sets");
