@@ -136,6 +136,7 @@
   "edit.arrange": "Organiser automatiquement",
   "edit.tip": "Astuce : échange {a} et {b} pour équilibrer les lignes.",
   "edit.tipApply": "Échanger",
+  "edit.tipFailed": "Échanger {a} et {b} n'équilibre pas les lignes ici, le tableau reste donc tel quel.",
   "edit.discard": "Annuler",
   "edit.bar": "Modifier la mise en page",
   "edit.editing": "Modification · {board}",

@@ -136,6 +136,7 @@
   "edit.arrange": "Disponi automaticamente",
   "edit.tip": "Suggerimento: scambia {a} e {b} per bilanciare le righe.",
   "edit.tipApply": "Scambia",
+  "edit.tipFailed": "Scambiare {a} e {b} qui non bilancia le righe, quindi la scheda resta com'era.",
   "edit.discard": "Annulla",
   "edit.bar": "Modifica layout",
   "edit.editing": "Modifica · {board}",

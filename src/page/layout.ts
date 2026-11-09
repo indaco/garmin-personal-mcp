@@ -142,7 +142,10 @@ interface Split {
   cut: number;
 }
 
-const better = (a: Split, b: Split | undefined) =>
+type Rows = Pick<Split, "rows" | "gap">;
+
+/** Fewer rows, else the smaller sum of height gaps in a row. */
+export const better = (a: Rows, b: Rows | undefined) =>
   !b || a.rows < b.rows || (a.rows === b.rows && a.gap < b.gap);
 
 type TileInfo = (i: Instance) => { height: number; min: Span } | undefined;
@@ -211,11 +214,13 @@ const TIP_GAIN = 40;
 /**
  * The swap of two neighbouring tiles that `arrange` would turn into fewer rows, or into rows with
  * heights at least TIP_GAIN px closer in all; the best one, with the board it gives. The swap is
- * done on this board, so a tile that the press made wider is not wider yet.
+ * done on this board, so a tile that the press made wider is not wider yet. `skip` names the swaps
+ * not to suggest, by the ids of the tiles in board order.
  */
 export function arrangeTip(
   board: Instance[],
   info: TileInfo,
+  skip: (a: string, b: string) => boolean = () => false,
 ): { swap: [string, string]; board: Instance[] } | undefined {
   const tiles = tilesOf(board, info);
   const now = splitsOf(tiles)[tiles.length];
@@ -225,12 +230,35 @@ export function arrangeTip(
     const split = splitsOf(swapped)[tiles.length];
     const gains =
       split.rows < now.rows || (split.rows === now.rows && now.gap - split.gap >= TIP_GAIN);
-    if (gains && better(split, found?.split)) found = { at, split };
+    const skipped = skip(tiles[at].item.id, tiles[at + 1].item.id);
+    if (gains && !skipped && better(split, found?.split)) found = { at, split };
   }
   if (!found) return undefined;
   const [a, b] = [tiles[found.at].item, tiles[found.at + 1].item];
   const swapped = board.map((i) => (i === a ? b : i === b ? a : i));
   return { swap: [a.id, b.id], board: arrange(swapped, info) };
+}
+
+/** The rows of the board as the page draws them in 3 columns, at the widths it has. */
+export function drawnRows(board: Instance[], info: TileInfo): Rows {
+  let rows = 0;
+  let gap = 0;
+  let used = 3;
+  let low = 0;
+  let high = 0;
+  for (const { item, height } of tilesOf(board, info)) {
+    if (used + item.span > 3) {
+      gap += high - low;
+      rows++;
+      used = 0;
+      low = height;
+      high = height;
+    }
+    used += item.span;
+    low = Math.min(low, height);
+    high = Math.max(high, height);
+  }
+  return { rows, gap: gap + high - low };
 }
 
 /** A width the user sets is the user's, so it drops the note of Auto-arrange. */

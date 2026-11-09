@@ -136,6 +136,7 @@
   "edit.arrange": "Organizar automáticamente",
   "edit.tip": "Consejo: intercambia {a} y {b} para equilibrar las filas.",
   "edit.tipApply": "Intercambiar",
+  "edit.tipFailed": "Intercambiar {a} y {b} no equilibra las filas aquí, así que la pestaña queda como estaba.",
   "edit.discard": "Descartar",
   "edit.bar": "Editar diseño",
   "edit.editing": "Editando · {board}",

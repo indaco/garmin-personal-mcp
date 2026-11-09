@@ -33,7 +33,9 @@ import {
   add,
   arrange,
   arrangeTip,
+  better,
   boardOf,
+  drawnRows,
   type Instance,
   type Layout,
   type LocalLayout,
@@ -106,8 +108,11 @@ let view: View;
 let editing = false;
 // edit mode works on a copy: Done saves it, Discard drops it
 let draft: Layout | null = null;
-/** The tip of the last Auto-arrange press, for its board; any other edit drops it. */
-let tip: { tab: string; swap: [string, string]; board: Instance[] } | undefined;
+/** The tip of the last Auto-arrange press, for its board; any other edit drops it. `failed`: Swap was tried and kept nothing. */
+let tip: { tab: string; swap: [string, string]; board: Instance[]; failed?: true } | undefined;
+// the swaps that Swap tried and kept nothing, until edit mode ends: a press does not suggest them again
+let refused = new Set<string>();
+const swapKey = (tab: string, a: string, b: string) => JSON.stringify([tab, a, b]);
 let accountOpen = false;
 // on a phone the week window folds into one control
 let windowOpen = false;
@@ -475,6 +480,7 @@ function leaveEdit(): void {
   editing = false;
   draft = null;
   tip = undefined;
+  refused = new Set();
   render();
   document.querySelector<HTMLElement>(".account summary")?.focus();
 }
@@ -1036,7 +1042,7 @@ function autoArrange(): void {
     render();
   }
   const next = arrange(board, tileInfo);
-  const found = arrangeTip(board, tileInfo);
+  const found = arrangeTip(board, tileInfo, (a, b) => refused.has(swapKey(view.tab, a, b)));
   const nextTip = found && { tab: view.tab, ...found };
   // a save lists a preset board, and the bar would show unsaved changes with nothing changed
   if (JSON.stringify(next) !== JSON.stringify(board)) saveBoard(next, nextTip);
@@ -1066,8 +1072,21 @@ const tipText = (swap: [string, string]) => t("edit.tip", swapNames(swap));
 function applyTip(): void {
   const { swap, board } = tip!;
   const names = swapNames(swap);
-  saveBoard(board);
-  announce(t("said.swapped", names));
+  const before = drawnRows(currentBoard(), tileInfo);
+  const saved = draft;
+  // the tip counted the heights at the old widths, and a chart's height follows its width: measure the swap drawn
+  draft = withBoard(draft ?? layout, view.tab, board, preset);
+  render();
+  if (better(drawnRows(board, tileInfo), before)) {
+    saveBoard(board);
+    announce(t("said.swapped", names));
+  } else {
+    draft = saved;
+    refused.add(swapKey(tip!.tab, ...swap));
+    tip = { ...tip!, failed: true };
+    render();
+    announce(t("edit.tipFailed", names));
+  }
 }
 
 /** A tile is as tall as its row, so its content ends at the bottom of its body. Whole px, so that sums compare. */
@@ -1228,8 +1247,8 @@ function editBar(): HTMLElement {
       h(
         "p",
         { class: "edit-tip small" },
-        h("span", {}, tipText(tip.swap)),
-        h("button", { class: "btn", onclick: applyTip }, t("edit.tipApply")),
+        h("span", {}, tip.failed ? t("edit.tipFailed", swapNames(tip.swap)) : tipText(tip.swap)),
+        !tip.failed && h("button", { class: "btn", onclick: applyTip }, t("edit.tipApply")),
       ),
   );
 }
