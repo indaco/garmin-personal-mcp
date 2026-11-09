@@ -265,6 +265,9 @@ time. Reload the page to see the new data.
 In Claude Code: `/mcp__garmin-personal__training-dashboard-update coach.html` updates `coach.html`. A
 value that ends in `.html` is the file, also in the first place.
 
+To update the data without coach notes, see
+[Update the dashboard](guide/dashboard.md#update-the-dashboard).
+
 After a release, this prompt also writes the new page code. Restart the client first. See
 [Update the page code after a release](guide/dashboard.md#update-the-page-code-after-a-release).
 

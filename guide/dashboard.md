@@ -58,10 +58,18 @@ from the web.
 
 ## Update the dashboard
 
-Run the `training-dashboard-update` prompt. The server replaces the data and the coach notes.
-Your layout, your custom widgets, your languages and your page settings stay. The layout changes only when
-a release adds a preset widget to a board that you edited (see below). Leave `weeks` empty to keep the weeks of
-the page.
+An update replaces the data. Your layout, your custom widgets, your languages and your page
+settings stay. The layout changes only when a release adds a preset widget to a board that you
+edited (see below). Use one of these procedures:
+
+- **Prompt**: run `training-dashboard-update`. The assistant writes new coach notes. Leave `weeks`
+  empty to keep the weeks of the page.
+- **Your own words**: ask your assistant, for example "update my dashboard without coach notes".
+  This also works in a client that does not show MCP prompts.
+- **Terminal**: run `npx -y @indaco/garmin-personal-mcp@latest refresh`. It removes the coach notes.
+  See [`refresh`](cli.md#refresh). In Claude Code, type `!` before the command to run it from the
+  chat.
+- **Schedule**: see [Update the dashboard on a schedule](#update-the-dashboard-on-a-schedule).
 
 When a release adds a widget to the preset of a board that you edited, the update also puts that widget
 on the board, one time, and saves in the page which preset widgets each board has met. A widget that
