@@ -463,7 +463,22 @@ function strength(i, name, light) {
     calories: Math.round((elapsed / 60) * 6.5),
     steps: ri(600, 1200),
     exercises,
+    planVerdicts: light ? null : planVerdicts(exercises),
   });
+}
+
+// the plan that the watch ran: 4 sets of the main lifts, 3 of the others, at least 12 reps of a
+// body-weight exercise; a lift added later is not in the plan, and a deload session has no plan
+const MAIN_LIFTS = ["Barbell Back Squat", "Barbell Bench Press", "Romanian Deadlift"];
+function planVerdicts(exercises) {
+  return exercises
+    .filter((e) => e.exercise !== "Hip Thrust")
+    .map(({ exercise, sets }) => {
+      const why = [];
+      if (sets.length < (MAIN_LIFTS.includes(exercise) ? 4 : 3)) why.push("sets");
+      if (exercise === "Push Up" && sets.some((s) => s.reps < 12)) why.push("reps");
+      return why.length ? { exercise, verdict: "miss", why } : { exercise, verdict: "hit" };
+    });
 }
 
 // ------------------------------------------------------------------ the year
