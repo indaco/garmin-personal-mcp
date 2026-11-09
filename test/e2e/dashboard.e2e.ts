@@ -1321,6 +1321,48 @@ describe("edit mode", () => {
       expect(errors).toEqual([]);
     });
 
+    it("drops the tip when edit mode ends", async () => {
+      const board = [of("low1", 1), of("tall1", 2), of("low2", 2), of("tall2", 1)];
+      const { page, errors } = await open(browser, pageFile({ layout: onAll(board), widgets }));
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await page.$(".edit-tip")).not.toBeNull();
+      await page.click(".edit-bar >> text=Discard");
+      await startEdit(page);
+      expect(await page.$(".edit-tip")).toBeNull();
+      expect(errors).toEqual([]);
+    });
+
+    it("shows the tip only on the board it is for", async () => {
+      const board = [of("low1", 1), of("tall1", 2), of("low2", 2), of("tall2", 1)];
+      const layout = { ...onAll(board), boards: { all: board, running: [of("typeKpis", 3)] } };
+      const { page, errors } = await open(browser, pageFile({ layout, widgets }));
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      await page.click("[role=tab][data-tab=running]");
+      expect(await page.$(".edit-tip")).toBeNull();
+      await page.click("[role=tab][data-tab=all]");
+      expect(await page.innerText(".edit-tip")).toContain("swap Custom tall1 and Custom low2");
+      expect(errors).toEqual([]);
+    });
+
+    it("drops the tip on a press that finds none, with no unsaved changes", async () => {
+      const board = [of("low1", 1), of("tall1", 2), of("low2", 2), of("tall2", 1)];
+      const { page, errors } = await open(browser, pageFile({ layout: onAll(board), widgets }));
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await page.$(".edit-tip")).not.toBeNull();
+      // the tall tiles get as low as the others: no swap evens the rows out any more
+      await page.$$eval(".tile[data-id^=tall] .tile-body div", (els) =>
+        els.forEach((e) => ((e as HTMLElement).style.height = "100px")),
+      );
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await page.$(".edit-tip")).toBeNull();
+      expect(await spans(page)).toBe("low1:1 tall1:2 low2:2 tall2:1");
+      expect(await page.innerText(".edit-bar")).not.toContain("Unsaved changes");
+      expect(errors).toEqual([]);
+    });
+
     it("shows the tip in the page language", async () => {
       const board = [of("low1", 1), of("tall1", 1), of("low2", 1), of("tall2", 1)];
       const { page } = await open(
