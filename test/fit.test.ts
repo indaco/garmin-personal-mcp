@@ -777,6 +777,11 @@ describe("laps", () => {
     const fit = decodeFit(fitFile([Profile.MesgNum.LAP, { totalTimerTime: 3725 }]), 11);
     expect(lapsOf(fit, 11)).toEqual({ activityId: 11, laps: [{ lap: 1, km: 0, time: "1:02:05" }] });
   });
+
+  it("gives a lap without a timer time the time 0:00", () => {
+    const fit = decodeFit(fitFile([Profile.MesgNum.LAP, { totalDistance: 1000 }]), 11);
+    expect(lapsOf(fit, 11)).toEqual({ activityId: 11, laps: [{ lap: 1, km: 1, time: "0:00" }] });
+  });
 });
 
 describe("run numbers of the laps", () => {
@@ -1140,10 +1145,11 @@ const cadenceRows = (more: Record<string, unknown>) =>
         },
       ],
       lapMesgs: [
-        { wktStepIndex: 1, totalDistance: 1000, avgCadence: 85 },
+        { wktStepIndex: 1, totalDistance: 1000, totalTimerTime: 300, avgCadence: 85 },
         {
           wktStepIndex: 1,
           totalDistance: 1000,
+          totalTimerTime: 300,
           avgCadence: 85,
           avgFractionalCadence: 0.5,
           ...more,
@@ -1154,6 +1160,17 @@ const cadenceRows = (more: Record<string, unknown>) =>
   ).plan?.laps ?? [];
 
 describe("plan of the laps", () => {
+  it("gives no verdict to a lap that the lap button ended after a few seconds", () => {
+    // the control: the same lap of 300 s is judged
+    expect(cadenceRows({})[1].verdict).toBe("hit");
+    expect(cadenceRows({ totalTimerTime: 4 })[1]).toMatchObject({ done: 171, verdict: null });
+    // the timer time counts, as for a rep: not the elapsed time, which holds the pauses
+    expect(cadenceRows({ totalTimerTime: 4, totalElapsedTime: 300 })[1]).toMatchObject({
+      done: 171,
+      verdict: null,
+    });
+  });
+
   const LAP = Profile.MesgNum.LAP;
   const steps: [number, Record<string, unknown>][] = [
     [M.WORKOUT_STEP, { messageIndex: 0, intensity: "warmup", targetType: "open" }],
@@ -1286,6 +1303,7 @@ describe("plan of the laps", () => {
     ["avgCadence", "85", { done: null, verdict: null }],
     ["avgFractionalCadence", "0.5", { done: 170, verdict: "hit" }],
     ["totalDistance", "1000", { done: 171, verdict: null }],
+    ["totalTimerTime", "300", { done: 171, verdict: null }],
   ])("reads a lap whose %s is %j as a lap without it", (field, bad, expected) => {
     // the control: the same lap with numbers
     expect(cadenceRows({})[1]).toMatchObject({ done: 171, verdict: "hit" });
@@ -1327,6 +1345,7 @@ describe("plan of the laps", () => {
           {
             wktStepIndex: 0,
             totalDistance: 1000,
+            totalTimerTime: 300,
             enhancedAvgSpeed: 3.2,
             avgHeartRate: 150,
             avgPower: 260,
@@ -1334,6 +1353,7 @@ describe("plan of the laps", () => {
           {
             wktStepIndex: 0,
             totalDistance: 1000,
+            totalTimerTime: 300,
             enhancedAvgSpeed: 3.2,
             avgHeartRate: 150,
             avgPower: 260,

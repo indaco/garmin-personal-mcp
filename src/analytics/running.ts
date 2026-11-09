@@ -356,6 +356,7 @@ export interface PlanLap {
   step?: number;
   intensity?: string;
   metres?: number;
+  seconds?: number;
   /** m/s */
   speed?: number;
   /** raw strides per minute */
@@ -380,8 +381,12 @@ export interface LapPlanRow {
   off: number | null;
 }
 
-/** A lap shorter than this is an open step ended by the lap button: no verdict. */
-const MIN_PLAN_METRES = 10;
+/**
+ * A lap shorter than this is an open step ended by the lap button: no verdict. The same rule as a rep
+ * (MIN_REP_KM, MIN_REP_SEC): 15 m is the raw distance that the rounded lap km shows as 0.02.
+ */
+const MIN_PLAN_METRES = 15;
+const MIN_PLAN_SEC = 8;
 const NAMES: Record<string, string> = {
   speed: "pace",
   heart_rate: "heart_rate",
@@ -417,6 +422,8 @@ function targetOf(
   const { targetLow: lo, targetHigh: hi } = s;
   if (lo === undefined || hi === undefined) return null;
   if (type === "pace") {
+    // a speed of 0 has no pace
+    if (lo <= 0 || hi <= 0) return null;
     const speed = positive(l.speed);
     return {
       target: { type, low: pace(lo / 1000), high: pace(hi / 1000), unit: "/km" },
@@ -447,7 +454,7 @@ function targetOf(
  * One row per lap that has a plan step, in lap order: the step's target, the lap's value, and hit
  * (inside the target, ends included) or miss with the signed distance outside it. No verdict for an
  * open or zone target, a target in % of max HR or FTP, a target outside the plausible range, a lap
- * under 10 m, or a lap without the value of its target.
+ * under 15 m or 8 s, or a lap without the value of its target.
  */
 export function planOfLaps(steps: PlanStep[], laps: PlanLap[]): LapPlanRow[] {
   const byIndex = new Map(steps.map((s) => [s.index, s]));
@@ -470,7 +477,8 @@ export function planOfLaps(steps: PlanStep[], laps: PlanLap[]): LapPlanRow[] {
     if (!("unit" in t.target) || t.done === null) return [row];
     const { low, high, unit } = t.target;
     const [min, max] = PLAUSIBLE[unit];
-    if ((l.metres ?? 0) < MIN_PLAN_METRES || [low, high].some((v) => v < min || v > max)) {
+    const short = (l.metres ?? 0) < MIN_PLAN_METRES || (l.seconds ?? 0) < MIN_PLAN_SEC;
+    if (short || [low, high].some((v) => v < min || v > max)) {
       return [row];
     }
     // a pace range runs from slow (low) to fast (high)

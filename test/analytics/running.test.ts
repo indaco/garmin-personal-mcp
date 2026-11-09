@@ -666,9 +666,11 @@ describe("best effort progression", () => {
 const plan = (targetType: string, targetLow?: number, targetHigh?: number, more = {}) => [
   { index: 0, intensity: "active", targetType, targetLow, targetHigh, ...more },
 ];
-/** The row of one 1 km lap of step 0. */
+/** The row of one 1 km lap of 5 min of step 0. */
 const rowOf = (steps: ReturnType<typeof plan>, more: Partial<PlanLap>) =>
-  planOfLaps(steps, [{ lap: 1, step: 0, intensity: "active", metres: 1000, ...more }])[0];
+  planOfLaps(steps, [
+    { lap: 1, step: 0, intensity: "active", metres: 1000, seconds: 300, ...more },
+  ])[0];
 /** The FIT speed of a pace, in mm/s. */
 const mms = (secPerKm: number) => Math.round(1e6 / secPerKm);
 
@@ -784,11 +786,14 @@ describe("plan of the laps", () => {
   });
 
   it.each([
-    [9.99, null],
-    [10, "hit"],
-    [undefined, null],
-  ])("judges a lap of %j m only from 10 m: %s", (metres, verdict) => {
-    expect(rowOf(plan("cadence", 80, 90), { cadence: 85, metres }).verdict).toBe(verdict);
+    [14.99, 300, null],
+    [15, 300, "hit"],
+    [undefined, 300, null],
+    [1000, 7.99, null],
+    [1000, 8, "hit"],
+    [1000, undefined, null],
+  ])("judges a lap of %j m and %j s only from 15 m and 8 s: %s", (metres, seconds, verdict) => {
+    expect(rowOf(plan("cadence", 80, 90), { cadence: 85, metres, seconds }).verdict).toBe(verdict);
   });
 
   it("gives a zone target its zone and no verdict, and a custom range of zone 0 a verdict", () => {
@@ -823,6 +828,11 @@ describe("plan of the laps", () => {
     ).toMatchObject(none);
     expect(rowOf(plan("cadence", 80), { cadence: 85 })).toMatchObject(none);
     expect(rowOf(plan("cadence", undefined, 90), { cadence: 85 })).toMatchObject(none);
+    // a pace end of 0 mm/s is no pace: 1000 / 0 would be Infinity s/km
+    expect(rowOf(plan("speed", 0, mms(300)), { speed: 3 })).toMatchObject(none);
+    expect(rowOf(plan("speed", mms(330), 0), { speed: 3 })).toMatchObject(none);
+    expect(rowOf(plan("speed", -1, mms(300)), { speed: 3 })).toMatchObject(none);
+    expect(rowOf(plan("speed", mms(330), -1), { speed: 3 })).toMatchObject(none);
     expect(rowOf(plan("cadence", 80, 90), { cadence: 85, step: 7 })).toMatchObject({
       step: 7,
       ...none,
@@ -850,8 +860,8 @@ describe("plan of the laps", () => {
     const out = planOfLaps(steps, [
       { lap: 1, step: 0, intensity: "warmup", metres: 1000 },
       { lap: 2, metres: 1000, cadence: 85 },
-      { lap: 3, step: 1, intensity: "active", metres: 400, cadence: 85 },
-      { lap: 4, step: 1, metres: 400, cadence: 91 },
+      { lap: 3, step: 1, intensity: "active", metres: 400, seconds: 90, cadence: 85 },
+      { lap: 4, step: 1, metres: 400, seconds: 90, cadence: 91 },
     ]);
     expect(out.map((r) => [r.lap, r.step, r.intensity, r.verdict])).toEqual([
       [1, 0, "warmup", null],
