@@ -120,8 +120,7 @@ register({
     let approximate = false;
     for (const a of ctx.activities) {
       const z = calc.zoneSeconds(a, floors);
-      const d = String(a.start).slice(0, 10);
-      const i = ctx.weeks.findIndex((w) => d >= w && d <= addDays(w, 6));
+      const i = calc.weekIndex(a, ctx.weeks);
       if (!z || i < 0) continue;
       approximate ||= z.approximate;
       z.sec.forEach((s, n) => (weeks[i][n] += s / 60));

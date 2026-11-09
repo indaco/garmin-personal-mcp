@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  type Activity,
   activitiesIn,
   boardOrder,
   dayOf,
@@ -16,6 +17,7 @@ import {
   sportOf,
   tabsFor,
   timedDistance,
+  weekIndex,
   weeksOf,
 } from "../../src/analytics/calc";
 import { formatHash, parseHash } from "../../src/page/state";
@@ -294,5 +296,20 @@ describe("isRunning", () => {
   it("does not throw on a type or sport that is not a text", () => {
     expect(isRunning({ type: 5 } as never)).toBe(false);
     expect(isRunning({ type: 5, sport: 5 } as never)).toBe(false);
+  });
+});
+
+describe("weekIndex", () => {
+  const weeks = ["2026-10-12", "2026-10-19"];
+  it.each([
+    ["the Monday", "2026-10-19 07:00:00", 1],
+    ["the Sunday", "2026-10-25 21:00:00", 1],
+    ["the first week", "2026-10-12 07:00:00", 0],
+    ["before the weeks", "2026-10-11 07:00:00", -1],
+    ["after the weeks", "2026-10-26 07:00:00", -1],
+    ["no start", undefined, -1],
+    ["a start that is not a date", "yesterday", -1],
+  ])("finds %s", (_, start, i) => {
+    expect(weekIndex({ start } as Activity, weeks)).toBe(i);
   });
 });

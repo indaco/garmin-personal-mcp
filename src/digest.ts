@@ -15,12 +15,14 @@ import {
   loadOf,
   loadRatio,
   loadSafety,
+  periodWindow,
   readinessOf,
   zonesOf,
 } from "./analytics/metrics";
 import {
   aerobicTrend,
   bestProgression,
+  isLongRun,
   racePredictionsOf,
   runPlanAdherence,
   type RunPlanMiss,
@@ -262,9 +264,9 @@ export function digest(data: Json): Digest {
   }
 
   // as many days as the period, right before it: the previous rows start a week earlier
-  const days = start && end ? (Date.parse(end) - Date.parse(start)) / 86_400_000 + 1 : 0;
-  const previousPeriod =
-    days > 0 ? { from: addDays(start, -days), to: addDays(start, -1) } : undefined;
+  const prior = start && end && start <= end ? periodWindow(start, end, undefined) : undefined;
+  // the digest has no `partial` field
+  const previousPeriod = prior ? { from: prior.from, to: prior.to } : undefined;
   const previousPeriodTotals: Record<string, Sum> = {};
   for (const a of previous) {
     const day = dayOf(a as Activity)!;
@@ -289,7 +291,7 @@ export function digest(data: Json): Digest {
   // the page's Long runs and Race predictor: the same functions, so the coach quotes the page
   const runs = acts.filter((a) => groupOf(a as Activity) === "running");
   const longRuns: Digest["longRuns"] = runs
-    .filter((a) => a.race === true || num(a.km) > 15)
+    .filter((a) => isLongRun(a as Activity))
     .map((a) => {
       const s = Array.isArray(a.laps)
         ? splitOf(a.laps as Parameters<typeof splitOf>[0])

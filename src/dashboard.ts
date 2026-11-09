@@ -7,7 +7,7 @@ import { addDays, localToday } from "./dates";
 import { digest } from "./digest";
 import { log } from "./log";
 import { type Activity, isRunning, mondayOf } from "./analytics/calc";
-import { type LapPlanRow, workoutOf } from "./analytics/running";
+import { isLongRun, type LapPlanRow, workoutOf } from "./analytics/running";
 import type { PlanRow } from "./analytics/strength";
 import {
   type GarminTools,
@@ -384,7 +384,7 @@ export class GarminDashboard {
               .filter((r) => r.verdict !== null)
               .map(({ exercise, verdict, why }) => ({ exercise, verdict, why }));
         }
-        const longRun = isRun(a) && typeof a.km === "number" && a.km > 15;
+        const longRun = isLongRun(a as Activity);
         let repeated = false;
         const w = workout(a);
         if (workouts && isRun(a) && w !== undefined && runNames.get(w)! > 1) {

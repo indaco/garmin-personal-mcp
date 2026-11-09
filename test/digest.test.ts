@@ -453,6 +453,16 @@ describe("digest", () => {
     expect(loose.period).not.toHaveProperty("previousPeriod");
   });
 
+  it("gives no previous period when the end is before the start", () => {
+    const out = digest({ ...data, start: "2026-10-26", end: "2026-08-03" });
+    expect(out.period).not.toHaveProperty("previousPeriod");
+  });
+
+  it("gives the day before as the previous period of a one-day period", () => {
+    const one = digest({ ...data, start: "2026-10-26", end: "2026-10-26" });
+    expect(one.period.previousPeriod).toEqual({ from: "2026-10-25", to: "2026-10-25" });
+  });
+
   it("has no load ratio without load in the 28 days", () => {
     expect(digest({ ...data, activities: [] }).load.acuteToChronic).toBeNull();
   });

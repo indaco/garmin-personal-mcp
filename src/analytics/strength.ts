@@ -1,6 +1,6 @@
 import { addDays } from "../dates";
 import type { Activity } from "./calc";
-import { dayOf } from "./calc";
+import { dayOf, weekIndex } from "./calc";
 import { epley, MIN_SESSIONS, mean } from "./metrics";
 
 /** Strength sets, muscle groups and the statistics of each exercise. Pure functions. */
@@ -93,11 +93,6 @@ export const timed = (s: StrengthSet) => (s.seconds ?? 0) > 0 && (s.reps ?? 0) <
 /** The group of an exercise: the group of its first primary muscle. */
 export const exerciseGroup = (e: Exercise): MuscleGroup =>
   e.primaryMuscles?.[0] ? muscleGroup(e.primaryMuscles[0]) : "other";
-
-function weekIndex(a: Activity, weeks: string[]): number {
-  const d = dayOf(a);
-  return d ? weeks.findIndex((w) => d >= w && d <= addDays(w, 6)) : -1;
-}
 
 /**
  * The strength sessions without sets (past the 30 newest whose .FIT file is not saved, or a file that

@@ -3,12 +3,16 @@ import {
   aerobicTrend,
   bestProgression,
   efficiency,
+  isLongRun,
+  longestShare,
   paceSeconds,
   type PlanLap,
   planOfLaps,
   predictRaces,
   racePredictionsOf,
   runPlanAdherence,
+  weeklyFastest,
+  weeklyIntensity,
   splitOf,
   workOf,
   workoutMetrics,
@@ -996,5 +1000,173 @@ describe("run plan adherence", () => {
       ["Hills", "power", 1],
       ["Tempo", "pace", 1],
     ]);
+  });
+});
+
+describe("long run", () => {
+  it.each([
+    ["a run over 15 km", { type: "running", sport: "running", km: 15.01 }, true],
+    ["a run of 15 km", { type: "running", sport: "running", km: 15 }, false],
+    ["a short race", { type: "running", sport: "running", km: 5, race: true }, true],
+    [
+      "a race flag that is not true",
+      { type: "running", sport: "running", km: 5, race: "yes" },
+      false,
+    ],
+    ["a run without km", { type: "running", sport: "running" }, false],
+    ["a km that is not a number", { type: "running", sport: "running", km: "20" }, false],
+    ["an infinite km", { type: "running", sport: "running", km: Infinity }, false],
+    ["a long ride", { type: "cycling", sport: "cycling", km: 60 }, false],
+    ["a ride race", { type: "cycling", sport: "cycling", km: 20, race: true }, false],
+    ["an older row without sport, by its type", { type: "trail_running", km: 21 }, true],
+  ])("tells %s: %s", (_, a, long) => {
+    expect(isLongRun(a as Activity)).toBe(long);
+  });
+});
+
+const zoneRun = (start: string, extra: Record<string, unknown> = {}): Activity => ({
+  type: "running",
+  start,
+  ...extra,
+});
+
+const bestRun = (name: string, start: string, best5k?: string): Activity => ({
+  name,
+  type: "running",
+  start,
+  ...(best5k === undefined ? {} : { best: { "5k": best5k } }),
+});
+
+const names = (r: (Activity | undefined)[]) => r.map((a) => a?.name);
+
+describe("weeklyIntensity", () => {
+  const weeks = ["2026-10-12", "2026-10-19"];
+  it("gives the share of zones 1-2 and 4-5 in the zone time of each week", () => {
+    const r = weeklyIntensity(
+      [zoneRun("2026-10-13 07:00:00", { hrZonesSec: [600, 600, 0, 300, 300] })],
+      weeks,
+      floors,
+    );
+    expect(r.easy[0]).toBeCloseTo(66.67, 2);
+    expect(r.hard[0]).toBeCloseTo(33.33, 2);
+    expect(r.approximate).toBe(false);
+  });
+
+  it("leaves a week without zone time null", () => {
+    const r = weeklyIntensity(
+      [zoneRun("2026-10-13 07:00:00", { hrZonesSec: [600, 600, 0, 300, 300] })],
+      weeks,
+      floors,
+    );
+    expect(r.easy[1]).toBeNull();
+    expect(r.hard[1]).toBeNull();
+    expect(weeklyIntensity([], weeks, floors)).toEqual({
+      easy: [null, null],
+      hard: [null, null],
+      approximate: false,
+    });
+  });
+
+  it("puts a run with only an average HR in one zone and flags it as approximate", () => {
+    const r = weeklyIntensity(
+      [zoneRun("2026-10-20 07:00:00", { duration: "30:00", avgHR: 100 })],
+      weeks,
+      floors,
+    );
+    expect(r).toEqual({ easy: [null, 100], hard: [null, 0], approximate: true });
+  });
+
+  it("adds the zones of several runs of a week", () => {
+    const r = weeklyIntensity(
+      [
+        zoneRun("2026-10-12 07:00:00", { hrZonesSec: [0, 600, 0, 0, 0] }),
+        zoneRun("2026-10-14 07:00:00", { hrZonesSec: [0, 0, 0, 0, 600] }),
+      ],
+      weeks,
+      floors,
+    );
+    expect(r.easy[0]).toBe(50);
+    expect(r.hard[0]).toBe(50);
+  });
+
+  it("skips a run without zones and one outside the weeks", () => {
+    const r = weeklyIntensity(
+      [
+        zoneRun("2026-10-13 07:00:00"),
+        zoneRun("2026-10-05 07:00:00", { hrZonesSec: [600, 0, 0, 0, 0] }),
+        zoneRun("2026-11-02 07:00:00", { hrZonesSec: [600, 0, 0, 0, 0] }),
+      ],
+      weeks,
+      floors,
+    );
+    expect(r).toEqual({ easy: [null, null], hard: [null, null], approximate: false });
+  });
+
+  it("keeps approximate when a later run has exact zones", () => {
+    const r = weeklyIntensity(
+      [
+        zoneRun("2026-10-13 07:00:00", { duration: "30:00", avgHR: 100 }),
+        zoneRun("2026-10-14 07:00:00", { hrZonesSec: [600, 0, 0, 0, 0] }),
+      ],
+      weeks,
+      floors,
+    );
+    expect(r.approximate).toBe(true);
+  });
+});
+
+describe("longestShare", () => {
+  it.each([
+    ["no runs", [], null],
+    ["two runs", [{ km: 10 }, { km: 5 }], 66.66666666666666],
+    ["a run without km and one of 8 km", [{}, { km: 8 }], 100],
+    ["two runs without km", [{}, {}], null],
+    ["a km that is not a number", [{ km: "9" }, { km: Number.NaN }, { km: 4 }], 100],
+  ])("with %s", (_, week, expected) => {
+    const share = longestShare(week as Activity[]);
+    if (expected === null) expect(share).toBeNull();
+    else expect(share).toBeCloseTo(expected, 8);
+  });
+});
+
+describe("weeklyFastest", () => {
+  const weeks = ["2026-10-12", "2026-10-19"];
+
+  it("is empty for no runs", () => {
+    expect(weeklyFastest([], weeks, "5k")).toEqual([undefined, undefined]);
+  });
+
+  it("keeps the faster of two runs, whichever comes first", () => {
+    const slow = bestRun("slow", "2026-10-13 07:00:00", "25:00");
+    const fast = bestRun("fast", "2026-10-14 07:00:00", "22:00");
+    expect(names(weeklyFastest([slow, fast], weeks, "5k"))).toEqual(["fast", undefined]);
+    expect(names(weeklyFastest([fast, slow], weeks, "5k"))).toEqual(["fast", undefined]);
+  });
+
+  it("works week by week", () => {
+    const a = bestRun("a", "2026-10-13 07:00:00", "25:00");
+    const b = bestRun("b", "2026-10-20 07:00:00", "24:00");
+    expect(names(weeklyFastest([a, b], weeks, "5k"))).toEqual(["a", "b"]);
+  });
+
+  it("gives undefined for a week without a 5k effort", () => {
+    const a = bestRun("a", "2026-10-13 07:00:00");
+    const b = bestRun("b", "2026-10-14 07:00:00", "24:00");
+    expect(names(weeklyFastest([a], weeks, "5k"))).toEqual([undefined, undefined]);
+    expect(names(weeklyFastest([a, b], weeks, "5k"))).toEqual(["b", undefined]);
+    expect(names(weeklyFastest([b], weeks, "10k"))).toEqual([undefined, undefined]);
+  });
+
+  it("skips an effort of 0:00 and a run outside the weeks", () => {
+    const zero = bestRun("zero", "2026-10-13 07:00:00", "0:00");
+    const old = bestRun("old", "2026-10-05 07:00:00", "20:00");
+    expect(names(weeklyFastest([zero, old], weeks, "5k"))).toEqual([undefined, undefined]);
+  });
+
+  it("keeps the first in the list on a tie", () => {
+    const a = bestRun("first", "2026-10-15 07:00:00", "24:00");
+    const b = bestRun("second", "2026-10-13 07:00:00", "24:00");
+    expect(names(weeklyFastest([a, b], weeks, "5k"))).toEqual(["first", undefined]);
+    expect(names(weeklyFastest([b, a], weeks, "5k"))).toEqual(["second", undefined]);
   });
 });

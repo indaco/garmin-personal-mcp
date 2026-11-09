@@ -1,5 +1,5 @@
 import { addDays } from "../dates";
-import { type Activity, dayOf, mondayOf, seconds } from "./calc";
+import { type Activity, dayOf, mondayOf, seconds, sessionSeconds, weekIndex } from "./calc";
 
 /**
  * Training and recovery numbers that the widgets share. Pure functions; the dashboard labels every
@@ -176,6 +176,46 @@ export function change(now: number, before: number): number | null {
   return before > 0 ? ((now - before) / before) * 100 : null;
 }
 
+export interface Totals {
+  sessions: number;
+  km: number;
+  seconds: number;
+  load: number;
+  /** How many of the sessions have a load. */
+  loadKnown: number;
+}
+
+/** Sessions, km, time and load of `acts`; `loadKnown` counts the sessions with a load. */
+export function totalsOf(acts: Activity[], maxHR?: number): Totals {
+  return acts.reduce<Totals>(
+    (t, a) => {
+      const l = loadOf(a, maxHR);
+      return {
+        sessions: t.sessions + 1,
+        km: t.km + (typeof a.km === "number" ? a.km : 0),
+        seconds: t.seconds + sessionSeconds(a),
+        load: t.load + (l?.value ?? 0),
+        loadKnown: t.loadKnown + (l ? 1 : 0),
+      };
+    },
+    { sessions: 0, km: 0, seconds: 0, load: 0, loadKnown: 0 },
+  );
+}
+
+/**
+ * The last 7 days against the mean week of the 4 before them. Null when the base is empty or starts
+ * before the data: part of 4 weeks divided by 4 reads as a rise.
+ */
+export function fourWeekChange(
+  now: number,
+  before: number,
+  end: string,
+  dataStart?: string,
+): number | null {
+  const whole = !dataStart || addDays(end, -34) >= dataStart;
+  return whole ? change(now, before / 4) : null;
+}
+
 /** The colour of a change: better is green, worse is red, no change is grey. */
 export function changeClass(
   delta: number | null | undefined,
@@ -193,9 +233,7 @@ export function weekly(
 ): number[] {
   const out = weeks.map(() => 0);
   for (const a of acts) {
-    const d = dayOf(a);
-    if (!d) continue;
-    const i = weeks.findIndex((w) => d >= w && d <= addDays(w, 6));
+    const i = weekIndex(a, weeks);
     if (i >= 0) out[i] += value(a);
   }
   return out;
