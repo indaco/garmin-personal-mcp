@@ -3197,6 +3197,103 @@ describe("type boards", () => {
     });
   });
 
+  describe("weekly series from synthetic runs", () => {
+    const run = { type: "running", sport: "running" };
+    // 13 weeks, the last starts on 2026-10-26: the runs fall in the weeks of 10-12 and 10-19
+    const runs = [
+      { ...run, id: 1, name: "A", start: "2026-10-20 08:00:00", km: 10, duration: "50:00" },
+      { ...run, id: 2, name: "B", start: "2026-10-21 08:00:00", km: 5, duration: "25:00" },
+      { ...run, id: 3, name: "C", start: "2026-10-13 08:00:00", km: 8, duration: "40:00" },
+    ];
+    const gaps = Array.from({ length: 10 }, () => null);
+
+    it("draws the fastest 5 km and 10 km effort of each week in Best efforts", async () => {
+      // week of 10-19: A is faster over 5 km, B over 10 km; week of 10-12: C alone
+      const activities = [
+        { ...runs[0], best: { "5k": "20:00", "10k": "50:00" } },
+        { ...runs[1], best: { "5k": "25:00", "10k": "45:00" } },
+        { ...runs[2], best: { "5k": "24:00", "10k": "48:00" } },
+      ];
+      const { page, errors } = await open(browser, onlyActivities(activities), {
+        hash: "#running",
+      });
+      // seconds per km: 1440 / 5 and 1200 / 5, then 2880 / 10 and 2700 / 10
+      expect((await chartDataset(page, "bestEfforts", "5 km")).data).toEqual([
+        ...gaps,
+        288,
+        240,
+        null,
+      ]);
+      expect((await chartDataset(page, "bestEfforts", "10 km")).data).toEqual([
+        ...gaps,
+        288,
+        270,
+        null,
+      ]);
+      expect(errors).toEqual([]);
+    });
+
+    it("draws the share of the longest run in the weekly distance in Long runs", async () => {
+      const { page, errors } = await open(browser, onlyActivities(runs), { hash: "#running" });
+      const share = (await chartDataset(page, "longRuns", "Longest run share of weekly distance"))
+        .data as (number | null)[];
+      // 10 of 15 km in the week of 10-19, 8 of 8 km in the week before, no run in the others
+      expect(share.slice(0, 10)).toEqual(gaps);
+      expect(share[10]).toBe(100);
+      expect(share[11]).toBeCloseTo((10 / 15) * 100, 6);
+      expect(share[12]).toBeNull();
+      expect(errors).toEqual([]);
+    });
+
+    it("draws the zone minutes of each week in HR zones", async () => {
+      const floors = zonesOf(data.zones).floors;
+      const activities = [
+        { ...runs[0], hrZonesSec: [600, 1200, 0, 0, 1800] },
+        { ...runs[1], hrZonesSec: [60, 0, 0, 0, 0] },
+      ];
+      const { page, errors } = await open(browser, onlyActivities(activities), {
+        hash: "#running",
+      });
+      const zone = async (n: number) =>
+        (await chartDataset(page, "hrZones", `Z${n + 1} (${floors[n]}+)`)).data as number[];
+      // minutes of the week of 10-19; the other weeks have none
+      expect((await Promise.all([0, 1, 2, 3, 4].map(zone))).map((d) => d.at(-2))).toEqual([
+        11, 20, 0, 0, 30,
+      ]);
+      expect((await zone(0)).filter((v) => v > 0)).toHaveLength(1);
+      expect(errors).toEqual([]);
+    });
+
+    it("shows the speed of a ride over its moving time in Bike details", async () => {
+      const ride = data.activities.find((a: Record<string, unknown>) => a.type === "cycling");
+      const rides = [
+        { ...ride, id: 11, start: "2026-10-20 09:00:00", km: 30, duration: "1:30:00" },
+        { ...without(ride, ["km"]), id: 12, start: "2026-10-19 09:00:00" },
+      ];
+      const { page, errors } = await open(browser, onlyActivities(rides), { hash: "#cycling" });
+      const speeds = await page.$$eval("[data-id=bikeDetails] table.data tbody tr", (r) =>
+        r.map((x) => x.children[3].textContent),
+      );
+      expect(speeds).toEqual(["20.0 km/h", "n/a"]);
+      expect(errors).toEqual([]);
+    });
+
+    it("totals the load of a run without a Garmin load from its heart rate", async () => {
+      const maxHR = zonesOf(data.zones).maxHR!;
+      const noLoadRun = { ...runs[0], duration: "60:00", avgHR: 150 };
+      const { page, errors } = await open(browser, onlyActivities([noLoadRun]), {
+        hash: "#running",
+      });
+      const tile = page
+        .locator("[data-id=typeKpis] .kpi", {
+          has: page.locator(".kpi-label", { hasText: "Garmin training load" }),
+        })
+        .locator(".kpi-value");
+      expect(await tile.textContent()).toBe(whole.format((60 * 150) / maxHR));
+      expect(errors).toEqual([]);
+    });
+  });
+
   it("shows n/a in the racket table for no zone time, and a real 0 for easy zones only", async () => {
     const base = data.activities.find((a: Record<string, unknown>) => a.type === "paddelball");
     const padel = (n: number, extra: Record<string, unknown>) => ({
@@ -5321,6 +5418,9 @@ describe("new in this version", () => {
 /** The test page with extra activities before the fixture's own. */
 const withActivities = (extra: unknown[]) =>
   pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: [...extra, ...data.activities] } });
+/** The test page with these activities instead of the fixture's own. */
+const onlyActivities = (activities: unknown[]) =>
+  pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } });
 /** The text of the KPI widget of the Run board with extra activities. */
 const runKpiText = async (activities: unknown[]) => {
   const { page } = await open(browser, withActivities(activities), { hash: "#running" });

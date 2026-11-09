@@ -90,6 +90,47 @@ export function zoneSeconds(
   return { sec, approximate: true };
 }
 
+/**
+ * Per week, the share in % of the zone time spent in zones 1-2 (easy) and 4-5 (hard); null for a week
+ * without zone time. `approximate` when a run has no zone seconds and counts in the zone of its average HR.
+ */
+export function weeklyIntensity(acts: Activity[], weeks: string[], floors: number[]) {
+  const sums = weeks.map(() => [0, 0, 0]);
+  let approximate = false;
+  for (const a of acts) {
+    const z = zoneSeconds(a, floors);
+    const i = weekIndex(a, weeks);
+    if (!z || i < 0) continue;
+    approximate ||= z.approximate;
+    sums[i][0] += z.sec[0] + z.sec[1];
+    sums[i][1] += z.sec[3] + z.sec[4];
+    sums[i][2] += z.sec.reduce((s, v) => s + v, 0);
+  }
+  const share = (n: number) => sums.map((w) => (w[2] > 0 ? (w[n] / w[2]) * 100 : null));
+  return { easy: share(0), hard: share(1), approximate };
+}
+
+/** The longest run's km in % of the week's km; null when the week has no km. */
+export function longestShare(week: Activity[]): number | null {
+  const km = week.reduce((s, a) => s + (num(a.km) ?? 0), 0);
+  const longest = Math.max(0, ...week.map((a) => num(a.km) ?? 0));
+  return km > 0 ? (longest / km) * 100 : null;
+}
+
+/** Per week, the run with the fastest best effort at `d`; the first in the list keeps a tie. */
+export function weeklyFastest(
+  runs: Activity[],
+  weeks: string[],
+  d: string,
+): (Activity | undefined)[] {
+  const effort = (a: Activity) => seconds((a.best as Record<string, unknown> | undefined)?.[d]);
+  return weeks.map((_, i) =>
+    runs
+      .filter((a) => weekIndex(a, weeks) === i && effort(a) > 0)
+      .reduce<Activity | undefined>((b, a) => (b && effort(b) <= effort(a) ? b : a), undefined),
+  );
+}
+
 export type SplitKind = "negative" | "even" | "positive";
 
 /**

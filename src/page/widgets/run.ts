@@ -62,14 +62,7 @@ register({
     const weekly = Object.entries(TREND).map(([d, km]) => ({
       d,
       km,
-      weeks: ctx.weeks.map((_, i) =>
-        runs(ctx)
-          .filter((a) => weekOf(ctx, a) === i && effort(a, d) > 0)
-          .reduce<Activity | undefined>(
-            (b, a) => (b && effort(b, d) <= effort(a, d) ? b : a),
-            undefined,
-          ),
-      ),
+      weeks: ctx.calc.weeklyFastest(runs(ctx), ctx.weeks, d),
     }));
     const shown = weekly.filter((x) => x.weeks.filter(Boolean).length >= 2);
     if (shown.length === 0) return;
@@ -291,27 +284,16 @@ register({
     const { t, calc, fmt } = ctx;
     if (oneSession(el, ctx)) return;
     const floors = calc.zonesOf(ctx.data.zones).floors;
-    const weeks = ctx.weeks.map(() => [0, 0, 0]);
-    let approximate = false;
-    for (const a of ctx.activities) {
-      const z = calc.zoneSeconds(a, floors);
-      const i = weekOf(ctx, a);
-      if (!z || i < 0) continue;
-      approximate ||= z.approximate;
-      weeks[i][0] += z.sec[0] + z.sec[1];
-      weeks[i][1] += z.sec[3] + z.sec[4];
-      weeks[i][2] += z.sec.reduce((s, v) => s + v, 0);
-    }
-    const share = (n: number) => weeks.map((w) => (w[2] > 0 ? (w[n] / w[2]) * 100 : null));
+    const { easy, hard, approximate } = calc.weeklyIntensity(ctx.activities, ctx.weeks, floors);
     ctx.chart(el, {
       type: "line",
       data: {
         labels: ctx.weeks.map((w) => weekLabel(ctx, w)),
         datasets: [
-          { label: t("is.easy"), data: share(0), borderColor: ctx.color("good"), spanGaps: true },
+          { label: t("is.easy"), data: easy, borderColor: ctx.color("good"), spanGaps: true },
           {
             label: t("is.hard"),
-            data: share(1),
+            data: hard,
             borderColor: ctx.color("bad"),
             borderDash: [6, 4], // not told apart by colour alone
             spanGaps: true,
@@ -509,11 +491,7 @@ register({
     const { t, fmt, calc } = ctx;
     if (oneSession(el, ctx)) return;
     const weekly = ctx.weeks.map((_, i) => runs(ctx).filter((a) => weekOf(ctx, a) === i));
-    const share = weekly.map((w) => {
-      const km = w.reduce((s, a) => s + (num(a.km) ?? 0), 0);
-      const longest = Math.max(0, ...w.map((a) => num(a.km) ?? 0));
-      return km > 0 ? (longest / km) * 100 : null;
-    });
+    const share = weekly.map((w) => calc.longestShare(w));
     // a week without ascent data is a gap, not flat running
     const ascent = weekly.map((w) => {
       const m = w.map((a) => num(a.ascentM)).filter((v): v is number => v !== undefined);

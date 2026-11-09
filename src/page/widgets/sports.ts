@@ -1,4 +1,4 @@
-import { type Activity, isIndoor, seconds, sessionSeconds, sportOf } from "../../analytics/calc";
+import { type Activity, isIndoor, sessionSeconds, sportOf } from "../../analytics/calc";
 import { append, h } from "../dom";
 import type { Key } from "../i18n";
 import { register } from "../registry";
@@ -10,12 +10,6 @@ import { delta, everyActivity, kpi, kpiRow, note, sessionTable, weekLabel, withU
 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 const day = (a: Activity) => String(a.start).slice(0, 10);
-/** km/h over moving time. */
-function speed(a: Activity): number | undefined {
-  const hours = seconds(a.duration) / 3600;
-  return typeof a.km === "number" && hours > 0 ? a.km / hours : undefined;
-}
-
 const weekOf = (ctx: Ctx, a: Activity) => ctx.calc.weekIndex(a, ctx.weeks);
 
 register({
@@ -310,7 +304,7 @@ register({
           fmt.day(day(a)),
           a.name ?? "",
           fmt.dist(num(a.km)),
-          fmt.speed(speed(a)),
+          fmt.speed(ctx.calc.kmPerHour(a)),
           fmt.elev(num(a.ascentM)),
           isIndoor(a.type ?? "") ? t("bd.indoor") : t("bd.outdoor"),
           ...(dynamics ? [fmt.num(num(a.grit), 1), fmt.num(num(a.flow), 1)] : []),

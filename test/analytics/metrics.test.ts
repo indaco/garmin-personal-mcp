@@ -7,6 +7,7 @@ import {
   epley,
   fitnessFatigue,
   fitnessFatigueFrom,
+  fourWeekChange,
   intensityMinutes,
   loadOf,
   loadSafety,
@@ -20,6 +21,7 @@ import {
   riegel,
   rolling,
   sd,
+  totalsOf,
   weekly,
   weeklyKnown,
   weeklyMeans,
@@ -562,5 +564,48 @@ describe("period comparison", () => {
     ],
   ])("compares equal days: %s", (_name, from, end, dataStart, pfrom, pto, partial) => {
     expect(w(from, end, dataStart)).toEqual({ from: pfrom, to: pto, partial });
+  });
+});
+
+describe("totalsOf", () => {
+  it("is all zero for no activities", () => {
+    expect(totalsOf([])).toEqual({ sessions: 0, km: 0, seconds: 0, load: 0, loadKnown: 0 });
+  });
+
+  it("adds sessions, km, time and the known loads", () => {
+    const t = totalsOf([
+      { type: "running", km: 10, duration: "50:00", trainingLoad: 80 },
+      { type: "running", km: 5, duration: "30:00" },
+    ]);
+    expect(t).toEqual({ sessions: 2, km: 15, seconds: 4800, load: 80, loadKnown: 1 });
+  });
+
+  it("estimates a load from HR when it has a max HR", () => {
+    const run = { type: "running", duration: "60:00", avgHR: 150 };
+    expect(totalsOf([run], 200)).toMatchObject({ load: 45, loadKnown: 1 });
+    expect(totalsOf([run])).toMatchObject({ load: 0, loadKnown: 0 });
+  });
+
+  it("counts 0 km for a km that is not a number", () => {
+    expect(totalsOf([{ type: "running", km: "10" as unknown as number }]).km).toBe(0);
+  });
+
+  it("counts the elapsed time of a strength session", () => {
+    const s = { type: "strength_training", duration: "10:00", elapsed: "45:00" };
+    expect(totalsOf([s]).seconds).toBe(2700);
+  });
+});
+
+describe("fourWeekChange", () => {
+  const end = "2026-10-25";
+  it.each([
+    ["no data start", 30, 80, undefined, 50],
+    ["no base", 30, 0, undefined, null],
+    ["a base that starts on the first day of the data", 30, 80, "2026-09-21", 50],
+    ["a base that starts before the data", 30, 80, "2026-09-22", null],
+    ["a data start long before the base", 30, 80, "2026-01-01", 50],
+    ["no base and a short data", 30, 0, "2026-09-22", null],
+  ])("with %s", (_, now, before, dataStart, expected) => {
+    expect(fourWeekChange(now, before, end, dataStart)).toBe(expected);
   });
 });

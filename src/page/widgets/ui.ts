@@ -1,5 +1,6 @@
 import { addDays } from "../../dates";
-import { type Activity, groupOf, mondayOf, sessionSeconds } from "../../analytics/calc";
+import { type Activity, groupOf, mondayOf } from "../../analytics/calc";
+import type { Totals } from "../../analytics/metrics";
 import { h } from "../dom";
 import { en } from "../i18n/en";
 import type { Key, T } from "../i18n";
@@ -104,9 +105,8 @@ export function vsFourWeeks(
   end: string,
   label: Key,
 ): HTMLElement | false {
-  const pct = ctx.calc.change(now, before / 4);
-  const whole = !ctx.data.prevStart || addDays(end, -34) >= ctx.data.prevStart;
-  return pct !== null && whole && h("span", {}, delta(ctx, pct), " ", ctx.t(label));
+  const pct = ctx.calc.fourWeekChange(now, before, end, ctx.data.prevStart);
+  return pct !== null && h("span", {}, delta(ctx, pct), " ", ctx.t(label));
 }
 
 /** A table; numeric columns align right. */
@@ -181,34 +181,12 @@ export function between(
   });
 }
 
-export interface Totals {
-  sessions: number;
-  km: number;
-  seconds: number;
-  load: number;
-  /** How many of the sessions have a load. */
-  loadKnown: number;
-}
+export type { Totals };
 
 /** The max HR of the default zones, for estimated loads. */
 export const maxHR = (ctx: Ctx) => ctx.calc.zonesOf(ctx.data.zones).maxHR;
 
-export function totals(ctx: Ctx, acts: Activity[]): Totals {
-  const max = maxHR(ctx);
-  return acts.reduce<Totals>(
-    (t, a) => {
-      const l = ctx.calc.loadOf(a, max);
-      return {
-        sessions: t.sessions + 1,
-        km: t.km + (typeof a.km === "number" ? a.km : 0),
-        seconds: t.seconds + sessionSeconds(a),
-        load: t.load + (l?.value ?? 0),
-        loadKnown: t.loadKnown + (l ? 1 : 0),
-      };
-    },
-    { sessions: 0, km: 0, seconds: 0, load: 0, loadKnown: 0 },
-  );
-}
+export const totals = (ctx: Ctx, acts: Activity[]): Totals => ctx.calc.totalsOf(acts, maxHR(ctx));
 
 /** The load of a total; n/a when there are sessions and none of them has a load. */
 export const loadText = (ctx: Ctx, t: Totals) =>

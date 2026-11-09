@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Activity } from "../../src/analytics/calc";
 import {
   distancePerStroke,
+  kmPerHour,
   perHour,
   runLoadPerMinute,
   strokesPerLength,
@@ -162,5 +163,18 @@ describe("sport numbers", () => {
     // (60 + 90) / 90 min
     expect(runLoadPerMinute(runs)).toBeCloseTo(150 / 90, 6);
     expect(runLoadPerMinute([])).toBeNull();
+  });
+});
+
+describe("kmPerHour", () => {
+  it.each([
+    ["km over moving time", { km: 30, duration: "1:00:00" }, 30],
+    ["a half hour", { km: 10, duration: "30:00" }, 20],
+    ["no km", { duration: "1:00:00" }, undefined],
+    ["a km that is a string", { km: "30" as unknown as number, duration: "1:00:00" }, undefined],
+    ["no time", { km: 30, duration: "0:00" }, undefined],
+    ["no duration", { km: 30 }, undefined],
+  ])("with %s", (_, a, expected) => {
+    expect(kmPerHour(a as Activity)).toBe(expected);
   });
 });

@@ -90,6 +90,12 @@ export function perHour(value: number, a: Activity): number | undefined {
   return h > 0 ? value / h : undefined;
 }
 
+/** km/h over moving time. */
+export function kmPerHour(a: Activity): number | undefined {
+  const hours = seconds(a.duration) / 3600;
+  return typeof a.km === "number" && hours > 0 ? a.km / hours : undefined;
+}
+
 /** The share in % of the zone seconds in the given zones (0-4). */
 export function zoneShare(sec: number[], zones: number[]): number | null {
   const total = sec.reduce((s, v) => s + v, 0);
