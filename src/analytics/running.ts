@@ -246,16 +246,23 @@ export type WorkoutMetric =
   | "gct"
   | "vertRatio"
   | "stride"
-  | "power";
+  | "power"
+  | "plan";
 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 
 /**
  * The numbers that compare the sessions of one workout: pace, HR, cadence and power of the work laps
- * of a structured workout, else of the whole run; the running form of the whole run.
+ * of a structured workout, else of the whole run; the running form of the whole run; `plan`, the
+ * percent of the laps with a planned target that were inside it.
  */
 export function workoutMetrics(a: Activity) {
   const work = Array.isArray(a.laps) ? workOf(a.laps as Lap[]) : undefined;
+  const verdicts = (Array.isArray(a.planVerdicts) ? a.planVerdicts : []).map(
+    (r: unknown) => (r as { verdict?: unknown } | null)?.verdict,
+  );
+  const hit = verdicts.filter((v) => v === "hit").length;
+  const judged = hit + verdicts.filter((v) => v === "miss").length;
   const pace = work ? work.pace : paceSeconds(a);
   const hr = work ? work.hr : num(a.avgHR);
   const m: Partial<Record<WorkoutMetric, number>> & { reps?: number; fade?: number } = {
@@ -267,6 +274,7 @@ export function workoutMetrics(a: Activity) {
     vertRatio: work ? work.vertRatio : num(a.vertRatioPct),
     stride: work ? work.stride : num(a.strideCm),
     power: work ? work.power : num(a.avgPowerW),
+    plan: judged > 0 ? Math.round((100 * hit) / judged) : undefined,
     reps: work?.reps,
     fade: work?.fade,
   };

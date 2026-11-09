@@ -68,10 +68,16 @@ export function showAll(ctx: Ctx, extra: HTMLElement[], total: number): HTMLElem
 }
 
 /**
- * A change in %, with an arrow. Only a metric where one direction is better (HRV up, resting HR down)
- * is green or red, with "better" or "worse" for screen readers; a change of volume is neither.
+ * A change in %, or in points for a metric that is itself a percent, with an arrow. Only a metric
+ * where one direction is better (HRV up, resting HR down) is green or red, with "better" or "worse"
+ * for screen readers; a change of volume is neither.
  */
-export function delta(ctx: Ctx, pct: number | null, better?: "up" | "down"): HTMLElement {
+export function delta(
+  ctx: Ctx,
+  pct: number | null,
+  better?: "up" | "down",
+  points = false,
+): HTMLElement {
   // no base to compare with (e.g. no sessions before) is not missing data: show nothing
   if (pct === null) return h("span", {});
   const cls = better ? ctx.calc.changeClass(pct, better === "up") : "same";
@@ -80,7 +86,9 @@ export function delta(ctx: Ctx, pct: number | null, better?: "up" | "down"): HTM
     "span",
     { class: `delta ${better ? cls : ""}` },
     flat ? "" : pct > 0 ? "▲ " : "▼ ",
-    ctx.fmt.pct(Math.abs(pct)).replace("+", ""),
+    points
+      ? ctx.t("delta.points", { n: ctx.fmt.num(Math.abs(pct), 0) })
+      : ctx.fmt.pct(Math.abs(pct)).replace("+", ""),
     cls !== "same" && h("span", { class: "sr-only" }, ` (${ctx.t(`delta.${cls}`)})`),
   );
 }
