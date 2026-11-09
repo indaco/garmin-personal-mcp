@@ -32,6 +32,7 @@ import {
 import {
   add,
   arrange,
+  arrangeTip,
   boardOf,
   type Instance,
   type Layout,
@@ -105,6 +106,8 @@ let view: View;
 let editing = false;
 // edit mode works on a copy: Done saves it, Discard drops it
 let draft: Layout | null = null;
+/** The tip of the last Auto-arrange press, for its board; any other edit drops it. */
+let tip: { tab: string; swap: [string, string]; board: Instance[] } | undefined;
 let accountOpen = false;
 // on a phone the week window folds into one control
 let windowOpen = false;
@@ -471,6 +474,7 @@ function dirty(): boolean {
 function leaveEdit(): void {
   editing = false;
   draft = null;
+  tip = undefined;
   render();
   document.querySelector<HTMLElement>(".account summary")?.focus();
 }
@@ -1016,23 +1020,45 @@ function currentBoard(): Instance[] {
 }
 
 /** An edit changes the draft only; Done saves it. */
-function saveBoard(board: Instance[]): void {
-  setDraft(withBoard(draft ?? layout, view.tab, board, preset));
+function saveBoard(board: Instance[], nextTip?: typeof tip): void {
+  setDraft(withBoard(draft ?? layout, view.tab, board, preset), nextTip);
 }
 
-/** The current board in full rows, in its own order. A draft like every other edit. */
+/** What Auto-arrange needs of a tile. */
+const tileInfo = (i: Instance) =>
+  // a withheld widget has no tile, so it takes no column; it stays on the board
+  withheld.has(i.widget)
+    ? undefined
+    : // shortcut: heights are measured at the current window width, measure at 3 columns if phone results are poor
+      { height: contentHeight(i.id), min: widget(i.widget)?.minSpan ?? 1 };
+
+/** The current board in full rows, in its own order, and a tip when a swap would do better. A draft like every other edit. */
 function autoArrange(): void {
   const board = currentBoard();
-  // shortcut: heights are measured at the current window width, measure at 3 columns if phone results are poor
-  const next = arrange(board, (i) =>
-    // a withheld widget has no tile, so it takes no column; it stays on the board
-    withheld.has(i.widget)
-      ? undefined
-      : { height: contentHeight(i.id), min: widget(i.widget)?.minSpan ?? 1 },
-  );
+  const next = arrange(board, tileInfo);
+  const found = arrangeTip(board, tileInfo);
+  const nextTip = found && { tab: view.tab, ...found };
   // a save lists a preset board, and the bar would show unsaved changes with nothing changed
-  if (JSON.stringify(next) !== JSON.stringify(board)) saveBoard(next);
-  announce(t("said.arranged"));
+  if (JSON.stringify(next) !== JSON.stringify(board)) saveBoard(next, nextTip);
+  else if (tip || nextTip) {
+    tip = nextTip;
+    render();
+  }
+  announce(nextTip ? `${t("said.arranged")}. ${tipText(nextTip.swap)}` : t("said.arranged"));
+}
+
+const titleOfId = (id: string) => {
+  const inst = currentBoard().find((i) => i.id === id)!;
+  return titleOf(inst, widget(inst.widget));
+};
+const swapNames = ([a, b]: [string, string]) => ({ a: titleOfId(a), b: titleOfId(b) });
+const tipText = (swap: [string, string]) => t("edit.tip", swapNames(swap));
+
+function applyTip(): void {
+  const { swap, board } = tip!;
+  const names = swapNames(swap);
+  saveBoard(board);
+  announce(t("said.swapped", names));
 }
 
 /** A tile is as tall as its row, so its content ends at the bottom of its body. Whole px, so that sums compare. */
@@ -1042,8 +1068,9 @@ function contentHeight(id: string): number {
   return Math.round(end - el.getBoundingClientRect().top);
 }
 
-function setDraft(next: Layout): void {
+function setDraft(next: Layout, nextTip?: typeof tip): void {
   draft = next;
+  tip = nextTip;
   render();
 }
 
@@ -1188,6 +1215,13 @@ function editBar(): HTMLElement {
     h("button", { class: "btn", onclick: copyDialog }, t("edit.copy")),
     h("button", { class: "btn", onclick: discard }, t("edit.discard")),
     h("button", { class: "btn primary", onclick: done }, t("edit.done")),
+    tip?.tab === view.tab &&
+      h(
+        "p",
+        { class: "edit-tip small" },
+        h("span", {}, tipText(tip.swap)),
+        h("button", { class: "btn", onclick: applyTip }, t("edit.tipApply")),
+      ),
   );
 }
 

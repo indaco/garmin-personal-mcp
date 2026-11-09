@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   add,
   arrange,
+  arrangeTip,
   boardOf,
   type Instance,
   type Layout,
@@ -873,5 +874,57 @@ describe("arrange", () => {
       expect(open).toBe(0);
       expect(run(once, facts)).toEqual(once);
     }
+  });
+});
+
+const tipOf = (spans: [string, Span][], heights: Record<string, number> = {}, board?: Instance[]) =>
+  arrangeTip(board ?? spans.map(([id, span]) => placed(id, span)), (i) => ({
+    height: heights[i.id] ?? 100,
+    min: 1,
+  }));
+const narrow = (letters: string) => [...letters].map((id): [string, Span] => [id, 1]);
+
+describe("arrangeTip", () => {
+  it("swaps the neighbours that give rows of closer heights, and arranges the result", () => {
+    const tip = tipOf(narrow("abcd"), { a: 100, b: 400, c: 100, d: 400 })!;
+    expect(tip.swap).toEqual(["b", "c"]);
+    expect(shape(tip.board)).toBe("a:2 c:1 b:2 d:1");
+  });
+
+  it("swaps the neighbours that save a row, also with one height", () => {
+    const tip = tipOf([
+      ["a", 2],
+      ["b", 2],
+      ["c", 1],
+      ["d", 1],
+    ])!;
+    expect(tip.swap).toEqual(["b", "c"]);
+    expect(shape(tip.board)).toBe("a:2 c:1 b:2 d:1");
+  });
+
+  it.each<[string, [string, Span][], Record<string, number>]>([
+    ["an empty board", [], {}],
+    ["one tile", narrow("a"), {}],
+    ["rows that a swap cannot better", narrow("abc"), { a: 100, b: 100, c: 400 }],
+    ["a gain below 40 px", narrow("abcd"), { a: 100, b: 139, c: 100, d: 139 }],
+  ])("gives no tip for %s", (_name, spans, heights) => {
+    expect(tipOf(spans, heights)).toBeUndefined();
+  });
+
+  it("gives a tip for a gain of 40 px", () => {
+    expect(tipOf(narrow("abcd"), { a: 100, b: 140, c: 100, d: 140 })?.swap).toEqual(["b", "c"]);
+  });
+
+  it("swaps across a hidden widget, which keeps its place", () => {
+    const board = [
+      placed("a", 1),
+      placed("b", 1),
+      placed("h", 1, { hidden: true }),
+      placed("c", 1),
+      placed("d", 1),
+    ];
+    const tip = tipOf([], { a: 100, b: 400, c: 100, d: 400 }, board)!;
+    expect(tip.swap).toEqual(["b", "c"]);
+    expect(shape(tip.board)).toBe("a:2 c:1 h:1 b:2 d:1");
   });
 });

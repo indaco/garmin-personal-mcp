@@ -143,21 +143,18 @@ interface Split {
 const better = (a: Split, b: Split | undefined) =>
   !b || a.rows < b.rows || (a.rows === b.rows && a.gap < b.gap);
 
-/**
- * The board in full rows, in the order the user gave. Only widths change: each row is 1 to 3
- * neighbouring tiles, the split has the fewest rows and then the closest heights in a row, and the
- * free columns of a row go to its tallest tile. A width only grows. A hidden widget, and one that
- * `info` gives nothing for (it has no tile), keeps its place and width and takes no column.
- */
-export function arrange(
-  board: Instance[],
-  info: (i: Instance) => { height: number; min: Span } | undefined,
-): Instance[] {
-  const tiles = board.flatMap((item): Tile[] => {
+type TileInfo = (i: Instance) => { height: number; min: Span } | undefined;
+
+/** The tiles that take columns: not hidden, and with a tile on the page. */
+function tilesOf(board: Instance[], info: TileInfo): Tile[] {
+  return board.flatMap((item): Tile[] => {
     const facts = item.hidden ? undefined : info(item);
     return facts ? [{ item, height: facts.height, min: Math.max(item.span, facts.min) }] : [];
   });
-  // best[end] splits tiles[0..end); a single tile always fits a row, so each end has a split
+}
+
+/** best[end] splits tiles[0..end); a single tile always fits a row, so each end has a split. */
+function splitsOf(tiles: Tile[]): Split[] {
   const best: Split[] = [{ rows: 0, gap: 0, cut: 0 }];
   for (let end = 1; end <= tiles.length; end++) {
     for (let size = 1; size <= Math.min(3, end); size++) {
@@ -172,6 +169,18 @@ export function arrange(
       if (better(split, best[end])) best[end] = split;
     }
   }
+  return best;
+}
+
+/**
+ * The board in full rows, in the order the user gave. Only widths change: each row is 1 to 3
+ * neighbouring tiles, the split has the fewest rows and then the closest heights in a row, and the
+ * free columns of a row go to its tallest tile. A width only grows. A hidden widget, and one that
+ * `info` gives nothing for (it has no tile), keeps its place and width and takes no column.
+ */
+export function arrange(board: Instance[], info: TileInfo): Instance[] {
+  const tiles = tilesOf(board, info);
+  const best = splitsOf(tiles);
   const spans = new Map<Instance, Span>();
   for (let end = tiles.length; end > 0; end = best[end].cut) {
     const row = tiles.slice(best[end].cut, end);
@@ -183,6 +192,34 @@ export function arrange(
     const span = spans.get(i);
     return span === undefined || span === i.span ? i : { ...i, span };
   });
+}
+
+// shortcut: a fixed pixel gain, so that a few px of measuring noise give no tip; scale it with the font size if tips show for rows that look even
+const TIP_GAIN = 40;
+
+/**
+ * The swap of two neighbouring tiles that `arrange` would turn into fewer rows, or into rows with
+ * heights at least TIP_GAIN px closer in all; the best one, with the board it gives. The swap is
+ * done on this board, so a tile that the press made wider is not wider yet.
+ */
+export function arrangeTip(
+  board: Instance[],
+  info: TileInfo,
+): { swap: [string, string]; board: Instance[] } | undefined {
+  const tiles = tilesOf(board, info);
+  const now = splitsOf(tiles)[tiles.length];
+  let found: { at: number; split: Split } | undefined;
+  for (let at = 0; at + 1 < tiles.length; at++) {
+    const swapped = tiles.with(at, tiles[at + 1]).with(at + 1, tiles[at]);
+    const split = splitsOf(swapped)[tiles.length];
+    const gains =
+      split.rows < now.rows || (split.rows === now.rows && now.gap - split.gap >= TIP_GAIN);
+    if (gains && better(split, found?.split)) found = { at, split };
+  }
+  if (!found) return undefined;
+  const [a, b] = [tiles[found.at].item, tiles[found.at + 1].item];
+  const swapped = board.map((i) => (i === a ? b : i === b ? a : i));
+  return { swap: [a.id, b.id], board: arrange(swapped, info) };
 }
 
 export function setSpan(board: Instance[], id: string, span: Span): Instance[] {

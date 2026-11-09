@@ -190,6 +190,8 @@ out. To add one:
 | `edit.add` | Add widget |
 | `edit.reset` | Reset board |
 | `edit.arrange` | Auto-arrange |
+| `edit.tip` | Tip: swap {a} and {b} to even out the rows. |
+| `edit.tipApply` | Swap |
 | `edit.discard` | Discard |
 | `edit.bar` | Edit layout |
 | `edit.editing` | Editing · {board} |
@@ -220,6 +222,7 @@ out. To add one:
 | `said.saved` | Layout saved |
 | `said.unchanged` | No changes to save |
 | `said.arranged` | Widgets arranged |
+| `said.swapped` | {a} and {b} swapped |
 | `said.discarded` | Changes discarded |
 | `stale.label` | New layout |
 | `stale.text` | Your assistant wrote a new layout for this dashboard. The layout you made in this browser stays until you choose. |

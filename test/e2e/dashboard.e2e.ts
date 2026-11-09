@@ -1266,6 +1266,78 @@ describe("edit mode", () => {
       expect(errors).toEqual([]);
     });
 
+    it("suggests a swap that evens out the rows, and Swap applies it", async () => {
+      const board = [of("low1", 1), of("tall1", 1), of("low2", 1), of("tall2", 1)];
+      const { page, errors } = await open(browser, pageFile({ layout: onAll(board), widgets }));
+      await startEdit(page);
+      expect(await page.$(".edit-tip")).toBeNull();
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await spans(page)).toBe("low1:1 tall1:1 low2:1 tall2:3");
+      const tipText = "Tip: swap Custom tall1 and Custom low2 to even out the rows.";
+      expect(await page.innerText(".edit-tip")).toContain(tipText);
+      expect(await page.textContent("#announce")).toBe(`Widgets arranged. ${tipText}`);
+      expect(await page.innerText(".edit-tip button")).toBe("Swap");
+
+      await page.click(".edit-tip button");
+      expect(await spans(page)).toBe(paired);
+      expect(await page.$(".edit-tip")).toBeNull();
+      expect(await page.textContent("#announce")).toBe("Custom tall1 and Custom low2 swapped");
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await page.$(".edit-tip")).toBeNull();
+      expect(errors).toEqual([]);
+    });
+
+    it("shows a tip on a board that is already arranged, with no unsaved changes", async () => {
+      const board = [of("low1", 1), of("tall1", 2), of("low2", 2), of("tall2", 1)];
+      const { page, errors } = await open(browser, pageFile({ layout: onAll(board), widgets }));
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await spans(page)).toBe("low1:1 tall1:2 low2:2 tall2:1");
+      expect(await page.innerText(".edit-bar")).not.toContain("Unsaved changes");
+      expect(await page.innerText(".edit-tip")).toContain("swap Custom tall1 and Custom low2");
+      await page.click(".edit-tip button");
+      expect(await spans(page)).toBe("low1:1 low2:2 tall1:2 tall2:1");
+      expect(await page.innerText(".edit-bar")).toContain("Unsaved changes");
+      expect(errors).toEqual([]);
+    });
+
+    it("drops the tip on another edit and on a press that finds none", async () => {
+      const board = [of("low1", 1), of("tall1", 1), of("low2", 1), of("tall2", 1)];
+      const { page, errors } = await open(browser, pageFile({ layout: onAll(board), widgets }));
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      await page.click(".edit-bar >> text=Reset board");
+      expect(await page.$(".edit-tip")).toBeNull();
+
+      await page.click(".edit-bar >> text=Discard");
+      await page.click("dialog >> text=Discard changes");
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      await page.click(".edit-tip button");
+      await page.click(".edit-bar >> text=Discard");
+      await page.click("dialog >> text=Discard changes");
+      await startEdit(page);
+      expect(await page.$(".edit-tip")).toBeNull();
+      expect(errors).toEqual([]);
+    });
+
+    it("shows the tip in the page language", async () => {
+      const board = [of("low1", 1), of("tall1", 1), of("low2", 1), of("tall2", 1)];
+      const { page } = await open(
+        browser,
+        pageFile({ layout: onAll(board), widgets, settings: { languages: ["en", "it"] } }),
+        { locale: "it-IT" },
+      );
+      await page.click(".account summary");
+      await page.click(".account-panel >> text=Modifica layout");
+      await page.click(".edit-bar >> text=Disponi automaticamente");
+      expect(await page.innerText(".edit-tip")).toContain(
+        "Suggerimento: scambia Custom tall1 e Custom low2 per bilanciare le righe.",
+      );
+      await page.click(".edit-tip button");
+      expect(await spans(page)).toBe(paired);
+    });
+
     it.each([390, 1000])("splits by height and stays the same at %d px", async (width) => {
       const { page, errors } = await open(browser, pageFile({ layout: onAll(byHeight), widgets }), {
         viewport: { width, height: 844 },

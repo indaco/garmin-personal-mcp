@@ -306,7 +306,10 @@ The edit bar stays at the top of the window while you scroll. It has:
   It keeps your widgets and custom widgets, unlike **Reset board**. It changes only the widths: it
   makes a tile wider where a row has free columns, and never narrower. It uses as few rows as it can,
   and of those it picks the rows whose tiles have the closest heights. Move a widget to change which
-  tiles share a row. Select **Done** to keep the result, or **Discard** to undo it.
+  tiles share a row. When swapping two neighbouring widgets would save a row or give rows of
+  clearly closer heights, the bar shows a tip with a **Swap** button. **Swap** makes that swap and
+  arranges the board again; any other edit removes the tip. Select **Done** to keep the result, or
+  **Discard** to undo it.
 - **Copy layout**: gives the layout as text.
 - **Discard**: puts the layout back as it was before you selected **Edit layout**, on every board.
   When you have changes, the page asks first. Escape does the same.
