@@ -386,9 +386,11 @@ function findActivity(activity: string, one: string, many: string, type: string)
   if (/^\d+$/.test(activity))
     return `The ${one} is the activity with \`activityId\` = ${activity}.`;
   return activity
-    ? `Call \`listActivities\` with \`names\` = ${JSON.stringify([activity])} and \`limit\` = 100, and keep the ${many} (${type}). My words can be only the start of the name: when the ${many} have more than one name, list the 5 most recent with date and name and ask me which one. Then take the most recent ${one} of that name.`
-    : // 100 activities answer about 55,000 characters, over a client's tool output limit: page by 20
-      `Call \`listActivities\` and take the most recent ${one} (${type}). When none of them is one, call it again with \`endDate\` = the day of the oldest activity in the list, until you find one.`;
+    ? // the tool filters names in the newest 200 activities; 20 rows hold this one and the one before
+      `Call \`listActivities\` with \`names\` = ${JSON.stringify([activity])}, and keep the ${many} (${type}). My words can be only the start of the name: when the ${many} have more than one name, list the 5 most recent with date and name and ask me which one. Then take the most recent ${one} of that name. When no row is a ${one}, say that none of my last 200 activities is a ${one} with that name, and stop.`
+    : // 100 activities answer about 55,000 characters, over a client's tool output limit: page by 20,
+      // and stop after 5 pages: a user without such an activity must not page through all history
+      `Call \`listActivities\` and take the most recent ${one} (${type}). When none of them is one, call it again with \`endDate\` = the day of the oldest activity in the list, at most 5 calls in all. When none of them has one, say that none of my last 100 activities is a ${one}, and stop.`;
 }
 
 function renderDashboard(template: string, w: number): string {

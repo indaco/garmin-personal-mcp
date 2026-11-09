@@ -649,7 +649,11 @@ describe("coach prompts", () => {
     expect(byId).toContain('a failed call shows as "n/a"');
     expect(byId.includes("{{")).toBe(false);
     const byName = await render("run-review", { activity: "Riverside" });
-    expect(byName).toContain('`names` = ["Riverside"] and `limit` = 100');
+    expect(byName).toContain('`names` = ["Riverside"], and keep the runs');
+    expect(byName).not.toContain("`limit` = 100");
+    expect(byName).toContain(
+      "When no row is a run, say that none of my last 200 activities is a run with that name, and stop.",
+    );
     // the slash command can pass only the first word of the name
     expect(byName).toContain(
       "when the runs have more than one name, list the 5 most recent with date and name and ask me which one",
@@ -657,7 +661,7 @@ describe("coach prompts", () => {
     // 100 activities answer about 55,000 characters, over a client's tool output limit: page by 20
     const latest = await render("run-review");
     expect(latest).toContain(
-      "Call `listActivities` and take the most recent run (a type that ends in `running`). When none of them is one, call it again with `endDate` = the day of the oldest activity in the list, until you find one.",
+      "Call `listActivities` and take the most recent run (a type that ends in `running`). When none of them is one, call it again with `endDate` = the day of the oldest activity in the list, at most 5 calls in all. When none of them has one, say that none of my last 100 activities is a run, and stop.",
     );
     expect(latest).not.toContain("`limit` = 100");
   });
@@ -683,8 +687,9 @@ describe("coach prompts", () => {
     );
     // a search by name in step 1 already holds this session and the previous ones
     expect(text).toContain(
-      "3. When step 1 called `listActivities` with `names`, use its rows; otherwise call `listActivities` with `names` = [the session's name] and `limit` = 100",
+      "3. When step 1 called `listActivities` with `names`, use its rows; otherwise call `listActivities` with `names` = [the session's name] and `endDate` = the session's day (`getActivity` gives the name and the day when you have only the id). Its row of this session is the summary. The previous session is the most recent strength session of the same name before this one: call `getActivitySets` with its `activityId`. Without one, show the comparison as \"n/a\".",
     );
+    expect(text).not.toContain("`limit` = 100");
   });
 
   it("reviews a strength session by id, by name, or the latest one", async () => {
@@ -694,13 +699,17 @@ describe("coach prompts", () => {
     expect(byId.includes("{{")).toBe(false);
     const byName = await render("strength-review", { activity: "Upper" });
     expect(byName).toContain(
-      'Call `listActivities` with `names` = ["Upper"] and `limit` = 100, and keep the strength sessions (a type that contains `strength`).',
+      'Call `listActivities` with `names` = ["Upper"], and keep the strength sessions (a type that contains `strength`).',
+    );
+    expect(byName).not.toContain("`limit` = 100");
+    expect(byName).toContain(
+      "When no row is a strength session, say that none of my last 200 activities is a strength session with that name, and stop.",
     );
     expect(byName).toContain(
       "when the strength sessions have more than one name, list the 5 most recent",
     );
     expect(await render("strength-review")).toContain(
-      "Call `listActivities` and take the most recent strength session (a type that contains `strength`). When none of them is one,",
+      "Call `listActivities` and take the most recent strength session (a type that contains `strength`). When none of them is one, call it again with `endDate` = the day of the oldest activity in the list, at most 5 calls in all. When none of them has one, say that none of my last 100 activities is a strength session, and stop.",
     );
   });
 
@@ -936,7 +945,14 @@ describe("coach prompts", () => {
     expect(await render("swim-review", { activity: "21000000789" })).toContain(
       "The swim is the activity with `activityId` = 21000000789.",
     );
-    expect(await render("swim-review", { activity: "Morning" })).toContain('`names` = ["Morning"]');
+    const byName = await render("swim-review", { activity: "Morning" });
+    expect(byName).toContain('`names` = ["Morning"]');
+    expect(byName).toContain(
+      "When no row is a swim, say that none of my last 200 activities is a swim with that name, and stop.",
+    );
+    expect(await render("swim-review")).toContain(
+      "at most 5 calls in all. When none of them has one, say that none of my last 100 activities is a swim, and stop.",
+    );
   });
 
   describe("swim-readiness", () => {

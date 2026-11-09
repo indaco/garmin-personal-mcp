@@ -4,10 +4,10 @@ server. Today is {{today}}.
 1. {{find}}
 2. Call `getActivitySets` with its `activityId`.
 3. When step 1 called `listActivities` with `names`, use its rows; otherwise call `listActivities`
-   with `names` = [the session's name] and `limit` = 100 (`getActivity` gives the name when you have
-   only the id). Its row of this session is the summary. The previous session is the most recent
-   strength session of the same name before this one: call `getActivitySets` with its `activityId`.
-   Without one, show the comparison as "n/a".
+   with `names` = [the session's name] and `endDate` = the session's day (`getActivity` gives the
+   name and the day when you have only the id). Its row of this session is the summary. The previous
+   session is the most recent strength session of the same name before this one: call
+   `getActivitySets` with its `activityId`. Without one, show the comparison as "n/a".
 4. Call `getSleep` with `date` = the day after the session (the night after it), and `getHrvRange`
    with `fromDate` and `toDate` = that day. When that night has not come yet, skip both calls and show
    the recovery as "n/a".
