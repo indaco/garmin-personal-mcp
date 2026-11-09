@@ -886,6 +886,7 @@ describe("FIT tools", () => {
     );
     expect(JSON.parse(await tools.getActivitySets(79))).toEqual({
       activityId: 79,
+      plan: null,
       exercises: [
         {
           exercise: "Barbell Back Squat",

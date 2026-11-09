@@ -2,7 +2,7 @@ import { Decoder, Profile, Stream } from "@garmin/fitsdk";
 import { unzipSync } from "fflate";
 import { GarminApiError } from "./api-client";
 import { splitOf, workOf } from "./analytics/running";
-import { bestE1rm, topSet } from "./analytics/strength";
+import { bestE1rm, type PlanStep, planOfSets, topSet } from "./analytics/strength";
 
 /** The fields of a FIT set message the tools read; enums are raw values (decoded without strings). */
 export interface FitSet {
@@ -12,6 +12,7 @@ export interface FitSet {
   duration?: number;
   category?: number[];
   categorySubtype?: number[];
+  wktStepIndex?: number;
 }
 
 export interface Exercise {
@@ -278,6 +279,50 @@ export function runNumbers(laps: Record<string, unknown>[]) {
   };
 }
 
+/** The FIT wkt_step_target value of a rep range: the SDK's enum does not have it. */
+const TARGET_REPS = 23;
+const STEP_NUMBERS = [
+  "intensity",
+  "durationType",
+  "durationValue",
+  "targetType",
+  "targetValue",
+  "customTargetValueLow",
+  "customTargetValueHigh",
+  "exerciseCategory",
+  "exerciseName",
+];
+
+/**
+ * The plan the watch ran, from the workout messages: its name and its steps, in FIT units; null
+ * without a workout or a step. A step with a field of the wrong type is left out.
+ */
+export function planSteps(fit: Messages, stepNames = new Map<string, string>()) {
+  const workout = fit.workoutMesgs?.[0];
+  const steps: PlanStep[] = [];
+  for (const m of fit.workoutStepMesgs ?? []) {
+    const bad = STEP_NUMBERS.some((f) => m[f] !== undefined && typeof m[f] !== "number");
+    if (bad || !Number.isInteger(m.messageIndex)) continue;
+    const category = m.exerciseCategory;
+    steps.push({
+      index: m.messageIndex,
+      intensity: enumName("intensity", m.intensity),
+      durationType: enumName("wktStepDuration", m.durationType),
+      durationValue: m.durationValue,
+      targetType: m.targetType === TARGET_REPS ? "reps" : enumName("wktStepTarget", m.targetType),
+      targetValue: m.targetValue,
+      targetLow: m.customTargetValueLow,
+      targetHigh: m.customTargetValueHigh,
+      exercise:
+        category === undefined
+          ? undefined
+          : exerciseName(category, m.exerciseName, stepNames.get(`${category}/${m.exerciseName}`)),
+    });
+  }
+  if (!workout || steps.length === 0) return null;
+  return { name: typeof workout.wktName === "string" ? workout.wktName : null, steps };
+}
+
 /** The getActivitySets answer. */
 export function setsOf(fit: Messages, activityId: number, catalogue: Catalogue | undefined) {
   const stepNames = new Map<string, string>();
@@ -287,13 +332,46 @@ export function setsOf(fit: Messages, activityId: number, catalogue: Catalogue |
       stepNames.set(`${t.exerciseCategory}/${t.exerciseName}`, step);
     }
   }
-  const exercises = groupSets(fit.setMesgs ?? [], stepNames, catalogue).map((e) => {
+  const sets: FitSet[] = fit.setMesgs ?? [];
+  const exercises = groupSets(sets, stepNames, catalogue).map((e) => {
     const top = topSet(e.sets);
     if (!top) return e;
     const best = bestE1rm(e.sets);
     return { ...e, top, e1rmKg: best === undefined ? null : round(best, 1) };
   });
-  return { activityId, exercises };
+  const plan = planSteps(fit, stepNames);
+  const done = realSets(sets, stepNames)
+    .filter((s) => s.setType === SET_TYPE_ACTIVE)
+    .map((s) => ({
+      step: s.wktStepIndex,
+      exercise: setName(s, stepNames),
+      reps: s.repetitions,
+      seconds: s.duration,
+    }));
+  return {
+    activityId,
+    exercises,
+    plan: plan && { name: plan.name, exercises: planOfSets(plan.steps, done) },
+  };
+}
+
+const keyOf = (s: FitSet) => `${s.category?.[0]}/${s.categorySubtype?.[0]}`;
+const setName = (s: FitSet, stepNames: Map<string, string>) =>
+  exerciseName(s.category?.[0], s.categorySubtype?.[0], stepNames.get(keyOf(s)));
+
+/**
+ * The sets of the workout. The watch opens one more set when the workout ends (no exercise, no reps,
+ * no weight, nothing after it): that set and what follows it are not part of the workout.
+ */
+function realSets(sets: FitSet[], stepNames: Map<string, string>): FitSet[] {
+  const isEmpty = (s: FitSet) =>
+    s.setType === SET_TYPE_ACTIVE &&
+    setName(s, stepNames) === "Unknown exercise" &&
+    !((s.repetitions ?? 0) > 0) &&
+    !((s.weight ?? 0) > 0);
+  const lastReal = sets.findLastIndex((s) => s.setType === SET_TYPE_ACTIVE && !isEmpty(s));
+  const end = sets.findIndex((s, i) => i > lastReal && s.setType === SET_TYPE_ACTIVE);
+  return end < 0 ? sets : sets.slice(0, end);
 }
 
 /**
@@ -306,25 +384,13 @@ export function groupSets(
   catalogue: Catalogue | undefined,
 ): Exercise[] {
   const exercises = new Map<string, Exercise>();
-  const keyOf = (s: FitSet) => `${s.category?.[0]}/${s.categorySubtype?.[0]}`;
-  // the watch opens one more set when the workout ends: no exercise, no reps, no weight, nothing after it
-  const isEmpty = (s: FitSet) =>
-    s.setType === SET_TYPE_ACTIVE &&
-    exerciseName(s.category?.[0], s.categorySubtype?.[0], stepNames.get(keyOf(s))) ===
-      "Unknown exercise" &&
-    !((s.repetitions ?? 0) > 0) &&
-    !((s.weight ?? 0) > 0);
-  const lastReal = sets.findLastIndex((s) => s.setType === SET_TYPE_ACTIVE && !isEmpty(s));
   let previous: Record<string, number> | undefined;
-  for (const [i, s] of sets.entries()) {
+  for (const s of realSets(sets, stepNames)) {
     if (s.setType !== SET_TYPE_ACTIVE) {
       if (previous && s.setType === SET_TYPE_REST && s.duration != null) {
         previous.restSec = Math.round(s.duration);
       }
       continue;
-    }
-    if (i > lastReal) {
-      break; // the set the watch opened at the end: what follows it is not part of the workout
     }
     const category = s.category?.[0];
     const subtype = s.categorySubtype?.[0];
@@ -338,7 +404,7 @@ export function groupSets(
         : undefined;
       const found = entry && typeof entry === "object" && !Array.isArray(entry);
       exercise = {
-        exercise: exerciseName(category, subtype, stepNames.get(key)),
+        exercise: setName(s, stepNames),
         category: cat ? words(cat) : "Unknown",
         ...(found
           ? {
