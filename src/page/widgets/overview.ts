@@ -255,11 +255,10 @@ register({
       );
     // a sport board has these in its own table: Best efforts, Exercises
     const summaryOnly = ctx.type === "all";
+    // the digest's and Best efforts' rule: the oldest run keeps a tied time
+    const fastest = summaryOnly ? calc.bestProgression(ctx.activities) : {};
     for (const d of summaryOnly ? ["1k", "mile", "5k", "10k", "half", "marathon"] : []) {
-      const best = ctx.activities
-        .map((a) => ({ a, s: calc.seconds((a.best as Record<string, string> | undefined)?.[d]) }))
-        .filter((x) => x.s > 0)
-        .toSorted((x, y) => x.s - y.s)[0];
+      const best = fastest[d]?.at(-1);
       if (best) {
         badges.push(badge(t("rec.best", { d: t(`d.${d}` as Key) }), fmt.hms(best.s), best.a));
         top[0] = badges.at(-1);

@@ -4446,6 +4446,40 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     expect(await hikeRecords([{ ...trek, id: 1 }])).toContain("No records");
   });
 
+  it("keeps the oldest run on a tie in the records, as Best efforts and the digest", async () => {
+    const run = { type: "running", sport: "running", km: 5, best: { "5k": "25:00" } };
+    // newest first, as the server writes them
+    const activities = [
+      { ...run, id: 2, name: "New Park", start: "2026-10-20 08:00:00" },
+      { ...run, id: 1, name: "Old Park", start: "2026-10-13 08:00:00" },
+    ];
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }),
+    );
+    const badge = page.locator("[data-id=records] .badge", { hasText: "Fastest 5 km" });
+    expect(await badge.innerText()).toContain("Old Park");
+    expect(errors).toEqual([]);
+  });
+
+  it("shows the fastest run in the records, not the first one", async () => {
+    const run = { type: "running", sport: "running", km: 5 };
+    // newest first; the older run is slower, so the progression has two entries
+    const activities = [
+      { ...run, id: 2, name: "New Park", start: "2026-10-20 08:00:00", best: { "5k": "24:00" } },
+      { ...run, id: 1, name: "Old Park", start: "2026-10-13 08:00:00", best: { "5k": "26:00" } },
+    ];
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }),
+    );
+    const badge = page.locator("[data-id=records] .badge", { hasText: "Fastest 5 km" });
+    const text = await badge.innerText();
+    expect(text).toContain("New Park");
+    expect(text).toContain("24:00");
+    expect(errors).toEqual([]);
+  });
+
   it("repeats no table of its board: efforts and 1RM records are on the all board", async () => {
     const labels = async (tab: string) => {
       const { page } = await open(browser, pageFile(), { hash: tab });
