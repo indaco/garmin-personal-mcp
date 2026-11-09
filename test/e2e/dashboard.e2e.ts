@@ -1321,6 +1321,42 @@ describe("edit mode", () => {
       expect(errors).toEqual([]);
     });
 
+    it("keeps the board when the swap, drawn, does not even out the rows", async () => {
+      // sq is as tall as it is wide: the tip counts it at width 1, but in its new row it gets width 2
+      const square = custom("sq", `el.innerHTML = '<div style="aspect-ratio:1"></div>';`);
+      const library = [
+        square,
+        tallBox("a", 300),
+        tallBox("b", 100),
+        tallBox("c", 100),
+        tallBox("d", 100),
+      ];
+      const board = [of("sq", 1), of("b", 1), of("a", 1), of("c", 1), of("d", 1)];
+      const { page, errors } = await open(
+        browser,
+        pageFile({ layout: onAll(board), widgets: library }),
+        {
+          viewport: { width: 1280, height: 800 },
+        },
+      );
+      await startEdit(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      const pressed = "sq:1 b:1 a:1 c:2 d:1";
+      expect(await spans(page)).toBe(pressed);
+      expect(await page.innerText(".edit-tip")).toContain("swap Custom b and Custom a");
+      await page.click(".edit-tip button");
+      expect(await spans(page)).toBe(pressed);
+      const failed =
+        "Swapping Custom b and Custom a does not even out the rows here, so the board stays as it was.";
+      expect(await page.innerText(".edit-tip")).toBe(failed);
+      expect(await page.$(".edit-tip button")).toBeNull();
+      expect(await page.textContent("#announce")).toBe(failed);
+      await page.click(".edit-bar >> text=Done");
+      const { boards } = JSON.parse((await saved(page))!).layout;
+      expect(boards.all.map((i: { id: string }) => i.id)).toEqual(["sq", "b", "a", "c", "d"]);
+      expect(errors).toEqual([]);
+    });
+
     it("drops the tip when edit mode ends", async () => {
       const board = [of("low1", 1), of("tall1", 2), of("low2", 2), of("tall2", 1)];
       const { page, errors } = await open(browser, pageFile({ layout: onAll(board), widgets }));

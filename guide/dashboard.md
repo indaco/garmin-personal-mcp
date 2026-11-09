@@ -311,7 +311,9 @@ The edit bar stays at the top of the window while you scroll. It has:
   heights. Move a widget to change which
   tiles share a row. When swapping two neighbouring widgets would save a row or give rows of
   clearly closer heights, the bar shows a tip with a **Swap** button. **Swap** makes that swap and
-  arranges the board again; any other edit removes the tip. Select **Done** to keep the result, or
+  arranges the board again. A chart can get taller when it gets wider, so **Swap** then measures
+  the new rows: when they are not more even, the board stays as it was and the bar says so. Any
+  other edit removes the tip. Select **Done** to keep the result, or
   **Discard** to undo it.
 - **Copy layout**: gives the layout as text.
 - **Discard**: puts the layout back as it was before you selected **Edit layout**, on every board.

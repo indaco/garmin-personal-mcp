@@ -136,6 +136,7 @@
   "edit.arrange": "Automatisch anordnen",
   "edit.tip": "Tipp: {a} und {b} tauschen, um die Zeilen auszugleichen.",
   "edit.tipApply": "Tauschen",
+  "edit.tipFailed": "{a} und {b} zu tauschen gleicht die Zeilen hier nicht aus, daher bleibt das Board, wie es war.",
   "edit.discard": "Verwerfen",
   "edit.bar": "Layout bearbeiten",
   "edit.editing": "Bearbeiten · {board}",

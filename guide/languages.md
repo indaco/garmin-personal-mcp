@@ -192,6 +192,7 @@ out. To add one:
 | `edit.arrange` | Auto-arrange |
 | `edit.tip` | Tip: swap {a} and {b} to even out the rows. |
 | `edit.tipApply` | Swap |
+| `edit.tipFailed` | Swapping {a} and {b} does not even out the rows here, so the board stays as it was. |
 | `edit.discard` | Discard |
 | `edit.bar` | Edit layout |
 | `edit.editing` | Editing · {board} |

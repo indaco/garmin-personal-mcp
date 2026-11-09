@@ -3,7 +3,9 @@ import {
   add,
   arrange,
   arrangeTip,
+  better,
   boardOf,
+  drawnRows,
   type Instance,
   type Layout,
   type Span,
@@ -978,5 +980,51 @@ describe("arrangeTip", () => {
     const tip = tipOf([], { a: 100, b: 400, c: 100, d: 400 }, board)!;
     expect(tip.swap).toEqual(["b", "c"]);
     expect(shape(tip.board)).toBe("a:2 c:1 h:1 b:2 d:1");
+  });
+});
+
+const rowsOf = (board: Instance[], heights: Record<string, number | undefined>) =>
+  drawnRows(board, (i) => {
+    const height = heights[i.id];
+    return height === undefined ? undefined : { height, min: 1 };
+  });
+
+describe("drawnRows", () => {
+  it.each<[string, Instance[], Record<string, number | undefined>, { rows: number; gap: number }]>([
+    ["an empty board", [], {}, { rows: 0, gap: 0 }],
+    ["one tile", [placed("a", 2)], { a: 300 }, { rows: 1, gap: 0 }],
+    [
+      "full rows, each row's tallest minus its lowest",
+      [placed("a", 2), placed("b", 1), placed("c", 1), placed("d", 1), placed("e", 1)],
+      { a: 100, b: 400, c: 200, d: 250, e: 100 },
+      { rows: 2, gap: 300 + 150 },
+    ],
+    [
+      "a row with free columns, as the page wraps it",
+      [placed("a", 2), placed("b", 2), placed("c", 1)],
+      { a: 100, b: 300, c: 100 },
+      { rows: 2, gap: 200 },
+    ],
+    [
+      "a hidden widget and one with no tile take no column",
+      [placed("a", 1), placed("h", 3, { hidden: true }), placed("w", 3), placed("b", 2)],
+      { a: 100, h: 900, w: undefined, b: 160 },
+      { rows: 1, gap: 60 },
+    ],
+  ])("counts %s", (_name, board, heights, rows) => {
+    expect(rowsOf(board, heights)).toEqual(rows);
+  });
+});
+
+describe("better", () => {
+  it.each<[string, [number, number], [number, number] | undefined, boolean]>([
+    ["anything against nothing", [3, 500], undefined, true],
+    ["fewer rows, with a larger gap", [2, 500], [3, 0], true],
+    ["more rows, with a smaller gap", [3, 0], [2, 500], false],
+    ["the same rows and a smaller gap", [2, 99], [2, 100], true],
+    ["the same rows and the same gap", [2, 100], [2, 100], false],
+    ["the same rows and a larger gap", [2, 101], [2, 100], false],
+  ])("ranks %s", (_name, [rows, gap], b, want) => {
+    expect(better({ rows, gap }, b && { rows: b[0], gap: b[1] })).toBe(want);
   });
 });

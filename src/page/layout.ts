@@ -142,7 +142,10 @@ interface Split {
   cut: number;
 }
 
-const better = (a: Split, b: Split | undefined) =>
+type Rows = Pick<Split, "rows" | "gap">;
+
+/** Fewer rows, else the smaller sum of height gaps in a row. */
+export const better = (a: Rows, b: Rows | undefined) =>
   !b || a.rows < b.rows || (a.rows === b.rows && a.gap < b.gap);
 
 type TileInfo = (i: Instance) => { height: number; min: Span } | undefined;
@@ -231,6 +234,28 @@ export function arrangeTip(
   const [a, b] = [tiles[found.at].item, tiles[found.at + 1].item];
   const swapped = board.map((i) => (i === a ? b : i === b ? a : i));
   return { swap: [a.id, b.id], board: arrange(swapped, info) };
+}
+
+/** The rows of the board as the page draws them in 3 columns, at the widths it has. */
+export function drawnRows(board: Instance[], info: TileInfo): Rows {
+  let rows = 0;
+  let gap = 0;
+  let used = 3;
+  let low = 0;
+  let high = 0;
+  for (const { item, height } of tilesOf(board, info)) {
+    if (used + item.span > 3) {
+      gap += high - low;
+      rows++;
+      used = 0;
+      low = height;
+      high = height;
+    }
+    used += item.span;
+    low = Math.min(low, height);
+    high = Math.max(high, height);
+  }
+  return { rows, gap: gap + high - low };
 }
 
 /** A width the user sets is the user's, so it drops the note of Auto-arrange. */

@@ -136,6 +136,7 @@
   "edit.arrange": "Organizar automaticamente",
   "edit.tip": "Dica: troque {a} e {b} para equilibrar as linhas.",
   "edit.tipApply": "Trocar",
+  "edit.tipFailed": "Trocar {a} e {b} não equilibra as linhas aqui, por isso o quadro fica como estava.",
   "edit.discard": "Descartar",
   "edit.bar": "Editar layout",
   "edit.editing": "Editando · {board}",
