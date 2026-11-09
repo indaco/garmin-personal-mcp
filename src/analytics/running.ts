@@ -1,5 +1,6 @@
 import { type Activity, seconds } from "./calc";
-import { riegel } from "./metrics";
+import { addDays } from "../dates";
+import { change, MIN_SESSIONS, mean, riegel } from "./metrics";
 
 /** Pace, zones, splits and race predictions. Pure functions over the embedded data. */
 
@@ -15,6 +16,56 @@ export function paceSeconds(a: Activity): number | undefined {
 export function efficiency(a: Activity): number | undefined {
   const pace = paceSeconds(a);
   return pace && typeof a.avgHR === "number" && a.avgHR > 0 ? 60_000 / pace / a.avgHR : undefined;
+}
+
+export interface AerobicTrend {
+  /** The mean efficiency of each week; null for a week without an aerobic run. */
+  weekly: (number | null)[];
+  /** The aerobic runs with an efficiency inside the weeks, in the order given. */
+  runs: Activity[];
+  /** The weeks at each end of the window that are compared: 4, or half of a short window. */
+  n: number;
+  first: number | null;
+  last: number | null;
+  firstRuns: number;
+  lastRuns: number;
+  /** `last` against `first` in %, only with MIN_SESSIONS runs on each side. */
+  change: number | null;
+}
+
+/**
+ * The efficiency of the runs below zone 4 over the Monday `weeks`: intervals, tempo runs and races
+ * raise HR for other reasons. Without zones (`z4` undefined) every run with HR counts.
+ */
+export function aerobicTrend(runs: Activity[], weeks: string[], z4?: number): AerobicTrend {
+  const weekOf = (a: Activity) => {
+    const day = String(a.start).slice(0, 10);
+    return weeks.findIndex((w) => day >= w && day <= addDays(w, 6));
+  };
+  const aerobic = runs.filter(
+    (a) =>
+      (z4 === undefined || (typeof a.avgHR === "number" && a.avgHR < z4)) &&
+      efficiency(a) !== undefined &&
+      weekOf(a) >= 0,
+  );
+  const values = (from: number, to: number) =>
+    aerobic.filter((a) => weekOf(a) >= from && weekOf(a) < to).map((a) => efficiency(a)!);
+  const n = Math.min(4, Math.floor(weeks.length / 2));
+  const first = values(0, n);
+  const last = values(weeks.length - n, weeks.length);
+  return {
+    weekly: weeks.map((_, i) => mean(values(i, i + 1))),
+    runs: aerobic,
+    n,
+    first: mean(first),
+    last: mean(last),
+    firstRuns: first.length,
+    lastRuns: last.length,
+    change:
+      Math.min(first.length, last.length) >= MIN_SESSIONS
+        ? change(mean(last)!, mean(first)!)
+        : null,
+  };
 }
 
 /** The zone index (0-4) of a heart rate; below zone 1 counts as zone 1. */

@@ -33,6 +33,9 @@ const onBoard = (day: string, name: string, km: number, more: Record<string, unk
   ...more,
 });
 
+/** 6 km in 30:00 is 200 m a minute: the efficiency is 200 / avgHR. */
+const easyRun = (day: string, avgHR: number) => onBoard(day, "Easy", 6, { avgHR });
+
 /** A lap with its time, the watch's pace and its average HR. */
 const lapOf = (km: number, time: string, pace: string, avgHR?: number) => ({
   km,
@@ -520,6 +523,55 @@ describe("digest", () => {
     expect(out.longRuns[0].hrDriftPct).toBe(-0.1);
     // the race of the fixture has no laps
     expect(d.longRuns).toEqual([{ date: "2026-10-25", name: "City 10K", km: 10, ...none }]);
+  });
+
+  it("gives the page's aerobic efficiency: the runs below zone 4, last 4 weeks against the first 4", () => {
+    const zones = [
+      {
+        sport: "DEFAULT",
+        zone1Floor: 94,
+        zone2Floor: 113,
+        zone3Floor: 132,
+        zone4Floor: 150,
+        zone5Floor: 169,
+      },
+    ];
+    const first = [
+      easyRun("2026-08-04", 125),
+      easyRun("2026-08-11", 125),
+      easyRun("2026-08-18", 125),
+    ];
+    const last = [
+      easyRun("2026-10-06", 100),
+      easyRun("2026-10-13", 100),
+      easyRun("2026-10-20", 100),
+    ];
+    const activities = [...last, easyRun("2026-08-05", 160), ...first];
+    expect(digest({ ...data, zones, activities }).aerobicEfficiency).toEqual({
+      comparedWeeks: 4,
+      first: 1.6,
+      last: 2,
+      firstRuns: 3,
+      lastRuns: 3,
+      changePct: 25,
+    });
+    // fewer than 3 runs on a side: no change; no run on a side: null
+    expect(digest({ ...data, zones, activities: last.slice(1) }).aerobicEfficiency).toEqual({
+      comparedWeeks: 4,
+      first: null,
+      last: 2,
+      firstRuns: 0,
+      lastRuns: 2,
+      changePct: null,
+    });
+    expect(digest({ ...data, zones, activities: first }).aerobicEfficiency).toMatchObject({
+      first: 1.6,
+      last: null,
+    });
+    // no run at all: no key
+    expect(digest({ ...data, activities: [run("2026-10-20", "cycling")] })).not.toHaveProperty(
+      "aerobicEfficiency",
+    );
   });
 
   it("gives the longest run of the period", () => {

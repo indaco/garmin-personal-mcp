@@ -8,9 +8,16 @@ import {
   mondayOf,
   sessionSeconds,
   seconds,
+  weeksOf,
 } from "./analytics/calc";
 import { fitnessFatigueFrom, loadOf, loadRatio, readinessOf, zonesOf } from "./analytics/metrics";
-import { racePredictionsOf, type SplitKind, splitOf, workoutOf } from "./analytics/running";
+import {
+  aerobicTrend,
+  racePredictionsOf,
+  type SplitKind,
+  splitOf,
+  workoutOf,
+} from "./analytics/running";
 import { strokesPerLength, swimPace, swimTrend } from "./analytics/sports";
 import { completed, type StrengthSet, topSet as pageTopSet } from "./analytics/strength";
 
@@ -142,6 +149,19 @@ export interface Digest {
     /** As load.acuteToChronic; the verdict uses the exact ratio. */
     loadRatio: number | null;
   };
+  /**
+   * The page's Aerobic fitness: metres per heartbeat of the runs below zone 4, the first and the
+   * last `comparedWeeks` of the period, 2 decimals; null without such a run on that side. The change
+   * in % needs 3 runs on each side. Absent without runs.
+   */
+  aerobicEfficiency?: {
+    comparedWeeks: number;
+    first: number | null;
+    last: number | null;
+    firstRuns: number;
+    lastRuns: number;
+    changePct: number | null;
+  };
   /** Today's fitness, fatigue and form of the page, 1 decimal; null when no activity has a load. */
   fitnessFatigue: { fitness: number; fatigue: number; form: number } | null;
   hrvLast14: unknown[];
@@ -223,6 +243,11 @@ export function digest(data: Json): Digest {
         hrDriftPct: s?.drift === undefined ? null : round(s.drift, 1),
       };
     });
+  const trend = aerobicTrend(
+    runs as Activity[],
+    start ? weeksOf(start, end) : [],
+    zonesOf(data.zones).floors[3],
+  );
   // the first one wins a tie
   const longest = runs.reduce<Json | undefined>(
     (top, a) => (num(a.km) > num(top?.km) ? a : top),
@@ -308,6 +333,18 @@ export function digest(data: Json): Digest {
     longRuns,
     ...(longestRun ? { longestRun } : {}),
     ...(swims ? { swims } : {}),
+    ...(runs.length > 0
+      ? {
+          aerobicEfficiency: {
+            comparedWeeks: trend.n,
+            first: r2(trend.first),
+            last: r2(trend.last),
+            firstRuns: trend.firstRuns,
+            lastRuns: trend.lastRuns,
+            changePct: trend.change === null ? null : round(trend.change, 1),
+          },
+        }
+      : {}),
     racePredictions,
     repeatedRuns: repeatedRuns(acts),
     strengthExercises,
@@ -432,6 +469,9 @@ function fastestEfforts(acts: Json[]): Digest["bestEfforts"] {
   }
   return best;
 }
+
+/** An efficiency to 2 decimals; null stays null. */
+const r2 = (v: number | null) => (v === null ? null : round(v, 2));
 
 function sum(): Sum {
   return { sessions: 0, km: 0, runKm: 0, hours: 0, load: 0, known: 0, estimated: 0 };

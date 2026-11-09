@@ -382,6 +382,7 @@ second half. It ends with the sleep and HRV of the night after the run, and a sh
 
 The assistant reads the server's summary of 12 weeks (a `writeDashboard` preview, which writes
 nothing). It has the weekly run distance and load, the long runs with their pace split and HR drift,
+the aerobic efficiency (distance per heartbeat of the easy runs, last 4 weeks against the first 4)
 and the race predictions, as the dashboard computes them. The assistant gives the days to the race
 and these numbers, and tells whether your load drops in the last 2 weeks (the taper). The race
 prediction uses your best efforts of 5 km or more (Riegel, an estimate: the fastest prediction

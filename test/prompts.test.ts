@@ -765,6 +765,17 @@ describe("coach prompts", () => {
     expect(text.includes("{{")).toBe(false);
   });
 
+  it("quotes the digest's aerobic efficiency in the training block", async () => {
+    const text = (await render("race-readiness", { date: "2026-11-15" })).replace(/\s+/g, " ");
+    const block = text.slice(
+      text.indexOf("- **Training block**"),
+      text.indexOf("- **Load and taper**"),
+    );
+    expect(block).toBe(
+      "- **Training block**: a table of the run km (`weekly.<monday>.runKm`) and the load of each week. The first week can be partial (`partial: true`): say so. Also the longest run and its date (`longestRun`). For each long run (`longRuns`): the pace of the first and the second half, the split, and the HR drift. An HR drift of 5% or less shows a solid aerobic base. `null` is n/a: for example, a lap without heart rate. Then the aerobic efficiency (`aerobicEfficiency`): the metres per heartbeat of the runs below zone 4, the last `comparedWeeks` weeks against the first, and the change in % (`changePct`). A higher value is more distance for each heartbeat. A null value, or no `aerobicEfficiency`, is n/a. ",
+    );
+  });
+
   it("reads the race date and goal by their shape from any slot, as the slash command passes them", async () => {
     // "/mcp__garmin-personal__race-readiness half marathon 2026-11-15 1:45:00" fills the slots in order
     const text = await render("race-readiness", {
