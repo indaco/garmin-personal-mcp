@@ -777,6 +777,11 @@ describe("laps", () => {
     const fit = decodeFit(fitFile([Profile.MesgNum.LAP, { totalTimerTime: 3725 }]), 11);
     expect(lapsOf(fit, 11)).toEqual({ activityId: 11, laps: [{ lap: 1, km: 0, time: "1:02:05" }] });
   });
+
+  it("gives a lap without a timer time the time 0:00", () => {
+    const fit = decodeFit(fitFile([Profile.MesgNum.LAP, { totalDistance: 1000 }]), 11);
+    expect(lapsOf(fit, 11)).toEqual({ activityId: 11, laps: [{ lap: 1, km: 1, time: "0:00" }] });
+  });
 });
 
 describe("run numbers of the laps", () => {
