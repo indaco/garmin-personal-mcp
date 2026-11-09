@@ -2825,6 +2825,18 @@ describe("type boards", () => {
         h.map((x) => x.textContent),
       ),
     ).toEqual(["5 km", "10 km"]);
+    // the newest best of each distance, not the first effort of the window
+    expect(
+      await page.$$eval("[data-id=bestEfforts] table.data tbody tr", (r) =>
+        r.map((x) => [...x.children].map((c) => c.textContent)),
+      ),
+    ).toEqual([
+      ["1 km", "4:36", "Oct 17 · Riverside Half Marathon"],
+      ["mile", "7:25", "Oct 17 · Riverside Half Marathon"],
+      ["5 km", "23:02", "Oct 17 · Riverside Half Marathon"],
+      ["10 km", "46:05", "Oct 17 · Riverside Half Marathon"],
+      ["half marathon", "1:37:13", "Oct 17 · Riverside Half Marathon"],
+    ]);
     // the laps of the fixture have HR, so every long run has a drift
     const drift = await page.$$eval("[data-id=longRuns] table.data tbody tr", (r) =>
       r.map((x) => x.children[5].textContent),

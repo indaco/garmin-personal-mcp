@@ -20,6 +20,7 @@ import {
 } from "./analytics/metrics";
 import {
   aerobicTrend,
+  bestProgression,
   racePredictionsOf,
   type SplitKind,
   splitOf,
@@ -116,6 +117,15 @@ export interface Digest {
     strain: number | null;
   };
   bestEfforts: Record<string, { time: string; date: string; name: unknown }>;
+  /**
+   * Each run (board "running") that set a new fastest time of a best-effort distance, oldest first:
+   * the last one is the best of the period, not an all-time record. A tie is no new best. `previous`
+   * is the time it beat; null for the first effort of the period.
+   */
+  recordProgression: Record<
+    string,
+    { date: string; time: string; previous: string | null; id: unknown; name: unknown }[]
+  >;
   races: Json[];
   /** Runs (board "running") that are a race or over 15 km, newest first, with the page's split. */
   longRuns: {
@@ -350,6 +360,15 @@ export function digest(data: Json): Digest {
       strain: safety.strain === null ? null : round(safety.strain, 1),
     },
     bestEfforts,
+    recordProgression: mapValues(bestProgression(runs as Activity[]), (bests) =>
+      bests.map((b, i) => ({
+        date: dayOf(b.a)!,
+        time: b.time,
+        previous: i > 0 ? bests[i - 1].time : null,
+        id: b.a.id,
+        name: b.a.name,
+      })),
+    ),
     races: acts
       .filter((a) => a.race === true)
       .map((a) => ({
@@ -483,17 +502,12 @@ function swimsOf(acts: Json[]): Swims | undefined {
   };
 }
 
+/** The last of each progression: the fastest, and the first run of a tie, as on the page. */
 function fastestEfforts(acts: Json[]): Digest["bestEfforts"] {
-  const best: Digest["bestEfforts"] = {};
-  for (const a of acts) {
-    for (const [distance, time] of Object.entries(isObject(a.best) ? a.best : {})) {
-      const known = best[distance];
-      if (typeof time === "string" && (!known || seconds(time) < seconds(known.time))) {
-        best[distance] = { time, date: dayOf(a as Activity)!, name: a.name };
-      }
-    }
-  }
-  return best;
+  return mapValues(bestProgression(acts as Activity[]), (bests) => {
+    const { time, a } = bests.at(-1)!;
+    return { time, date: dayOf(a)!, name: a.name };
+  });
 }
 
 /** An efficiency to 2 decimals; null stays null. */

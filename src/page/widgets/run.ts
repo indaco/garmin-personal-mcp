@@ -40,16 +40,10 @@ const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : u
 const weekOf = (ctx: Ctx, a: Activity) =>
   ctx.weeks.findIndex((w) => day(a) >= w && day(a) <= addDays(w, 6));
 
-/** The fastest of each best-effort distance in the window, with its activity. */
+/** The fastest of each best-effort distance in the window, with its activity (the digest's best). */
 function bestEfforts(ctx: Ctx) {
-  const best: Record<string, { s: number; a: Activity }> = {};
-  for (const a of runs(ctx)) {
-    for (const [d, v] of Object.entries((a.best ?? {}) as Record<string, string>)) {
-      const s = ctx.calc.seconds(v);
-      if (s > 0 && (!best[d] || s < best[d].s)) best[d] = { s, a };
-    }
-  }
-  return best;
+  const progression = Object.entries(ctx.calc.bestProgression(runs(ctx)));
+  return Object.fromEntries(progression.map(([d, list]) => [d, list.at(-1)!]));
 }
 
 register({

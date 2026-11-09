@@ -1,4 +1,4 @@
-import { type Activity, seconds } from "./calc";
+import { type Activity, dayOf, seconds } from "./calc";
 import { addDays } from "../dates";
 import { change, MIN_SESSIONS, mean, riegel } from "./metrics";
 
@@ -308,4 +308,35 @@ export function racePredictionsOf(best: Record<string, number>) {
 /** Race times (Riegel) from the best effort of 5 km or more that predicts the fastest times. */
 export function predictRaces(best: Record<string, number>) {
   return racePredictionsOf(best)[0];
+}
+
+/** A run that set a new fastest time of a best-effort distance. */
+export interface Best {
+  /** The time in seconds, and as Garmin wrote it. */
+  s: number;
+  time: string;
+  a: Activity;
+}
+
+/**
+ * Each activity that set a new fastest time of each best-effort distance (`best`), oldest first: the
+ * last one is the fastest. A tie is no new best, so the first run with a time holds it, and the list
+ * grows with the improvements, not with the sessions. Only the given activities count: the result is
+ * the best of the page's weeks, not an all-time record. A time that does not read as seconds (or
+ * reads as 0) counts for nothing.
+ */
+export function bestProgression(acts: Activity[]): Record<string, Best[]> {
+  const out = new Map<string, Best[]>();
+  const dated = acts.filter((a) => dayOf(a) !== undefined);
+  for (const a of dated.toSorted((x, y) => (String(x.start) < String(y.start) ? -1 : 1))) {
+    const best = a.best;
+    if (typeof best !== "object" || best === null || Array.isArray(best)) continue;
+    for (const [d, time] of Object.entries(best)) {
+      const s = seconds(time);
+      if (s <= 0) continue;
+      const list = out.get(d) ?? [];
+      if (list.length === 0 || s < list.at(-1)!.s) out.set(d, [...list, { s, time, a }]);
+    }
+  }
+  return Object.fromEntries(out);
 }

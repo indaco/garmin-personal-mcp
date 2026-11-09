@@ -467,7 +467,8 @@ writes nothing). It uses the weeks of your dashboard page, so the numbers are th
 page. It compares your last whole week, Monday to Sunday, with up to 4 weeks before it: sessions,
 hours, km, run km and load, and the load ramp against the week before (above 10% is the page's
 warning level). Then it gives the load ratio, the monotony and strain of the last 7 days and the
-form of today, and a short coach note. The summary has no split by sport for each week, so the review has none. The prompt has no
+form of today, and the new run bests of the week with the time each one beat. These are bests since the
+page's first week, not all-time records: a faster run before that week is not counted. It ends with a short coach note. The summary has no split by sport for each week, so the review has none. The prompt has no
 arguments.
 
 ## Configuration

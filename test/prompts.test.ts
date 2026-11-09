@@ -858,10 +858,18 @@ describe("coach prompts", () => {
     const text = (await render("week-review")).replace(/\s+/g, " ");
     const part = text.slice(
       text.indexOf("- **Against the weeks before**"),
-      text.indexOf("- **Coach note**"),
+      text.indexOf("- **New bests**"),
     );
     expect(part).toBe(
       '- **Against the weeks before**: how the week\'s load and hours compare with the mean of the weeks before it in the table, as a percent. Without an earlier week or with a null load, write "n/a". Then the page\'s load ramp of the week (`rampPct`): its load against the week before, in %. A ramp of more than 10% is the page\'s warning level: say so. A null `rampPct` is "n/a". - **Now**: the load ratio of 7 to 28 days (`load.acuteToChronic`), the monotony and strain of the last 7 days (`load.monotony`, `load.strain`), and `fitnessFatigue.form` (below 0 you carry fatigue). A monotony above 2 is the page\'s flag: the days are too alike. Say that these describe today, not the reviewed week. A null value is "n/a". If `fitnessFatigue` is null, write "n/a". ',
+    );
+  });
+
+  it("lists the new run bests of the week from the digest's progression", async () => {
+    const text = (await render("week-review")).replace(/\s+/g, " ");
+    const part = text.slice(text.indexOf("- **New bests**"), text.indexOf("- **Coach note**"));
+    expect(part).toBe(
+      '- **New bests**: the run bests of the week of `2026-10-19`: each entry of `recordProgression` with a date in that week, with the distance, the time and the `previous` time it beat. These are bests since `digest.period.start` only: an older, faster run can sit before that date, so name each one "best since" that date, never a personal record. A null `previous` means no earlier effort of that distance since that date, not a first ever. Without such an entry, write "none". ',
     );
   });
 
