@@ -51,7 +51,7 @@ import {
   withPresetWidgets,
 } from "./layout";
 import { type News, parseNews } from "./news";
-import { baseline, preset, zoneOf } from "./presets";
+import { baseline, preset } from "./presets";
 import {
   allWidgets,
   type Ctx,
@@ -1020,32 +1020,19 @@ function saveBoard(board: Instance[]): void {
   setDraft(withBoard(draft ?? layout, view.tab, board, preset));
 }
 
-/** The current board by meaning, in full rows. A draft like every other edit. */
+/** The current board in full rows, in its own order. A draft like every other edit. */
 function autoArrange(): void {
-  // a wider tile can get shorter, and a second press would then see other heights; 3 rounds, because a widget can change its height on each draw
-  for (let round = 0; round < 3; round++) {
-    if (!arrangeOnce()) break;
-  }
-  announce(t("said.arranged"));
-}
-
-/** Whether the board changed. */
-function arrangeOnce(): boolean {
   const board = currentBoard();
-  // a withheld widget has no tile, so it would leave a gap in a row; it stays on the board
-  const absent = board.filter((i) => withheld.has(i.widget));
-  const present = board.filter((i) => !absent.includes(i));
   // shortcut: heights are measured at the current window width, measure at 3 columns if phone results are poor
-  const arranged = arrange(present, (i) => ({
-    zone: zoneOf(i.widget),
-    height: contentHeight(i.id),
-    min: widget(i.widget)?.minSpan ?? 1,
-  }));
-  const next = [...arranged, ...absent];
+  const next = arrange(board, (i) =>
+    // a withheld widget has no tile, so it takes no column; it stays on the board
+    withheld.has(i.widget)
+      ? undefined
+      : { height: contentHeight(i.id), min: widget(i.widget)?.minSpan ?? 1 },
+  );
   // a save lists a preset board, and the bar would show unsaved changes with nothing changed
-  if (JSON.stringify(next) === JSON.stringify(board)) return false;
-  saveBoard(next);
-  return true;
+  if (JSON.stringify(next) !== JSON.stringify(board)) saveBoard(next);
+  announce(t("said.arranged"));
 }
 
 /** A tile is as tall as its row, so its content ends at the bottom of its body. Whole px, so that sums compare. */

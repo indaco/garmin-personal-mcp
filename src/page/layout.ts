@@ -127,82 +127,62 @@ export function loneAtTwoColumns(spans: Span[]): number[] {
 
 interface Tile {
   item: Instance;
-  span: Span;
   height: number;
-  /** The place among the shown tiles of the board. */
-  at: number;
+  /** The narrowest width the tile can get: its stored width or the widget's minimum. */
+  min: number;
 }
-type Pair = [wide: Tile, narrow: Tile];
 
-const gapOf = (pairs: Pair[]) =>
-  pairs.reduce((sum, [a, b]) => sum + Math.abs(a.height - b.height), 0);
-const tallestFirst = (list: Tile[]) => list.toSorted((a, b) => b.height - a.height);
-
-/** The tiles of one zone in full rows; each row is in the board order of its earliest tile. */
-function fullRows(tiles: Tile[]): Tile[][] {
-  const wide = tiles.filter((x) => x.span === 2);
-  const narrow = tiles.filter((x) => x.span === 1);
-  const tallNarrow = tallestFirst(narrow);
-  const best = tallestFirst(wide)
-    .slice(0, narrow.length)
-    .map((x, n): Pair => [x, tallNarrow[n]]);
-  const neighbours = wide.flatMap((x): Pair[] => {
-    const next = narrow.find((y) => y.at === x.at + 1);
-    return next ? [[x, next]] : [];
-  });
-  // pairs as close as the best ones stay: tiles of one height would swap on each press otherwise
-  const pairs =
-    neighbours.length === best.length && gapOf(neighbours) <= gapOf(best) ? neighbours : best;
-  const paired = new Set(pairs.flat());
-  const rest = narrow.filter((x) => !paired.has(x));
-  if (rest.length % 3 === 2) {
-    const [a, b] = rest.slice(-2);
-    const [tall, low] = b.height > a.height ? [b, a] : [a, b];
-    // the new pair can change the best pairs, and the next press would see it
-    return fullRows(
-      tiles.map((x) => {
-        if (x === a) return { ...tall, span: 2, at: a.at };
-        return x === b ? { ...low, at: b.at } : x;
-      }),
-    );
-  }
-  const threes = Array.from({ length: Math.floor(rest.length / 3) }, (_, n) =>
-    rest.slice(n * 3, n * 3 + 3),
-  );
-  const alone = [
-    ...wide.filter((x) => !paired.has(x)),
-    ...(rest.length % 3 === 1 ? rest.slice(-1) : []),
-    ...tiles.filter((x) => x.span === 3),
-  ];
-  const first = (row: Tile[]) => Math.min(...row.map((x) => x.at));
-  return [...pairs, ...threes, ...alone.map((x): Tile[] => [{ ...x, span: 3 }])].toSorted(
-    (a, b) => first(a) - first(b),
-  );
+/** The best split of the first tiles into rows: fewest rows, then the smallest height gaps in a row. */
+interface Split {
+  rows: number;
+  gap: number;
+  /** Where the last row starts. */
+  cut: number;
 }
+
+const better = (a: Split, b: Split | undefined) =>
+  !b || a.rows < b.rows || (a.rows === b.rows && a.gap < b.gap);
 
 /**
- * The board in full rows: by zone first, so zones never share a row, and with the closest heights
- * side by side. A width only grows, so a widget stays as wide as it needs. Hidden widgets go last.
+ * The board in full rows, in the order the user gave. Only widths change: each row is 1 to 3
+ * neighbouring tiles, the split has the fewest rows and then the closest heights in a row, and the
+ * free columns of a row go to its tallest tile. A width only grows. A hidden widget, and one that
+ * `info` gives nothing for (it has no tile), keeps its place and width and takes no column.
  */
 export function arrange(
   board: Instance[],
-  info: (i: Instance) => { zone: number; height: number; min: Span },
+  info: (i: Instance) => { height: number; min: Span } | undefined,
 ): Instance[] {
-  const shown = board
-    .filter((i) => !i.hidden)
-    .map((item, at) => {
-      const { zone, height, min } = info(item);
-      return { item, zone, height, at, span: Math.max(item.span, min) as Span };
-    });
-  const zones = [...new Set(shown.map((x) => x.zone))].toSorted((a, b) => a - b);
-  return [
-    ...zones.flatMap((zone) =>
-      fullRows(shown.filter((x) => x.zone === zone))
-        .flat()
-        .map((x) => ({ ...x.item, span: x.span })),
-    ),
-    ...board.filter((i) => i.hidden),
-  ];
+  const tiles = board.flatMap((item): Tile[] => {
+    const facts = item.hidden ? undefined : info(item);
+    return facts ? [{ item, height: facts.height, min: Math.max(item.span, facts.min) }] : [];
+  });
+  // best[end] splits tiles[0..end); a single tile always fits a row, so each end has a split
+  const best: Split[] = [{ rows: 0, gap: 0, cut: 0 }];
+  for (let end = 1; end <= tiles.length; end++) {
+    for (let size = 1; size <= Math.min(3, end); size++) {
+      const row = tiles.slice(end - size, end);
+      if (row.reduce((sum, x) => sum + x.min, 0) > 3) break;
+      const heights = row.map((x) => x.height);
+      const split = {
+        rows: best[end - size].rows + 1,
+        gap: best[end - size].gap + Math.max(...heights) - Math.min(...heights),
+        cut: end - size,
+      };
+      if (better(split, best[end])) best[end] = split;
+    }
+  }
+  const spans = new Map<Instance, Span>();
+  for (let end = tiles.length; end > 0; end = best[end].cut) {
+    const row = tiles.slice(best[end].cut, end);
+    const tallest = row.reduce((a, b) => (b.height > a.height ? b : a));
+    const free = 3 - row.reduce((sum, x) => sum + x.min, 0);
+    for (const x of row) spans.set(x.item, (x.min + (x === tallest ? free : 0)) as Span);
+  }
+  return board.map((i) => {
+    const span = spans.get(i);
+    return span === undefined || span === i.span ? i : { ...i, span };
+  });
 }
 
 export function setSpan(board: Instance[], id: string, span: Span): Instance[] {

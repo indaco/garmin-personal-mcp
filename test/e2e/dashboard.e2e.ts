@@ -857,6 +857,15 @@ const of = (id: string, span: number, extra = {}) => ({ id, widget: id, span, ..
 const tallBox = (id: string, height: number) =>
   custom(id, `el.innerHTML = '<div style="height:${height}px"></div>';`);
 
+/** Each tile as `id:span`, in board order. */
+const spans = (page: Page) =>
+  page.$$eval(".tile", (els) =>
+    els
+      .map((e) => `${(e as HTMLElement).dataset.id}:${e.className.match(/span-(\d)/)?.[1]}`)
+      .join(" "),
+  );
+const onAll = (all: unknown[]) => ({ rev: "r1", base: "preset", seen: MET, boards: { all } });
+
 describe("edit mode", () => {
   const one = {
     rev: "r0",
@@ -1064,27 +1073,29 @@ describe("edit mode", () => {
       tallBox("low2", 100),
       tallBox("tall1", 400),
     ];
-    const scrambled = {
-      rev: "r1",
-      base: "preset",
-      seen: { ...MET, running: preset("running").map((i) => i.widget) },
-      boards: {
-        all: [
-          of("activities", 3),
-          of("x", 1),
-          of("calendar", 1),
-          of("intensityMinutes", 1, { hidden: true }),
-          of("records", 3),
-          of("kpis", 3),
-        ],
-        running: [of("activities", 3), of("typeKpis", 3)],
-      },
-    };
+    // in one row the stretched tiles all read 400 px; only the content heights pair low with low
+    const byHeight = [of("low1", 1), of("low2", 1), of("tall1", 1), of("tall2", 1)];
+    const paired = "low1:2 low2:1 tall1:2 tall2:1";
 
-    it("sorts the current board by meaning, as a draft that Discard undoes and Done saves", async () => {
+    it("keeps the order and fills the rows, as a draft that Discard undoes and Done saves", async () => {
+      const layout = {
+        rev: "r1",
+        base: "preset",
+        seen: { ...MET, running: preset("running").map((i) => i.widget) },
+        boards: {
+          all: [
+            of("activities", 3),
+            of("x", 1),
+            of("intensityMinutes", 1, { hidden: true }),
+            of("records", 3),
+            of("kpis", 3),
+          ],
+          running: [of("activities", 3), of("typeKpis", 3)],
+        },
+      };
       const { page, errors } = await open(
         browser,
-        pageFile({ layout: scrambled, widgets, settings: { languages: ["en", "it"] } }),
+        pageFile({ layout, widgets, settings: { languages: ["en", "it"] } }),
         { locale: "it-IT" },
       );
       const startItalianEdit = async () => {
@@ -1093,46 +1104,45 @@ describe("edit mode", () => {
       };
       await startItalianEdit();
       await page.click(".edit-bar >> text=Disponi automaticamente");
-      const arranged = ["calendar", "kpis", "records", "x", "activities"];
-      expect(await tiles(page)).toEqual(arranged);
+      const arranged = "activities:3 x:3 records:3 kpis:3";
+      expect(await spans(page)).toBe(arranged);
       expect(await page.textContent("#announce")).toBe("Widget disposti");
       expect(await page.innerText(".edit-bar")).toContain("Modifiche non salvate");
       expect(await saved(page)).toBeNull();
-      expect(await page.getAttribute("[data-id=x]", "class")).toContain("span-3");
 
       await page.click(".edit-bar >> text=Annulla");
       await page.click("dialog >> text=Annulla le modifiche");
-      expect(await tiles(page)).toEqual(["activities", "x", "calendar", "records", "kpis"]);
+      expect(await spans(page)).toBe("activities:3 x:1 records:3 kpis:3");
 
       await startItalianEdit();
       await page.click(".edit-bar >> text=Disponi automaticamente");
       await page.click(".edit-bar >> text=Fine");
-      expect(await tiles(page)).toEqual(arranged);
+      expect(await spans(page)).toBe(arranged);
       const { boards } = JSON.parse((await saved(page))!).layout;
-      expect(boards.all.map((i: { id: string }) => i.id)).toEqual([
-        ...arranged,
-        "intensityMinutes",
+      expect(boards.all).toEqual([
+        of("activities", 3),
+        of("x", 3),
+        of("intensityMinutes", 1, { hidden: true }),
+        of("records", 3),
+        of("kpis", 3),
       ]);
-      expect(boards.all.at(-1)).toEqual(of("intensityMinutes", 1, { hidden: true }));
-      expect(boards.running).toEqual(scrambled.boards.running);
+      expect(boards.running).toEqual(layout.boards.running);
       expect(errors).toEqual([]);
     });
 
-    it("pairs tiles by the height of their content, not of the stretched tile", async () => {
-      const board = [of("tall2", 2), of("low1", 1), of("low2", 2), of("tall1", 1)];
-      const layout = { rev: "r1", base: "preset", seen: MET, boards: { all: board } };
-      const { page } = await open(browser, pageFile({ layout, widgets }));
+    it("splits the rows by the height of their content, not of the stretched tile", async () => {
+      const { page } = await open(browser, pageFile({ layout: onAll(byHeight), widgets }));
       await startEdit(page);
       await page.click(".edit-bar >> text=Auto-arrange");
-      expect(await tiles(page)).toEqual(["tall2", "tall1", "low2", "low1"]);
+      expect(await spans(page)).toBe(paired);
     });
 
     it("counts a widget's narrowest width", async () => {
       const board = [of("calendar", 1), of("fitnessAge", 1), of("periodComparison", 1)];
-      const layout = { rev: "r1", base: "preset", seen: MET, boards: { all: board } };
-      const { page } = await open(browser, pageFile({ layout }));
+      const { page } = await open(browser, pageFile({ layout: onAll(board) }));
       await startEdit(page);
       await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await tiles(page)).toEqual(["calendar", "fitnessAge", "periodComparison"]);
       const widths = await page.$$eval(".tile", (els) => els.map((e) => e.className));
       expect(widths.map((c) => c.match(/span-\d/)?.[0]).toSorted()).toEqual([
         "span-1",
@@ -1142,12 +1152,7 @@ describe("edit mode", () => {
     });
 
     it("shows no unsaved changes on a board that is already arranged", async () => {
-      const boards = [[of("x", 3)], [], [of("x", 1, { hidden: true })]].map((all) => ({
-        rev: "r1",
-        base: "preset",
-        seen: MET,
-        boards: { all },
-      }));
+      const boards = [[of("x", 3)], [], [of("x", 1, { hidden: true })]].map(onAll);
       for (const layout of [null, ...boards]) {
         const { page, errors } = await open(browser, pageFile({ layout, widgets }));
         await startEdit(page);
@@ -1158,48 +1163,35 @@ describe("edit mode", () => {
       }
     });
 
-    it("arranges only the tiles it shows, and keeps a withheld or unknown widget", async () => {
-      const layout = {
-        rev: "r1",
-        base: "preset",
-        seen: MET,
-        boards: {
-          all: [
-            of("readiness", 2),
-            of("hrv", 1, { hidden: true }),
-            of("calendar", 1),
-            of("gone", 1),
-          ],
-        },
-      };
+    it("gives a withheld or hidden widget no column, and keeps it in its place", async () => {
+      const board = [of("gone", 3), of("readiness", 2), of("hrv", 1, { hidden: true }), of("x", 1)];
       const { page, errors } = await open(
         browser,
-        pageFile({ layout, settings: { exclude: ["recovery"] } }),
+        pageFile({ layout: onAll(board), widgets, settings: { exclude: ["recovery"] } }),
       );
       await startEdit(page);
       await page.click(".edit-bar >> text=Auto-arrange");
-      expect(await tiles(page)).toEqual(["calendar", "gone"]);
-      expect(await page.getAttribute("[data-id=calendar]", "class")).toContain("span-3");
+      expect(await spans(page)).toBe("gone:3 x:3");
       await page.click(".edit-bar >> text=Done");
       const { boards } = JSON.parse((await saved(page))!).layout;
       expect(boards.all).toEqual([
-        of("calendar", 3),
         of("gone", 3),
         of("readiness", 2),
         of("hrv", 1, { hidden: true }),
+        of("x", 3),
       ]);
       expect(errors).toEqual([]);
     });
 
     it("gives the same board on a second press", async () => {
       const board = [of("low1", 1), of("tall2", 2), of("tall1", 1), of("x", 1), of("low2", 2)];
-      const layout = { rev: "r1", base: "preset", seen: MET, boards: { all: board } };
-      const { page } = await open(browser, pageFile({ layout, widgets }));
+      const { page } = await open(browser, pageFile({ layout: onAll(board), widgets }));
       await startEdit(page);
       await page.click(".edit-bar >> text=Auto-arrange");
-      const once = await tiles(page);
+      const once = await spans(page);
+      expect(once).not.toBe("low1:1 tall2:2 tall1:1 x:1 low2:2");
       await page.click(".edit-bar >> text=Auto-arrange");
-      expect(await tiles(page)).toEqual(once);
+      expect(await spans(page)).toBe(once);
     });
 
     it("gives the same board on a second press when a wider tile gets shorter", async () => {
@@ -1208,96 +1200,81 @@ describe("edit mode", () => {
         "wraps",
         `el.innerHTML = '<div style="display:inline-block;width:100px;height:130px"></div>'.repeat(9);`,
       );
-      const board = [of("wide", 2), of("top", 1), of("wraps", 1), of("low", 1)];
-      const layout = { rev: "r1", base: "preset", seen: MET, boards: { all: board } };
+      const board = [of("wraps", 1), of("top", 1), of("low", 1), of("wide", 1)];
       const { page } = await open(
         browser,
         pageFile({
-          layout,
-          widgets: [tallBox("wide", 300), tallBox("top", 420), tallBox("low", 250), wraps],
+          layout: onAll(board),
+          widgets: [tallBox("wide", 300), tallBox("top", 380), tallBox("low", 250), wraps],
         }),
         { viewport: { width: 1280, height: 800 } },
       );
       await startEdit(page);
       await page.click(".edit-bar >> text=Auto-arrange");
-      const once = await tiles(page);
+      const once = await spans(page);
+      expect(once).toBe("wraps:2 top:1 low:1 wide:2");
       await page.click(".edit-bar >> text=Auto-arrange");
-      expect(await tiles(page)).toEqual(once);
-      expect(once).toEqual(["wide", "top", "wraps", "low"]);
+      expect(await spans(page)).toBe(once);
     });
 
-    it("stops after 3 rounds on a tile whose height changes on each draw", async () => {
+    it("draws the board once, also with a tile whose height changes on each draw", async () => {
       const flips = custom(
         "flips",
         `window.draws = (window.draws ?? 0) + 1;
          el.innerHTML = '<div style="height:' + (window.draws % 2 ? 400 : 100) + 'px"></div>';`,
       );
-      const board = [of("flips", 2), of("top", 1), of("steady", 2), of("low", 1)];
-      const layout = { rev: "r1", base: "preset", seen: MET, boards: { all: board } };
+      const board = [of("flips", 1), of("top", 1), of("steady", 1), of("low", 1)];
       const { page, errors } = await open(
         browser,
         pageFile({
-          layout,
+          layout: onAll(board),
           widgets: [tallBox("steady", 250), tallBox("top", 400), tallBox("low", 100), flips],
         }),
       );
       await startEdit(page);
       const draws = () => page.evaluate(() => (window as unknown as { draws: number }).draws);
-      // an even count: the tile is at 100 px now, so the first round changes the board
       const before = await draws();
-      expect(before % 2).toBe(0);
       await page.click(".edit-bar >> text=Auto-arrange");
-      expect((await draws()) - before).toBe(3);
+      expect((await draws()) - before).toBe(1);
+      const once = await spans(page);
+      await page.click(".edit-bar >> text=Auto-arrange");
+      expect(await spans(page)).toBe(once);
       expect(errors).toEqual([]);
     });
 
     it("keeps keyboard focus on the button when the board changes", async () => {
       const { page } = await open(
         browser,
-        pageFile({
-          layout: {
-            rev: "r1",
-            base: "preset",
-            seen: MET,
-            boards: { all: [of("x", 1), of("kpis", 3)] },
-          },
-          widgets,
-        }),
+        pageFile({ layout: onAll([of("x", 1), of("kpis", 3)]), widgets }),
       );
       await startEdit(page);
       await page.focus(".edit-bar >> text=Auto-arrange");
       await page.keyboard.press("Enter");
-      expect(await tiles(page)).toEqual(["kpis", "x"]);
+      expect(await spans(page)).toBe("x:3 kpis:3");
       expect(await page.evaluate(() => document.activeElement?.textContent)).toBe("Auto-arrange");
     });
 
     it("reads the height of an instance by its own id, also with a quote in it", async () => {
-      const board = [
-        { id: 'tall"2', widget: "tall2", span: 2 },
-        of("low1", 1),
-        of("low2", 2),
-        of("tall1", 1),
-      ];
-      const layout = { rev: "r1", base: "preset", seen: MET, boards: { all: board } };
-      const { page, errors } = await open(browser, pageFile({ layout, widgets }));
+      const board = [of("low1", 1), of("low2", 1), { id: 'tall"1', widget: "tall1", span: 1 }];
+      const { page, errors } = await open(
+        browser,
+        pageFile({ layout: onAll([...board, of("tall2", 1)]), widgets }),
+      );
       await startEdit(page);
       await page.click(".edit-bar >> text=Auto-arrange");
-      expect(await tiles(page)).toEqual(['tall"2', "tall1", "low2", "low1"]);
+      expect(await spans(page)).toBe('low1:2 low2:1 tall"1:2 tall2:1');
       expect(errors).toEqual([]);
     });
 
-    it.each([390, 1000])("pairs by height and stays the same at %d px", async (width) => {
-      const board = [of("tall2", 2), of("low1", 1), of("low2", 2), of("tall1", 1)];
-      const layout = { rev: "r1", base: "preset", seen: MET, boards: { all: board } };
-      const { page, errors } = await open(browser, pageFile({ layout, widgets }), {
+    it.each([390, 1000])("splits by height and stays the same at %d px", async (width) => {
+      const { page, errors } = await open(browser, pageFile({ layout: onAll(byHeight), widgets }), {
         viewport: { width, height: 844 },
       });
       await startEdit(page);
       await page.click(".edit-bar >> text=Auto-arrange");
-      const paired = ["tall2", "tall1", "low2", "low1"];
-      expect(await tiles(page)).toEqual(paired);
+      expect(await spans(page)).toBe(paired);
       await page.click(".edit-bar >> text=Auto-arrange");
-      expect(await tiles(page)).toEqual(paired);
+      expect(await spans(page)).toBe(paired);
       expect(errors).toEqual([]);
     });
   });
