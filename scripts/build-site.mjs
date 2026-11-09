@@ -215,6 +215,7 @@ function jsonLd(f) {
           description: f.site.description,
           applicationCategory: "DeveloperApplication",
           operatingSystem: "macOS, Linux, Windows",
+          softwareVersion: f.pkg.version,
           softwareRequirements: f.node,
           isAccessibleForFree: true,
           offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
@@ -245,7 +246,9 @@ export function values(f) {
   return {
     // the home page; renderWhatsNew gives its own values
     home: "",
-    title: "garmin-personal-mcp",
+    title: "garmin-personal-mcp: Garmin Connect MCP server",
+    // link previews show the tagline; search engines rank the title above
+    shareTitle: "garmin-personal-mcp: every sport, one assistant",
     canonical: f.site.url,
     url: f.site.url,
     description: escapeHtml(f.site.description),
@@ -319,6 +322,9 @@ export function renderWhatsNew({ root = ".", script = "" } = {}) {
     ...vals,
     home: "index.html",
     title: "What's new - garmin-personal-mcp",
+    shareTitle: "What's new - garmin-personal-mcp",
+    // its own description: search engines flag the same one on two pages
+    description: "What each new version of garmin-personal-mcp adds and corrects.",
     canonical: `${vals.url}whats-new.html`,
   });
 }
