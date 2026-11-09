@@ -4,7 +4,7 @@ import { register } from "../registry";
 import type { Ctx } from "../registry";
 import type { ExerciseStats, MuscleGroup, StrengthSet } from "../../analytics/strength";
 import { oneSession } from "./types";
-import { kpi, kpiRow, note, showRest, weekLabel } from "./ui";
+import { kpi, kpiRow, note, showRest, table, weekLabel } from "./ui";
 
 /** The Strength board: sets per movement, muscle-group balance, the exercises with their detail, the sessions. */
 
@@ -125,6 +125,76 @@ register({
       Math.max(160, groups.length * 26),
     );
     append(el, note(t("mb.note")));
+    noSets(el, ctx, "ex.noSetsWeeks");
+  },
+});
+
+register({
+  id: "planAdherence",
+  render(el, ctx) {
+    const { t, fmt, calc } = ctx;
+    const plan = calc.planAdherence(ctx.activities, ctx.weeks);
+    if (plan.sessions === plan.unplanned) {
+      ctx.empty(el, t("plan.none"));
+      return void append(el, note(t("plan.note")));
+    }
+    const hit = sum(plan.weeks.map((w) => w?.hit ?? null));
+    const miss = sum(plan.weeks.map((w) => w?.miss ?? null));
+    append(
+      el,
+      kpiRow(
+        kpi(t("plan.sessions"), fmt.num(plan.sessions - plan.unplanned)),
+        kpi(t("plan.hit"), fmt.num(hit)),
+        kpi(t("plan.miss"), fmt.num(miss)),
+        kpi(
+          t("plan.share"),
+          hit + miss > 0 ? `${Math.round((100 * hit) / (hit + miss))}%` : fmt.na,
+        ),
+      ),
+    );
+    // a chart needs 2 weeks with a planned exercise
+    if (plan.weeks.filter((w) => w && w.hit + w.miss > 0).length > 1)
+      ctx.chart(
+        el,
+        {
+          type: "bar",
+          data: {
+            labels: ctx.weeks.map((w) => weekLabel(ctx, w)),
+            datasets: [
+              {
+                label: t("plan.hit"),
+                data: plan.weeks.map((w) => w?.hit ?? null),
+                backgroundColor: ctx.color("good"),
+              },
+              {
+                label: t("plan.miss"),
+                data: plan.weeks.map((w) => w?.miss ?? null),
+                backgroundColor: ctx.color("bad"),
+              },
+            ],
+          },
+          options: {
+            scales: { x: { stacked: true }, y: { stacked: true, ticks: { precision: 0 } } },
+          },
+        },
+        220,
+      );
+    const missed = plan.exercises.slice(0, 5);
+    if (missed.length > 0)
+      append(
+        el,
+        table(
+          [t("ex.name"), t("plan.missed"), t("plan.sets"), t("plan.reps")],
+          missed.map((x) => [
+            x.exercise,
+            t("plan.of", { misses: x.misses, sessions: x.sessions }),
+            fmt.num(x.sets),
+            fmt.num(x.reps),
+          ]),
+          [1, 2, 3],
+        ),
+      );
+    append(el, note(t("plan.note")));
     noSets(el, ctx, "ex.noSetsWeeks");
   },
 });

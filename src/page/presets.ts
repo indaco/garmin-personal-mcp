@@ -54,6 +54,7 @@ const PRESETS: Record<string, Row> & { generic: Row } = {
     ["records", 3],
     ["setsPerCategory", 2],
     ["muscleBalance", 1],
+    ["planAdherence", 3],
     ["exercises", 3],
     ["strengthSessions", 3],
   ],

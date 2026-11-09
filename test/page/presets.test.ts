@@ -68,6 +68,13 @@ describe("preset", () => {
   it("gives the generic widgets to a board name that only the prototype has", () => {
     for (const board of INHERITED) expect(names(board)).toEqual(names("zzz"));
   });
+
+  it("has the plan widget on a row of its own, right after the muscle-group balance", () => {
+    const list = preset("strengthTraining");
+    const i = list.findIndex((x) => x.widget === "planAdherence");
+    expect(list[i - 1]?.widget).toBe("muscleBalance");
+    expect(list[i]?.span).toBe(3);
+  });
 });
 
 describe("sport boards", () => {
@@ -122,6 +129,15 @@ describe("withPresetWidgets with the real preset", () => {
     expect(withPresetWidgets(r.layout, preset, baseline).added).toEqual({});
   });
 
+  it("gives a Strength board from an older release the plan widget once", () => {
+    const strengthTraining = preset("strengthTraining").filter((i) =>
+      baseline("strengthTraining").includes(i.widget),
+    );
+    const r = withPresetWidgets(parseLayout({ boards: { strengthTraining } }), preset, baseline);
+    expect(r.added).toEqual({ strengthTraining: ["records", "planAdherence"] });
+    expect(withPresetWidgets(r.layout, preset, baseline).added).toEqual({});
+  });
+
   it("does not throw on an inherited board name, and adds only what a release added", () => {
     for (const board of INHERITED) {
       const layout = parseLayout(JSON.parse(`{"boards":{"${board}":[]}}`));
@@ -168,6 +184,7 @@ describe("zoneOf", () => {
     ["intensityMinutes", 1],
     ["records", 2],
     ["runningForm", 3],
+    ["planAdherence", 3],
     ["walkDetails", 4],
     ["bikeDetails", 4],
     ["swimDetails", 4],

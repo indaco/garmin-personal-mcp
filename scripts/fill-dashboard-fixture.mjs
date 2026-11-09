@@ -42,7 +42,10 @@ export function asServer(activities, workouts = false, saved = false) {
   const lapped = new Map();
   let strength = 0;
   activities.forEach((a, i) => {
-    if (a.type?.includes("strength") && strength++ >= 30 && !saved) delete a.exercises;
+    if (a.type?.includes("strength") && strength++ >= 30 && !saved) {
+      delete a.exercises;
+      delete a.planVerdicts;
+    }
     const longRun = isRun(a) && typeof a.km === "number" && a.km > 15;
     const w = workout(a);
     const repeated =

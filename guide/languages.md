@@ -513,6 +513,17 @@ out. To add one:
 | `ex.noSetsWeeks` | {n} strength session has no sets (past the 30 newest without a saved .FIT file, or not readable): its week is left out.\|{n} strength sessions have no sets (past the 30 newest without a saved .FIT file, or not readable): their weeks are left out. |
 | `w.strengthSessions` | Sessions |
 | `ss.count` | {n} exercise\|{n} exercises |
+| `w.planAdherence` | Planned exercises hit |
+| `plan.sessions` | Planned sessions |
+| `plan.hit` | Exercises hit |
+| `plan.miss` | Exercises missed |
+| `plan.share` | Hit share |
+| `plan.missed` | Missed |
+| `plan.of` | {misses} of {sessions} |
+| `plan.sets` | Too few sets |
+| `plan.reps` | Reps under the plan |
+| `plan.none` | No planned strength session in this period. |
+| `plan.note` | Only the sessions you did: a skipped planned session leaves no file and is not counted. |
 | `mg.chest` | Chest |
 | `mg.back` | Back |
 | `mg.shoulders` | Shoulders |

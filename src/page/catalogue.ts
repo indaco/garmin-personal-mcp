@@ -237,6 +237,12 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
     span: 1,
   },
   {
+    id: "planAdherence",
+    title: "w.planAdherence",
+    types: ["strengthTraining"],
+    span: 3,
+  },
+  {
     id: "exercises",
     title: "w.exercises",
     types: ["strengthTraining"],

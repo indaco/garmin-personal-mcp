@@ -41,6 +41,7 @@ it by hand.
 | Workout trend | `workoutTrend` | The same workout (runs with the same name, without the place that Garmin puts before it) across weeks: pace, HR, efficiency and running form, up to 3 workouts side by side; intervals by their work laps. Only on a page with the workout comparison (setting workouts). | running | 3 |
 | Sets per movement | `setsPerCategory` | Completed sets of each movement category each week. | strengthTraining | 2 |
 | Muscle-group balance | `muscleBalance` | Average weekly sets of each muscle group against 10-20, and the push:pull ratio. | strengthTraining | 1 |
+| Planned exercises hit | `planAdherence` | The planned exercises hit and missed each week, from the plan that the watch ran, and the exercises missed most with the reason. Only the sessions you did: a skipped planned session leaves no file and is not counted. | strengthTraining | 3 |
 | Exercises | `exercises` | Each exercise by muscle group, with sort, search and group filter, and a tag on a stalled or falling lift; a row opens its trend and its sessions. | strengthTraining | 3 |
 | Sessions | `strengthSessions` | Each strength session with its exercises and sets in order, the last 6 first, the others under Show all. | strengthTraining | 3 |
 | Pace and walks | `walkDetails` | Weekly pace and average HR, and steps, cadence and body battery change of each walk. | walking, hiking | 2 |
@@ -60,7 +61,7 @@ every board. _Width_ is the default width in columns.
 | ----- | ----------------- |
 | all | `kpis`, `readiness`, `calendar`, `periodComparison`, `weeklyVolume`, `intensityMinutes`, `records`, `loadSafety`, `fitnessFatigue`, `loadVsRecovery`, `activities`, `coachNotes` |
 | running | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `races`, `racePredictor`, `aerobicFitness`, `bestEfforts`, `trainingEffect`, `intensityShare`, `runningForm`, `longRuns`, `runWalk`, `workoutTrend`, `activities` |
-| strengthTraining | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `setsPerCategory`, `muscleBalance`, `exercises`, `strengthSessions` |
+| strengthTraining | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `setsPerCategory`, `muscleBalance`, `planAdherence`, `exercises`, `strengthSessions` |
 | walking | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `steps`, `walkDetails`, `activities` |
 | hiking | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `hikeVertical`, `activities` |
 | cycling | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `intensityShare`, `hikeVertical`, `bikeDetails`, `activities` |

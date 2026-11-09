@@ -3356,6 +3356,203 @@ const zero = (sets: Record<string, unknown>[], field: string) =>
 
 const rows = (page: Page) => page.$$eval(".ex-row .linkish", (r) => r.map((x) => x.textContent));
 
+const hit = (exercise: string) => ({ exercise, verdict: "hit" });
+const miss = (exercise: string, ...why: string[]) => ({ exercise, verdict: "miss", why });
+
+/**
+ * The plan verdicts of the fixture's strength sessions, by day. A day with `null` had no plan, a day
+ * with "no sets" lost its sets; the other sessions keep no `planVerdicts` key.
+ */
+function planned(days: Record<string, unknown>): unknown[] {
+  return data.activities.map((a: Record<string, unknown>) => {
+    const day = String(a.start).slice(0, 10);
+    if (!(day in days)) return a;
+    if (days[day] === "no sets") return { ...a, exercises: undefined };
+    return { ...a, planVerdicts: days[day] };
+  });
+}
+
+// weeks 08-03 to 09-28 have no plan, 10-05 has 7 hits and 2 misses, 10-12 has a session without
+// sets, 10-19 has 3 hits and 6 misses, 10-26 (the last week, from the page end) has no session
+const PLANNED = {
+  "2026-10-05": [
+    hit("Barbell Back Squat"),
+    hit("Barbell Back Squat"),
+    hit("Barbell Bench Press"),
+    hit("Bent Over Row"),
+    hit("Plank"),
+  ],
+  "2026-10-09": [
+    miss("Romanian Deadlift", "sets"),
+    hit("Dumbbell Shoulder Press"),
+    hit("Lat Pulldown"),
+    hit("Dumbbell Biceps Curl"),
+    hit("Dumbbell Lunge"),
+    miss("Dumbbell Lunge", "reps"),
+  ],
+  "2026-10-12": null,
+  "2026-10-16": "no sets",
+  "2026-10-19": [
+    hit("Barbell Back Squat"),
+    miss("Barbell Bench Press", "sets"),
+    miss("Bent Over Row", "reps"),
+    hit("Plank"),
+  ],
+  "2026-10-23": [
+    miss("Romanian Deadlift", "sets", "reps"),
+    miss("Dumbbell Shoulder Press", "reps"),
+    miss("Lat Pulldown", "sets"),
+    miss("Dumbbell Biceps Curl", "reps"),
+    hit("Dumbbell Lunge"),
+  ],
+};
+
+const SKIPPED =
+  "Only the sessions you did: a skipped planned session leaves no file and is not counted.";
+
+const planPage = (activities: unknown[]) =>
+  open(browser, pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }), {
+    hash: "#strengthTraining",
+  });
+
+const missedRows = (page: Page) =>
+  page.$$eval("[data-id=planAdherence] table.data tbody tr", (r) =>
+    r.map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent)),
+  );
+
+describe("plan adherence", () => {
+  it("counts the planned exercises hit and missed by week, and lists the ones missed most", async () => {
+    const { page, errors } = await planPage(planned(PLANNED));
+    expect(await kpiTexts(page, "planAdherence")).toEqual({
+      "Planned sessions": ["4", null],
+      "Exercises hit": ["10", null],
+      "Exercises missed": ["8", null],
+      "Hit share": ["56%", null],
+    });
+    // a week without a planned session is 0, the week with a session without sets is a gap
+    const none = Array(9).fill(0);
+    expect((await chartDataset(page, "planAdherence", "Exercises hit")).data).toEqual([
+      ...none,
+      7,
+      null,
+      3,
+      0,
+    ]);
+    expect((await chartDataset(page, "planAdherence", "Exercises missed")).data).toEqual([
+      ...none,
+      2,
+      null,
+      6,
+      0,
+    ]);
+    const colours = await page.evaluate(() => {
+      const css = getComputedStyle(document.documentElement);
+      const sets = Object.values(window.Chart!.instances)
+        .filter((c) => c.canvas.closest("[data-widget=planAdherence]"))
+        .flatMap((c) => c.data.datasets.map((d) => [d.label, d.backgroundColor]));
+      return {
+        sets,
+        good: css.getPropertyValue("--good").trim(),
+        bad: css.getPropertyValue("--bad").trim(),
+      };
+    });
+    expect(colours.sets).toEqual([
+      ["Exercises hit", colours.good],
+      ["Exercises missed", colours.bad],
+    ]);
+    // the weeks of the sets chart, stacked on both axes
+    const axes = await page.evaluate(() => {
+      const charts = Object.values(window.Chart!.instances);
+      const c = charts.find((x) => x.canvas.closest("[data-widget=planAdherence]"))!;
+      const sets = charts.find((x) => x.canvas.closest("[data-widget=setsPerCategory]"))!;
+      const scales = c.options.scales as Record<string, { stacked?: boolean }>;
+      return {
+        labels: c.data.labels,
+        sets: sets.data.labels,
+        stacked: [scales.x?.stacked, scales.y?.stacked],
+      };
+    });
+    expect(axes.labels).toHaveLength(13);
+    expect(axes.labels).toEqual(axes.sets);
+    expect(axes.stacked).toEqual([true, true]);
+    // the counts align right, the exercise name does not
+    expect(
+      await page.$$eval("[data-id=planAdherence] table.data tbody tr:first-child td", (c) =>
+        c.map((x) => x.className),
+      ),
+    ).toEqual(["", "num", "num", "num"]);
+    // 7 exercises missed: the first 5, most misses first, then by name
+    expect(
+      await page.$$eval("[data-id=planAdherence] table.data th", (h) =>
+        h.map((x) => x.textContent),
+      ),
+    ).toEqual(["Exercise", "Missed", "Too few sets", "Reps under the plan"]);
+    expect(await missedRows(page)).toEqual([
+      ["Romanian Deadlift", "2 of 2", "2", "1"],
+      ["Barbell Bench Press", "1 of 2", "1", "0"],
+      ["Bent Over Row", "1 of 2", "0", "1"],
+      ["Dumbbell Biceps Curl", "1 of 2", "0", "1"],
+      ["Dumbbell Lunge", "1 of 2", "0", "1"],
+    ]);
+    const text = await page.innerText("[data-id=planAdherence]");
+    expect(text).toContain(SKIPPED);
+    expect(text).toContain(
+      "1 strength session has no sets (past the 30 newest without a saved .FIT file, or not readable): its week is left out.",
+    );
+    expect(errors).toEqual([]);
+  });
+
+  it("draws no chart for one week with a plan, and lists no exercise when none missed", async () => {
+    const { page, errors } = await planPage(
+      planned({ "2026-10-19": [hit("Barbell Back Squat"), hit("Plank")] }),
+    );
+    expect(await page.$$("[data-id=planAdherence] canvas")).toHaveLength(0);
+    expect(await kpiTexts(page, "planAdherence")).toEqual({
+      "Planned sessions": ["1", null],
+      "Exercises hit": ["2", null],
+      "Exercises missed": ["0", null],
+      "Hit share": ["100%", null],
+    });
+    expect(await page.$$("[data-id=planAdherence] table")).toHaveLength(0);
+    expect(await page.innerText("[data-id=planAdherence]")).toContain(SKIPPED);
+    expect(errors).toEqual([]);
+  });
+
+  it("draws the chart from two weeks with a plan", async () => {
+    const { page, errors } = await planPage(
+      planned({ "2026-10-12": [hit("Plank")], "2026-10-19": [miss("Plank", "sets")] }),
+    );
+    expect(await page.$$("[data-id=planAdherence] canvas")).toHaveLength(1);
+    expect(await missedRows(page)).toEqual([["Plank", "1 of 2", "1", "0"]]);
+    expect(errors).toEqual([]);
+  });
+
+  it("gives n/a as the hit share of planned sessions without a verdict", async () => {
+    const { page, errors } = await planPage(planned({ "2026-10-19": [], "2026-10-12": [] }));
+    expect(await kpiTexts(page, "planAdherence")).toEqual({
+      "Planned sessions": ["2", null],
+      "Exercises hit": ["0", null],
+      "Exercises missed": ["0", null],
+      "Hit share": ["n/a", null],
+    });
+    expect(errors).toEqual([]);
+  });
+
+  it.each([
+    ["no session has plan verdicts", {}],
+    ["every session had no plan", { "2026-10-19": null, "2026-10-23": null }],
+  ])("shows the empty state when %s", async (_, days) => {
+    const { page, errors } = await planPage(planned(days));
+    expect(await page.$$("[data-id=planAdherence] canvas")).toHaveLength(0);
+    expect(await page.$$("[data-id=planAdherence] .kpi")).toHaveLength(0);
+    expect(await page.innerText("[data-id=planAdherence] .empty")).toBe(
+      "No planned strength session in this period.",
+    );
+    expect(await page.innerText("[data-id=planAdherence]")).toContain(SKIPPED);
+    expect(errors).toEqual([]);
+  });
+});
+
 describe("strength board", () => {
   it("shows the Strength widgets", async () => {
     const { page, errors } = await open(browser, pageFile(), { hash: "#strengthTraining" });
@@ -3366,6 +3563,7 @@ describe("strength board", () => {
       "records",
       "setsPerCategory",
       "muscleBalance",
+      "planAdherence",
       "exercises",
       "strengthSessions",
     ]);

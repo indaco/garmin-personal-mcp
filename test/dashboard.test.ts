@@ -560,13 +560,23 @@ describe("jsonByLines", () => {
   });
 });
 
-/** How many of 32 strength sessions with sets keep them in a demo, on a first build or with every file saved. */
-const keptSets = (saved: boolean) =>
-  asServer(
-    Array.from({ length: 32 }, (_, i) => ({ id: i, type: "strength_training", exercises: [] })),
+/**
+ * How many of 32 strength sessions with sets keep them, and their plan verdicts, in a demo, on a first
+ * build or with every file saved.
+ */
+const keptSets = (saved: boolean) => {
+  const out = asServer(
+    Array.from({ length: 32 }, (_, i) => ({
+      id: i,
+      type: "strength_training",
+      exercises: [],
+      planVerdicts: null,
+    })),
     false,
     saved,
-  ).filter((a: Record<string, unknown>) => a.exercises).length;
+  );
+  return [out.filter((a) => a.exercises).length, out.filter((a) => "planVerdicts" in a).length];
+};
 
 const ids = (out: { activities: { id: number }[] }) => out.activities.map((a) => a.id).toSorted();
 /** Range answers without any day. */
@@ -1934,7 +1944,10 @@ describe("getDashboardData", () => {
   });
 
   it("keeps in the demos the sets that the server gives: the 30 newest, all once every file is saved", () => {
-    expect([keptSets(false), keptSets(true)]).toEqual([30, 32]);
+    expect([keptSets(false), keptSets(true)]).toEqual([
+      [30, 30],
+      [32, 32],
+    ]);
   });
 
   it("adds the laps of the last 8 sessions of each repeated run name, only when asked", async () => {
