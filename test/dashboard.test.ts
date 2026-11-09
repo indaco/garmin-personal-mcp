@@ -1914,6 +1914,27 @@ describe("getDashboardData", () => {
         );
       });
 
+      it("reports an older run whose saved file does not decode, and goes on", async () => {
+        garminActivities = [1, 2, 3, 4, 5].map((n) => activity(n, `2026-10-2${7 - n}`));
+        const tools = new GarminTools(api as unknown as GarminApiClient, dataDir);
+        api.getBytes.mockResolvedValueOnce(plannedRun());
+        await tools.fetchFit(5);
+        // run 4: a valid header and a wrong CRC
+        const ok = plannedRun();
+        writeFileSync(
+          join(dataDir, "fit", "4.fit"),
+          ok.map((v: number, i: number) => (i === ok.length - 1 ? v ^ 0xff : v)),
+        );
+        api.getBytes.mockClear();
+        const out = JSON.parse(await dashboard.getDashboardData(1));
+        expect(api.getBytes).toHaveBeenCalledTimes(3);
+        expect(out.sync).toMatchObject({ failedDetails: 1, stoppedEarly: false });
+        const [, , , bad, saved] = out.activities;
+        expect(bad.detailError).toMatch(/^Cannot decode the \.FIT file of 4/);
+        expect(bad).not.toHaveProperty("planVerdicts");
+        expect(saved.planVerdicts).toEqual(RUN_VERDICTS);
+      });
+
       it("gives a planned run with no target to check an empty list", async () => {
         garminActivities = [activity(1, "2026-10-26")];
         const M = Profile.MesgNum;
