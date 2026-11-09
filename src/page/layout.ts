@@ -12,6 +12,8 @@ export interface Instance {
   type?: string;
   span: Span;
   hidden?: boolean;
+  /** The user's width, when Auto-arrange made the tile wider; the next press starts from it. */
+  baseSpan?: Span;
 }
 
 export interface Layout {
@@ -149,7 +151,8 @@ type TileInfo = (i: Instance) => { height: number; min: Span } | undefined;
 function tilesOf(board: Instance[], info: TileInfo): Tile[] {
   return board.flatMap((item): Tile[] => {
     const facts = item.hidden ? undefined : info(item);
-    return facts ? [{ item, height: facts.height, min: Math.max(item.span, facts.min) }] : [];
+    const own = item.baseSpan ?? item.span;
+    return facts ? [{ item, height: facts.height, min: Math.max(own, facts.min) }] : [];
   });
 }
 
@@ -175,22 +178,30 @@ function splitsOf(tiles: Tile[]): Split[] {
 /**
  * The board in full rows, in the order the user gave. Only widths change: each row is 1 to 3
  * neighbouring tiles, the split has the fewest rows and then the closest heights in a row, and the
- * free columns of a row go to its tallest tile. A width only grows. A hidden widget, and one that
- * `info` gives nothing for (it has no tile), keeps its place and width and takes no column.
+ * free columns of a row go to its tallest tile. It starts from the user's widths (`baseSpan`, else
+ * `span`) and notes the user's width on each tile it makes wider. A hidden widget, and one that
+ * `info` gives nothing for (it has no tile), keeps its place, width and note, and takes no column.
  */
 export function arrange(board: Instance[], info: TileInfo): Instance[] {
   const tiles = tilesOf(board, info);
   const best = splitsOf(tiles);
-  const spans = new Map<Instance, Span>();
+  const placed = new Map<Instance, Instance>();
   for (let end = tiles.length; end > 0; end = best[end].cut) {
     const row = tiles.slice(best[end].cut, end);
     const tallest = row.reduce((a, b) => (b.height > a.height ? b : a));
     const free = 3 - row.reduce((sum, x) => sum + x.min, 0);
-    for (const x of row) spans.set(x.item, (x.min + (x === tallest ? free : 0)) as Span);
+    for (const x of row) {
+      const span = (x.min + (x === tallest ? free : 0)) as Span;
+      const { baseSpan: _, ...item } = x.item;
+      placed.set(
+        x.item,
+        span > x.min ? { ...item, span, baseSpan: x.min as Span } : { ...item, span },
+      );
+    }
   }
   return board.map((i) => {
-    const span = spans.get(i);
-    return span === undefined || span === i.span ? i : { ...i, span };
+    const next = placed.get(i);
+    return next && JSON.stringify(next) !== JSON.stringify(i) ? next : i;
   });
 }
 
@@ -222,8 +233,13 @@ export function arrangeTip(
   return { swap: [a.id, b.id], board: arrange(swapped, info) };
 }
 
+/** A width the user sets is the user's, so it drops the note of Auto-arrange. */
 export function setSpan(board: Instance[], id: string, span: Span): Instance[] {
-  return board.map((i) => (i.id === id ? { ...i, span } : i));
+  return board.map((i) => {
+    if (i.id !== id) return i;
+    const { baseSpan: _, ...rest } = i;
+    return { ...rest, span };
+  });
 }
 
 export function toggleHidden(board: Instance[], id: string): Instance[] {
@@ -287,6 +303,12 @@ function parseBoard(list: unknown[]): Instance[] {
       ...(typeof item.type === "string" ? { type: item.type } : {}),
       span,
       ...(item.hidden === true ? { hidden: true } : {}),
+      // only a width narrower than the tile is a width that Auto-arrange added to
+      ...(Number.isInteger(item.baseSpan) &&
+      Number(item.baseSpan) >= 1 &&
+      Number(item.baseSpan) < span
+        ? { baseSpan: item.baseSpan as Span }
+        : {}),
     });
   }
   return board;

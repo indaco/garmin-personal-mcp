@@ -304,10 +304,11 @@ The edit bar stays at the top of the window while you scroll. It has:
 - **Reset board**: puts the preset widgets back on the board.
 - **Auto-arrange**: fills every row of the current board and keeps the order you gave the widgets.
   It keeps your widgets and custom widgets, unlike **Reset board**. It changes only the widths: it
-  makes a tile wider where a row has free columns, and never narrower than you made it. A width that
-  an earlier press added in the same edit session can go back; after **Done** every width counts as
-  yours. It uses as few rows as it can,
-  and of those it picks the rows whose tiles have the closest heights. Move a widget to change which
+  makes a tile wider where a row has free columns, and never narrower than you made it. The layout
+  saves the width you gave a tile, so a width that a press added can go back on a later press, also
+  after **Done**. Each press starts from your widths. When you resize a tile, its new width is yours.
+  It uses as few rows as it can, and of those it picks the rows whose tiles have the closest
+  heights. Move a widget to change which
   tiles share a row. When swapping two neighbouring widgets would save a row or give rows of
   clearly closer heights, the bar shows a tip with a **Swap** button. **Swap** makes that swap and
   arranges the board again; any other edit removes the tip. Select **Done** to keep the result, or

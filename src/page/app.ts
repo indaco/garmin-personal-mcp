@@ -108,13 +108,6 @@ let editing = false;
 let draft: Layout | null = null;
 /** The tip of the last Auto-arrange press, for its board; any other edit drops it. */
 let tip: { tab: string; swap: [string, string]; board: Instance[] } | undefined;
-/**
- * For each board, the width of each tile at its first Auto-arrange press in this edit session, and
- * its content height at that width. A later press starts from these, so a width that a press added
- * can go back; a resize, a removal and a reset forget them, and Done makes the widths the user's.
- */
-const arrangeBase = new Map<string, Map<string, { span: Span; height: number }>>();
-const forgetBase = (id: string) => arrangeBase.get(view.tab)?.delete(id);
 let accountOpen = false;
 // on a phone the week window folds into one control
 let windowOpen = false;
@@ -482,7 +475,6 @@ function leaveEdit(): void {
   editing = false;
   draft = null;
   tip = undefined;
-  arrangeBase.clear();
   render();
   document.querySelector<HTMLElement>(".account summary")?.focus();
 }
@@ -1035,33 +1027,34 @@ function saveBoard(board: Instance[], nextTip?: typeof tip): void {
 /** The current board in full rows, in its own order, and a tip when a swap would do better. A draft like every other edit. */
 function autoArrange(): void {
   const board = currentBoard();
-  const base = arrangeBase.get(view.tab) ?? new Map<string, { span: Span; height: number }>();
-  arrangeBase.set(view.tab, base);
-  for (const i of board) {
-    // a hidden or withheld widget has no tile, so it takes no column; it stays on the board
-    if (base.has(i.id) || i.hidden || withheld.has(i.widget)) continue;
-    // shortcut: heights are measured at the current window width, measure at 3 columns if phone results are poor
-    base.set(i.id, { span: i.span, height: contentHeight(i.id) });
+  const saved = draft;
+  // heights are measured at the user's widths, so a tile that a press made wider is drawn at its own width first
+  const own = board.map(({ baseSpan, ...i }) => (baseSpan ? { ...i, span: baseSpan } : i));
+  const drawnOwn = own.some((i, n) => i.span !== board[n].span);
+  if (drawnOwn) {
+    draft = withBoard(draft ?? layout, view.tab, own, preset);
+    render();
   }
-  const before = board.map((i) => {
-    const span = base.get(i.id)?.span;
-    return span === undefined || span === i.span ? i : { ...i, span };
-  });
-  const info = (i: Instance) => {
-    const known = base.get(i.id);
-    return known && { height: known.height, min: widget(i.widget)?.minSpan ?? 1 };
-  };
-  const next = arrange(before, info);
-  const found = arrangeTip(before, info);
+  const next = arrange(board, tileInfo);
+  const found = arrangeTip(board, tileInfo);
   const nextTip = found && { tab: view.tab, ...found };
   // a save lists a preset board, and the bar would show unsaved changes with nothing changed
   if (JSON.stringify(next) !== JSON.stringify(board)) saveBoard(next, nextTip);
-  else if (tip || nextTip) {
+  else if (drawnOwn || tip || nextTip) {
+    draft = saved;
     tip = nextTip;
     render();
   }
   announce(nextTip ? `${t("said.arranged")}. ${tipText(nextTip.swap)}` : t("said.arranged"));
 }
+
+/** What Auto-arrange needs of a tile. */
+const tileInfo = (i: Instance) =>
+  // a withheld widget has no tile, so it takes no column; it stays on the board
+  withheld.has(i.widget)
+    ? undefined
+    : // shortcut: heights are measured at the current window width, measure at 3 columns if phone results are poor
+      { height: contentHeight(i.id), min: widget(i.widget)?.minSpan ?? 1 };
 
 const titleOfId = (id: string) => {
   const inst = currentBoard().find((i) => i.id === id)!;
@@ -1174,7 +1167,6 @@ function resizer(inst: Instance, title: string, def: WidgetDef | undefined): HTM
   const setWidth = (span: number, at: number) => {
     const stored = storedSpan(span, inst.span, at);
     if (stored === inst.span) return;
-    forgetBase(inst.id);
     saveBoard(setSpan(currentBoard(), inst.id, stored));
     announce(t("said.width", { title, n: span, cols: at }));
   };
@@ -1224,10 +1216,7 @@ function editBar(): HTMLElement {
       "button",
       {
         class: "btn",
-        onclick: () => {
-          arrangeBase.delete(view.tab);
-          setDraft(resetBoard(draft ?? layout, view.tab, preset));
-        },
+        onclick: () => setDraft(resetBoard(draft ?? layout, view.tab, preset)),
       },
       t("edit.reset"),
     ),
@@ -1348,7 +1337,6 @@ function addDialog(): void {
               class: "btn",
               onclick: () => {
                 d.close();
-                forgetBase(inst.id);
                 saveBoard(remove(board, inst.id));
                 announce(t("said.removed", { title }));
               },

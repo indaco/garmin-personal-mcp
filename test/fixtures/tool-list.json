@@ -26,7 +26,7 @@
             "type": "string"
           },
           "additionalProperties": {},
-          "description": "A whole layout: { base, boards: { all: [{ id, widget, type?, span, hidden? }] }, seen?: { all: [widget names] } }. `seen` is the record of the preset widgets that each board has met: give it back as you got it."
+          "description": "A whole layout: { base, boards: { all: [{ id, widget, type?, span, hidden?, baseSpan? }] }, seen?: { all: [widget names] } }. `seen` is the record of the preset widgets that each board has met: give it back as you got it."
         },
         "place": {
           "type": "array",

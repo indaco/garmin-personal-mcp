@@ -1475,7 +1475,7 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         layout: z
           .record(z.string(), z.unknown())
           .describe(
-            "A whole layout: { base, boards: { all: [{ id, widget, type?, span, hidden? }] }, seen?: { all: [widget names] } }. `seen` is the record of the preset widgets that each board has met: give it back as you got it.",
+            "A whole layout: { base, boards: { all: [{ id, widget, type?, span, hidden?, baseSpan? }] }, seen?: { all: [widget names] } }. `seen` is the record of the preset widgets that each board has met: give it back as you got it.",
           )
           .optional(),
         place: z

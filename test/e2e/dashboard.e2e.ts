@@ -1121,7 +1121,7 @@ describe("edit mode", () => {
       const { boards } = JSON.parse((await saved(page))!).layout;
       expect(boards.all).toEqual([
         of("activities", 3),
-        of("x", 3),
+        of("x", 3, { baseSpan: 1 }),
         of("intensityMinutes", 1, { hidden: true }),
         of("records", 3),
         of("kpis", 3),
@@ -1178,7 +1178,7 @@ describe("edit mode", () => {
         of("gone", 3),
         of("readiness", 2),
         of("hrv", 1, { hidden: true }),
-        of("x", 3),
+        of("x", 3, { baseSpan: 1 }),
       ]);
       expect(errors).toEqual([]);
     });
@@ -1360,20 +1360,65 @@ describe("edit mode", () => {
 
       it("gives way to a width the user sets after the press", async () => {
         const { page, errors } = await pressed();
-        await page.locator("[aria-label='Width of Custom tall2']").focus();
+        // tall1 is 2 wide with the note 1; the user's 3 replaces both
+        await page.locator("[aria-label='Width of Custom tall1']").focus();
         await page.keyboard.press("End");
         await page.click(".edit-bar >> text=Auto-arrange");
-        expect(await spans(page)).toBe("low1:1 low2:1 tall1:1 tall2:3");
+        expect(await spans(page)).toBe("low1:2 low2:1 tall1:3 tall2:3");
         expect(errors).toEqual([]);
       });
 
-      it("is the user's width after Done", async () => {
+      it("still goes back after Done and a reload", async () => {
         const { page, errors } = await pressed();
         await page.click(".edit-bar >> text=Done");
+        const { boards } = JSON.parse((await saved(page))!).layout;
+        expect(boards.all).toEqual([
+          of("low1", 2, { baseSpan: 1 }),
+          of("low2", 1),
+          of("tall1", 2, { baseSpan: 1 }),
+          of("tall2", 1),
+        ]);
+        await page.reload();
         await startEdit(page);
         await page.click("[aria-label='Hide Custom low2']");
         await page.click(".edit-bar >> text=Auto-arrange");
-        expect(await spans(page)).toBe("low1:3 tall1:2 tall2:1");
+        expect(await spans(page)).toBe("low1:1 tall1:1 tall2:1");
+        expect(errors).toEqual([]);
+      });
+
+      it("is drawn at the user's width before the heights are measured", async () => {
+        // nine boxes in 3 rows at width 1 (as tall as a), in 1 row at width 3 (as low as b and c):
+        // measured at 3, wraps would join b and c and leave a alone
+        const wraps = custom(
+          "wraps",
+          `el.innerHTML = '<div style="display:inline-block;width:100px;height:130px"></div>'.repeat(9);`,
+        );
+        const board = [of("a", 1), of("wraps", 3, { baseSpan: 1 }), of("b", 1), of("c", 1)];
+        const { page, errors } = await open(
+          browser,
+          pageFile({
+            layout: onAll(board),
+            widgets: [wraps, tallBox("a", 420), tallBox("b", 130), tallBox("c", 130)],
+          }),
+          { viewport: { width: 1280, height: 800 } },
+        );
+        await startEdit(page);
+        expect(await spans(page)).toBe("a:1 wraps:3 b:1 c:1");
+        await page.click(".edit-bar >> text=Auto-arrange");
+        expect(await spans(page)).toBe("a:2 wraps:1 b:2 c:1");
+        expect(errors).toEqual([]);
+      });
+
+      it("shows no unsaved changes when the press gives the same widths again", async () => {
+        const board = [of("wraps", 3, { baseSpan: 1 })];
+        const { page, errors } = await open(
+          browser,
+          pageFile({ layout: onAll(board), widgets: [tallBox("wraps", 100)] }),
+        );
+        await startEdit(page);
+        await page.click(".edit-bar >> text=Auto-arrange");
+        expect(await spans(page)).toBe("wraps:3");
+        expect(await page.innerText(".edit-bar")).not.toContain("Unsaved changes");
         expect(errors).toEqual([]);
       });
 

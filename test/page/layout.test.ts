@@ -183,6 +183,11 @@ describe("edits", () => {
     expect(setSpan(board, "hrv", 3)[1]).toMatchObject({ id: "hrv", span: 3 });
   });
 
+  it("makes a set width the user's: it drops the width before Auto-arrange", () => {
+    const widened = [{ id: "a", widget: "hrv", span: 3 as Span, baseSpan: 1 as Span }];
+    expect(setSpan(widened, "a", 2)).toEqual([{ id: "a", widget: "hrv", span: 2 }]);
+  });
+
   it("hides a widget in its place, and a second toggle shows it again", () => {
     const hidden = toggleHidden(board, "hrv");
     expect(hidden[1]).toMatchObject({ id: "hrv", hidden: true });
@@ -227,6 +232,19 @@ describe("edits", () => {
 });
 
 describe("parseLayout", () => {
+  it.each<[string, unknown, Span | undefined]>([
+    ["a narrower width", 1, 1],
+    ["the same width", 3, undefined],
+    ["a wider width", 4, undefined],
+    ["0", 0, undefined],
+    ["a fraction", 1.5, undefined],
+    ["a string", "1", undefined],
+  ])("keeps the width before Auto-arrange only when it is %s", (_name, baseSpan, want) => {
+    const l = parseLayout({ boards: { all: [{ id: "a", widget: "hrv", span: 3, baseSpan }] } });
+    expect(l.boards.all[0].baseSpan).toBe(want);
+    if (want === undefined) expect(l.boards.all[0]).not.toHaveProperty("baseSpan");
+  });
+
   it("keeps a type that is a string, and reads a span that is no number as 1", () => {
     const l = parseLayout({
       boards: { run: [{ id: "a", widget: "kpis", type: "cycling", span: "wide" }] },
@@ -821,6 +839,36 @@ describe("arrange", () => {
     ).toBe(want);
   });
 
+  it.each<[string, Instance[], Facts, Instance[]]>([
+    [
+      "starts from the width before an earlier press",
+      [placed("a", 3, { baseSpan: 1 }), placed("b", 1), placed("c", 1)],
+      {},
+      [placed("a", 1), placed("b", 1), placed("c", 1)],
+    ],
+    ["notes the width it adds", [placed("a", 1)], {}, [placed("a", 3, { baseSpan: 1 })]],
+    [
+      "notes the width before a press, not a widget minimum",
+      [placed("a", 1)],
+      { mins: { a: 2 } },
+      [placed("a", 3, { baseSpan: 2 })],
+    ],
+    [
+      "keeps the note when the press gives the same width again",
+      [placed("a", 3, { baseSpan: 1 })],
+      {},
+      [placed("a", 3, { baseSpan: 1 })],
+    ],
+    [
+      "leaves a hidden widget and its note as they are",
+      [placed("h", 3, { hidden: true, baseSpan: 1 }), placed("a", 3)],
+      {},
+      [placed("h", 3, { hidden: true, baseSpan: 1 }), placed("a", 3)],
+    ],
+  ])("%s", (_name, board, facts, want) => {
+    expect(run(board, facts)).toEqual(want);
+  });
+
   it("keeps a hidden widget in its place, unchanged, and gives it no column", () => {
     const hidden = placed("h", 1, { hidden: true });
     expect(run([placed("a", 1), hidden, placed("b", 2)])).toEqual([
@@ -844,7 +892,7 @@ describe("arrange", () => {
     expect(board).toEqual([placed("a", 1), placed("b", 1)]);
   });
 
-  it("keeps the order, fills each row, never shrinks a tile and settles in one press", () => {
+  it("keeps the order, fills each row, starts from the user's widths and settles in one press", () => {
     // a fixed seed, so a failure shows the same board again
     let seed = 7;
     const next = (n: number) => {
@@ -852,9 +900,11 @@ describe("arrange", () => {
       return seed % n;
     };
     for (let round = 0; round < 500; round++) {
-      const board = Array.from({ length: 1 + next(9) }, (_, n) =>
-        placed(`t${n}`, (1 + next(3)) as Span, next(6) === 0 ? { hidden: true } : {}),
-      );
+      const board = Array.from({ length: 1 + next(9) }, (_, n) => {
+        const span = (1 + next(3)) as Span;
+        const base = next(3) === 0 && span > 1 ? { baseSpan: (1 + next(span - 1)) as Span } : {};
+        return placed(`t${n}`, span, next(6) === 0 ? { hidden: true, ...base } : base);
+      });
       const facts: Facts = {
         heights: Object.fromEntries(board.map((i) => [i.id, 50 + next(400)])),
         mins: Object.fromEntries(board.map((i) => [i.id, (1 + next(2)) as Span])),
@@ -866,7 +916,9 @@ describe("arrange", () => {
       let open = 0;
       for (const i of shown) {
         const was = board.find((b) => b.id === i.id)!;
-        expect(i.span).toBeGreaterThanOrEqual(Math.max(was.span, facts.mins![i.id]));
+        const own = Math.max(was.baseSpan ?? was.span, facts.mins![i.id]);
+        expect(i.span).toBeGreaterThanOrEqual(own);
+        expect(i.baseSpan).toBe(i.span > own ? own : undefined);
         open += i.span;
         expect(open).toBeLessThanOrEqual(3);
         if (open === 3) open = 0;
