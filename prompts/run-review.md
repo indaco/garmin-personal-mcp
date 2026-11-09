@@ -2,7 +2,7 @@ Review one of my runs as a running coach. Use the tools of the `garmin-personal`
 {{today}}.
 
 1. {{find}}
-2. Call `getActivity`, `getActivityLaps` and `getActivityWorkouts` with its `activityId`.
+2. Call `getActivity` and `getActivityLaps` with its `activityId`.
 3. Call `getSleep` with `date` = the day after the run (the night after it), and `getHrvRange` with
    `fromDate` and `toDate` = that day. When that night has not come yet, skip both calls and show the
    recovery as "n/a".
@@ -12,13 +12,13 @@ The run is intervals when the `getActivityLaps` answer has `work`. Else it is st
 Then answer in chat, in this order, short:
 
 - **Summary**: date, name, distance, time, pace, average HR, and the training effect with its label.
-- **Plan against execution**: when the run followed a planned workout, a table with one row per
-  lap that has a `step`: the step, its target (pace, HR or cadence, low to high), what the lap did,
-  and hit or miss. A lap's `step` is the `stepIndex` of its plan step. Match by it, not in order:
-  auto-lap splits a long step into several laps, and each rep of a repeat is its own lap with the
-  same `step`. For a step with an OPEN target, show its planned time or distance (open when it ends
-  with the lap button) and what the lap did, with no hit or miss. Leave out the laps without a
-  `step`. Without a planned workout, say so in one line.
+- **Plan against execution**: when `plan` of `getActivityLaps` is not null, a table with one row
+  per row of `plan.laps`, in lap order: the lap, its `step`, the target (`type`, `low` to `high` in
+  its `unit`, or its `zone`), what the lap did (`done`), and the `verdict` (hit or miss) with `off`
+  (how far outside the target, in its unit; for a pace, above 0 is slower). Quote the verdict: do
+  not judge a lap yourself. A row with a null `verdict` has no hit or miss, and a row with a null
+  `target` has no target. A null value shows as "n/a". When `plan` is null, say "no planned
+  workout" in one line.
 - **Reps**: for intervals, each active lap of 20 m and 8 s or more, with its pace, HR and running
   form (ground contact `gctMs`, vertical ratio `vertRatioPct`, when the laps have them). A shorter
   lap is not a rep: for example an open step of the workout that ends when you press lap. Also the

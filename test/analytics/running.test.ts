@@ -4,6 +4,8 @@ import {
   bestProgression,
   efficiency,
   paceSeconds,
+  type PlanLap,
+  planOfLaps,
   predictRaces,
   racePredictionsOf,
   splitOf,
@@ -634,5 +636,201 @@ describe("best effort progression", () => {
     expect(Object.keys(out).toSorted()).toEqual(["__proto__", "constructor"]);
     const key: string = "constructor";
     expect(out[key].map((b) => b.time)).toEqual(["4:00"]);
+  });
+});
+
+/** A plan of one step (index 0) with a target. */
+const plan = (targetType: string, targetLow?: number, targetHigh?: number, more = {}) => [
+  { index: 0, intensity: "active", targetType, targetLow, targetHigh, ...more },
+];
+/** The row of one 1 km lap of step 0. */
+const rowOf = (steps: ReturnType<typeof plan>, more: Partial<PlanLap>) =>
+  planOfLaps(steps, [{ lap: 1, step: 0, intensity: "active", metres: 1000, ...more }])[0];
+/** The FIT speed of a pace, in mm/s. */
+const mms = (secPerKm: number) => Math.round(1e6 / secPerKm);
+
+describe("plan of the laps", () => {
+  const cadence = { type: "cadence", low: 160, high: 180, unit: "spm" };
+
+  it.each([
+    [79.5, 159, "miss", -1],
+    [80, 160, "hit", 0],
+    [80.25, 161, "hit", 0],
+    [89.75, 180, "hit", 0],
+    [90, 180, "hit", 0],
+    [90.5, 181, "miss", 1],
+    [79.96, 160, "miss", -0.1],
+  ])("judges a raw cadence of %d against 80-90: %d spm, %s, off %d", (raw, spm, verdict, off) => {
+    expect(rowOf(plan("cadence", 80, 90), { cadence: raw })).toEqual({
+      lap: 1,
+      step: 0,
+      intensity: "active",
+      target: cadence,
+      done: spm,
+      verdict,
+      off,
+    });
+  });
+
+  it.each([
+    [331, "miss", 1],
+    [330, "hit", 0],
+    [300, "hit", 0],
+    [299, "miss", -1],
+  ])("judges a lap at %d s/km against 5:00-5:30: %s, off %d", (sec, verdict, off) => {
+    const row = rowOf(plan("speed", mms(330), mms(300)), { speed: 1000 / sec });
+    expect(row.target).toEqual({ type: "pace", low: 330, high: 300, unit: "/km" });
+    expect([row.done, row.verdict, row.off]).toEqual([sec, verdict, off]);
+  });
+
+  it.each([
+    [
+      "heart_rate",
+      245,
+      265,
+      144,
+      { type: "heart_rate", low: 145, high: 165, unit: "bpm" },
+      "miss",
+      -1,
+    ],
+    [
+      "heart_rate",
+      245,
+      265,
+      145,
+      { type: "heart_rate", low: 145, high: 165, unit: "bpm" },
+      "hit",
+      0,
+    ],
+    [
+      "heart_rate",
+      245,
+      265,
+      166,
+      { type: "heart_rate", low: 145, high: 165, unit: "bpm" },
+      "miss",
+      1,
+    ],
+    ["power", 1250, 1300, 249, { type: "power", low: 250, high: 300, unit: "W" }, "miss", -1],
+    ["power", 1250, 1300, 300, { type: "power", low: 250, high: 300, unit: "W" }, "hit", 0],
+    ["power", 1250, 1300, 301, { type: "power", low: 250, high: 300, unit: "W" }, "miss", 1],
+  ])(
+    "judges a %s target of %d-%d on a lap of %d",
+    (type, low, high, value, target, verdict, off) => {
+      const row = rowOf(plan(type, low, high), { hr: value, power: value });
+      expect([row.target, row.done, row.verdict, row.off]).toEqual([target, value, verdict, off]);
+    },
+  );
+
+  it.each([
+    ["heart_rate", 100, 100, { type: "heart_rate", low: 100, high: 100, unit: "%max" }],
+    ["heart_rate", 90, 160, { type: "heart_rate", low: 90, high: 160, unit: "%max" }],
+    ["heart_rate", 100, 160, { type: "heart_rate", low: 100, high: 160, unit: "%max" }],
+    ["heart_rate", 160, 100, { type: "heart_rate", low: 160, high: 100, unit: "%max" }],
+    ["power", 1000, 1000, { type: "power", low: 1000, high: 1000, unit: "%ftp" }],
+    ["power", 900, 1300, { type: "power", low: 900, high: 1300, unit: "%ftp" }],
+    ["power", 1000, 1300, { type: "power", low: 1000, high: 1300, unit: "%ftp" }],
+    ["power", 1300, 1000, { type: "power", low: 1300, high: 1000, unit: "%ftp" }],
+  ])("gives a %s target of %d-%d in %% and no verdict", (type, low, high, target) => {
+    const row = rowOf(plan(type, low, high), { hr: 150, power: 250 });
+    expect([row.target, row.done, row.verdict, row.off]).toEqual([target, null, null, null]);
+  });
+
+  it.each([
+    // the plausible ends: pace 2:00-15:00 /km, heart rate 30-230 bpm, power 1-2000 W, cadence 60-250 spm
+    ["speed", mms(900), mms(119), false],
+    ["speed", mms(900), mms(120), true],
+    ["speed", mms(901), mms(120), false],
+    ["heart_rate", 130, 330, true],
+    ["heart_rate", 129, 330, false],
+    ["heart_rate", 130, 331, false],
+    // 101 is 1 bpm
+    ["heart_rate", 101, 330, false],
+    ["power", 1001, 3000, true],
+    ["power", 1001, 3001, false],
+    ["cadence", 29.5, 125, false],
+    ["cadence", 30, 125, true],
+    ["cadence", 30, 125.5, false],
+  ])("judges a %s target of %d-%d only when it is plausible: %s", (type, low, high, judged) => {
+    const row = rowOf(plan(type, low, high), { speed: 3, hr: 150, power: 250, cadence: 80 });
+    expect(row.verdict !== null).toBe(judged);
+    expect(row.off !== null).toBe(judged);
+  });
+
+  it.each([
+    [9.99, null],
+    [10, "hit"],
+    [undefined, null],
+  ])("judges a lap of %j m only from 10 m: %s", (metres, verdict) => {
+    expect(rowOf(plan("cadence", 80, 90), { cadence: 85, metres }).verdict).toBe(verdict);
+  });
+
+  it("gives a zone target its zone and no verdict, and a custom range of zone 0 a verdict", () => {
+    expect(
+      rowOf(plan("heart_rate", undefined, undefined, { targetValue: 3 }), { hr: 150 }),
+    ).toEqual({
+      lap: 1,
+      step: 0,
+      intensity: "active",
+      target: { type: "heart_rate", zone: 3 },
+      done: null,
+      verdict: null,
+      off: null,
+    });
+    expect(rowOf(plan("speed", undefined, undefined, { targetValue: 2 }), {}).target).toEqual({
+      type: "pace",
+      zone: 2,
+    });
+    expect(rowOf(plan("cadence", 80, 90, { targetValue: 0 }), { cadence: 85 }).verdict).toBe("hit");
+  });
+
+  it("gives no target to an open step, a step without a target type or its range, or a lap of a step not in the plan", () => {
+    const none = { target: null, done: null, verdict: null, off: null };
+    expect(rowOf(plan("open"), { cadence: 85 })).toEqual({
+      lap: 1,
+      step: 0,
+      intensity: "active",
+      ...none,
+    });
+    expect(
+      planOfLaps([{ index: 0 }], [{ lap: 1, step: 0, metres: 1000, cadence: 85 }])[0],
+    ).toMatchObject(none);
+    expect(rowOf(plan("cadence", 80), { cadence: 85 })).toMatchObject(none);
+    expect(rowOf(plan("cadence", undefined, 90), { cadence: 85 })).toMatchObject(none);
+    expect(rowOf(plan("cadence", 80, 90), { cadence: 85, step: 7 })).toMatchObject({
+      step: 7,
+      ...none,
+    });
+  });
+
+  it("gives no verdict to a lap without the value of its target", () => {
+    expect(rowOf(plan("cadence", 80, 90), {})).toMatchObject({
+      target: cadence,
+      done: null,
+      verdict: null,
+      off: null,
+    });
+    expect(rowOf(plan("speed", mms(330), mms(300)), { speed: 0 })).toMatchObject({
+      done: null,
+      verdict: null,
+    });
+  });
+
+  it("gives one row per lap with a step, in lap order", () => {
+    const steps = [
+      { index: 0, intensity: "warmup", targetType: "open" },
+      { index: 1, intensity: "active", targetType: "cadence", targetLow: 80, targetHigh: 90 },
+    ];
+    const out = planOfLaps(steps, [
+      { lap: 1, step: 0, intensity: "warmup", metres: 1000 },
+      { lap: 2, metres: 1000, cadence: 85 },
+      { lap: 3, step: 1, intensity: "active", metres: 400, cadence: 85 },
+      { lap: 4, step: 1, metres: 400, cadence: 91 },
+    ]);
+    expect(out.map((r) => [r.lap, r.step, r.intensity, r.verdict])).toEqual([
+      [1, 0, "warmup", null],
+      [3, 1, "active", "hit"],
+      [4, 1, undefined, "miss"],
+    ]);
   });
 });
