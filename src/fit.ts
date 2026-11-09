@@ -195,6 +195,7 @@ function runPlan(fit: Messages) {
       step: Number.isInteger(l.wktStepIndex) ? (l.wktStepIndex as number) : undefined,
       intensity: enumName("intensity", l.intensity),
       metres: num(l.totalDistance),
+      seconds: num(l.totalTimerTime),
       speed: num(l.enhancedAvgSpeed ?? l.avgSpeed),
       cadence: cadence === undefined ? undefined : cadence + (num(l.avgFractionalCadence) ?? 0),
       hr: num(l.avgHeartRate),
