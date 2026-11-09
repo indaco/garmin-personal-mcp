@@ -136,7 +136,8 @@ register({
     const plan = calc.planAdherence(ctx.activities, ctx.weeks);
     if (plan.sessions === plan.unplanned) {
       ctx.empty(el, t("plan.none"));
-      return void append(el, note(t("plan.note")));
+      append(el, note(t("plan.note")));
+      return noSets(el, ctx, "ex.noSetsWeeks");
     }
     const hit = sum(plan.weeks.map((w) => w?.hit ?? null));
     const miss = sum(plan.weeks.map((w) => w?.miss ?? null));

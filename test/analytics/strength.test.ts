@@ -762,9 +762,35 @@ describe("plan adherence", () => {
     expect(planAdherence(sessions, weeks)).toEqual({
       weeks: [{ hit: 0, miss: 0 }, null, { hit: 1, miss: 0 }],
       exercises: [],
-      sessions: 3,
+      // session 3 is in the week of session 2, which has no sets
+      sessions: 2,
       unplanned: 1,
     });
+  });
+
+  it("leaves the misses of a week with a session without sets out of the most missed", () => {
+    const sessions = [
+      planned(1, "2026-10-13", [miss("Squat", "sets")]),
+      { id: 2, type: "strength_training", start: "2026-10-14 18:00:00" },
+      planned(3, "2026-10-20", [hit("Squat")]),
+    ];
+    expect(planAdherence(sessions, weeks)).toEqual({
+      weeks: [null, { hit: 1, miss: 0 }, { hit: 0, miss: 0 }],
+      exercises: [],
+      sessions: 1,
+      unplanned: 0,
+    });
+  });
+
+  it("counts an unplanned session of a week without sets nowhere", () => {
+    const sessions = [
+      planned(1, "2026-10-13", null),
+      { id: 2, type: "strength_training", start: "2026-10-14 18:00:00" },
+    ];
+    const plan = planAdherence(sessions, weeks);
+    expect(plan.weeks[0]).toBeNull();
+    expect(plan.sessions).toBe(0);
+    expect(plan.unplanned).toBe(0);
   });
 
   it("counts strength sessions only, whatever plan verdicts a run has", () => {

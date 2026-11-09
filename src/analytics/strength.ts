@@ -462,7 +462,8 @@ export interface PlanMiss {
 /**
  * The plan verdicts of the strength sessions in the weeks (`planVerdicts`: null is a session with no
  * plan, absent is a session whose sets were not read). One count per exercise per session: a miss
- * when any of its rows misses, else a hit. A week that holds a session without sets is null.
+ * when any of its rows misses, else a hit. A week that holds a session without sets is null, and its
+ * sessions count nowhere.
  */
 export function planAdherence(acts: Activity[], weeks: string[]) {
   const out = {
@@ -472,12 +473,13 @@ export function planAdherence(acts: Activity[], weeks: string[]) {
     unplanned: 0,
   };
   const stats = new Map<string, PlanMiss>();
+  const gaps = missingSets(acts, weeks).weeks;
   for (const a of acts) {
     const rows = a.planVerdicts;
     const i = weekIndex(a, weeks);
     // runs carry planVerdicts too
     if (!String(a.type).includes("strength")) continue;
-    if (i < 0 || (rows !== null && !Array.isArray(rows))) continue;
+    if (i < 0 || gaps.has(i) || (rows !== null && !Array.isArray(rows))) continue;
     out.sessions++;
     if (rows === null) {
       out.unplanned++;
@@ -507,7 +509,7 @@ export function planAdherence(acts: Activity[], weeks: string[]) {
       if (why.has("reps")) x.reps++;
     }
   }
-  for (const i of missingSets(acts, weeks).weeks) out.weeks[i] = null;
+  for (const i of gaps) out.weeks[i] = null;
   out.exercises = [...stats.values()]
     .filter((x) => x.misses > 0)
     .toSorted((x, y) => y.misses - x.misses || (x.exercise < y.exercise ? -1 : 1));
