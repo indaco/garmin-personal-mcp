@@ -33,6 +33,9 @@ const onBoard = (day: string, name: string, km: number, more: Record<string, unk
   ...more,
 });
 
+/** 6 km in 30:00 is 200 m a minute: the efficiency is 200 / avgHR. */
+const easyRun = (day: string, avgHR: number) => onBoard(day, "Easy", 6, { avgHR });
+
 /** A lap with its time, the watch's pace and its average HR. */
 const lapOf = (km: number, time: string, pace: string, avgHR?: number) => ({
   km,
@@ -175,6 +178,25 @@ const data = {
   sync: { garminCalls: 4, newActivities: 1, failedDays: 0, failedDates: [], cachedActivities: 8 },
 };
 
+/** 3 weeks to Sunday 25 Oct with the loads 100, 110 (+10%) and 132 (+20%). */
+const RAMP_DATA = {
+  ...data,
+  weeks: 3,
+  start: "2026-10-05",
+  end: "2026-10-25",
+  activities: [
+    loaded("2026-10-22", 66),
+    loaded("2026-10-20", 66),
+    loaded("2026-10-13", 110),
+    loaded("2026-10-06", 100),
+  ],
+  previousActivities: [],
+};
+
+/** The ramp of each weekly row, oldest first. */
+const ramps = (d: ReturnType<typeof digest>) =>
+  Object.entries(d.weekly).map(([monday, w]) => [monday, w.rampPct]);
+
 describe("digest", () => {
   const d = digest(data);
 
@@ -232,6 +254,8 @@ describe("digest", () => {
       runKm: 15.5,
       hours: 2.3,
       load: 190,
+      // the week before has no session
+      rampPct: null,
     });
     expect(d.weekly["2026-10-26"]).toEqual({
       sessions: 1,
@@ -239,6 +263,7 @@ describe("digest", () => {
       runKm: 0,
       hours: 0.6,
       load: null,
+      rampPct: null,
     });
   });
 
@@ -249,6 +274,9 @@ describe("digest", () => {
       weeklyAvgLast28Days: 47.5,
       acuteToChronic: 4,
       estimatedLoads: 0,
+      // 20 Oct to 26 Oct: 50, 0, 40, 0, 0, 100, 0
+      monotony: 0.76,
+      strain: 144.3,
     });
   });
 
@@ -267,6 +295,9 @@ describe("digest", () => {
       weeklyAvgLast28Days: null,
       acuteToChronic: null,
       estimatedLoads: 0,
+      // one load of 100 in the 7 days
+      monotony: 0.41,
+      strain: 40.8,
     });
     // from the first of the 28 days on, the data covers them
     expect(digest({ ...week, prevStart: "2026-09-29" }).load.acuteToChronic).toBe(4);
@@ -289,6 +320,8 @@ describe("digest", () => {
       weeklyAvgLast28Days: 50,
       acuteToChronic: 2,
       estimatedLoads: 0,
+      monotony: 0.41,
+      strain: 40.8,
     });
   });
 
@@ -303,6 +336,8 @@ describe("digest", () => {
       weeklyAvgLast28Days: null,
       acuteToChronic: null,
       estimatedLoads: 0,
+      monotony: null,
+      strain: null,
     });
     expect(none.totals.running.load).toBeNull();
     expect(none.previousPeriodTotals.running.load).toBeNull();
@@ -320,6 +355,32 @@ describe("digest", () => {
     expect(out.totals.running).toEqual({ sessions: 2, km: 10, hours: 1, load: 80 });
   });
 
+  it("gives the page's load ramp of each week and the monotony of the last 7 days", () => {
+    const out = digest(RAMP_DATA);
+    expect(ramps(out)).toEqual([
+      ["2026-10-05", null],
+      ["2026-10-12", 10],
+      ["2026-10-19", 20],
+    ]);
+    // 19 Oct to 25 Oct: 0, 66, 0, 66, 0, 0, 0
+    expect(out.load).toMatchObject({ last7Days: 132, monotony: 0.63, strain: 83.5 });
+    // a Friday: the last week is in progress
+    expect(ramps(digest({ ...RAMP_DATA, end: "2026-10-23" })).at(-1)).toEqual(["2026-10-19", null]);
+  });
+
+  it("gives no ramp to the week after a partial first week", () => {
+    const partial = digest({
+      ...RAMP_DATA,
+      start: "2026-10-07",
+      activities: [...RAMP_DATA.activities.slice(0, 3), loaded("2026-10-08", 100)],
+    });
+    expect(ramps(partial)).toEqual([
+      ["2026-10-05", null],
+      ["2026-10-12", null],
+      ["2026-10-19", 20],
+    ]);
+  });
+
   it("uses the page's estimate from heart rate for a session without load, and counts it", () => {
     const out = digest({
       ...data,
@@ -335,6 +396,9 @@ describe("digest", () => {
       weeklyAvgLast28Days: 5.6,
       acuteToChronic: 4,
       estimatedLoads: 1,
+      // one load in the 7 days: 1 / sqrt(6), and the strain from the estimate
+      monotony: 0.41,
+      strain: 9.2,
     });
     expect(out.totals.running).toEqual({ sessions: 1, hours: 0.5, load: 22.5, estimatedLoads: 1 });
     expect(out.weekly["2026-10-19"]).toMatchObject({ load: 22.5, estimatedLoads: 1 });
@@ -520,6 +584,63 @@ describe("digest", () => {
     expect(out.longRuns[0].hrDriftPct).toBe(-0.1);
     // the race of the fixture has no laps
     expect(d.longRuns).toEqual([{ date: "2026-10-25", name: "City 10K", km: 10, ...none }]);
+  });
+
+  it("gives the page's aerobic efficiency: the runs below zone 4, last 4 weeks against the first 4", () => {
+    const zones = [
+      {
+        sport: "DEFAULT",
+        zone1Floor: 94,
+        zone2Floor: 113,
+        zone3Floor: 132,
+        zone4Floor: 150,
+        zone5Floor: 169,
+      },
+    ];
+    const first = [
+      easyRun("2026-08-04", 125),
+      easyRun("2026-08-11", 125),
+      easyRun("2026-08-18", 125),
+    ];
+    const last = [
+      easyRun("2026-10-06", 100),
+      easyRun("2026-10-13", 100),
+      easyRun("2026-10-20", 100),
+    ];
+    const activities = [...last, easyRun("2026-08-05", 160), ...first];
+    expect(digest({ ...data, zones, activities }).aerobicEfficiency).toEqual({
+      comparedWeeks: 4,
+      first: 1.6,
+      last: 2,
+      firstRuns: 3,
+      lastRuns: 3,
+      changePct: 25,
+    });
+    // fewer than 3 runs on a side: no change; no run on a side: null
+    expect(digest({ ...data, zones, activities: last.slice(1) }).aerobicEfficiency).toEqual({
+      comparedWeeks: 4,
+      first: null,
+      last: 2,
+      firstRuns: 0,
+      lastRuns: 2,
+      changePct: null,
+    });
+    expect(digest({ ...data, zones, activities: first }).aerobicEfficiency).toMatchObject({
+      first: 1.6,
+      last: null,
+    });
+    // no run at all: no key
+    expect(digest({ ...data, activities: [run("2026-10-20", "cycling")] })).not.toHaveProperty(
+      "aerobicEfficiency",
+    );
+  });
+
+  it.each([
+    ["no HR zones", undefined],
+    ["a zones row without floors", [{ sport: "DEFAULT", maxHeartRateUsed: 190 }]],
+  ])("has no aerobic efficiency with %s: the value would count every run", (_name, zones) => {
+    const activities = [easyRun("2026-10-20", 100), easyRun("2026-08-04", 125)];
+    expect(digest({ ...data, zones, activities })).not.toHaveProperty("aerobicEfficiency");
   });
 
   it("gives the longest run of the period", () => {

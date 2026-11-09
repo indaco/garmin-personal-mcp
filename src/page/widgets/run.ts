@@ -5,7 +5,6 @@ import type { Key } from "../i18n";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
 import type { WorkoutMetric } from "../../analytics/running";
-import { MIN_SESSIONS } from "../../analytics/metrics";
 import { oneSession } from "./types";
 import {
   alpha,
@@ -207,43 +206,21 @@ register({
       const d = calc.timedDistance(w);
       return d.km > 0 ? fmt.to.pace(d.seconds / d.km) : null;
     });
-    // intervals, tempo runs and races raise HR for other reasons: efficiency counts the runs below zone 4
+    // the same trend as the digest's aerobicEfficiency
     const z4 = calc.zonesOf(ctx.data.zones).floors[3];
-    const aerobic = (a: Activity) =>
-      z4 === undefined || (typeof a.avgHR === "number" && a.avgHR < z4);
-    const aerobicValues = (w: Activity[]) =>
-      w
-        .filter(aerobic)
-        .map((a) => calc.efficiency(a))
-        .filter((v): v is number => v !== undefined);
-    const effOf = (w: Activity[]) => calc.mean(aerobicValues(w));
-    const eff = weekly.map(effOf);
-    const points = runs(ctx)
-      .filter((a) => aerobic(a) && calc.efficiency(a) !== undefined && weekOf(ctx, a) >= 0)
-      .toReversed();
-    // the first and the last weeks of the window; a short window compares its halves
-    const n = Math.min(4, Math.floor(ctx.weeks.length / 2));
-    const lastWeeks = aerobicValues(weekly.slice(-n).flat());
-    const firstWeeks = aerobicValues(weekly.slice(0, n).flat());
-    const now = calc.mean(lastWeeks);
-    const before = calc.mean(firstWeeks);
+    const trend = calc.aerobicTrend(runs(ctx), ctx.weeks, z4);
+    const eff = trend.weekly;
+    const points = trend.runs.toReversed();
+    const { n } = trend;
     if (n > 0) {
       append(
         el,
         kpiRow(
           kpi(
             t("af.aerobicEff", { n }),
-            now === null ? fmt.na : fmt.num(now, 2),
-            now !== null &&
-              before !== null &&
-              Math.min(lastWeeks.length, firstWeeks.length) >= MIN_SESSIONS &&
-              h(
-                "span",
-                {},
-                delta(ctx, calc.change(now, before), "up"),
-                " ",
-                t("af.vsFirst", { n }),
-              ),
+            trend.last === null ? fmt.na : fmt.num(trend.last, 2),
+            trend.change !== null &&
+              h("span", {}, delta(ctx, trend.change, "up"), " ", t("af.vsFirst", { n })),
           ),
         ),
       );

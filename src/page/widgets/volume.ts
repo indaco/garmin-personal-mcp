@@ -145,22 +145,11 @@ register({
     const { t, fmt, calc } = ctx;
     const max = maxHR(ctx);
     const acts = ctx.allActivities;
-    const load = calc.weeklyKnown(acts, ctx.weeks, (a) => calc.loadOf(a, max)?.value);
-    const ramp = calc.ramp(load);
-    const open =
-      new Date(`${ctx.data.end}T00:00:00Z`).getUTCDay() !== 0 &&
-      ctx.weeks.at(-1) === ctx.calc.mondayOf(ctx.data.end);
-    // a week in progress has no ramp yet
-    if (open) ramp[ramp.length - 1] = null;
-    const flagged = ramp.map((r) => r !== null && r > 10);
-    const end = windowEnd(ctx);
-    const week = calc.monotony(calc.dailyLoads(acts, addDays(end, -6), end, max));
-    const weekActs = acts.filter((a) => {
-      const d = dayOf(a);
-      return d !== undefined && d >= addDays(end, -6) && d <= end;
-    });
+    // the same numbers as the digest's weekly rampPct and load.monotony
+    const week = calc.loadSafety(acts, ctx.weeks, windowEnd(ctx), max);
+    const { load, ramp, flagged } = week;
     // none of the week's activities has a load: show n/a, not a 0 that was never measured
-    const weekNa = weekActs.length > 0 && !weekActs.some((a) => calc.loadOf(a, max));
+    const weekNa = week.unknown;
     const estimated = acts.some((a) => calc.loadOf(a, max)?.estimate);
     append(
       el,

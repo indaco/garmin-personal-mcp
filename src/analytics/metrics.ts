@@ -1,5 +1,5 @@
 import { addDays } from "../dates";
-import { type Activity, dayOf, seconds } from "./calc";
+import { type Activity, dayOf, mondayOf, seconds } from "./calc";
 
 /**
  * Training and recovery numbers that the widgets share. Pure functions; the dashboard labels every
@@ -83,6 +83,31 @@ export function monotony(daily: number[]) {
   const s = sd(daily);
   const value = m !== null && s !== null && s > 0 ? m / s : null;
   return { weekLoad, monotony: value, strain: value === null ? null : weekLoad * value };
+}
+
+/**
+ * The page's Load safety: the weekly load (null for a week whose sessions have no load), its ramp in %
+ * against the week before (flagged above 10%), and the monotony and strain of the 7 days that end on
+ * `end`. A last week that `end` cuts before its Sunday is in progress and has no ramp. `unknown`: the 7
+ * days have sessions and none of them has a load.
+ */
+export function loadSafety(acts: Activity[], weeks: string[], end: string, maxHR?: number) {
+  const load = weeklyKnown(acts, weeks, (a) => loadOf(a, maxHR)?.value);
+  const rampPct = ramp(load);
+  if (new Date(`${end}T00:00:00Z`).getUTCDay() !== 0 && weeks.at(-1) === mondayOf(end))
+    rampPct[rampPct.length - 1] = null;
+  const from = addDays(end, -6);
+  const days = acts.filter((a) => {
+    const d = dayOf(a);
+    return d !== undefined && d >= from && d <= end;
+  });
+  return {
+    load,
+    ramp: rampPct,
+    flagged: rampPct.map((r) => r !== null && r > 10),
+    ...monotony(dailyLoads(acts, from, end, maxHR)),
+    unknown: days.length > 0 && !days.some((a) => loadOf(a, maxHR)),
+  };
 }
 
 /**

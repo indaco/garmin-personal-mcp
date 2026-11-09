@@ -19,10 +19,12 @@ Then answer in chat, in this order, short:
   0, say that some loads of that week are estimates from heart rate.
 - **Against the weeks before**: how the week's load and hours compare with the mean of the weeks
   before it in the table, as a percent. Without an earlier week or with a null load, write "n/a".
-  Say that a jump of more than 10% in one week is the page's warning level.
-- **Now**: the load ratio of 7 to 28 days (`load.acuteToChronic`) and `fitnessFatigue.form` (below
-  0 you carry fatigue). Say that these describe today, not the reviewed week. A null value is
-  "n/a". If `fitnessFatigue` is null, write "n/a".
+  Then the page's load ramp of the week (`rampPct`): its load against the week before, in %. A
+  ramp of more than 10% is the page's warning level: say so. A null `rampPct` is "n/a".
+- **Now**: the load ratio of 7 to 28 days (`load.acuteToChronic`), the monotony and strain of the
+  last 7 days (`load.monotony`, `load.strain`), and `fitnessFatigue.form` (below 0 you carry
+  fatigue). A monotony above 2 is the page's flag: the days are too alike. Say that these describe
+  today, not the reviewed week. A null value is "n/a". If `fitnessFatigue` is null, write "n/a".
 - **Coach note**: 2 or 3 sentences: what the week did well, and what to change next week. Base each
   sentence on a number above. Do not mention the data or the sports that the `settings` of the
   reply exclude.

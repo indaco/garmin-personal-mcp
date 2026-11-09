@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  aerobicTrend,
   efficiency,
   paceSeconds,
   predictRaces,
@@ -26,6 +27,84 @@ describe("pace and efficiency", () => {
     // 10 km in 50 min = 200 m/min, at 160 bpm
     expect(efficiency({ km: 10, duration: "50:00", avgHR: 160 })).toBe(1.25);
     expect(efficiency({ km: 10, duration: "50:00" })).toBeUndefined();
+  });
+});
+
+/** A run at 5:00/km: 200 m a minute, so the efficiency is 200 / avgHR. */
+const easy = (day: string, avgHR?: number) => ({
+  type: "running",
+  start: `${day} 07:00:00`,
+  pace: "5:00/km",
+  ...(avgHR === undefined ? {} : { avgHR }),
+});
+const EIGHT_WEEKS = [
+  "2026-08-31",
+  "2026-09-07",
+  "2026-09-14",
+  "2026-09-21",
+  "2026-09-28",
+  "2026-10-05",
+  "2026-10-12",
+  "2026-10-19",
+];
+const BLOCK = [
+  easy("2026-08-20", 125), // before the window
+  easy("2026-09-01", 125), // 1.6
+  easy("2026-09-02", 160), // zone 4: not aerobic
+  easy("2026-09-03"), // no HR, no efficiency
+  easy("2026-09-08", 125),
+  easy("2026-09-15", 125),
+  easy("2026-09-29", 100), // 2.0
+  easy("2026-10-06", 100),
+  easy("2026-10-20", 100),
+];
+
+describe("aerobic efficiency trend", () => {
+  it("compares the runs below zone 4 of the last 4 weeks with the first 4", () => {
+    const t = aerobicTrend(BLOCK, EIGHT_WEEKS, 150);
+    expect(t).toEqual({
+      weekly: [1.6, 1.6, 1.6, null, 2, 2, null, 2],
+      runs: [BLOCK[1], BLOCK[4], BLOCK[5], BLOCK[6], BLOCK[7], BLOCK[8]],
+      n: 4,
+      first: expect.closeTo(1.6, 10),
+      last: 2,
+      firstRuns: 3,
+      lastRuns: 3,
+      change: expect.closeTo(25, 10),
+    });
+  });
+
+  it("gives no change with fewer than 3 runs on one side", () => {
+    const t = aerobicTrend(BLOCK.slice(0, -1), EIGHT_WEEKS, 150);
+    expect([t.last, t.lastRuns, t.change]).toEqual([2, 2, null]);
+  });
+
+  it("counts every run with HR when the zones are unknown", () => {
+    const t = aerobicTrend(BLOCK, EIGHT_WEEKS, undefined);
+    expect([t.first, t.firstRuns, t.weekly[0]]).toEqual([expect.closeTo(1.5125, 10), 4, 1.425]);
+  });
+
+  it("leaves out a run at the zone 4 floor and keeps one just below it", () => {
+    expect(aerobicTrend([easy("2026-09-01", 150)], EIGHT_WEEKS, 150).runs).toEqual([]);
+    expect(aerobicTrend([easy("2026-09-01", 149)], EIGHT_WEEKS, 150).runs).toHaveLength(1);
+  });
+
+  it("compares the halves of a short window, and nothing in a 1-week window", () => {
+    const three = aerobicTrend(BLOCK, EIGHT_WEEKS.slice(0, 3), 150);
+    expect([three.n, three.first, three.last, three.firstRuns, three.lastRuns]).toEqual([
+      1, 1.6, 1.6, 1, 1,
+    ]);
+    const one = aerobicTrend(BLOCK, EIGHT_WEEKS.slice(0, 1), 150);
+    expect(one).toEqual({
+      weekly: [1.6],
+      runs: [BLOCK[1]],
+      n: 0,
+      first: null,
+      last: null,
+      firstRuns: 0,
+      lastRuns: 0,
+      change: null,
+    });
   });
 });
 

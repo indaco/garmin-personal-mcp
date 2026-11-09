@@ -8,9 +8,23 @@ import {
   mondayOf,
   sessionSeconds,
   seconds,
+  weeksOf,
 } from "./analytics/calc";
-import { fitnessFatigueFrom, loadOf, loadRatio, readinessOf, zonesOf } from "./analytics/metrics";
-import { racePredictionsOf, type SplitKind, splitOf, workoutOf } from "./analytics/running";
+import {
+  fitnessFatigueFrom,
+  loadOf,
+  loadRatio,
+  loadSafety,
+  readinessOf,
+  zonesOf,
+} from "./analytics/metrics";
+import {
+  aerobicTrend,
+  racePredictionsOf,
+  type SplitKind,
+  splitOf,
+  workoutOf,
+} from "./analytics/running";
 import { strokesPerLength, swimPace, swimTrend } from "./analytics/sports";
 import { completed, type StrengthSet, topSet as pageTopSet } from "./analytics/strength";
 
@@ -32,6 +46,12 @@ interface Week {
   hours: number;
   load: number | null;
   estimatedLoads?: number;
+  /**
+   * The page's Load safety ramp: the load in % against the week before, 1 decimal; above 10 is the
+   * page's warning level. Null when the week before has no load or is partial, and for a week in
+   * progress.
+   */
+  rampPct: number | null;
   /** The period starts after this Monday: the week is not whole. */
   partial?: true;
 }
@@ -91,6 +111,9 @@ export interface Digest {
     weeklyAvgLast28Days: number | null;
     acuteToChronic: number | null;
     estimatedLoads: number;
+    /** The page's Foster monotony (2 decimals) and strain (1 decimal) of the last 7 days; null: n/a. */
+    monotony: number | null;
+    strain: number | null;
   };
   bestEfforts: Record<string, { time: string; date: string; name: unknown }>;
   races: Json[];
@@ -141,6 +164,20 @@ export interface Digest {
     recoveryDate: string | null;
     /** As load.acuteToChronic; the verdict uses the exact ratio. */
     loadRatio: number | null;
+  };
+  /**
+   * The page's Aerobic fitness: metres per heartbeat of the runs below zone 4, the first and the
+   * last `comparedWeeks` of the period, 2 decimals; null without such a run on that side. The change
+   * in % needs 3 runs on each side. Absent without runs, and without a zone 4 floor (no zones, or
+   * zones that the settings leave out): the page's value then counts every run, not the aerobic ones.
+   */
+  aerobicEfficiency?: {
+    comparedWeeks: number;
+    first: number | null;
+    last: number | null;
+    firstRuns: number;
+    lastRuns: number;
+    changePct: number | null;
   };
   /** Today's fitness, fatigue and form of the page, 1 decimal; null when no activity has a load. */
   fitnessFatigue: { fitness: number; fatigue: number; form: number } | null;
@@ -223,6 +260,17 @@ export function digest(data: Json): Digest {
         hrDriftPct: s?.drift === undefined ? null : round(s.drift, 1),
       };
     });
+  const weeks = start ? weeksOf(start, end) : [];
+  const z4 = zonesOf(data.zones).floors[3];
+  const trend = aerobicTrend(runs as Activity[], weeks, z4);
+  // the page's Load safety
+  const safety = loadSafety(acts as Activity[], weeks, end, maxHR);
+  // a partial week before (or no week before: undefined) gives no ramp
+  const rampOf = (monday: string) => {
+    const i = weeks.indexOf(monday);
+    const r = weeks[i - 1] >= start ? safety.ramp[i] : null;
+    return r === null ? null : round(r, 1);
+  };
   // the first one wins a tie
   const longest = runs.reduce<Json | undefined>(
     (top, a) => (num(a.km) > num(top?.km) ? a : top),
@@ -288,7 +336,7 @@ export function digest(data: Json): Digest {
         // the period starts after this Monday: the week is not whole
         .map(([k, w]) => [
           k,
-          { ...roundWeek(w), ...(k < start ? { partial: true as const } : {}) },
+          { ...roundWeek(w, rampOf(k)), ...(k < start ? { partial: true as const } : {}) },
         ]),
     ),
     load: {
@@ -297,6 +345,9 @@ export function digest(data: Json): Digest {
         ratio.chronic === null || unknown(month) ? null : round(ratio.chronic, 1),
       acuteToChronic,
       estimatedLoads: month.filter((l) => l?.estimate).length,
+      // 7 days without a known load have no spread, so no monotony: n/a
+      monotony: r2(safety.monotony),
+      strain: safety.strain === null ? null : round(safety.strain, 1),
     },
     bestEfforts,
     races: acts
@@ -308,6 +359,18 @@ export function digest(data: Json): Digest {
     longRuns,
     ...(longestRun ? { longestRun } : {}),
     ...(swims ? { swims } : {}),
+    ...(runs.length > 0 && z4 !== undefined
+      ? {
+          aerobicEfficiency: {
+            comparedWeeks: trend.n,
+            first: r2(trend.first),
+            last: r2(trend.last),
+            firstRuns: trend.firstRuns,
+            lastRuns: trend.lastRuns,
+            changePct: trend.change === null ? null : round(trend.change, 1),
+          },
+        }
+      : {}),
     racePredictions,
     repeatedRuns: repeatedRuns(acts),
     strengthExercises,
@@ -433,6 +496,9 @@ function fastestEfforts(acts: Json[]): Digest["bestEfforts"] {
   return best;
 }
 
+/** An efficiency to 2 decimals; null stays null. */
+const r2 = (v: number | null) => (v === null ? null : round(v, 2));
+
 function sum(): Sum {
   return { sessions: 0, km: 0, runKm: 0, hours: 0, load: 0, known: 0, estimated: 0 };
 }
@@ -456,13 +522,14 @@ function loadPart(s: Sum): Pick<Totals, "load" | "estimatedLoads"> {
   };
 }
 
-function roundWeek(w: Sum): Week {
+function roundWeek(w: Sum, rampPct: number | null): Week {
   return {
     sessions: w.sessions,
     km: round(w.km, 1),
     runKm: round(w.runKm, 1),
     hours: round(w.hours, 1),
     ...loadPart(w),
+    rampPct,
   };
 }
 

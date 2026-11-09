@@ -382,6 +382,7 @@ second half. It ends with the sleep and HRV of the night after the run, and a sh
 
 The assistant reads the server's summary of 12 weeks (a `writeDashboard` preview, which writes
 nothing). It has the weekly run distance and load, the long runs with their pace split and HR drift,
+the aerobic efficiency (distance per heartbeat of the easy runs, last 4 weeks against the first 4)
 and the race predictions, as the dashboard computes them. The assistant gives the days to the race
 and these numbers, and tells whether your load drops in the last 2 weeks (the taper). The race
 prediction uses your best efforts of 5 km or more (Riegel, an estimate: the fastest prediction
@@ -464,8 +465,9 @@ no readiness: the verdict and its inputs show as "n/a". The prompt has no argume
 The assistant reads the server's summary of the dashboard data (a `writeDashboard` preview, which
 writes nothing). It uses the weeks of your dashboard page, so the numbers are the same as on the
 page. It compares your last whole week, Monday to Sunday, with up to 4 weeks before it: sessions,
-hours, km, run km and load. Then it gives the load ratio and the form of today, and a short coach
-note. The summary has no split by sport for each week, so the review has none. The prompt has no
+hours, km, run km and load, and the load ramp against the week before (above 10% is the page's
+warning level). Then it gives the load ratio, the monotony and strain of the last 7 days and the
+form of today, and a short coach note. The summary has no split by sport for each week, so the review has none. The prompt has no
 arguments.
 
 ## Configuration

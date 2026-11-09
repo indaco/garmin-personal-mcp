@@ -17,7 +17,10 @@ Then answer in chat, in this order:
   first week can be partial (`partial: true`): say so. Also the longest run and its date
   (`longestRun`). For each long run (`longRuns`): the pace of the first and the second half, the
   split, and the HR drift. An HR drift of 5% or less shows a solid aerobic base. `null` is n/a: for
-  example, a lap without heart rate.
+  example, a lap without heart rate. Then the aerobic efficiency (`aerobicEfficiency`): the metres
+  per heartbeat of the runs below zone 4, the last `comparedWeeks` weeks against the first, and the
+  change in % (`changePct`). A higher value is more distance for each heartbeat. A null value, or no
+  `aerobicEfficiency`, is n/a.
 - **Load and taper**: the load of the last 7 days against the weekly average of the last 28
   (`load.acuteToChronic`). If it is null, write "n/a": the data has fewer than 28 days, or no
   load. In the last 2 weeks before a race the load should drop: say if it does, or how to use the

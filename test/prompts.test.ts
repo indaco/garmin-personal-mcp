@@ -765,6 +765,17 @@ describe("coach prompts", () => {
     expect(text.includes("{{")).toBe(false);
   });
 
+  it("quotes the digest's aerobic efficiency in the training block", async () => {
+    const text = (await render("race-readiness", { date: "2026-11-15" })).replace(/\s+/g, " ");
+    const block = text.slice(
+      text.indexOf("- **Training block**"),
+      text.indexOf("- **Load and taper**"),
+    );
+    expect(block).toBe(
+      "- **Training block**: a table of the run km (`weekly.<monday>.runKm`) and the load of each week. The first week can be partial (`partial: true`): say so. Also the longest run and its date (`longestRun`). For each long run (`longRuns`): the pace of the first and the second half, the split, and the HR drift. An HR drift of 5% or less shows a solid aerobic base. `null` is n/a: for example, a lap without heart rate. Then the aerobic efficiency (`aerobicEfficiency`): the metres per heartbeat of the runs below zone 4, the last `comparedWeeks` weeks against the first, and the change in % (`changePct`). A higher value is more distance for each heartbeat. A null value, or no `aerobicEfficiency`, is n/a. ",
+    );
+  });
+
   it("reads the race date and goal by their shape from any slot, as the slash command passes them", async () => {
     // "/mcp__garmin-personal__race-readiness half marathon 2026-11-15 1:45:00" fills the slots in order
     const text = await render("race-readiness", {
@@ -841,6 +852,17 @@ describe("coach prompts", () => {
     for (const line of template("week-review").split("\n")) {
       expect(line.length).toBeLessThanOrEqual(100);
     }
+  });
+
+  it("quotes the page's load ramp, monotony and strain of the digest", async () => {
+    const text = (await render("week-review")).replace(/\s+/g, " ");
+    const part = text.slice(
+      text.indexOf("- **Against the weeks before**"),
+      text.indexOf("- **Coach note**"),
+    );
+    expect(part).toBe(
+      '- **Against the weeks before**: how the week\'s load and hours compare with the mean of the weeks before it in the table, as a percent. Without an earlier week or with a null load, write "n/a". Then the page\'s load ramp of the week (`rampPct`): its load against the week before, in %. A ramp of more than 10% is the page\'s warning level: say so. A null `rampPct` is "n/a". - **Now**: the load ratio of 7 to 28 days (`load.acuteToChronic`), the monotony and strain of the last 7 days (`load.monotony`, `load.strain`), and `fitnessFatigue.form` (below 0 you carry fatigue). A monotony above 2 is the page\'s flag: the days are too alike. Say that these describe today, not the reviewed week. A null value is "n/a". If `fitnessFatigue` is null, write "n/a". ',
+    );
   });
 
   it("starts the last whole week one week before a Monday, and before a Sunday", async () => {

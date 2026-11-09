@@ -3823,10 +3823,14 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
         }),
         { hash: "#running" },
       );
-      return page.$("[data-id=aerobicFitness] .kpi-sub .delta");
+      return {
+        sub: await page.$("[data-id=aerobicFitness] .kpi-sub"),
+        delta: await page.$("[data-id=aerobicFitness] .kpi-sub .delta"),
+      };
     };
-    expect(await sub(2)).toBeNull();
-    expect(await sub(3)).not.toBeNull();
+    // no change figure: no sub line at all, not "vs first n weeks" without a number
+    expect((await sub(2)).sub).toBeNull();
+    expect((await sub(3)).delta).not.toBeNull();
   });
 
   it("gives every sport its longest session, by distance or else by time", async () => {

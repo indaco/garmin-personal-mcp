@@ -9,6 +9,7 @@ import {
   fitnessFatigueFrom,
   intensityMinutes,
   loadOf,
+  loadSafety,
   loadRatio,
   mean,
   monotony,
@@ -173,6 +174,61 @@ describe("load", () => {
     expect(v.weekLoad).toBe(240);
     expect(v.monotony).toBeCloseTo(34.2857 / 29.6923, 3);
     expect(v.strain).toBeCloseTo(240 * v.monotony!, 6);
+  });
+});
+
+/** The Mondays of the load safety fixture: 2026-10-05 to 2026-10-26. */
+const SAFETY_WEEKS = ["2026-10-05", "2026-10-12", "2026-10-19", "2026-10-26"];
+/** 100, 110 (+10%), 132 (+20%) and 50 in the last week. */
+const SAFETY_ACTS = [
+  act("2026-10-06", { trainingLoad: 100 }),
+  act("2026-10-13", { trainingLoad: 110 }),
+  act("2026-10-20", { trainingLoad: 66 }),
+  act("2026-10-22", { trainingLoad: 66 }),
+  act("2026-10-27", { trainingLoad: 50 }),
+];
+
+describe("load safety", () => {
+  it("flags a ramp above 10%, and gives no ramp to the week in progress", () => {
+    // 2026-10-28 is a Wednesday of the last week
+    const s = loadSafety(SAFETY_ACTS, SAFETY_WEEKS, "2026-10-28");
+    expect(s.load).toEqual([100, 110, 132, 50]);
+    expect(s.ramp).toEqual([null, 10, 20, null]);
+    expect(s.flagged).toEqual([false, false, true, false]);
+  });
+
+  it.each([
+    ["on the Sunday that closes the last week", "2026-11-01"],
+    ["after the last week", "2026-11-04"],
+  ])("keeps the ramp of the last week when the window ends %s", (_name, end) => {
+    expect(loadSafety(SAFETY_ACTS, SAFETY_WEEKS, end).ramp.at(-1)).toBeCloseTo(-62.12, 2);
+  });
+
+  it("gives monotony and strain of the 7 days that end on the last day", () => {
+    const s = loadSafety(SAFETY_ACTS, SAFETY_WEEKS, "2026-10-28");
+    // 2026-10-22 to 2026-10-28: 66 on the first day, 50 on the sixth
+    expect(s).toMatchObject({
+      ...monotony([66, 0, 0, 0, 0, 50, 0]),
+      weekLoad: 116,
+      unknown: false,
+    });
+  });
+
+  it("gives an unknown week when no session of the 7 days has a load", () => {
+    const acts = [act("2026-10-06", { trainingLoad: 100 }), act("2026-10-27")];
+    expect(loadSafety(acts, SAFETY_WEEKS, "2026-10-28").unknown).toBe(true);
+    // a rest week is a true 0, not unknown
+    expect(loadSafety(acts.slice(0, 1), SAFETY_WEEKS, "2026-10-28").unknown).toBe(false);
+  });
+
+  it("estimates a load from HR with a max HR", () => {
+    const acts = [act("2026-10-27", { avgHR: 150 })];
+    // 30 minutes x 150 / 180
+    expect(loadSafety(acts, SAFETY_WEEKS, "2026-10-28", 180)).toMatchObject({
+      load: [0, 0, 0, 25],
+      weekLoad: 25,
+      unknown: false,
+    });
   });
 });
 
