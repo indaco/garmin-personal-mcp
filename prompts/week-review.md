@@ -26,9 +26,10 @@ Then answer in chat, in this order, short:
   fatigue). A monotony above 2 is the page's flag: the days are too alike. Say that these describe
   today, not the reviewed week. A null value is "n/a". If `fitnessFatigue` is null, write "n/a".
 - **New bests**: the run bests of the week of `{{week}}`: each entry of `recordProgression` with a
-  date in that week, with the distance, the time and the `previous` time it beat. A null
-  `previous` is the first effort of that distance on the page: say so. These are the best times of
-  the page's weeks, not all-time records. Without such an entry, write "none".
+  date in that week, with the distance, the time and the `previous` time it beat. These are bests
+  since `digest.period.start` only: an older, faster run can sit before that date, so name each one
+  "best since" that date, never a personal record. A null `previous` means no earlier effort of
+  that distance since that date, not a first ever. Without such an entry, write "none".
 - **Coach note**: 2 or 3 sentences: what the week did well, and what to change next week. Base each
   sentence on a number above. Do not mention the data or the sports that the `settings` of the
   reply exclude.

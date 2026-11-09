@@ -869,7 +869,7 @@ describe("coach prompts", () => {
     const text = (await render("week-review")).replace(/\s+/g, " ");
     const part = text.slice(text.indexOf("- **New bests**"), text.indexOf("- **Coach note**"));
     expect(part).toBe(
-      '- **New bests**: the run bests of the week of `2026-10-19`: each entry of `recordProgression` with a date in that week, with the distance, the time and the `previous` time it beat. A null `previous` is the first effort of that distance on the page: say so. These are the best times of the page\'s weeks, not all-time records. Without such an entry, write "none". ',
+      '- **New bests**: the run bests of the week of `2026-10-19`: each entry of `recordProgression` with a date in that week, with the distance, the time and the `previous` time it beat. These are bests since `digest.period.start` only: an older, faster run can sit before that date, so name each one "best since" that date, never a personal record. A null `previous` means no earlier effort of that distance since that date, not a first ever. Without such an entry, write "none". ',
     );
   });
 
