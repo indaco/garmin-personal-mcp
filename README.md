@@ -177,7 +177,7 @@ Desktop. In Claude Code, use `/permissions` and add `mcp__garmin-personal`.
 | `listActivities`           | each activity with pace, HR, load and effect, by date, type or name                                                                                                                                                                                   |
 | `getActivity`              | the details of one activity                                                                                                                                                                                                                           |
 | `getActivityLaps`          | the laps of an activity, from its .FIT file; for a run also the half split, the HR drift and the fade of each workout step; for a swim also the distance in metres, pace per 100 m, stroke, lengths, SWOLF, strokes and the fade of each repeated set |
-| `getActivitySets`          | the strength sets of an activity, with the muscles, the top set and the e1RM, from its .FIT file                                                                                                                                                      |
+| `getActivitySets`          | the strength sets of an activity, with the muscles, the top set and the e1RM, and the planned workout against the done sets, from its .FIT file                                                                                                       |
 | `getActivityWorkouts`      | the planned workout of an activity: steps, targets and notes                                                                                                                                                                                          |
 | `downloadActivityFit`      | saves the .FIT file of an activity in the data folder                                                                                                                                                                                                 |
 | `getHrvRange`              | HRV during the night                                                                                                                                                                                                                                  |
@@ -401,8 +401,10 @@ in the form `1:45:00` is the goal, and the other words are the distance. For exa
 
 ### strength-review
 
-The assistant compares the planned workout with the sets you did: the planned sets and reps of each
-exercise, what you did, and hit or miss. Garmin plans no weights, so the plan shows none. For each
+The assistant compares the planned workout that your watch ran with the sets you did: the planned
+sets and reps of each exercise, what you did, and hit or miss. The server finds hit or miss from the
+session's .FIT file, so two reviews of one session give the same result. Garmin plans no weights, so
+the plan shows none. For each
 exercise it gives the top set and its estimated 1RM against the previous session of the same name,
 and the rep drop from the first set to the last at the same weight. It compares your rest with the
 planned rest, and ends with the sleep and HRV of the night after the session, and a short coach note.

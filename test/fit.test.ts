@@ -235,6 +235,7 @@ describe("sets", () => {
     );
     expect(setsOf(fit, 7, undefined)).toEqual({
       activityId: 7,
+      plan: null,
       exercises: [
         {
           exercise: "My Press",
@@ -249,7 +250,311 @@ describe("sets", () => {
   });
 
   it("gives no exercises for a FIT file without sets", () => {
-    expect(setsOf({}, 8, undefined)).toEqual({ activityId: 8, exercises: [] });
+    expect(setsOf({}, 8, undefined)).toEqual({ activityId: 8, exercises: [], plan: null });
+  });
+});
+
+const M = Profile.MesgNum;
+const UNKNOWN = value("exerciseCategory", "unknown");
+const PLANK = value("exerciseCategory", "plank");
+const CURL = value("exerciseCategory", "curl");
+const [WARMUP, COOLDOWN] = [2, 3];
+const [TIME, OPEN, REPEAT, REPS] = [0, 5, 6, 29];
+
+/**
+ * A planned session: a warm-up squat, a block of 3 box squats of 8-12 reps, a custom press of 10 reps,
+ * a timed plank and a cool-down plank; a curl that is not in the plan, then the set the watch opens.
+ */
+function planned(withPlan: boolean): Uint8Array {
+  const plan: [number, Record<string, unknown>][] = [
+    [M.WORKOUT, { wktName: "Legs", numValidSteps: 7 }],
+    [
+      M.WORKOUT_STEP,
+      { messageIndex: 0, intensity: WARMUP, durationType: OPEN, exerciseCategory: SQUAT },
+    ],
+    [
+      M.WORKOUT_STEP,
+      {
+        messageIndex: 1,
+        intensity: 0,
+        targetType: 23,
+        targetValue: 12,
+        customTargetValueLow: 8,
+        exerciseCategory: SQUAT,
+        exerciseName: BARBELL_BOX_SQUAT,
+      },
+    ],
+    [M.WORKOUT_STEP, { messageIndex: 2, intensity: 1, durationType: TIME, durationValue: 90_000 }],
+    [M.WORKOUT_STEP, { messageIndex: 3, durationType: REPEAT, durationValue: 1, targetValue: 3 }],
+    [
+      M.WORKOUT_STEP,
+      {
+        messageIndex: 4,
+        intensity: 0,
+        durationType: REPS,
+        durationValue: 10,
+        exerciseCategory: UNKNOWN,
+        exerciseName: 3,
+      },
+    ],
+    [
+      M.WORKOUT_STEP,
+      {
+        messageIndex: 5,
+        intensity: 0,
+        durationType: TIME,
+        durationValue: 60_000,
+        exerciseCategory: PLANK,
+      },
+    ],
+    [
+      M.WORKOUT_STEP,
+      { messageIndex: 6, intensity: COOLDOWN, durationType: OPEN, exerciseCategory: PLANK },
+    ],
+  ];
+  const box = {
+    category: [SQUAT],
+    categorySubtype: [BARBELL_BOX_SQUAT],
+    wktStepIndex: 1,
+    weight: 60,
+  };
+  const rest = { setType: REST, duration: 60, wktStepIndex: 2 };
+  return fitFile(
+    [M.EXERCISE_TITLE, { exerciseCategory: UNKNOWN, exerciseName: 3, wktStepName: "My Press" }],
+    ...(withPlan ? plan : []),
+    [M.SET, { setType: ACTIVE, repetitions: 10, category: [SQUAT], wktStepIndex: 0 }],
+    [M.SET, { setType: ACTIVE, repetitions: 10, ...box }],
+    [M.SET, rest],
+    [M.SET, { setType: ACTIVE, repetitions: 12, ...box }],
+    [M.SET, rest],
+    [M.SET, { setType: ACTIVE, repetitions: 13, ...box }],
+    [M.SET, rest],
+    [
+      M.SET,
+      {
+        setType: ACTIVE,
+        repetitions: 10,
+        category: [UNKNOWN],
+        categorySubtype: [3],
+        wktStepIndex: 4,
+      },
+    ],
+    [M.SET, { setType: ACTIVE, repetitions: 1, duration: 60, category: [PLANK], wktStepIndex: 5 }],
+    [M.SET, { setType: ACTIVE, repetitions: 0, duration: 5, category: [PLANK], wktStepIndex: 6 }],
+    [M.SET, { setType: ACTIVE, repetitions: 12, category: [CURL], wktStepIndex: 9 }],
+    // the set the watch opens when the workout ends: a timed set of no exercise
+    [M.SET, { setType: ACTIVE, duration: 17.5, category: [UNKNOWN] }],
+    [M.SET, { setType: REST, duration: 2 }],
+  );
+}
+
+const noVerdict = { verdict: null, why: [], over: 0, extra: 0 };
+
+/** A plan of a box squat of 10 reps (step 0) and a plank (step 1), with a set of the squat. */
+function handBuilt(squatStep: Record<string, unknown>) {
+  return setsOf(
+    {
+      workoutMesgs: [{ wktName: 5 }],
+      workoutStepMesgs: [
+        {
+          messageIndex: 0,
+          intensity: 0,
+          durationType: REPS,
+          durationValue: 10,
+          exerciseCategory: SQUAT,
+          exerciseName: BARBELL_BOX_SQUAT,
+          ...squatStep,
+        },
+        { messageIndex: 1, intensity: 0, exerciseCategory: PLANK },
+      ],
+      setMesgs: [set(ACTIVE, 10, 60, 30)].map((s) => ({ ...s, wktStepIndex: 0 })),
+    },
+    1,
+    undefined,
+  ).plan;
+}
+
+describe("plan of the sets", () => {
+  it("gives no plan without a workout, or without a step", () => {
+    const sets: [number, Record<string, unknown>][] = [
+      [M.SET, { setType: ACTIVE, repetitions: 5, category: [SQUAT], wktStepIndex: 0 }],
+    ];
+    const step: [number, Record<string, unknown>] = [
+      M.WORKOUT_STEP,
+      { messageIndex: 0, intensity: 0, exerciseCategory: SQUAT },
+    ];
+    const workout: [number, Record<string, unknown>] = [M.WORKOUT, { wktName: "Legs" }];
+    expect(setsOf(decodeFit(fitFile(...sets), 1), 1, undefined).plan).toBeNull();
+    expect(setsOf(decodeFit(fitFile(step, ...sets), 1), 1, undefined).plan).toBeNull();
+    expect(setsOf(decodeFit(fitFile(workout, ...sets), 1), 1, undefined).plan).toBeNull();
+    // the control: a workout with a step has a plan
+    expect(setsOf(decodeFit(fitFile(workout, step, ...sets), 1), 1, undefined).plan?.name).toBe(
+      "Legs",
+    );
+  });
+
+  it("matches the sets of the file to the steps of the plan the watch ran", () => {
+    const out = setsOf(decodeFit(planned(true), 1), 1, undefined);
+    expect(out.plan).toEqual({
+      name: "Legs",
+      exercises: [
+        // a step with the category only: the same name as the exercise of the sets
+        {
+          exercise: "Squat",
+          steps: [0],
+          plannedSets: 1,
+          plannedReps: null,
+          doneSets: 1,
+          reps: [10],
+          ...noVerdict,
+          part: "warmup",
+        },
+        {
+          exercise: "Barbell Box Squat",
+          steps: [1],
+          plannedSets: 3,
+          plannedReps: { low: 8, high: 12 },
+          doneSets: 3,
+          reps: [10, 12, 13],
+          verdict: "hit",
+          why: [],
+          over: 1,
+          extra: 0,
+        },
+        // a custom exercise is named after its workout step, like its sets
+        {
+          exercise: "My Press",
+          steps: [4],
+          plannedSets: 1,
+          plannedReps: { low: 10, high: 10 },
+          doneSets: 1,
+          reps: [10],
+          verdict: "hit",
+          why: [],
+          over: 0,
+          extra: 0,
+        },
+        {
+          exercise: "Plank",
+          steps: [5],
+          plannedSets: 1,
+          plannedReps: null,
+          doneSets: 1,
+          reps: null,
+          verdict: "hit",
+          why: [],
+          over: 0,
+          extra: 0,
+        },
+        {
+          exercise: "Plank",
+          steps: [6],
+          plannedSets: 1,
+          plannedReps: null,
+          doneSets: 0,
+          reps: [],
+          ...noVerdict,
+          part: "cooldown",
+        },
+        {
+          exercise: "Curl",
+          steps: [],
+          plannedSets: null,
+          plannedReps: null,
+          doneSets: 1,
+          reps: [12],
+          ...noVerdict,
+          notInPlan: true,
+        },
+      ],
+    });
+    expect(out.exercises.map((e) => e.exercise)).toEqual([
+      "Squat",
+      "Barbell Box Squat",
+      "My Press",
+      "Plank",
+      "Curl",
+    ]);
+  });
+
+  it("adds plan and changes no other field of the answer", () => {
+    const { plan, ...rest } = setsOf(decodeFit(planned(true), 1), 1, undefined);
+    expect(plan?.exercises).toHaveLength(6);
+    expect({ ...rest, plan: null }).toEqual(setsOf(decodeFit(planned(false), 1), 1, undefined));
+  });
+
+  it("names the workout null when its name is not a text", () => {
+    expect(handBuilt({})).toEqual({
+      name: null,
+      exercises: [
+        {
+          exercise: "Barbell Box Squat",
+          steps: [0],
+          plannedSets: 1,
+          plannedReps: { low: 10, high: 10 },
+          doneSets: 1,
+          reps: [10],
+          verdict: "hit",
+          why: [],
+          over: 0,
+          extra: 0,
+        },
+        {
+          exercise: "Plank",
+          steps: [1],
+          plannedSets: 1,
+          plannedReps: null,
+          doneSets: 0,
+          reps: [],
+          verdict: "miss",
+          why: ["sets"],
+          over: 0,
+          extra: 0,
+        },
+      ],
+    });
+  });
+
+  it.each([
+    ["messageIndex", "0"],
+    ["messageIndex", 0.5],
+    ["intensity", "active"],
+    ["durationType", "reps"],
+    ["durationValue", "10"],
+    ["targetType", "reps"],
+    ["targetValue", "12"],
+    ["customTargetValueLow", "8"],
+    ["customTargetValueHigh", "12"],
+    ["exerciseCategory", "squat"],
+    ["exerciseName", "BARBELL_BOX_SQUAT"],
+    // a step without an exercise has no row either
+    ["exerciseCategory", undefined],
+  ])("leaves out a step whose %s is %j, and lists its sets as not in the plan", (field, bad) => {
+    const plan = handBuilt({ [field]: bad });
+    expect(plan?.exercises.map((r) => [r.exercise, r.steps, r.notInPlan])).toEqual([
+      ["Plank", [1], undefined],
+      ["Barbell Box Squat", [], true],
+    ]);
+  });
+
+  it.each([
+    [7, 3],
+    [0, 0],
+    [0, -1],
+    [0, 1.5],
+  ])("counts a repeat from step %j, %j times, as one pass", (from, times) => {
+    const plan = setsOf(
+      {
+        workoutMesgs: [{ wktName: "Legs" }],
+        workoutStepMesgs: [
+          { messageIndex: 0, intensity: 0, exerciseCategory: SQUAT },
+          { messageIndex: 1, durationType: REPEAT, durationValue: from, targetValue: times },
+        ],
+      },
+      1,
+      undefined,
+    ).plan;
+    expect(plan?.exercises[0].plannedSets).toBe(1);
   });
 });
 

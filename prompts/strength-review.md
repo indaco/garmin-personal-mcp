@@ -21,19 +21,15 @@ Then answer in chat, in this order, short:
   has it, else `duration`), average and max HR (`avgHR`, `maxHR`), training load (`trainingLoad`),
   and the aerobic and anaerobic training effect (`aerobicTE`, `anaerobicTE`) with its label
   (`teLabel`).
-- **Plan against execution**: when the session followed a planned workout, a table with one row per
-  planned exercise, in plan order: the planned sets and reps, the done sets and reps, and hit or miss.
-  Match a planned step to the done exercise by `exerciseName` (`BARBELL_BACK_SQUAT` is "Barbell Back
-  Squat", case ignored), or by `exerciseCategory` when the step has no `exerciseName`. The planned
-  sets of an exercise are its `ACTIVE` steps times the repeats of the `REPEAT_UNTIL_STEPS_CMPLT` step
-  around them. A step with `durationType` REPS plans `durationValue` reps; a step with `targetType`
-  REPS plans `targetValueLow` to `targetValue` reps, and when `targetValue` is 0 or under it, at
-  least `targetValueLow` reps; any other step has no planned reps: show "n/a". The plan has no
-  weights: do not show a planned weight. List a done exercise that matches a `WARMUP` or `COOLDOWN`
-  step as the warm-up or cool-down, without hit or miss, and one that the plan does not have as "not
-  in the plan". When the done sets have no reps (timed sets), judge the sets only and show the reps
-  as "n/a". The warm-up and cool-down stay out of Sets and Rest. Without a planned workout, say so in
-  one line.
+- **Plan against execution**: when `plan` of `getActivitySets` is not null, a table with one
+  row per row of `plan.exercises`, in its order: the exercise, the planned sets and reps
+  (`plannedSets`, `plannedReps` from `low` to `high`; `high` null is "at least `low`"), the done
+  sets and reps (`doneSets`, `reps`), and the `verdict` (hit or miss) with its `why` (`sets`,
+  `reps`). Add `extra` (done sets above the plan) and `over` (done sets above the high end) when
+  they are not 0. Show a row with `part` as the warm-up or cool-down and a row with `notInPlan` as
+  "not in the plan", both without hit or miss. The plan has no weights: do not show a planned
+  weight. A null value shows as "n/a". The warm-up and cool-down stay out of Sets and Rest. When
+  `plan` is null, say "no planned workout" in one line.
 - **Sets**: for each exercise, the top set (`top`) and the e1RM (`e1rmKg`: the best estimate of its
   sets of 1 to 12 reps) of `getActivitySets`. Give the same for the previous session when it has
   that exercise, with the change in %. When `e1rmKg` is null, show "n/a" and give the change in % of

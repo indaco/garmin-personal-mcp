@@ -318,3 +318,134 @@ export function slug(name: string): string {
   // a name of symbols only keeps its text, so it still gets its own link
   return s || name;
 }
+
+/** A step of the plan the watch ran, in FIT units, with FIT enum names in lower case. */
+export interface PlanStep {
+  index: number;
+  intensity?: string;
+  durationType?: string;
+  /** time in ms, the reps of a reps step, the first step of a repeat */
+  durationValue?: number;
+  targetType?: string;
+  /** the count of a repeat, the high end of a rep range */
+  targetValue?: number;
+  targetLow?: number;
+  targetHigh?: number;
+  exercise?: string;
+}
+
+/** An active set and the index of the plan step it was done for. */
+export interface PlanSet {
+  step?: number;
+  exercise: string;
+  reps?: number;
+  seconds?: number;
+}
+
+export interface PlanRow {
+  exercise: string;
+  steps: number[];
+  plannedSets: number | null;
+  plannedReps: { low: number; high: number | null } | null;
+  doneSets: number;
+  reps: (number | null)[] | null;
+  verdict: "hit" | "miss" | null;
+  why: ("sets" | "reps")[];
+  over: number;
+  extra: number;
+  part?: "warmup" | "cooldown";
+  notInPlan?: true;
+}
+
+const REPEAT = "repeat_until_steps_cmplt";
+
+/** The reps a step plans: a reps duration, or a rep range target whose high end 0 or under low is "at least low". */
+function plannedReps(s: PlanStep): PlanRow["plannedReps"] {
+  if (s.durationType === "reps" && s.durationValue !== undefined) {
+    return { low: s.durationValue, high: s.durationValue };
+  }
+  if (s.targetType !== "reps" || s.targetLow === undefined) return null;
+  const top = s.targetValue ?? 0;
+  return { low: s.targetLow, high: top > 0 && top >= s.targetLow ? top : null };
+}
+
+/**
+ * One row per planned exercise, in plan order, with the planned and done sets and reps, then one row
+ * per done exercise whose sets point at no exercise step. A row has the steps of one exercise with one
+ * rep plan. A set is done when completed; a set under the low end is a miss, above the high end a hit
+ * counted in over. A warm-up or cool-down step has its part and no verdict.
+ */
+export function planOfSets(steps: PlanStep[], sets: PlanSet[]): PlanRow[] {
+  // the times each step runs: the repeats of every block around it
+  const times = new Map(steps.map((s) => [s.index, 1]));
+  for (const r of steps) {
+    if (r.durationType !== REPEAT) continue;
+    const from = r.durationValue ?? r.index;
+    const n = r.targetValue ?? 0;
+    const count = Number.isInteger(n) && n > 0 ? n : 1;
+    for (const s of steps) {
+      if (s.index >= from && s.index < r.index) times.set(s.index, times.get(s.index)! * count);
+    }
+  }
+  const planned = new Map<string, PlanRow & { plannedSets: number }>();
+  const rowOf = new Map<number | undefined, PlanRow>();
+  for (const s of steps) {
+    const part = s.intensity === "warmup" || s.intensity === "cooldown" ? s.intensity : undefined;
+    if (!s.exercise || !(part || s.intensity === "active")) continue;
+    const reps = plannedReps(s);
+    const isTimed = s.durationType === "time";
+    const key = JSON.stringify([s.exercise, part, reps, isTimed]);
+    const row = planned.get(key) ?? {
+      exercise: s.exercise,
+      steps: [],
+      plannedSets: 0,
+      plannedReps: reps,
+      doneSets: 0,
+      reps: isTimed ? null : [],
+      verdict: null,
+      why: [],
+      over: 0,
+      extra: 0,
+      ...(part ? { part } : {}),
+    };
+    row.steps.push(s.index);
+    row.plannedSets += times.get(s.index)!;
+    planned.set(key, row);
+    rowOf.set(s.index, row);
+  }
+  const notInPlan = new Map<string, PlanRow>();
+  for (const set of sets) {
+    if (!completed(set)) continue;
+    let row = rowOf.get(set.step);
+    if (!row) {
+      row = notInPlan.get(set.exercise) ?? {
+        exercise: set.exercise,
+        steps: [],
+        plannedSets: null,
+        plannedReps: null,
+        doneSets: 0,
+        reps: [],
+        verdict: null,
+        why: [],
+        over: 0,
+        extra: 0,
+        notInPlan: true,
+      };
+      notInPlan.set(set.exercise, row);
+    }
+    row.doneSets++;
+    row.reps?.push(set.reps ?? null);
+  }
+  for (const row of planned.values()) {
+    if (row.part) continue;
+    const done = (row.reps ?? []).filter((r): r is number => r !== null);
+    const low = row.plannedReps?.low;
+    const high = row.plannedReps?.high;
+    if (row.doneSets < row.plannedSets) row.why.push("sets");
+    if (low !== undefined && done.some((r) => r < low)) row.why.push("reps");
+    row.verdict = row.why.length > 0 ? "miss" : "hit";
+    row.extra = Math.max(0, row.doneSets - row.plannedSets);
+    row.over = high == null ? 0 : done.filter((r) => r > high).length;
+  }
+  return [...planned.values(), ...notInPlan.values()];
+}

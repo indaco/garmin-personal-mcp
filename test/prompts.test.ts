@@ -703,15 +703,9 @@ describe("coach prompts", () => {
   it("compares planned sets with done sets and never shows a planned weight", async () => {
     // the sentences as one line: the template wraps them anywhere
     const text = (await render("strength-review")).replace(/\s+/g, " ");
-    // Garmin names the planned exercise by its constant, the sets by words
-    expect(text).toContain('(`BARBELL_BACK_SQUAT` is "Barbell Back Squat", case ignored)');
     expect(text).toContain("The plan has no weights: do not show a planned weight.");
     expect(text).toContain("A set with 0 reps was not done");
     expect(text).toContain("the previous session when it has that exercise");
-    // a step can plan a range of reps as its target, without a duration
-    expect(text).toContain("REPS plans `targetValueLow` to `targetValue` reps");
-    // a rep target can have no upper value: Garmin sends 0
-    expect(text).toContain("when `targetValue` is 0 or under it, at least `targetValueLow` reps");
     // a short rest inside the block is the condition: straight sets with a long rest after them are no group
     expect(text).toContain(
       "a repeat block whose rest inside it is 20 s or less or OPEN, with a longer rest step right after the block",
@@ -722,12 +716,30 @@ describe("coach prompts", () => {
       "Two exercises in one repeat block with one rest step after the second, inside the block, are a superset",
     );
     expect(text).toContain("compare each with the rests after the sets it follows");
-    expect(text).toContain("as the warm-up or cool-down, without hit or miss");
-    // a rep target with timed sets done: the sets compare, the reps cannot
-    expect(text).toContain("When the done sets have no reps (timed sets), judge the sets only");
     expect(text).toContain("The warm-up and cool-down stay out of Sets and Rest.");
     // the time of a timed set follows the lap button: it is no gain or loss
     expect(text).toContain("for a timed one, the longest set in seconds, without a change");
+  });
+
+  it("quotes the plan of getActivitySets as the plan against execution", async () => {
+    const text = (await render("strength-review")).replace(/\s+/g, " ");
+    const bullet = text.slice(
+      text.indexOf("- **Plan against execution**"),
+      text.indexOf("- **Sets**"),
+    );
+    expect(bullet).toBe(
+      [
+        "- **Plan against execution**: when `plan` of `getActivitySets` is not null, a table with one",
+        "row per row of `plan.exercises`, in its order: the exercise, the planned sets and reps",
+        '(`plannedSets`, `plannedReps` from `low` to `high`; `high` null is "at least `low`"), the done',
+        "sets and reps (`doneSets`, `reps`), and the `verdict` (hit or miss) with its `why` (`sets`,",
+        "`reps`). Add `extra` (done sets above the plan) and `over` (done sets above the high end) when",
+        "they are not 0. Show a row with `part` as the warm-up or cool-down and a row with `notInPlan` as",
+        '"not in the plan", both without hit or miss. The plan has no weights: do not show a planned',
+        'weight. A null value shows as "n/a". The warm-up and cool-down stay out of Sets and Rest. When',
+        '`plan` is null, say "no planned workout" in one line. ',
+      ].join(" "),
+    );
   });
 
   it("keeps the data that the page settings leave out of the coach notes", async () => {

@@ -7,6 +7,8 @@ import {
   missingSets,
   muscleGroup,
   muscleSets,
+  planOfSets,
+  type PlanStep,
   pushPull,
   recentWindow,
   setsByCategory,
@@ -420,5 +422,244 @@ describe("top set and e1RM", () => {
     expect(topSet(sets)).toEqual({ kg: 100, reps: 1 });
     expect(bestE1rm(sets)).toBe(120);
     expect(epley(90, 10)).toBe(120);
+  });
+});
+
+const step = (index: number, more: Partial<PlanStep> = {}): PlanStep => ({
+  index,
+  intensity: "active",
+  exercise: "Back Squat",
+  ...more,
+});
+const rest = (index: number): PlanStep => ({
+  index,
+  intensity: "rest",
+  durationType: "time",
+  durationValue: 90_000,
+});
+const repeat = (index: number, from: number | undefined, times: number | undefined): PlanStep => ({
+  index,
+  durationType: "repeat_until_steps_cmplt",
+  durationValue: from,
+  targetValue: times,
+});
+const range = (low: number, high: number | undefined): Partial<PlanStep> => ({
+  targetType: "reps",
+  targetLow: low,
+  targetValue: high,
+});
+const done = (
+  stepIndex: number | undefined,
+  reps: number | undefined,
+  exercise = "Back Squat",
+) => ({
+  step: stepIndex,
+  exercise,
+  reps,
+  seconds: 30,
+});
+/** Back Squat, 3 x 8-12 reps: step 0 in a block of 3 with a rest. */
+const block = (more: Partial<PlanStep> = range(8, 12)) => [step(0, more), rest(1), repeat(2, 0, 3)];
+const squatRow = (more: Record<string, unknown>) => ({
+  exercise: "Back Squat",
+  steps: [0],
+  plannedSets: 3,
+  plannedReps: { low: 8, high: 12 },
+  doneSets: 3,
+  reps: [10, 10, 10],
+  verdict: "hit",
+  why: [],
+  over: 0,
+  extra: 0,
+  ...more,
+});
+
+describe("plan of the sets", () => {
+  it("plans the active steps times the repeats of the block around them", () => {
+    expect(planOfSets(block(), [done(0, 10), done(0, 10), done(0, 10)])).toEqual([squatRow({})]);
+  });
+
+  it.each([
+    [2, "miss", ["sets"], 0],
+    [3, "hit", [], 0],
+    [4, "hit", [], 1],
+  ])("gives %i done sets of 3 planned: %s %j, extra %i", (count, verdict, why, extra) => {
+    const sets = Array.from({ length: count }, () => done(0, 10));
+    expect(planOfSets(block(), sets)).toEqual([
+      squatRow({ doneSets: count, reps: sets.map(() => 10), verdict, why, extra }),
+    ]);
+  });
+
+  it.each([
+    [7, "miss", ["reps"], 0],
+    [8, "hit", [], 0],
+    [12, "hit", [], 0],
+    [13, "hit", [], 1],
+  ])("judges a set of %i reps against 8-12: %s %j, over %i", (reps, verdict, why, over) => {
+    expect(planOfSets(block(), [done(0, 10), done(0, reps), done(0, 10)])).toEqual([
+      squatRow({ reps: [10, reps, 10], verdict, why, over }),
+    ]);
+  });
+
+  it("gives both reasons for too few sets with too few reps", () => {
+    expect(planOfSets(block(), [done(0, 10), done(0, 7)])).toEqual([
+      squatRow({ doneSets: 2, reps: [10, 7], verdict: "miss", why: ["sets", "reps"] }),
+    ]);
+  });
+
+  it.each([
+    [8, 0, null],
+    [8, 6, null],
+    [8, 8, 8],
+    [0, 0, null],
+    [8, undefined, null],
+  ])("reads the rep range %j to %j as a high end of %j", (low, high, planned) => {
+    const [row] = planOfSets(block(range(low, high)), [done(0, 20), done(0, 20), done(0, 20)]);
+    expect(row.plannedReps).toEqual({ low, high: planned });
+    // more reps than an open range has no top to go over
+    expect(row.over).toBe(planned === null ? 0 : 3);
+  });
+
+  it("reads a reps duration as a range of one value, and none without its value or low end", () => {
+    const reps = { durationType: "reps", durationValue: 10 };
+    expect(planOfSets(block(reps), [])[0].plannedReps).toEqual({ low: 10, high: 10 });
+    const noValue = { durationType: "reps" };
+    expect(planOfSets(block(noValue), [])[0].plannedReps).toBeNull();
+    const noLow = { targetType: "reps", targetValue: 12 };
+    expect(planOfSets(block(noLow), [])[0].plannedReps).toBeNull();
+  });
+
+  it("does not count a set of 0 reps as done", () => {
+    expect(planOfSets(block(), [done(0, 10), done(0, 0), done(0, 10)])).toEqual([
+      squatRow({ doneSets: 2, reps: [10, 10], verdict: "miss", why: ["sets"] }),
+    ]);
+  });
+
+  it.each([
+    [3, "hit", [] as string[]],
+    [2, "miss", ["sets"]],
+  ])("judges %i sets of a timed step by the sets only: %s", (count, verdict, why) => {
+    const timedStep = { exercise: "Plank", durationType: "time", durationValue: 60_000 };
+    const sets = Array.from({ length: count }, () => ({ step: 0, exercise: "Plank", seconds: 60 }));
+    expect(planOfSets(block(timedStep), sets)).toEqual([
+      squatRow({
+        exercise: "Plank",
+        plannedReps: null,
+        doneSets: count,
+        reps: null,
+        verdict,
+        why,
+      }),
+    ]);
+  });
+
+  it("shows the reps of an open step and of a set without reps, and judges the sets only", () => {
+    expect(planOfSets(block({}), [done(0, 10), done(0, 15), done(0, 5)])).toEqual([
+      squatRow({ plannedReps: null, reps: [10, 15, 5] }),
+    ]);
+    const timedSet = { step: 0, exercise: "Back Squat", seconds: 40 };
+    expect(planOfSets(block(), [done(0, 10), timedSet, done(0, 10)])).toEqual([
+      squatRow({ reps: [10, null, 10] }),
+    ]);
+  });
+
+  it("gives a warm-up and a cool-down step their part and no verdict", () => {
+    const steps = [
+      step(0, { intensity: "warmup", exercise: "Push Up" }),
+      step(1, range(8, 12)),
+      rest(2),
+      repeat(3, 1, 3),
+      step(4, { intensity: "cooldown", exercise: "Stretch" }),
+    ];
+    const out = planOfSets(steps, [done(0, 10, "Push Up"), done(4, 1, "Stretch")]);
+    const none = { plannedReps: null, verdict: null, why: [], over: 0, extra: 0 };
+    expect(out).toEqual([
+      {
+        ...none,
+        exercise: "Push Up",
+        steps: [0],
+        plannedSets: 1,
+        doneSets: 1,
+        reps: [10],
+        part: "warmup",
+      },
+      squatRow({ steps: [1], doneSets: 0, reps: [], verdict: "miss", why: ["sets"] }),
+      {
+        ...none,
+        exercise: "Stretch",
+        steps: [4],
+        plannedSets: 1,
+        doneSets: 1,
+        reps: [1],
+        part: "cooldown",
+      },
+    ]);
+  });
+
+  it("lists the done sets that point at no exercise step after the plan, as not in the plan", () => {
+    const sets = [
+      done(9, 5, "Curl"),
+      done(0, 10),
+      done(undefined, 6, "Curl"),
+      // a step that is in the plan but is a rest
+      done(1, 8, "Dip"),
+      done(9, 0, "Row"),
+    ];
+    const none = {
+      steps: [],
+      plannedSets: null,
+      plannedReps: null,
+      verdict: null,
+      why: [],
+      over: 0,
+      extra: 0,
+    };
+    expect(planOfSets(block(), sets)).toEqual([
+      squatRow({ doneSets: 1, reps: [10], verdict: "miss", why: ["sets"] }),
+      { ...none, exercise: "Curl", doneSets: 2, reps: [5, 6], notInPlan: true },
+      { ...none, exercise: "Dip", doneSets: 1, reps: [8], notInPlan: true },
+    ]);
+  });
+
+  it.each([
+    ["a first step past the repeat", 7, 3],
+    ["no first step", undefined, 3],
+    ["0 repeats", 0, 0],
+    ["-1 repeats", 0, -1],
+    ["1.5 repeats", 0, 1.5],
+    ["no repeat count", 0, undefined],
+  ])("counts a repeat with %s as one pass", (_, from, times) => {
+    const steps = [step(0, range(8, 12)), rest(1), repeat(2, from, times)];
+    expect(planOfSets(steps, [])[0].plannedSets).toBe(1);
+  });
+
+  it("multiplies the repeats of a block inside a block", () => {
+    const steps = [step(0, range(8, 12)), rest(1), repeat(2, 0, 2), repeat(3, 0, 3)];
+    expect(planOfSets(steps, [])[0].plannedSets).toBe(6);
+  });
+
+  it("gives one row to the steps of one exercise and one plan, and a row to each other plan", () => {
+    const steps = [
+      step(0, range(8, 12)),
+      step(1, { exercise: "Row", ...range(8, 12) }),
+      step(2, range(8, 12)),
+      step(3, range(5, 5)),
+    ];
+    const out = planOfSets(steps, [done(0, 10), done(2, 9), done(3, 5)]);
+    expect(out.map((r) => [r.exercise, r.steps, r.plannedSets, r.plannedReps, r.reps])).toEqual([
+      ["Back Squat", [0, 2], 2, { low: 8, high: 12 }, [10, 9]],
+      ["Row", [1], 1, { low: 8, high: 12 }, []],
+      ["Back Squat", [3], 1, { low: 5, high: 5 }, [5]],
+    ]);
+  });
+
+  it("gives no row to a step without an exercise, or to a rest or recovery step", () => {
+    const steps = [
+      step(0, { exercise: undefined }),
+      step(1, { intensity: "rest" }),
+      step(2, { intensity: "recovery" }),
+      step(3, { intensity: undefined }),
+    ];
+    expect(planOfSets(steps, [])).toEqual([]);
   });
 });
