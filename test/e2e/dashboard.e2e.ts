@@ -3460,6 +3460,27 @@ describe("plan adherence", () => {
       ["Exercises hit", colours.good],
       ["Exercises missed", colours.bad],
     ]);
+    // the weeks of the sets chart, stacked on both axes
+    const axes = await page.evaluate(() => {
+      const charts = Object.values(window.Chart!.instances);
+      const c = charts.find((x) => x.canvas.closest("[data-widget=planAdherence]"))!;
+      const sets = charts.find((x) => x.canvas.closest("[data-widget=setsPerCategory]"))!;
+      const scales = c.options.scales as Record<string, { stacked?: boolean }>;
+      return {
+        labels: c.data.labels,
+        sets: sets.data.labels,
+        stacked: [scales.x?.stacked, scales.y?.stacked],
+      };
+    });
+    expect(axes.labels).toHaveLength(13);
+    expect(axes.labels).toEqual(axes.sets);
+    expect(axes.stacked).toEqual([true, true]);
+    // the counts align right, the exercise name does not
+    expect(
+      await page.$$eval("[data-id=planAdherence] table.data tbody tr:first-child td", (c) =>
+        c.map((x) => x.className),
+      ),
+    ).toEqual(["", "num", "num", "num"]);
     // 7 exercises missed: the first 5, most misses first, then by name
     expect(
       await page.$$eval("[data-id=planAdherence] table.data th", (h) =>
