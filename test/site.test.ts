@@ -134,6 +134,8 @@ describe("releases on the website", () => {
   });
 });
 
+const description = (html: string) => html.match(/<meta name="description" content="([^"]*)"/)![1];
+
 describe("what's new page", () => {
   const page = renderWhatsNew();
   const home = render();
@@ -146,10 +148,21 @@ describe("what's new page", () => {
     expect(page).toContain("<title>What's new - garmin-personal-mcp</title>");
     expect(page).toContain(`<link rel="canonical" href="${f.site.url}whats-new.html" />`);
     expect(page).toContain(`<meta property="og:url" content="${f.site.url}whats-new.html" />`);
+    expect(page).toContain(
+      `<meta property="og:title" content="What's new - garmin-personal-mcp" />`,
+    );
+  });
+
+  it("has a description of its own, not the one of the home page", () => {
+    expect(description(page)).toContain("new version");
+    expect(description(page)).not.toBe(description(home));
   });
 
   it("keeps the title and the address of the home page", () => {
-    expect(home).toContain("<title>garmin-personal-mcp</title>");
+    expect(home).toContain("<title>garmin-personal-mcp: Garmin Connect MCP server</title>");
+    expect(home).toContain(
+      `<meta property="og:title" content="garmin-personal-mcp: every sport, one assistant" />`,
+    );
     expect(home).toContain(`<link rel="canonical" href="${f.site.url}" />`);
   });
 
