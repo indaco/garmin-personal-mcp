@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { addDays, localToday } from "./dates";
 import { hms, swimPaceText } from "./fit";
-import { mondayOf } from "./page/calc";
+import { mondayOf } from "./analytics/calc";
 import { BUILT_IN } from "./page/i18n/built-in";
 import { en } from "./page/i18n/en";
 import { THEMES } from "./page/theme";

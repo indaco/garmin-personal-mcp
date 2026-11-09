@@ -27,8 +27,8 @@ import { filterData } from "../src/dashboard-page";
 import { addDays } from "../src/dates";
 import { digest } from "../src/digest";
 import { log as logMock } from "../src/log";
-import { groupOf } from "../src/page/calc";
-import { periodWindow } from "../src/page/metrics";
+import { groupOf } from "../src/analytics/calc";
+import { periodWindow } from "../src/analytics/metrics";
 import { GarminTools, writeAtomically } from "../src/tools";
 import { fitFile } from "./fit-file";
 

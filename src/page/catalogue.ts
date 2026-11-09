@@ -1,4 +1,4 @@
-import { GROUPS } from "./calc";
+import { GROUPS } from "../analytics/calc";
 import type { Key } from "./i18n/en";
 import type { Span } from "./layout";
 import type { DataItem, Settings } from "./settings";

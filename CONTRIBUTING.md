@@ -116,7 +116,8 @@ Where each part of the server and the page is.
 | `src/dashboard-page.ts`              | `writeDashboard` and `editDashboard`: the page file and its blocks                   |
 | `src/schedule.ts`                    | `scheduleDashboardRefresh`: the cron, and the job for each system                    |
 | `src/digest.ts`                      | the digest of the data for the coach notes                                           |
-| `src/page/`                          | the dashboard page: app, layout, calculations, widgets, themes and texts             |
+| `src/analytics/`                     | the calculations that the page and the digest share. No I/O: the lint refuses it     |
+| `src/page/`                          | the dashboard page: app, layout, widgets, themes and texts                           |
 | `src/prompts.ts`                     | the prompts. The prompt texts are in `prompts/`.                                     |
 | `src/config.ts`, `src/log.ts`        | the settings and the log                                                             |
 | `scripts/build-template.mjs`         | writes `dist/dashboard.html`                                                         |
@@ -206,8 +207,9 @@ module that they test (`test/tools.test.ts` for `src/tools.ts`).
 2. Add an English description of more than 20 characters to `ABOUT` in
    `src/page/catalogue-about.ts`. The assistant and the widget guide read it.
 3. Add the title to every catalogue in `src/page/i18n/locales/`.
-4. Put its calculations in a module of `src/page/` (for example `metrics.ts`), with a test in
-   `test/page/`.
+4. Put its calculations in a module of `src/analytics/` (for example `metrics.ts`), with a test in
+   `test/analytics/`. A value that the coach prompts also need goes into the digest
+   (`src/digest.ts`) from the same function: a widget or a prompt never computes it again.
 5. Register it in a file of `src/page/widgets/` with `register({ id, render })`.
 6. Add a page test in `test/e2e/` if it has controls or a chart.
 7. Run `pnpm guide` to write the widget catalogue in `guide/widgets.md`.

@@ -1,9 +1,17 @@
-import * as calc from "./calc";
-import * as metrics from "./metrics";
-import * as running from "./running";
-import * as strength from "./strength";
-import * as sports from "./sports";
-import { type Activity, activitiesIn, GROUPS, groupOf, isLate, named, weeksOf } from "./calc";
+import * as calc from "../analytics/calc";
+import * as metrics from "../analytics/metrics";
+import * as running from "../analytics/running";
+import * as strength from "../analytics/strength";
+import * as sports from "../analytics/sports";
+import {
+  type Activity,
+  activitiesIn,
+  GROUPS,
+  groupOf,
+  isLate,
+  named,
+  weeksOf,
+} from "../analytics/calc";
 import { Chart, chart, destroyCharts, themeCharts } from "./charts";
 import { announce, h, keepFocus } from "./dom";
 import { dragTile, keyMove, resizeTile } from "./edit-drag";

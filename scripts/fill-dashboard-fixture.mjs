@@ -21,7 +21,7 @@ export const fill = (page, block, value) =>
   );
 
 const isRun = (a) => typeof a.type === "string" && a.type.endsWith("running");
-// workoutOf of src/page/running.ts: the run name without the place that Garmin puts before " - "
+// workoutOf of src/analytics/running.ts: the run name without the place that Garmin puts before " - "
 const workoutOf = (name) => {
   const i = name.indexOf(" - ");
   return (i > 0 ? name.slice(i + 3).trim() : "") || name;

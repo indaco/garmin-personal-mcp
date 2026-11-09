@@ -1,5 +1,5 @@
 import { addDays } from "../../dates";
-import { type Activity, isIndoor, seconds, sessionSeconds, sportOf } from "../calc";
+import { type Activity, isIndoor, seconds, sessionSeconds, sportOf } from "../../analytics/calc";
 import { append, h } from "../dom";
 import type { Key } from "../i18n";
 import { register } from "../registry";

@@ -6,8 +6,8 @@ import { type GarminApiClient, GarminApiError } from "./api-client";
 import { addDays, localToday } from "./dates";
 import { digest } from "./digest";
 import { log } from "./log";
-import { type Activity, isRunning, mondayOf } from "./page/calc";
-import { workoutOf } from "./page/running";
+import { type Activity, isRunning, mondayOf } from "./analytics/calc";
+import { workoutOf } from "./analytics/running";
 import {
   type GarminTools,
   MODEL_ONLY,

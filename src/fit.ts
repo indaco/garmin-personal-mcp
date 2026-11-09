@@ -1,8 +1,8 @@
 import { Decoder, Profile, Stream } from "@garmin/fitsdk";
 import { unzipSync } from "fflate";
 import { GarminApiError } from "./api-client";
-import { splitOf, workOf } from "./page/running";
-import { bestE1rm, topSet } from "./page/strength";
+import { splitOf, workOf } from "./analytics/running";
+import { bestE1rm, topSet } from "./analytics/strength";
 
 /** The fields of a FIT set message the tools read; enums are raw values (decoded without strings). */
 export interface FitSet {

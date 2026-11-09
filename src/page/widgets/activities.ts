@@ -1,8 +1,8 @@
-import { type Activity, groupOf, seconds } from "../calc";
+import { type Activity, groupOf, seconds } from "../../analytics/calc";
 import { append, h } from "../dom";
 import type { Fmt } from "../i18n";
 import { register } from "../registry";
-import { swimPace } from "../sports";
+import { swimPace } from "../../analytics/sports";
 import { garminWord, LIST_ROWS, showAll, table, typeCell } from "./ui";
 
 /** Activities whose laps the page shows: the rows can open. */

@@ -17,7 +17,7 @@ import {
   tabsFor,
   timedDistance,
   weeksOf,
-} from "../../src/page/calc";
+} from "../../src/analytics/calc";
 import { formatHash, parseHash } from "../../src/page/state";
 
 describe("activity types", () => {

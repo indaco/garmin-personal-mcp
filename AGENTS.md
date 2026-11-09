@@ -66,7 +66,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 
 ## Before you finish
 
-Run `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm build`. After a change to `src/page/` or
-`site/`, also run `pnpm build:site` and `pnpm test:page`. After a change to `src/cli.ts`, also run
+Run `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm build`. After a change to `src/page/`,
+`src/analytics/` or `site/`, also run `pnpm build:site` and `pnpm test:page`. After a change to `src/cli.ts`, also run
 `pnpm test:e2e`. A running client keeps the old server
 process: start a new session to see a changed tool or prompt.

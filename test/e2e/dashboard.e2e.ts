@@ -7,7 +7,7 @@ import { THEMES } from "../../src/page/theme";
 import { digest } from "../../src/digest";
 import { en as enTexts } from "../../src/page/i18n/en";
 import { preset } from "../../src/page/presets";
-import { fitnessFatigueFrom, zonesOf } from "../../src/page/metrics";
+import { fitnessFatigueFrom, zonesOf } from "../../src/analytics/metrics";
 import { DASHBOARD_VERSION } from "../../src/prompts";
 import { pageCode } from "../../src/dashboard-page";
 import { data, launch, open, pageFile } from "./page";

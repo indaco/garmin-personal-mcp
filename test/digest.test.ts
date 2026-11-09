@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { filterData } from "../src/dashboard-page";
 import { digest, syncGaps } from "../src/digest";
 import { hms, round } from "../src/fit";
-import { type Activity, sessionSeconds } from "../src/page/calc";
+import { type Activity, sessionSeconds } from "../src/analytics/calc";
 import type { Settings } from "../src/page/settings";
-import { fitnessFatigueFrom, loadRatio, readinessOf } from "../src/page/metrics";
-import { predictRaces, splitOf } from "../src/page/running";
+import { fitnessFatigueFrom, loadRatio, readinessOf } from "../src/analytics/metrics";
+import { predictRaces, splitOf } from "../src/analytics/running";
 
 const squat = (sets: Record<string, number>[]) => ({ exercise: "Back Squat", sets });
 

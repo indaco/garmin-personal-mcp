@@ -1,5 +1,35 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "categories": { "correctness": "error", "suspicious": "error" },
-  "ignorePatterns": ["dist/**"]
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "ignorePatterns": ["dist/**"],
+  "overrides": [
+    {
+      "files": ["src/analytics/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "node:*",
+                  "fs",
+                  "path",
+                  "os",
+                  "child_process",
+                  "@modelcontextprotocol/*",
+                  "../*",
+                  "!../dates"
+                ],
+                "message": "src/analytics is pure calculations for the server and the page: no I/O, no MCP, no page or server code"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

@@ -1,11 +1,11 @@
 import { addDays } from "../../dates";
-import { type Activity, groupOf } from "../calc";
+import { type Activity, groupOf } from "../../analytics/calc";
 import { append, h } from "../dom";
 import type { Key } from "../i18n";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
-import type { WorkoutMetric } from "../running";
-import { MIN_SESSIONS } from "../metrics";
+import type { WorkoutMetric } from "../../analytics/running";
+import { MIN_SESSIONS } from "../../analytics/metrics";
 import { oneSession } from "./types";
 import {
   alpha,

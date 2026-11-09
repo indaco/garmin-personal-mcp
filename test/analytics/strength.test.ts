@@ -12,8 +12,8 @@ import {
   setsByCategory,
   slug,
   topSet,
-} from "../../src/page/strength";
-import { epley } from "../../src/page/metrics";
+} from "../../src/analytics/strength";
+import { epley } from "../../src/analytics/metrics";
 import { addDays } from "../../src/dates";
 
 const squat = (sets: Record<string, number>[]) => ({
