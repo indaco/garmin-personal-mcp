@@ -14,10 +14,12 @@ Then answer in chat, in this order, short:
 - **Summary**: date, name, pool or open water, the pool length of a pool swim, distance, time, the
   pace per 100 m (time / distance: your own division, say so), SWOLF, average HR, and the training
   effect with its label.
-- **Plan against execution**: when the swim followed a planned workout, a table with one row per lap
-  that has a `step`: the step, its target, what the lap did, and hit or miss. A lap's `step` is the
-  `stepIndex` of its plan step. Match by it, not in order. Without a planned workout, say so in one
-  line.
+- **Plan against execution**: when `getActivityWorkouts` gives steps, a table with one row per lap
+  that has a `step`: the step (its `intensity`, duration and target as `getActivityWorkouts` gives
+  them) and what the lap did (`metres`, `time`, `swimPace`). A lap's `step` is the `stepIndex` of its
+  plan step. Match by it, not in order. Give no hit or miss: the server judges no swim plan, so say
+  in one line that the table shows the plan beside the laps. With an empty list, say "no planned
+  workout" in one line.
 - **Intervals**: for a pool swim, a table with one row per lap with `metres` above 0: `metres`,
   `stroke`, `swimPace`, `swolf`, `strokes`, and the rest after it. A lap with `metres` 0 or `intensity`
   `rest` is a rest: its `time` is the rest of the lap before it. When no lap is a rest, write the rest

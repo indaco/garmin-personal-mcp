@@ -938,6 +938,14 @@ describe("coach prompts", () => {
     expect(text).toContain("Compare SWOLF only within this swim");
     expect(text).toContain("**Never invent or estimate a missing value**");
     expect(text).toContain("the most recent swim (a type that contains `swimming`)");
+    // the server judges no swim plan: the prompt must not ask the assistant for a verdict
+    expect(text).not.toContain("what the lap did, and hit or miss");
+    expect(text).toContain(
+      "Give no hit or miss: the server judges no swim plan, so say in one line that the table shows the plan beside the laps.",
+    );
+    expect(text).toContain(
+      '- **Plan against execution**: when `getActivityWorkouts` gives steps, a table with one row per lap that has a `step`: the step (its `intensity`, duration and target as `getActivityWorkouts` gives them) and what the lap did (`metres`, `time`, `swimPace`). A lap\'s `step` is the `stepIndex` of its plan step. Match by it, not in order. Give no hit or miss: the server judges no swim plan, so say in one line that the table shows the plan beside the laps. With an empty list, say "no planned workout" in one line.',
+    );
     expect(text.includes("{{")).toBe(false);
   });
 
@@ -967,6 +975,18 @@ describe("coach prompts", () => {
       expect(text).toContain("Give no predicted time");
       expect(text).toContain("**Never invent or estimate a missing value**");
       expect(text).not.toContain("is missing");
+      // weeks = 12 covers the 12 whole weeks and this week so far
+      expect(text).toContain(
+        'When the digest has no `swims`, say that the 12 weeks and this week have no swim, and show each swim value below as "n/a".',
+      );
+      expect(text).toContain("say how many of these weeks have a swim");
+      expect(text).toContain(
+        '- **Training block**: a table of the swims and km of each week (`swims.weekly`): the 12 whole weeks and this week so far. `null` km is "n/a": no swim of that week has a distance. Leave out the weeks that are not in `swims.weekly`, and say how many of these weeks have a swim.',
+      );
+      expect(text).not.toContain("first compared date");
+      expect(text).toContain(
+        'For the pool, `swims.poolTrend`: the pace and strokes per length of the last `comparedSwims` swims against as many before them, in one pool length (`poolLengthM`). `swims` is the number of swims of that pool length since `from`, the date of the first of them; `left` is the other swims (open water, another pool length, or no strokes). A `null` comparison is "n/a": too few swims, or too close together.',
+      );
       expect(text.includes("{{")).toBe(false);
     });
 
