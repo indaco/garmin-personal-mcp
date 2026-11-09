@@ -3594,6 +3594,33 @@ describe("type boards", () => {
     expect(new Set(drift)).toEqual(new Set(["n/a"]));
   });
 
+  it("lists in Long runs a run over 15 km and a race, not a short run with laps", async () => {
+    const withLaps = data.activities.find((a: { laps?: unknown[] }) => a.laps?.length);
+    const make = (id: number, name: string, km: number, race?: boolean) => ({
+      ...withLaps,
+      id,
+      name,
+      km,
+      race,
+      start: `2026-10-2${id} 08:00:00`,
+    });
+    const activities = [
+      make(4, "Short Loop", 15),
+      make(3, "Long Loop", 15.5),
+      make(2, "Park Race", 5, true),
+    ];
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities } }),
+      { hash: "#running" },
+    );
+    const names = await page.$$eval("[data-id=longRuns] table.data tbody tr", (r) =>
+      r.map((x) => x.children[1].textContent),
+    );
+    expect(names.toSorted()).toEqual(["Long Loop", "Park Race"]);
+    expect(errors).toEqual([]);
+  });
+
   it("says when fitness has too little data before the window, and shows nothing without load", async () => {
     let { page } = await open(
       browser,

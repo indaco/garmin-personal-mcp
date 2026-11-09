@@ -3,6 +3,7 @@ import {
   aerobicTrend,
   bestProgression,
   efficiency,
+  isLongRun,
   paceSeconds,
   type PlanLap,
   planOfLaps,
@@ -996,5 +997,26 @@ describe("run plan adherence", () => {
       ["Hills", "power", 1],
       ["Tempo", "pace", 1],
     ]);
+  });
+});
+
+describe("long run", () => {
+  it.each([
+    ["a run over 15 km", { type: "running", sport: "running", km: 15.01 }, true],
+    ["a run of 15 km", { type: "running", sport: "running", km: 15 }, false],
+    ["a short race", { type: "running", sport: "running", km: 5, race: true }, true],
+    [
+      "a race flag that is not true",
+      { type: "running", sport: "running", km: 5, race: "yes" },
+      false,
+    ],
+    ["a run without km", { type: "running", sport: "running" }, false],
+    ["a km that is not a number", { type: "running", sport: "running", km: "20" }, false],
+    ["an infinite km", { type: "running", sport: "running", km: Infinity }, false],
+    ["a long ride", { type: "cycling", sport: "cycling", km: 60 }, false],
+    ["a ride race", { type: "cycling", sport: "cycling", km: 20, race: true }, false],
+    ["an older row without sport, by its type", { type: "trail_running", km: 21 }, true],
+  ])("tells %s: %s", (_, a, long) => {
+    expect(isLongRun(a as Activity)).toBe(long);
   });
 });

@@ -561,7 +561,7 @@ register({
       200,
     );
     const split = runs(ctx)
-      .filter((a) => Array.isArray(a.laps) && (a.race === true || (num(a.km) ?? 0) > 15))
+      .filter((a) => Array.isArray(a.laps) && ctx.calc.isLongRun(a))
       .map((a) => ({ a, s: calc.splitOf(a.laps as Parameters<typeof calc.splitOf>[0]) }))
       .filter((x) => x.s);
     append(

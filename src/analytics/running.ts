@@ -350,6 +350,12 @@ export function bestProgression(acts: Activity[]): Record<string, Best[]> {
   return Object.fromEntries(out);
 }
 
+/** A long run: a race, or a run over 15 km. The dashboard reads its laps; the page and the digest split it. */
+export function isLongRun(a: Activity): boolean {
+  if (!isRunning(a)) return false;
+  return a.race === true || (typeof a.km === "number" && Number.isFinite(a.km) && a.km > 15);
+}
+
 /** A lap of a run, in FIT units, for the plan step it was run for. */
 export interface PlanLap {
   lap: number;
