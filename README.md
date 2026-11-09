@@ -423,8 +423,8 @@ planned rest, and ends with the sleep and HRV of the night after the session, an
 The assistant gives the summary of one swim, and keeps pool and open water apart. For a pool swim it
 shows each interval: distance, stroke, pace per 100 m, SWOLF, strokes and the rest after it. For each
 repeated set it shows the pace and SWOLF of the first and the last repeat, and the fade in %. It
-compares the planned workout with the laps, and ends with the sleep and HRV of the night after the
-swim, and a short coach note. It does not judge a swim on heart rate alone.
+shows the planned workout beside the laps, without hit or miss, and ends with the sleep and HRV of
+the night after the swim, and a short coach note. It does not judge a swim on heart rate alone.
 
 | Argument   | Values                                                    | Default       |
 | ---------- | --------------------------------------------------------- | ------------- |

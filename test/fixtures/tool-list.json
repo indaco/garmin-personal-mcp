@@ -236,7 +236,7 @@
   },
   {
     "name": "getActivityWorkouts",
-    "description": "The planned workout that an activity followed, as created in Garmin Connect: its steps in\norder, each with its intensity (warmup/active/rest/recovery/cooldown), its duration (time in\nseconds, reps, or open), its target (cadence, heart rate, pace, or open, with low and high\nvalues), the exercise for strength steps, and the coach's notes. A step with durationType\nREPEAT_UNTIL_STEPS_CMPLT repeats the steps from stepIndex durationValue up to it, targetValue\ntimes in all. For plan against done, read the plan field of getActivitySets or getActivityLaps.\nAn empty list means the activity followed no planned workout. Null fields are left out.",
+    "description": "The planned workout that an activity followed, as created in Garmin Connect: its steps in\norder, each with its intensity (warmup/active/rest/recovery/cooldown), its duration (time in\nseconds, reps, or open), its target (cadence, heart rate, pace, or open, with low and high\nvalues), the exercise for strength steps, and the coach's notes. A step with durationType\nREPEAT_UNTIL_STEPS_CMPLT repeats the steps from stepIndex durationValue up to it, targetValue\ntimes in all. For plan against done, read the plan field of getActivitySets (strength)\nor getActivityLaps (runs); a swim has no plan field.\nAn empty list means the activity followed no planned workout. Null fields are left out.",
     "inputSchema": {
       "type": "object",
       "properties": {

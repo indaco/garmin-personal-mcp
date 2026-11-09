@@ -649,7 +649,11 @@ describe("coach prompts", () => {
     expect(byId).toContain('a failed call shows as "n/a"');
     expect(byId.includes("{{")).toBe(false);
     const byName = await render("run-review", { activity: "Riverside" });
-    expect(byName).toContain('`names` = ["Riverside"] and `limit` = 100');
+    expect(byName).toContain('`names` = ["Riverside"], and keep the runs');
+    expect(byName).not.toContain("`limit` = 100");
+    expect(byName).toContain(
+      "When no row is a run, say that none of my last 200 activities is a run with that name, and stop.",
+    );
     // the slash command can pass only the first word of the name
     expect(byName).toContain(
       "when the runs have more than one name, list the 5 most recent with date and name and ask me which one",
@@ -657,7 +661,7 @@ describe("coach prompts", () => {
     // 100 activities answer about 55,000 characters, over a client's tool output limit: page by 20
     const latest = await render("run-review");
     expect(latest).toContain(
-      "Call `listActivities` and take the most recent run (a type that ends in `running`). When none of them is one, call it again with `endDate` = the day of the oldest activity in the list, until you find one.",
+      "Call `listActivities` and take the most recent run (a type that ends in `running`). When none of them is one, call it again with `endDate` = the day of the oldest activity in the list, at most 5 calls in all. When none of them has one, say that none of my last 100 activities is a run, and stop.",
     );
     expect(latest).not.toContain("`limit` = 100");
   });
@@ -683,8 +687,9 @@ describe("coach prompts", () => {
     );
     // a search by name in step 1 already holds this session and the previous ones
     expect(text).toContain(
-      "3. When step 1 called `listActivities` with `names`, use its rows; otherwise call `listActivities` with `names` = [the session's name] and `limit` = 100",
+      "3. When step 1 called `listActivities` with `names`, use its rows; otherwise call `listActivities` with `names` = [the session's name] and `endDate` = the session's day (`getActivity` gives the name and the day when you have only the id). Its row of this session is the summary. The previous session is the most recent strength session of the same name before this one: call `getActivitySets` with its `activityId`. Without one, show the comparison as \"n/a\".",
     );
+    expect(text).not.toContain("`limit` = 100");
   });
 
   it("reviews a strength session by id, by name, or the latest one", async () => {
@@ -694,13 +699,17 @@ describe("coach prompts", () => {
     expect(byId.includes("{{")).toBe(false);
     const byName = await render("strength-review", { activity: "Upper" });
     expect(byName).toContain(
-      'Call `listActivities` with `names` = ["Upper"] and `limit` = 100, and keep the strength sessions (a type that contains `strength`).',
+      'Call `listActivities` with `names` = ["Upper"], and keep the strength sessions (a type that contains `strength`).',
+    );
+    expect(byName).not.toContain("`limit` = 100");
+    expect(byName).toContain(
+      "When no row is a strength session, say that none of my last 200 activities is a strength session with that name, and stop.",
     );
     expect(byName).toContain(
       "when the strength sessions have more than one name, list the 5 most recent",
     );
     expect(await render("strength-review")).toContain(
-      "Call `listActivities` and take the most recent strength session (a type that contains `strength`). When none of them is one,",
+      "Call `listActivities` and take the most recent strength session (a type that contains `strength`). When none of them is one, call it again with `endDate` = the day of the oldest activity in the list, at most 5 calls in all. When none of them has one, say that none of my last 100 activities is a strength session, and stop.",
     );
   });
 
@@ -929,6 +938,14 @@ describe("coach prompts", () => {
     expect(text).toContain("Compare SWOLF only within this swim");
     expect(text).toContain("**Never invent or estimate a missing value**");
     expect(text).toContain("the most recent swim (a type that contains `swimming`)");
+    // the server judges no swim plan: the prompt must not ask the assistant for a verdict
+    expect(text).not.toContain("what the lap did, and hit or miss");
+    expect(text).toContain(
+      "Give no hit or miss: the server judges no swim plan, so say in one line that the table shows the plan beside the laps.",
+    );
+    expect(text).toContain(
+      '- **Plan against execution**: when `getActivityWorkouts` gives steps, a table with one row per lap that has a `step`: the step (its `intensity`, duration and target as `getActivityWorkouts` gives them) and what the lap did (`metres`, `time`, `swimPace`). A lap\'s `step` is the `stepIndex` of its plan step. Match by it, not in order. Give no hit or miss: the server judges no swim plan, so say in one line that the table shows the plan beside the laps. With an empty list, say "no planned workout" in one line.',
+    );
     expect(text.includes("{{")).toBe(false);
   });
 
@@ -936,7 +953,14 @@ describe("coach prompts", () => {
     expect(await render("swim-review", { activity: "21000000789" })).toContain(
       "The swim is the activity with `activityId` = 21000000789.",
     );
-    expect(await render("swim-review", { activity: "Morning" })).toContain('`names` = ["Morning"]');
+    const byName = await render("swim-review", { activity: "Morning" });
+    expect(byName).toContain('`names` = ["Morning"]');
+    expect(byName).toContain(
+      "When no row is a swim, say that none of my last 200 activities is a swim with that name, and stop.",
+    );
+    expect(await render("swim-review")).toContain(
+      "at most 5 calls in all. When none of them has one, say that none of my last 100 activities is a swim, and stop.",
+    );
   });
 
   describe("swim-readiness", () => {
@@ -951,6 +975,18 @@ describe("coach prompts", () => {
       expect(text).toContain("Give no predicted time");
       expect(text).toContain("**Never invent or estimate a missing value**");
       expect(text).not.toContain("is missing");
+      // weeks = 12 covers the 12 whole weeks and this week so far
+      expect(text).toContain(
+        'When the digest has no `swims`, say that the 12 weeks and this week have no swim, and show each swim value below as "n/a".',
+      );
+      expect(text).toContain("say how many of these weeks have a swim");
+      expect(text).toContain(
+        '- **Training block**: a table of the swims and km of each week (`swims.weekly`): the 12 whole weeks and this week so far. `null` km is "n/a": no swim of that week has a distance. Leave out the weeks that are not in `swims.weekly`, and say how many of these weeks have a swim.',
+      );
+      expect(text).not.toContain("first compared date");
+      expect(text).toContain(
+        'For the pool, `swims.poolTrend`: the pace and strokes per length of the last `comparedSwims` swims against as many before them, in one pool length (`poolLengthM`). `swims` is the number of swims of that pool length since `from`, the date of the first of them; `left` is the other swims (open water, another pool length, or no strokes). A `null` comparison is "n/a": too few swims, or too close together.',
+      );
       expect(text.includes("{{")).toBe(false);
     });
 
