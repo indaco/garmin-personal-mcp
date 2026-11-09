@@ -22,6 +22,8 @@ import {
   aerobicTrend,
   bestProgression,
   racePredictionsOf,
+  runPlanAdherence,
+  type RunPlanMiss,
   type SplitKind,
   splitOf,
   workoutOf,
@@ -175,6 +177,20 @@ export interface Digest {
     unplanned: number;
     weeks: Record<string, { hit: number; miss: number } | null>;
     mostMissed: PlanMiss[];
+  };
+  /**
+   * The plan verdicts of the runs whose laps the page read (a skipped run has no file and is not
+   * seen): one count per lap with a verdict. `runs` counts every run of the period, `unread` those
+   * whose laps were not read. `weeks` by Monday: the weeks with a counted lap, and null for a week
+   * with an unread run and no counted lap. `mostMissed`: the first 5 workouts and target types with a
+   * miss. Absent without a run.
+   */
+  runPlan?: {
+    runs: number;
+    untargeted: number;
+    unread: number;
+    weeks: Record<string, { hit: number; miss: number } | null>;
+    mostMissed: RunPlanMiss[];
   };
   /**
    * The page's readiness verdict for today and its inputs; null when the data cannot back a value.
@@ -357,6 +373,19 @@ export function digest(data: Json): Digest {
           mostMissed: plan.exercises.slice(0, 5),
         }
       : undefined;
+  const lapPlan = runPlanAdherence(acts as Activity[], weeks);
+  const runPlan =
+    lapPlan.runs > 0
+      ? {
+          ...lapPlan,
+          weeks: Object.fromEntries(
+            weeks
+              .map((w, i) => [w, lapPlan.weeks[i]] as const)
+              .filter(([, v]) => v === null || v.hit + v.miss > 0),
+          ),
+          mostMissed: lapPlan.mostMissed.slice(0, 5),
+        }
+      : undefined;
 
   // the page's readiness and fitness: the verdict from the exact ratio, only the shown values rounded
   const hrv = list(data.hrv);
@@ -427,6 +456,7 @@ export function digest(data: Json): Digest {
     repeatedRuns: repeatedRuns(acts),
     strengthExercises,
     ...(strengthPlan ? { strengthPlan } : {}),
+    ...(runPlan ? { runPlan } : {}),
     ...(hrv.length > 0 || recovery.length > 0
       ? {
           readiness: {

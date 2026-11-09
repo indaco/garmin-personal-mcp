@@ -475,6 +475,8 @@ export function planAdherence(acts: Activity[], weeks: string[]) {
   for (const a of acts) {
     const rows = a.planVerdicts;
     const i = weekIndex(a, weeks);
+    // runs carry planVerdicts too
+    if (!String(a.type).includes("strength")) continue;
     if (i < 0 || (rows !== null && !Array.isArray(rows))) continue;
     out.sessions++;
     if (rows === null) {

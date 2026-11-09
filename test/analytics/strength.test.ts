@@ -676,6 +676,15 @@ const planned = (id: number, day: string, planVerdicts: unknown) => ({
   planVerdicts,
 });
 
+/** A run on 2026-10-13, with these plan verdicts when given. */
+const runOf = (id: number, planVerdicts?: unknown) => ({
+  id,
+  type: "running",
+  sport: "running",
+  start: "2026-10-13 07:00:00",
+  ...(planVerdicts === undefined ? {} : { planVerdicts }),
+});
+
 describe("plan adherence", () => {
   const weeks = ["2026-10-12", "2026-10-19", "2026-10-26"];
 
@@ -755,6 +764,26 @@ describe("plan adherence", () => {
       exercises: [],
       sessions: 3,
       unplanned: 1,
+    });
+  });
+
+  it("counts strength sessions only, whatever plan verdicts a run has", () => {
+    const sessions = [
+      planned(1, "2026-10-13", [hit("Squat")]),
+      runOf(2, [{ step: 1, type: "cadence", verdict: "miss", why: "low" }]),
+      // a free run with laps, and a run whose laps were not read
+      runOf(3, null),
+      runOf(4),
+    ];
+    expect(planAdherence(sessions, weeks)).toEqual({
+      weeks: [
+        { hit: 1, miss: 0 },
+        { hit: 0, miss: 0 },
+        { hit: 0, miss: 0 },
+      ],
+      exercises: [],
+      sessions: 1,
+      unplanned: 0,
     });
   });
 

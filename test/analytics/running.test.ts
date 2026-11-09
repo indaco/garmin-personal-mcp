@@ -8,6 +8,7 @@ import {
   planOfLaps,
   predictRaces,
   racePredictionsOf,
+  runPlanAdherence,
   splitOf,
   workOf,
   workoutMetrics,
@@ -16,6 +17,7 @@ import {
   zoneOf,
   zoneSeconds,
 } from "../../src/analytics/running";
+import type { Activity } from "../../src/analytics/calc";
 
 const floors = [94, 113, 132, 150, 169];
 
@@ -660,6 +662,9 @@ describe("plan of the laps", () => {
     [90, 180, "hit", 0],
     [90.5, 181, "miss", 1],
     [79.96, 160, "miss", -0.1],
+    // a miss by less than 0.05 spm keeps its side: off is never 0 on a miss
+    [79 + 127 / 128, 160, "miss", -0.1],
+    [90.01, 180, "miss", 0.1],
   ])("judges a raw cadence of %d against 80-90: %d spm, %s, off %d", (raw, spm, verdict, off) => {
     expect(rowOf(plan("cadence", 80, 90), { cadence: raw })).toEqual({
       lap: 1,
@@ -831,6 +836,134 @@ describe("plan of the laps", () => {
       [1, 0, "warmup", null],
       [3, 1, "active", "hit"],
       [4, 1, undefined, "miss"],
+    ]);
+  });
+});
+
+/** A lap with a verdict, as the dashboard keeps it in `planVerdicts`. */
+const lapHit = (type = "cadence") => ({ step: 1, type, verdict: "hit", why: null });
+const lapMiss = (why: string, type = "cadence") => ({ step: 1, type, verdict: "miss", why });
+/** A run on a day; `planVerdicts` undefined leaves the key out (laps not read). */
+const planRun = (
+  id: number,
+  day: string,
+  planVerdicts?: unknown,
+  name: unknown = "Park - Drills",
+): Activity => ({
+  id,
+  type: "running",
+  sport: "running",
+  // a name that is not text, as the page data can hold
+  name: name as string,
+  start: `${day} 07:00:00`,
+  ...(planVerdicts === undefined ? {} : { planVerdicts }),
+});
+
+describe("run plan adherence", () => {
+  const weeks = ["2026-10-12", "2026-10-19", "2026-10-26"];
+
+  it("counts each lap with a verdict, and the runs without a target or not read apart", () => {
+    const runs = [
+      planRun(1, "2026-10-13", [lapHit(), lapHit(), lapMiss("low")]),
+      // the same workout in another place
+      planRun(2, "2026-10-14", [lapMiss("high"), lapMiss("low", "pace")], "Hill - Drills"),
+      // a week with verdict laps and a run not read keeps its numbers
+      planRun(3, "2026-10-15"),
+      // planned with no target to check, and a run not read: the week can hide a planned run
+      planRun(4, "2026-10-20", []),
+      planRun(5, "2026-10-21"),
+      // a free run
+      planRun(6, "2026-10-27", null),
+    ];
+    expect(runPlanAdherence(runs, weeks)).toEqual({
+      runs: 6,
+      untargeted: 1,
+      unread: 2,
+      weeks: [{ hit: 2, miss: 3 }, null, { hit: 0, miss: 0 }],
+      mostMissed: [
+        { workout: "Drills", type: "cadence", laps: 4, misses: 2, low: 1, high: 1 },
+        { workout: "Drills", type: "pace", laps: 1, misses: 1, low: 1, high: 0 },
+      ],
+    });
+  });
+
+  it("takes only the runs in the weeks", () => {
+    const acts = [
+      // the Sunday before the first week, and the last day of the last week
+      planRun(1, "2026-10-11", [lapMiss("low")]),
+      planRun(2, "2026-11-01", [lapHit()]),
+      // the Monday of the second week is in that week, not in the first
+      planRun(6, "2026-10-19", [lapMiss("high")]),
+      // not a run, and a run of an older server without a sport
+      {
+        ...planRun(3, "2026-10-13", [lapMiss("low")]),
+        type: "strength_training",
+        sport: "training",
+      },
+      { ...planRun(4, "2026-10-13", [lapHit()]), sport: undefined },
+      { id: 5, type: "running", planVerdicts: [lapHit()] },
+    ];
+    expect(runPlanAdherence(acts, weeks)).toEqual({
+      runs: 3,
+      untargeted: 0,
+      unread: 0,
+      weeks: [
+        { hit: 1, miss: 0 },
+        { hit: 0, miss: 1 },
+        { hit: 1, miss: 0 },
+      ],
+      mostMissed: [{ workout: "Drills", type: "cadence", laps: 3, misses: 1, low: 0, high: 1 }],
+    });
+  });
+
+  it("skips rows without a verdict or a type, and reads a field that is not a list as not read", () => {
+    const odd = [
+      null,
+      "hit",
+      { step: 1, type: "cadence", verdict: null, why: null },
+      { step: 1, verdict: "hit", why: null },
+      { step: 1, type: 5, verdict: "miss", why: "low" },
+      // a miss without a known direction is still a miss
+      { step: 1, type: "power", verdict: "miss", why: "x" },
+    ];
+    expect(
+      runPlanAdherence(
+        [
+          planRun(1, "2026-10-13", odd),
+          planRun(2, "2026-10-20", "x"),
+          // a run not read in a week whose only counted lap is a miss: the week keeps its numbers
+          planRun(3, "2026-10-14"),
+        ],
+        weeks,
+      ),
+    ).toEqual({
+      runs: 3,
+      untargeted: 0,
+      unread: 2,
+      weeks: [{ hit: 0, miss: 1 }, null, { hit: 0, miss: 0 }],
+      mostMissed: [{ workout: "Drills", type: "power", laps: 1, misses: 1, low: 0, high: 0 }],
+    });
+  });
+
+  it("counts a run without a name in the weeks only", () => {
+    const out = runPlanAdherence([planRun(1, "2026-10-13", [lapMiss("low")], 7)], weeks);
+    expect(out.weeks[0]).toEqual({ hit: 0, miss: 1 });
+    expect(out.mostMissed).toEqual([]);
+  });
+
+  it("lists the most missed first, then by workout, then by target type", () => {
+    const runs = [
+      planRun(1, "2026-10-13", [lapMiss("low"), lapMiss("high", "pace")], "A - Tempo"),
+      planRun(2, "2026-10-14", [lapMiss("low", "power"), lapMiss("low")], "A - Hills"),
+      planRun(3, "2026-10-15", [lapMiss("high"), lapHit("heart_rate")], "A - Tempo"),
+    ];
+    expect(
+      runPlanAdherence(runs, weeks).mostMissed.map((x) => [x.workout, x.type, x.misses]),
+    ).toEqual([
+      ["Tempo", "cadence", 2],
+      ["Hills", "cadence", 1],
+      ["Hills", "power", 1],
+      ["Tempo", "pace", 1],
     ]);
   });
 });

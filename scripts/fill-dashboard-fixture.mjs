@@ -33,7 +33,8 @@ const workout = (a) => (typeof a.name === "string" ? workoutOf(a.name) : undefin
  * shows what the server gives. With `saved`, every .FIT file is saved, as on a page that has updated
  * for months; without, it is a first build. `activities` come newest first. Laps stay for the 3 newest activities,
  * races, runs over 15 km and, with `workouts`, the 8 newest runs of each run name that repeats; sets
- * stay for the 30 newest strength sessions, and for all of them when every file is saved.
+ * stay for the 30 newest strength sessions, and for all of them when every file is saved. A run keeps
+ * its plan verdicts with its laps, and always when every file is saved.
  */
 export function asServer(activities, workouts = false, saved = false) {
   const runNames = new Map();
@@ -55,7 +56,11 @@ export function asServer(activities, workouts = false, saved = false) {
       runNames.get(w) > 1 &&
       ((lapped.get(w) ?? 0) < 8 || saved);
     if (repeated) lapped.set(w, (lapped.get(w) ?? 0) + 1);
-    if (!(i < 3 || a.race === true || longRun || repeated)) delete a.laps;
+    if (!(i < 3 || a.race === true || longRun || repeated)) {
+      delete a.laps;
+      // the plan verdicts of an older run come from its saved file
+      if (isRun(a) && !saved) delete a.planVerdicts;
+    }
   });
   return activities;
 }

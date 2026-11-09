@@ -1,4 +1,4 @@
-import { type Activity, dayOf, seconds } from "./calc";
+import { type Activity, dayOf, isRunning, seconds } from "./calc";
 import { addDays } from "../dates";
 import { change, MIN_SESSIONS, mean, riegel } from "./metrics";
 import type { PlanStep } from "./strength";
@@ -470,7 +470,75 @@ export function planOfLaps(steps: PlanStep[], laps: PlanLap[]): LapPlanRow[] {
     const v = t.value ?? t.done;
     const off = v < a ? v - a : v > b ? v - b : 0;
     row.verdict = off === 0 ? "hit" : "miss";
-    row.off = Math.round(off * 10) / 10;
+    // a miss by less than 0.05 keeps its side, so off is never 0 on a miss
+    row.off = Math.round(off * 10) / 10 || Math.sign(off) * 0.1;
     return [row];
   });
+}
+
+/** A workout and target type whose laps miss the plan: under (`low`) or over (`high`) the range. */
+export interface RunPlanMiss {
+  workout: string;
+  type: string;
+  laps: number;
+  misses: number;
+  low: number;
+  high: number;
+}
+
+/** Text order by code unit, the same on every machine. */
+const byText = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0);
+
+/**
+ * The plan verdicts of the runs in the weeks (`planVerdicts`: [] is a planned run with no target to
+ * check, null a run without a plan, absent a run whose laps were not read). One count per lap with a
+ * verdict. A week without such a lap is null when it holds a run that was not read: that run can be
+ * a planned one.
+ */
+export function runPlanAdherence(acts: Activity[], weeks: string[]) {
+  const out = {
+    runs: 0,
+    untargeted: 0,
+    unread: 0,
+    weeks: weeks.map((): { hit: number; miss: number } | null => ({ hit: 0, miss: 0 })),
+    mostMissed: [] as RunPlanMiss[],
+  };
+  const unreadWeeks = new Set<number>();
+  const stats = new Map<string, RunPlanMiss>();
+  for (const a of acts) {
+    const d = dayOf(a);
+    const i = d ? weeks.findIndex((w) => d >= w && d <= addDays(w, 6)) : -1;
+    if (i < 0 || !isRunning(a)) continue;
+    out.runs++;
+    const rows = a.planVerdicts;
+    if (rows === null) continue;
+    if (!Array.isArray(rows)) {
+      out.unread++;
+      unreadWeeks.add(i);
+      continue;
+    }
+    if (rows.length === 0) out.untargeted++;
+    const workout = typeof a.name === "string" ? workoutOf(a.name) : undefined;
+    for (const r of rows as Record<string, unknown>[]) {
+      const { type, verdict, why } = r ?? {};
+      if (typeof type !== "string" || (verdict !== "hit" && verdict !== "miss")) continue;
+      out.weeks[i]![verdict]++;
+      if (workout === undefined) continue;
+      const key = JSON.stringify([workout, type]);
+      const x = stats.get(key) ?? { workout, type, laps: 0, misses: 0, low: 0, high: 0 };
+      stats.set(key, x);
+      x.laps++;
+      if (verdict === "hit") continue;
+      x.misses++;
+      if (why === "low" || why === "high") x[why]++;
+    }
+  }
+  for (const i of unreadWeeks)
+    if (out.weeks[i]!.hit + out.weeks[i]!.miss === 0) out.weeks[i] = null;
+  out.mostMissed = [...stats.values()]
+    .filter((x) => x.misses > 0)
+    .toSorted(
+      (x, y) => y.misses - x.misses || byText(x.workout, y.workout) || byText(x.type, y.type),
+    );
+  return out;
 }

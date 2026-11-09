@@ -7,7 +7,7 @@ import { addDays, localToday } from "./dates";
 import { digest } from "./digest";
 import { log } from "./log";
 import { type Activity, isRunning, mondayOf } from "./analytics/calc";
-import { workoutOf } from "./analytics/running";
+import { type LapPlanRow, workoutOf } from "./analytics/running";
 import type { PlanRow } from "./analytics/strength";
 import {
   type GarminTools,
@@ -392,10 +392,25 @@ export class GarminDashboard {
           lapped.set(w, newer + 1);
           repeated = newer < WORKOUT_SESSIONS || (await this.tools.hasFit(id));
         }
-        if (i < 3 || a.race === true || longRun || repeated) {
-          const laps = JSON.parse(await fit(id, (n) => this.tools.getActivityLaps(n))).laps;
+        const lapRules = i < 3 || a.race === true || longRun || repeated;
+        // an older run whose file is saved gives its plan verdicts at no cost, not its laps
+        if (lapRules || (isRun(a) && (await this.tools.hasFit(id)))) {
+          const answer = JSON.parse(await fit(id, (n) => this.tools.getActivityLaps(n)));
           // a file without laps (a strength session) gives none, not an empty list
-          if (Array.isArray(laps) && laps.length > 0) a.laps = laps;
+          if (lapRules && Array.isArray(answer.laps) && answer.laps.length > 0)
+            a.laps = answer.laps;
+          // the laps that count: an open step, a warm-up without a target and a lap off the plan have none
+          if (isRun(a) && "plan" in answer)
+            a.planVerdicts =
+              answer.plan &&
+              (answer.plan.laps as LapPlanRow[])
+                .filter((r) => r.verdict !== null)
+                .map((r) => ({
+                  step: r.step,
+                  type: r.target!.type,
+                  verdict: r.verdict,
+                  why: r.verdict === "hit" ? null : r.off! < 0 ? "low" : "high",
+                }));
         }
       } catch (e) {
         a.detailError = (e as Error).message;
@@ -711,7 +726,9 @@ export function registerDashboard(server: McpServer, dashboard: GarminDashboard)
         "All the data of the training dashboard in one call: HR zones, fitness age, the activities of the",
         "last `weeks` weeks (compact summaries, with strength sets and laps where they apply; a strength",
         "session with sets also has `planVerdicts`: hit or miss for each exercise of the plan that the",
-        "watch ran, null without a plan), the activities of the weeks before for the period comparison,",
+        "watch ran, null without a plan; a run whose laps are read, or whose .FIT file is saved, has",
+        "`planVerdicts` too: hit or miss for each lap with a planned target), the activities of the",
+        "weeks before for the period comparison,",
         "daily HRV, the last 14 days of sleep and daily",
         "summaries (with `recoveryHistory`, also short rows of the older days: date, sleep hours, sleep",
         "score and resting HR), and `units`: the measurement system of the Garmin profile (metric, statute_us or",

@@ -560,6 +560,74 @@ describe("jsonByLines", () => {
   });
 });
 
+/** A run whose plan has a cadence step (160-180 spm) and a pace step (5:00-5:30 /km). */
+const plannedRun = () => {
+  const M = Profile.MesgNum;
+  const lap = (step: number | undefined, more: Record<string, unknown>) =>
+    [M.LAP, { totalDistance: 1000, totalTimerTime: 300, wktStepIndex: step, ...more }] as [
+      number,
+      Record<string, unknown>,
+    ];
+  return fitFile(
+    [M.WORKOUT, { wktName: "Drills" }],
+    [M.WORKOUT_STEP, { messageIndex: 0, intensity: "warmup", targetType: "open" }],
+    [
+      M.WORKOUT_STEP,
+      {
+        messageIndex: 1,
+        intensity: "active",
+        targetType: "cadence",
+        customTargetValueLow: 80,
+        customTargetValueHigh: 90,
+      },
+    ],
+    [
+      M.WORKOUT_STEP,
+      {
+        messageIndex: 2,
+        intensity: "active",
+        targetType: "speed",
+        customTargetValueLow: Math.round(1e6 / 330),
+        customTargetValueHigh: Math.round(1e6 / 300),
+      },
+    ],
+    // a warm-up without a target, then a hit, a lap under and a lap over the cadence
+    lap(0, { intensity: "warmup" }),
+    lap(1, { avgCadence: 85, avgFractionalCadence: 0.5, intensity: "active" }),
+    lap(1, { avgCadence: 78, intensity: "active" }),
+    lap(1, { avgCadence: 92, intensity: "active" }),
+    // 5:31 /km: slower than the range, over it in s/km
+    lap(2, { enhancedAvgSpeed: 1000 / 331, intensity: "active" }),
+    // the lap that ends the session: no step
+    lap(undefined, { totalDistance: 50, totalTimerTime: 20 }),
+    [M.SESSION, { sport: "running" }],
+  );
+};
+const RUN_VERDICTS = [
+  { step: 1, type: "cadence", verdict: "hit", why: null },
+  { step: 1, type: "cadence", verdict: "miss", why: "low" },
+  { step: 1, type: "cadence", verdict: "miss", why: "high" },
+  { step: 2, type: "pace", verdict: "miss", why: "high" },
+];
+const freeRun = () =>
+  fitFile(
+    [Profile.MesgNum.LAP, { totalDistance: 1000, totalTimerTime: 300 }],
+    [Profile.MesgNum.SESSION, { sport: "running" }],
+  );
+
+/** Which of 5 runs of 5 km keep their laps and their plan verdicts in a demo. */
+const keptRunPlans = (saved: boolean) =>
+  asServer(
+    Array.from({ length: 5 }, (_, i) => ({
+      id: i,
+      type: "running",
+      km: 5,
+      laps: [],
+      planVerdicts: [],
+    })),
+    false,
+    saved,
+  ).map((a) => ["laps" in a, "planVerdicts" in a]);
 /**
  * How many of 32 strength sessions with sets keep them, and their plan verdicts, in a demo, on a first
  * build or with every file saved.
@@ -1814,6 +1882,82 @@ describe("getDashboardData", () => {
           "planVerdicts",
         );
       });
+      it("gives each run whose laps are read the verdicts of its plan, with no new download", async () => {
+        garminActivities = [
+          activity(1, "2026-10-26"),
+          activity(2, "2026-10-25"),
+          activity(3, "2026-10-24", "strength_training"),
+          // past the 3 newest, not a race, 5 km, no saved file: laps not read
+          activity(4, "2026-10-23"),
+        ];
+        const ok = await api.getBytes();
+        api.getBytes.mockClear();
+        api.getBytes
+          .mockResolvedValueOnce(plannedRun())
+          .mockResolvedValueOnce(freeRun())
+          .mockResolvedValue(ok);
+        const out = JSON.parse(await dashboard.getDashboardData(1));
+        // the 3 newest, as without the verdicts
+        expect(api.getBytes).toHaveBeenCalledTimes(3);
+        expect(out.sync.fitDownloads).toBe(3);
+        const [planned, free, strength, unread] = out.activities;
+        expect(planned.planVerdicts).toEqual(RUN_VERDICTS);
+        expect(planned.laps).toHaveLength(6);
+        expect(free.planVerdicts).toBeNull();
+        // the strength verdicts come from the sets, not from the laps
+        expect(strength.planVerdicts).toBeNull();
+        expect(strength.laps).toHaveLength(1);
+        expect(unread).not.toHaveProperty("planVerdicts");
+        expect(unread).not.toHaveProperty("laps");
+        expect(readFileSync(join(dataDir, "dashboard-cache.json"), "utf8")).not.toContain(
+          "planVerdicts",
+        );
+      });
+
+      it("gives a planned run with no target to check an empty list", async () => {
+        garminActivities = [activity(1, "2026-10-26")];
+        const M = Profile.MesgNum;
+        api.getBytes.mockResolvedValueOnce(
+          fitFile(
+            [M.WORKOUT, { wktName: "Easy" }],
+            [M.WORKOUT_STEP, { messageIndex: 0, intensity: "active", targetType: "open" }],
+            [M.LAP, { totalDistance: 1000, totalTimerTime: 300, wktStepIndex: 0 }],
+            [M.SESSION, { sport: "running" }],
+          ),
+        );
+        const out = JSON.parse(await dashboard.getDashboardData(1));
+        expect(out.activities[0].planVerdicts).toEqual([]);
+      });
+
+      it("reads the plan of an older run from its saved file, without its laps", async () => {
+        garminActivities = [
+          activity(1, "2026-10-26"),
+          activity(2, "2026-10-25"),
+          activity(3, "2026-10-24"),
+          activity(4, "2026-10-23"),
+          activity(5, "2026-10-22"),
+          // not a run: a saved file gives it no laps
+          activity(6, "2026-10-21", "cycling"),
+        ];
+        const tools = new GarminTools(api as unknown as GarminApiClient, dataDir);
+        api.getBytes.mockResolvedValueOnce(plannedRun()).mockResolvedValueOnce(freeRun());
+        await tools.fetchFit(4);
+        await tools.fetchFit(6);
+        api.getBytes.mockClear();
+        const read = vi.spyOn(GarminTools.prototype, "getActivityLaps");
+        const out = JSON.parse(await dashboard.getDashboardData(1));
+        // only the 3 newest download; the saved ride is not read
+        expect(api.getBytes).toHaveBeenCalledTimes(3);
+        expect(read.mock.calls.map(([id]) => id)).toEqual([1, 2, 3, 4]);
+        expect(out.sync.fitDownloads).toBe(3);
+        const [, , , saved, unsaved, ride] = out.activities;
+        expect(saved.planVerdicts).toEqual(RUN_VERDICTS);
+        expect(saved).not.toHaveProperty("laps");
+        expect(unsaved).not.toHaveProperty("planVerdicts");
+        expect(ride).not.toHaveProperty("planVerdicts");
+        expect(ride).not.toHaveProperty("laps");
+        read.mockRestore();
+      });
     });
 
     it("does not throw when Garmin answers a bare string for the HRV or the settings path", async () => {
@@ -1947,6 +2091,24 @@ describe("getDashboardData", () => {
     expect([keptSets(false), keptSets(true)]).toEqual([
       [30, 30],
       [32, 32],
+    ]);
+  });
+
+  it("keeps in the demos the run plan verdicts that the server gives: with the laps, or from a saved file", () => {
+    // the 3 newest have their laps; the 2 older runs keep their verdicts only when their file is saved
+    expect(keptRunPlans(false)).toEqual([
+      [true, true],
+      [true, true],
+      [true, true],
+      [false, false],
+      [false, false],
+    ]);
+    expect(keptRunPlans(true)).toEqual([
+      [true, true],
+      [true, true],
+      [true, true],
+      [false, true],
+      [false, true],
     ]);
   });
 
