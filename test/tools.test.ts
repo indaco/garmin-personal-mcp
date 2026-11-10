@@ -1522,13 +1522,40 @@ describe("writeAtomically", () => {
     expect(readFileSync(join(b, "real.html"), "utf8")).toBe("new");
   });
 
-  it("gives a new file the default mode, and makes a missing parent folder", async () => {
-    const plain = join(dir, "plain.html");
-    writeFileSync(plain, "");
+  it("makes a new file and its missing parent folders", async () => {
+    const f = join(dir, "sub", "deeper", "new.html");
+    await writeAtomically(f, "new");
+    expect(statSync(join(dir, "sub", "deeper")).isDirectory()).toBe(true);
+    expect(readFileSync(f, "utf8")).toBe("new");
+  });
+
+  it.skipIf(win)("makes a new file and its new folders private", async () => {
     const f = join(dir, "sub", "deeper", "new.html");
     await writeAtomically(f, "new");
     expect(readFileSync(f, "utf8")).toBe("new");
-    if (!win) expect(mode(f)).toBe(mode(plain));
+    expect(mode(f)).toBe(0o600);
+    expect(mode(join(dir, "sub"))).toBe(0o700);
+    expect(mode(join(dir, "sub", "deeper"))).toBe(0o700);
+  });
+
+  it.skipIf(win)("does not change an existing folder", async () => {
+    chmodSync(dir, 0o755);
+    const f = join(dir, "new.html");
+    await writeAtomically(f, "new");
+    expect(mode(dir)).toBe(0o755);
+    expect(mode(f)).toBe(0o600);
+  });
+
+  it.skipIf(win)("keeps 0600 under a permissive umask", async () => {
+    const f = join(dir, "sub", "new.html");
+    const old = process.umask(0o000);
+    try {
+      await writeAtomically(f, "new");
+    } finally {
+      process.umask(old);
+    }
+    expect(mode(f)).toBe(0o600);
+    expect(mode(join(dir, "sub"))).toBe(0o700);
   });
 
   it("leaves no temp file when the rename fails", async () => {
@@ -1558,6 +1585,7 @@ describe("writeAtomically", () => {
     await writeAtomically(link, "new");
     expect(lstatSync(link).isSymbolicLink()).toBe(false);
     expect(readFileSync(link, "utf8")).toBe("new");
+    expect(mode(link)).toBe(0o600);
     expect(existsSync(join(dir, "missing.html"))).toBe(false);
   });
 
@@ -1610,6 +1638,10 @@ describe("writeAtomically", () => {
       writeFileSync(other, "", { mode: 0o666 });
       // the umask applies, because chmod did not run
       expect(mode(wide)).toBe(mode(other));
+
+      const fresh = join(dir, "fresh.html");
+      await writeAtomically(fresh, "new");
+      expect(mode(fresh)).toBe(0o600);
     } finally {
       Object.defineProperty(process, "platform", original);
     }

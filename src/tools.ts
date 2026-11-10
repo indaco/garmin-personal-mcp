@@ -530,19 +530,20 @@ export function firstArray(json: unknown): unknown[] | undefined {
 
 /**
  * Writes a temp file and moves it into place, so a stopped process never leaves a half-written file. A link stays
- * a link and an existing file keeps its mode. A new file has the default mode.
+ * a link and an existing file keeps its mode. A new file is private (0600), and so is a folder it makes (0700):
+ * the data folder holds health data and GPS tracks.
  */
 export async function writeAtomically(target: string, data: Uint8Array | string): Promise<void> {
   const real = await realpath(target).catch(() => target);
-  const mode = (await stat(real).catch(() => undefined))?.mode;
-  await mkdir(dirname(resolve(real)), { recursive: true });
+  const mode = ((await stat(real).catch(() => undefined))?.mode ?? 0o600) & 0o777;
+  await mkdir(dirname(resolve(real)), { recursive: true, mode: 0o700 });
   // a unique name: two writers of one file never share a temp file
   const tmp = `${real}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
   try {
     // the mode from the start: a private page is never readable by others, also not for a moment
-    await writeFile(tmp, data, mode === undefined ? undefined : { mode: mode & 0o777 });
+    await writeFile(tmp, data, { mode });
     // writeFile's mode goes through the umask. Windows has no modes
-    if (mode !== undefined && process.platform !== "win32") await chmod(tmp, mode & 0o777);
+    if (process.platform !== "win32") await chmod(tmp, mode);
     await rename(tmp, real);
   } catch (e) {
     await rm(tmp, { force: true });
