@@ -2,8 +2,8 @@ Tell me if I should train hard today, as a coach. Use the tools of the `garmin-p
 Today is {{today}}.
 
 1. Call `writeDashboard` with `preview` = true. Do not give `weeks`: the server then uses the weeks
-   of the dashboard page, so the numbers match the page. It writes nothing and returns the `digest`.
-   Do not call `getDashboardData`: its whole result is too large for this check.
+   of the dashboard page, so the numbers match the page. It writes no page file and returns the
+   `digest`. Do not call `getDashboardData`: its whole result is too large for this check.
 
 Then answer in chat, in this order, short:
 

@@ -9,6 +9,20 @@ const EXERCISE_CATALOGUE_URL = "https://connect.garmin.com/web-data/exercises/Ex
 /** Re-obtain the token a bit before the documented 24h validity. */
 const DEFAULT_TOKEN_TTL_MS = 23 * 3600_000;
 
+/** The text of a fetch error and its cause: undici gives the reason (ENOTFOUND, a TLS error) only in the cause. */
+function failure(e: unknown): string {
+  const message = e instanceof Error ? e.message : String(e);
+  const cause =
+    e instanceof Error ? (e.cause as { message?: unknown; code?: unknown } | undefined) : undefined;
+  const why =
+    typeof cause?.message === "string" && cause.message !== ""
+      ? cause.message
+      : typeof cause?.code === "string"
+        ? cause.code
+        : "";
+  return why === "" || why === message ? message : `${message} (${why})`;
+}
+
 export class GarminApiError extends Error {
   override name = "GarminApiError";
 
@@ -82,9 +96,7 @@ export class GarminApiClient {
         signal: AbortSignal.timeout(60_000),
       });
     } catch (e) {
-      throw new GarminApiError(
-        `Network error reading the exercise catalogue: ${(e as Error).message}`,
-      );
+      throw new GarminApiError(`Network error reading the exercise catalogue: ${failure(e)}`);
     }
     if (!resp.ok) {
       throw new GarminApiError(`GET exercise catalogue -> HTTP ${resp.status}`);
@@ -92,9 +104,7 @@ export class GarminApiClient {
     try {
       return new Uint8Array(await resp.arrayBuffer());
     } catch (e) {
-      throw new GarminApiError(
-        `Network error reading the exercise catalogue: ${(e as Error).message}`,
-      );
+      throw new GarminApiError(`Network error reading the exercise catalogue: ${failure(e)}`);
     }
   }
 
@@ -121,7 +131,7 @@ export class GarminApiClient {
     try {
       body = new Uint8Array(await resp.arrayBuffer());
     } catch (e) {
-      throw new GarminApiError(`Network error reading ${path}: ${(e as Error).message}`);
+      throw new GarminApiError(`Network error reading ${path}: ${failure(e)}`);
     }
     if (!resp.ok) {
       throw new GarminApiError(
@@ -140,9 +150,7 @@ export class GarminApiClient {
         signal: AbortSignal.timeout(60_000),
       });
     } catch (e) {
-      throw new GarminApiError(
-        `Network error calling ${path}: ${this.#scrub((e as Error).message, token)}`,
-      );
+      throw new GarminApiError(`Network error calling ${path}: ${this.#scrub(failure(e), token)}`);
     }
   }
 
@@ -170,9 +178,7 @@ export class GarminApiClient {
       });
       text = await resp.text();
     } catch (e) {
-      throw new GarminApiError(
-        `Network error obtaining token: ${this.#scrub((e as Error).message, apiKey)}`,
-      );
+      throw new GarminApiError(`Network error obtaining token: ${this.#scrub(failure(e), apiKey)}`);
     }
     const contentType = resp.headers.get("Content-Type") ?? "none";
     if (!resp.ok) {
@@ -266,8 +272,13 @@ export class GarminApiClient {
     let key: string;
     try {
       key = (await readFile(file, "utf8")).trim();
-    } catch {
-      throw new GarminApiError(`No API key: set GARMIN_PERSONAL_API_KEY or create ${file}`);
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === "ENOENT")
+        throw new GarminApiError(`No API key: set GARMIN_PERSONAL_API_KEY or create ${file}`);
+      throw new GarminApiError(
+        `API key file cannot be read (${code ?? "unknown error"}): ${file}. Check its permissions, or set GARMIN_PERSONAL_API_KEY.`,
+      );
     }
     if (!key) {
       throw new GarminApiError(`API key file is empty: ${file}`);

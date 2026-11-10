@@ -2,8 +2,8 @@ Review my last whole training week, as a coach. Use the tools of the `garmin-per
 Today is {{today}}. The last whole week starts on Monday `{{week}}`.
 
 1. Call `writeDashboard` with `preview` = true. Do not give `weeks`: the server then uses the weeks
-   of the dashboard page, so the numbers match the page. It writes nothing and returns the `digest`.
-   Do not call `getDashboardData`: its whole result is too large for this check.
+   of the dashboard page, so the numbers match the page. It writes no page file and returns the
+   `digest`. Do not call `getDashboardData`: its whole result is too large for this check.
 
 `digest.weekly` has one row for each week, keyed by its Monday. A week from `digest.period.start` on
 without a row had no sessions: show it with 0 sessions, not as "n/a". A week before

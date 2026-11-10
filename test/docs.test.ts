@@ -96,6 +96,46 @@ describe("guide", () => {
     );
   });
 
+  it("says that showDashboard writes no page file but updates the data cache", () => {
+    expect(readFileSync("guide/tools.md", "utf8")).toContain(
+      "It writes no page file (it updates the data cache, as `getDashboardData` does) and has no coach notes.",
+    );
+    expect(readFileSync("guide/dashboard.md", "utf8")).toContain(
+      "- The server writes no page file (it updates the data cache), and the page has no coach notes.",
+    );
+    expect(readFileSync("README.md", "utf8")).toContain(
+      "The tool reads new data from Garmin and shows your saved page,\nwith its layout, custom widgets, languages and settings. It writes no page file, and the page has no\ncoach notes.",
+    );
+  });
+
+  it("says that a writeDashboard preview writes no page file", () => {
+    expect(readFileSync("guide/tools.md", "utf8")).toContain(
+      "`settings` set the title, the sports, the data, the languages, the themes, the workout comparison and the recovery history of the page; `preview` writes no page file (it updates the data cache, as `getDashboardData` does) and gives the activities of each board and the settings of the page.",
+    );
+    const readme = readFileSync("README.md", "utf8").replace(/\s+/g, " ");
+    const preview =
+      "The assistant reads the server's summary of the dashboard data (a `writeDashboard` preview, which writes no page file).";
+    // train-today and week-review both say it: toContain alone passes with one
+    expect(readme.split(preview).length - 1).toBe(2);
+    expect(readme).toContain(
+      `${preview} It uses the weeks of your dashboard page, so the numbers are the same as on the page. It gives the verdict of the dashboard's Readiness widget: go easy, normal or ready to push. This verdict is the dashboard's own rule, not Garmin's Training Readiness. A table shows each input and the rule it meets: the HRV status, the sleep score, the resting HR against the average of the 7 days before, and the load ratio of 7 to 28 days. When a value is from an older night, the assistant gives its date.`,
+    );
+    expect(readme).toContain(
+      `${preview} It uses the weeks of your dashboard page, so the numbers are the same as on the page. It compares your last whole week, Monday to Sunday, with up to 4 weeks before it: sessions, hours, km, run km and load, and the load ramp against the week before (above 10% is the page's warning level). Then it gives the load ratio, the monotony and strain of the last 7 days and the form of today, and the new run bests of the week with the time each one beat. These are bests since the page's first week, not all-time records: a faster run before that week is not counted.`,
+    );
+    const preview12 =
+      "The assistant reads the server's summary of 12 weeks (a `writeDashboard` preview, which writes no page file).";
+    // race-readiness and swim-readiness both say it
+    expect(readme.split(preview12).length - 1).toBe(2);
+    expect(readme).toContain(
+      `${preview12} It has the weekly run distance and load, the long runs with their pace split and HR drift, the aerobic efficiency (distance per heartbeat of the easy runs, last 4 weeks against the first 4) and the race predictions, as the dashboard computes them. The assistant gives the days to the race and these numbers, and tells whether your load drops in the last 2 weeks (the taper). The race prediction uses your best efforts of 5 km or more (Riegel, an estimate: the fastest prediction counts).`,
+    );
+    expect(readme).toContain(
+      `${preview12} It gives the days to the event, the swims and km of each week, the longest swim against the event distance, and your recent pace, with pool and open water in separate tables.`,
+    );
+    expect(readme).not.toContain("which writes nothing");
+  });
+
   it("lists every widget", () => {
     check("guide/widgets.md", widgetsDoc());
   });

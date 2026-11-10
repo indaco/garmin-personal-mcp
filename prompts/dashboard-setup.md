@@ -26,10 +26,10 @@ such a tool, ask the questions in chat as numbered lists, with the default first
      type another choice, for example "English and Italian, opens in Italian".
    - **Themes**: options "All 13 themes, opens in midnight" (default), "Midnight only" and "Paper
      only". Say that I can type other themes and the one it opens in: {{themes}}.
-3. Call `writeDashboard` with `preview` = true, `weeks` = {{weeks}} and the `path`. It writes nothing.
-   Ask which sports to keep (multiple choice) from the boards of `boards`, with their number of
-   activities. With more than 4 boards, show the 3 largest and say that I can type the others.
-   Default: all.
+3. Call `writeDashboard` with `preview` = true, `weeks` = {{weeks}} and the `path`. It writes no
+   page file. Ask which sports to keep (multiple choice) from the boards of `boards`, with their
+   number of activities. With more than 4 boards, show the 3 largest and say that I can type the
+   others. Default: all.
    In the same call, ask about the **Workout comparison**, only when `repeatedRuns` of the `digest`
    is not empty and I kept the activity names. Name the workouts of `repeatedRuns` with their number
    of runs. Options "No" (default) and "Yes, compare them across weeks". Say that a yes adds the

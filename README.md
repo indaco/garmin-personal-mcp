@@ -341,7 +341,7 @@ do not open a file or a browser. There is no prompt to run: ask in your own word
 - "Show garmin-dashboard-coach.html in the chat."
 
 The assistant calls `showDashboard`. The tool reads new data from Garmin and shows your saved page,
-with its layout, custom widgets, languages and settings. It writes no file, and the page has no
+with its layout, custom widgets, languages and settings. It writes no page file, and the page has no
 coach notes.
 
 | Client                                                | What you get                                                             |
@@ -387,12 +387,12 @@ coach note.
 
 ### race-readiness
 
-The assistant reads the server's summary of 12 weeks (a `writeDashboard` preview, which writes
-nothing). It has the weekly run distance and load, the long runs with their pace split and HR drift,
-the aerobic efficiency (distance per heartbeat of the easy runs, last 4 weeks against the first 4)
-and the race predictions, as the dashboard computes them. The assistant gives the days to the race
-and these numbers, and tells whether your load drops in the last 2 weeks (the taper). The race
-prediction uses your best efforts of 5 km or more (Riegel, an estimate: the fastest prediction
+The assistant reads the server's summary of 12 weeks (a `writeDashboard` preview, which writes no
+page file). It has the weekly run distance and load, the long runs with their pace split and HR
+drift, the aerobic efficiency (distance per heartbeat of the easy runs, last 4 weeks against the
+first 4) and the race predictions, as the dashboard computes them. The assistant gives the days to
+the race and these numbers, and tells whether your load drops in the last 2 weeks (the taper). The
+race prediction uses your best efforts of 5 km or more (Riegel, an estimate: the fastest prediction
 counts). The assistant compares it with your goal and checks the HRV and sleep of the last 7
 nights. It ends with a target pace for each quarter of the race.
 
@@ -437,8 +437,8 @@ sets of the same distance, stroke and intensity read as one.
 
 ### swim-readiness
 
-The assistant reads the server's summary of 12 weeks (a `writeDashboard` preview, which writes
-nothing). It gives the days to the event, the swims and km of each week, the longest swim against
+The assistant reads the server's summary of 12 weeks (a `writeDashboard` preview, which writes no
+page file). It gives the days to the event, the swims and km of each week, the longest swim against
 the event distance, and your recent pace, with pool and open water in separate tables. For the pool
 it compares your last swims with as many before them, in one pool length. It ends with your load,
 HRV and sleep, and a short verdict. It gives no predicted time.
@@ -476,11 +476,11 @@ same name, and the laps of a mountain-bike or indoor ride.
 ### train-today
 
 The assistant reads the server's summary of the dashboard data (a `writeDashboard` preview, which
-writes nothing). It uses the weeks of your dashboard page, so the numbers are the same as on the
-page. It gives the verdict of the dashboard's Readiness widget: go easy, normal or ready to push.
-This verdict is the dashboard's own rule, not Garmin's Training Readiness. A table shows each input
-and the rule it meets: the HRV status, the sleep score, the resting HR against the average of the
-7 days before, and the load ratio of 7 to 28 days. When a value is from an older night, the
+writes no page file). It uses the weeks of your dashboard page, so the numbers are the same as on
+the page. It gives the verdict of the dashboard's Readiness widget: go easy, normal or ready to
+push. This verdict is the dashboard's own rule, not Garmin's Training Readiness. A table shows each
+input and the rule it meets: the HRV status, the sleep score, the resting HR against the average of
+the 7 days before, and the load ratio of 7 to 28 days. When a value is from an older night, the
 assistant gives its date. Then it gives your fitness, fatigue and form, and a short coach note.
 
 Without HRV and sleep data, for example when the page leaves out the recovery data, the summary has
@@ -489,11 +489,11 @@ no readiness: the verdict and its inputs show as "n/a". The prompt has no argume
 ### week-review
 
 The assistant reads the server's summary of the dashboard data (a `writeDashboard` preview, which
-writes nothing). It uses the weeks of your dashboard page, so the numbers are the same as on the
-page. It compares your last whole week, Monday to Sunday, with up to 4 weeks before it: sessions,
-hours, km, run km and load, and the load ramp against the week before (above 10% is the page's
-warning level). Then it gives the load ratio, the monotony and strain of the last 7 days and the
-form of today, and the new run bests of the week with the time each one beat. These are bests since the
+writes no page file). It uses the weeks of your dashboard page, so the numbers are the same as on
+the page. It compares your last whole week, Monday to Sunday, with up to 4 weeks before it:
+sessions, hours, km, run km and load, and the load ramp against the week before (above 10% is the
+page's warning level). Then it gives the load ratio, the monotony and strain of the last 7 days and
+the form of today, and the new run bests of the week with the time each one beat. These are bests since the
 page's first week, not all-time records: a faster run before that week is not counted. It gives the planned strength exercises hit and missed in the week, and the exercises that miss most. These count only the sessions you did: a skipped planned session leaves no file and is not seen. It gives the laps of the week's runs on the planned target and off it, the drills that miss most, and how many runs it could not read (the page setting `workouts` reads more of them). It ends with a short coach note. The summary has no split by sport for each week, so the review has none. The prompt has no
 arguments.
 

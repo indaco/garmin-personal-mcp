@@ -7,11 +7,11 @@ recovery (HRV, sleep, resting heart rate, body battery) move together. Answer in
 
 ## Workout comparison
 
-First call `writeDashboard` with `preview` = true and `weeks` = {{weeks}}. It writes nothing. If
-`repeatedRuns` of its `digest` is not empty, ask me one question before you design the page: whether
-to compare those workouts across weeks. Name them with their number of runs. If your client has a
-tool for questions with choices, use it: "No" (default) and "Yes, compare them across weeks". Say
-that a yes adds a Workout trend section, and that the page then downloads the laps of the last 8
+First call `writeDashboard` with `preview` = true and `weeks` = {{weeks}}. It writes no page file.
+If `repeatedRuns` of its `digest` is not empty, ask me one question before you design the page:
+whether to compare those workouts across weeks. Name them with their number of runs. If your client
+has a tool for questions with choices, use it: "No" (default) and "Yes, compare them across weeks".
+Say that a yes adds a Workout trend section, and that the page then downloads the laps of the last 8
 runs of each workout, once: this build takes longer. On a yes:
 
 - Put this line first in the first inline script of the page:

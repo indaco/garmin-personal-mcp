@@ -3,9 +3,9 @@ server. Today is {{today}}.
 
 Event: {{event}}.
 {{missing}}
-1. Call `writeDashboard` with `preview` = true and `weeks` = 12. It writes nothing and returns the
-   `digest`: the swims (`swims`), the load of the last 7 and 28 days (`load`), HRV (`hrvLast14`) and
-   sleep (`recovery`). Quote the digest numbers instead of your own sums. Do not call
+1. Call `writeDashboard` with `preview` = true and `weeks` = 12. It writes no page file and returns
+   the `digest`: the swims (`swims`), the load of the last 7 and 28 days (`load`), HRV (`hrvLast14`)
+   and sleep (`recovery`). Quote the digest numbers instead of your own sums. Do not call
    `getDashboardData`: its whole result is too large for this check. When the digest has no `swims`,
    say that the 12 weeks and this week have no swim, and show each swim value below as "n/a".
 

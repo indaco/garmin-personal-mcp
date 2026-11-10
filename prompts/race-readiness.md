@@ -3,8 +3,8 @@ server. Today is {{today}}.
 
 Race: {{race}}.
 {{missing}}
-1. Call `writeDashboard` with `preview` = true and `weeks` = 12. It writes nothing and returns the
-   `digest`: the weekly km and load, the load of the last 7 and 28 days, best efforts, races, the long
+1. Call `writeDashboard` with `preview` = true and `weeks` = 12. It writes no page file and returns
+   the `digest`: the weekly km and load, the load of the last 7 and 28 days, best efforts, races, the long
    runs and races with their split and HR drift (`longRuns`), the longest run (`longestRun`), the race
    predictions (`racePredictions`), HRV (`hrvLast14`) and sleep (`recovery`). Quote the digest numbers
    instead of your own sums. Do not call `getDashboardData`: its whole result is too large for this

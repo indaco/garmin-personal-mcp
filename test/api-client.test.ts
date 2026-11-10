@@ -1,4 +1,5 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,6 +7,11 @@ import { GarminApiClient, GarminApiError } from "../src/api-client";
 import { log } from "../src/log";
 
 vi.mock("../src/log", () => ({ log: vi.fn() }));
+// the real readFile by default: one test gives it an error without a code
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const fs = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...fs, readFile: vi.fn(fs.readFile) };
+});
 
 const BASE = "https://api.test";
 const TOKEN_URL = `${BASE}/personalapitoken-service/personal-api/personal-api-key/token`;
@@ -38,6 +44,12 @@ function mockFetch(...queue: Reply[]) {
     }),
   );
 }
+
+/** A fetch error as undici throws it: the reason is only in the cause. */
+const notFound = () =>
+  Object.assign(new TypeError("fetch failed"), {
+    cause: Object.assign(new Error("getaddrinfo ENOTFOUND example.invalid"), { code: "ENOTFOUND" }),
+  });
 
 const tokenJson = (fields: Record<string, unknown>): Reply => ({ body: JSON.stringify(fields) });
 const ok = (body: unknown): Reply => ({ body: JSON.stringify(body) });
@@ -290,6 +302,39 @@ describe("API key", () => {
     mockFetch();
     await expect(client(file).getJson("/x")).rejects.toThrow(`API key file is empty: ${file}`);
   });
+
+  it("says that a key file which is a folder cannot be read, not that it is missing", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    const dir = mkdtempSync(join(tmpdir(), "garmin-"));
+    mockFetch();
+    const read = client(dir).getJson("/x");
+    await expect(read).rejects.toThrow(
+      /^API key file cannot be read \(EISDIR\): .*Check its permissions, or set GARMIN_PERSONAL_API_KEY\.$/,
+    );
+    await expect(read).rejects.not.toThrow(/No API key/);
+  });
+
+  it("gives only the error code for a key file path that cannot be opened", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    const file = join(mkdtempSync(join(tmpdir(), "garmin-")), "a\0b");
+    mockFetch();
+    const read = client(file).getJson("/x");
+    await expect(read).rejects.toThrow("API key file cannot be read (ERR_INVALID_ARG_VALUE)");
+    await expect(read).rejects.not.toThrow(/null bytes/);
+  });
+
+  it("says 'unknown error' for a key file read error without a code", async () => {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    vi.mocked(readFile).mockRejectedValueOnce(new Error("no code"));
+    mockFetch();
+    const read = client("/some/api-key").getJson("/x");
+    await expect(read).rejects.toThrow(
+      new GarminApiError(
+        "API key file cannot be read (unknown error): /some/api-key. Check its permissions, or set GARMIN_PERSONAL_API_KEY.",
+      ),
+    );
+    await expect(read).rejects.not.toThrow(/no code/);
+  });
 });
 
 describe("retries", () => {
@@ -520,6 +565,83 @@ describe("requests", () => {
       "Network error reading the exercise catalogue: terminated",
     );
   });
+
+  it.each([
+    ["a cause with a message", notFound(), "fetch failed (getaddrinfo ENOTFOUND example.invalid)"],
+    [
+      "a cause with a code only",
+      Object.assign(new TypeError("fetch failed"), {
+        cause: Object.assign(new AggregateError([], ""), { code: "ETIMEDOUT" }),
+      }),
+      "fetch failed (ETIMEDOUT)",
+    ],
+    [
+      "a cause equal to the message",
+      Object.assign(new TypeError("fetch failed"), { cause: new Error("fetch failed") }),
+      "fetch failed",
+    ],
+    ["a thrown value that is not an Error", "down", "down"],
+    [
+      "a string cause",
+      Object.assign(new TypeError("fetch failed"), { cause: "socket hang up" }),
+      "fetch failed",
+    ],
+    ["a null cause", Object.assign(new TypeError("fetch failed"), { cause: null }), "fetch failed"],
+    [
+      "a cause whose message and code are not strings",
+      Object.assign(new TypeError("fetch failed"), { cause: { message: 42, code: 23 } }),
+      "fetch failed",
+    ],
+  ])("names the cause of a network error: %s", async (_, thrown, text) => {
+    mockFetch(tokenJson({ access_token: "tok" }));
+    const api = client();
+    await api.getJson("/warm").catch(() => {});
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(thrown));
+    await expect(api.getJson("/x")).rejects.toThrow(
+      new GarminApiError(`Network error calling /x: ${text}`),
+    );
+    await expect(api.getJson("/x")).rejects.toBeInstanceOf(GarminApiError);
+  });
+
+  it("names the cause of a network error while reading the body", async () => {
+    mockFetch(tokenJson({ access_token: "tok" }));
+    const api = client();
+    await api.getJson("/warm").catch(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        arrayBuffer: () => Promise.reject(notFound()),
+      }),
+    );
+    await expect(api.getJson("/x")).rejects.toThrow(
+      new GarminApiError(
+        "Network error reading /x: fetch failed (getaddrinfo ENOTFOUND example.invalid)",
+      ),
+    );
+  });
+
+  it("names the cause of a network error while fetching the exercise catalogue", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(notFound()));
+    await expect(client().getExerciseCatalogue()).rejects.toThrow(
+      new GarminApiError(
+        "Network error reading the exercise catalogue: fetch failed (getaddrinfo ENOTFOUND example.invalid)",
+      ),
+    );
+  });
+
+  it("names the cause of a network error while reading the exercise catalogue body", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, arrayBuffer: () => Promise.reject(notFound()) }),
+    );
+    await expect(client().getExerciseCatalogue()).rejects.toThrow(
+      new GarminApiError(
+        "Network error reading the exercise catalogue: fetch failed (getaddrinfo ENOTFOUND example.invalid)",
+      ),
+    );
+  });
 });
 
 describe("secrets", () => {
@@ -595,5 +717,31 @@ describe("secrets", () => {
     await expect(api.getJson("/x")).rejects.toThrow(
       new GarminApiError("Network error calling /x: bad ***"),
     );
+  });
+
+  it("removes the key from the cause of a network error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new TypeError("fetch failed"), { cause: new Error(`bad header ${KEY}`) }),
+        ),
+    );
+    const error = await client()
+      .getJson("/x")
+      .catch((e: Error) => e);
+    expect(error).toEqual(
+      new GarminApiError("Network error obtaining token: fetch failed (bad header ***)"),
+    );
+    expect(String(error)).not.toContain(KEY);
+  });
+
+  it("wraps a token request rejection that is not an Error", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue("down"));
+    const error = await client()
+      .getJson("/x")
+      .catch((e: Error) => e);
+    expect(error).toEqual(new GarminApiError("Network error obtaining token: down"));
   });
 });

@@ -28,7 +28,7 @@ import { WIDGET_API } from "./page/widget-api";
 import { version } from "../package.json";
 import { log } from "./log";
 import { DASHBOARD_VERSION } from "./prompts";
-import { MODEL_ONLY, READ_ONLY, writeAtomically } from "./tools";
+import { MODEL_ONLY, writeAtomically } from "./tools";
 
 /**
  * The dashboard page file: the server writes it from the built-in template (or from a page that Claude
@@ -610,7 +610,10 @@ export class DashboardWriter {
     return run.catch(this.#unwritable(options.path));
   }
 
-  /** What a write would show, and the activities of each board, so the user can choose the sports; writes nothing. */
+  /**
+   * What a write would show, and the activities of each board, so the user can choose the sports;
+   * writes no page file, but updates the data cache.
+   */
   preview(options: Pick<WriteOptions, "weeks" | "path" | "settings">): Promise<PreviewResult> {
     const run = this.#queue.then(async () => {
       const target = this.#target(options.path);
@@ -649,7 +652,10 @@ export class DashboardWriter {
     return html;
   }
 
-  /** The blocks of the page with new data, for the dashboard in the chat (an MCP App); writes nothing. */
+  /**
+   * The blocks of the page with new data, for the dashboard in the chat (an MCP App); writes no
+   * page file, but updates the data cache.
+   */
   view(options: Pick<WriteOptions, "weeks" | "path">): Promise<ViewResult> {
     const run = this.#queue.then(async () => {
       const target = this.#target(options.path);
@@ -1374,8 +1380,8 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         "profile when the page has no texts in it (it shows English); editDashboard `languages` adds it.",
         "`missingWidgetTexts` lists the custom widgets that miss texts in a language of the page, with",
         "those languages; editDashboard `widgetTexts` adds them.",
-        "`preview: true` writes nothing: it returns the digest, the activities of each board and the",
-        "`settings` of the page.",
+        "`preview: true` writes no page file (it updates the data cache, as getDashboardData does): it",
+        "returns the digest, the activities of each board and the `settings` of the page.",
       ].join("\n"),
       inputSchema: z.object({
         weeks: z.number().int().describe("Weeks to cover, default 12, max 52").optional(),
@@ -1545,13 +1551,13 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
   server.registerTool(
     "showDashboard",
     {
-      annotations: READ_ONLY,
       description: [
         "Shows the training dashboard in the chat, in assistants that show MCP Apps: the page of `path`",
         "(default <data-dir>/garmin-dashboard.html) with its layout, custom widgets, languages and settings,",
-        "or the preset page when there is none, with new data of the last `weeks` weeks. Writes nothing and",
-        "has no coach notes. Returns the page path, the digest of the data and the page settings. Other",
-        "assistants show only this reply: there, writeDashboard writes the page as a file.",
+        "or the preset page when there is none, with new data of the last `weeks` weeks. Writes no page file,",
+        "but updates the data cache and the saved .FIT files as getDashboardData does, and has no coach",
+        "notes. Returns the page path, the digest of the data and the page settings. Other assistants show",
+        "only this reply: there, writeDashboard writes the page as a file.",
       ].join("\n"),
       inputSchema: z.object({
         weeks: z

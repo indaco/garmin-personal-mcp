@@ -315,6 +315,56 @@ describe("prompts", () => {
     expect(await render("dashboard-setup")).toContain("last **12 weeks**");
   });
 
+  it("says that the dashboard preview writes no page file", async () => {
+    const today =
+      "Call `writeDashboard` with `preview` = true. Do not give `weeks`: the server then uses the weeks of the dashboard page, so the numbers match the page. It writes no page file and returns the `digest`. Do not call `getDashboardData`: its whole result is too large for this check.";
+    const cases: [string, Record<string, string>, string[]][] = [
+      [
+        "dashboard-setup",
+        {},
+        [
+          "3. Call `writeDashboard` with `preview` = true, `weeks` = 12 and the `path`. It writes no page file. Ask which sports to keep (multiple choice) from the boards of `boards`, with their number of activities. With more than 4 boards, show the 3 largest and say that I can type the others. Default: all.",
+        ],
+      ],
+      [
+        "race-readiness",
+        { date: "2026-11-15", distance: "half", goal: "1:45:00" },
+        [
+          "Call `writeDashboard` with `preview` = true and `weeks` = 12. It writes no page file and returns the `digest`: the weekly km and load, the load of the last 7 and 28 days, best efforts, races, the long runs and races with their split and HR drift (`longRuns`), the longest run (`longestRun`), the race predictions (`racePredictions`), HRV (`hrvLast14`) and sleep (`recovery`).",
+        ],
+      ],
+      [
+        "swim-readiness",
+        { date: "2026-08-01", distance: "1.9 km", tests: "" },
+        [
+          "Call `writeDashboard` with `preview` = true and `weeks` = 12. It writes no page file and returns the `digest`: the swims (`swims`), the load of the last 7 and 28 days (`load`), HRV (`hrvLast14`) and sleep (`recovery`). Quote the digest numbers instead of your own sums. Do not call `getDashboardData`: its whole result is too large for this check.",
+        ],
+      ],
+      ["train-today", {}, [today]],
+      ["week-review", {}, [today]],
+      [
+        "training-dashboard",
+        { weeks: "12", layout: "freeform" },
+        [
+          'First call `writeDashboard` with `preview` = true and `weeks` = 12. It writes no page file. If `repeatedRuns` of its `digest` is not empty, ask me one question before you design the page: whether to compare those workouts across weeks. Name them with their number of runs. If your client has a tool for questions with choices, use it: "No" (default) and "Yes, compare them across weeks". Say that a yes adds a Workout trend section, and that the page then downloads the laps of the last 8 runs of each workout, once: this build takes longer.',
+        ],
+      ],
+      [
+        "training-dashboard",
+        { weeks: "12" },
+        [
+          "1. Call `writeDashboard` with `preview` = true and `weeks` = 12. It writes no page file.",
+          'Its `settings` are the settings of the page, or none when there is no page, and its `digest` has `repeatedRuns`: the workouts with more than one run (a run name without the place that Garmin puts before " - ").',
+        ],
+      ],
+    ];
+    for (const [name, args, sentences] of cases) {
+      const text = (await render(name, args)).replace(/\s+/g, " ");
+      for (const sentence of sentences) expect(text, name).toContain(sentence);
+      expect(text, name).not.toContain("writes nothing");
+    }
+  });
+
   it("has the names, descriptions and arguments of the reference prompt list", async () => {
     const { prompts } = await client.listPrompts();
     const sorted = prompts.toSorted((a, b) => a.name.localeCompare(b.name));
@@ -506,7 +556,7 @@ describe("workout comparison", () => {
       expect(text).toContain("give `settings` with `workouts` = true");
     }
     const freeform = await render("training-dashboard", { layout: "freeform" });
-    expect(freeform).toContain("If\n`repeatedRuns` of its `digest` is not empty");
+    expect(freeform).toContain("If `repeatedRuns` of its `digest` is not empty");
     expect(freeform).toContain(
       "`window.GARMIN_SETTINGS = /* garmin-settings:start */null/* garmin-settings:end */;`",
     );
