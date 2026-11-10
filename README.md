@@ -462,9 +462,9 @@ The assistant gives the summary of one ride: distance, moving time, speed, ascen
 hour, heart rate, training effect and load, and the time in the easy and hard HR zones. It shows the
 power only when the ride has power data, and the grit and flow of a mountain-bike ride. It shows the
 planned workout beside the laps, without hit or miss, and a table of the laps. It compares the ride
-with your earlier rides of the same name and a similar distance, because a hillier route changes
-speed and climbing at the same fitness. It ends with the sleep and HRV of the night after the ride,
-and a short coach note.
+with your earlier rides of the same name and a similar distance, among the 200 activities before it,
+because a hillier route changes speed and climbing at the same fitness. It ends with the sleep and
+HRV of the night after the ride, and a short coach note.
 
 | Argument   | Values                                                       | Default       |
 | ---------- | ------------------------------------------------------------ | ------------- |
