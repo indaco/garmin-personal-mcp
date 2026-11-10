@@ -78,6 +78,12 @@ function check(file: string, text: string): void {
 }
 
 describe("guide", () => {
+  it("says in the tool guide that a ride or a swim has no plan", () => {
+    expect(readFileSync("guide/tools.md", "utf8")).toContain(
+      "For plan against done, read `plan` of `getActivitySets` (strength) or `getActivityLaps` (runs); a ride or a swim has no `plan`",
+    );
+  });
+
   it("lists every widget", () => {
     check("guide/widgets.md", widgetsDoc());
   });

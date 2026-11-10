@@ -979,18 +979,20 @@ describe("coach prompts", () => {
         "summary. The earlier rides are the rows before this one with the same `type` and the same name,",
         "ignoring case. Same name does not prove the same route: leave out a ride whose `km` differs from",
         "this ride's by more than 10%, and say how many you left out.",
+        "When the summary row has no `sport`, or its `sport` is not `cycling`, say that the activity is not a",
+        "ride, and stop.",
         "4. Call `getSleep` with `date` = the day after the ride (the night after it), and `getHrvRange` with",
         "`fromDate` and `toDate` = that day. When that night has not come yet, skip both calls and show the",
         'recovery as "n/a".',
         "The ride is a mountain-bike ride when its type is `mountain_biking`. Else it is a road ride. An",
-        "indoor ride (type `indoor_cycling` or `virtual_ride`) has no real ascent: show its ascent per hour as",
-        '"n/a".',
+        "indoor ride (type `indoor_cycling` or `virtual_ride`) has no real ascent: show its `ascentM`, also",
+        'in the laps, and its ascent per hour as "n/a".',
         "Then answer in chat, in this order, short:",
         "- **Summary**, from the `listActivities` row: date, name, road or mountain bike, distance, the",
         "moving time `duration` (and `elapsed` when the row has it), the speed in km/h (`km` / `duration`:",
         "your own division, say so; the row's `pace` is for foot sports, do not quote it), ascent `ascentM`,",
         "the ascent per hour (`ascentM` / `duration`: your own division), average and max HR, and the",
-        "training effect with its label and the `trainingLoad`.",
+        "training effect (`aerobicTE`, `anaerobicTE` and its label `teLabel`) and the `trainingLoad`.",
         '- **Power**: `avgPowerW` and `normPowerW` of the row. When the row has neither, write "n/a: the ride',
         'has no power data" in one line, and give no power, IF or TSS from heart rate or speed.',
         "- **Trail**: for a mountain-bike ride, `grit` (how hard the trail was) and `flow` (how smoothly you",
@@ -1044,6 +1046,19 @@ describe("coach prompts", () => {
     expect(latest).not.toContain('`names` = [""]');
     // digits inside a name are a name, not an id
     expect(await render("ride-review", { activity: "Loop 2" })).toContain('`names` = ["Loop 2"]');
+  });
+
+  it("ride-review shows no indoor ascent and stops on an activity that is not a ride", async () => {
+    const text = (await render("ride-review")).replace(/\s+/g, " ");
+    expect(text).toContain(
+      'An indoor ride (type `indoor_cycling` or `virtual_ride`) has no real ascent: show its `ascentM`, also in the laps, and its ascent per hour as "n/a".',
+    );
+    expect(text).toContain(
+      "the training effect (`aerobicTE`, `anaerobicTE` and its label `teLabel`) and the `trainingLoad`.",
+    );
+    expect(text).toContain(
+      "When the summary row has no `sport`, or its `sport` is not `cycling`, say that the activity is not a ride, and stop.",
+    );
   });
 
   describe("swim-readiness", () => {
