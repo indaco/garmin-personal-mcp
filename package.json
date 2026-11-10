@@ -42,7 +42,7 @@
     "axe-core": "^4.14.0",
     "chart.js": "^4.6.1",
     "fflate": "^0.8.3",
-    "oxfmt": "0.75.0",
+    "oxfmt": "0.76.0",
     "oxlint": "^1.91.0",
     "playwright-core": "^1.64.1",
     "tsdown": "^0.23.5",
