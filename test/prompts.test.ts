@@ -592,7 +592,7 @@ const check = (tests: string) =>
   render("swim-readiness", { date: "2026-08-01", distance: "1.9 km", tests });
 
 describe("coach prompts", () => {
-  it.each(["run-review", "strength-review", "swim-review"])(
+  it.each(["run-review", "strength-review", "swim-review", "ride-review"])(
     "%s shows a night without sleep data as n/a",
     async (name) => {
       const text = (await render(name)).replace(/\s+/g, " ");
@@ -960,6 +960,46 @@ describe("coach prompts", () => {
     );
     expect(await render("swim-review")).toContain(
       "at most 5 calls in all. When none of them has one, say that none of my last 100 activities is a swim, and stop.",
+    );
+  });
+
+  it("ride-review keeps power, trail and the same route honest", async () => {
+    const text = (await render("ride-review")).replace(/\s+/g, " ");
+    expect(text).toContain(
+      "The ride is a mountain-bike ride when its type is `mountain_biking`. Else it is a road ride.",
+    );
+    expect(text).toContain(
+      'An indoor ride (type `indoor_cycling` or `virtual_ride`) has no real ascent: show its ascent per hour as "n/a".',
+    );
+    expect(text).toContain(
+      'When the row has neither, write "n/a: the ride has no power data" in one line, and give no power, IF or TSS from heart rate or speed.',
+    );
+    expect(text).toContain("the row's `pace` is for foot sports, do not quote it");
+    expect(text).toContain(
+      "leave out a ride whose `km` differs from this ride's by more than 10%, and say how many you left out.",
+    );
+    expect(text).toContain(
+      "A lap's speed follows its climb: do not read a slower lap with more `ascentM` as a fade.",
+    );
+    expect(text).toContain(
+      "Give no hit or miss: the server judges no ride plan, so say in one line that the table shows the plan beside the laps.",
+    );
+    expect(text).toContain(
+      "Compare speed, HR and ascent per hour only with the rides of **Same route**",
+    );
+    expect(text).toContain("**Never invent or estimate a missing value**");
+    expect(text).toContain("the most recent ride (`sport` = `cycling`)");
+    expect(text.includes("{{")).toBe(false);
+  });
+
+  it("ride-review finds a ride by id or by words of its name", async () => {
+    expect(await render("ride-review", { activity: "21000000790" })).toContain(
+      "The ride is the activity with `activityId` = 21000000790.",
+    );
+    const byName = await render("ride-review", { activity: "Trail" });
+    expect(byName).toContain('`names` = ["Trail"]');
+    expect(byName).toContain(
+      "When no row is a ride, say that none of my last 200 activities is a ride with that name, and stop.",
     );
   });
 

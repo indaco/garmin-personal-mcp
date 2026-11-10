@@ -64,6 +64,17 @@
     ]
   },
   {
+    "name": "ride-review",
+    "description": "Review a ride as a coach: speed, climbing, power, grit and flow, the same route before, recovery",
+    "arguments": [
+      {
+        "name": "activity",
+        "description": "An activity id, or words of its name; empty = the latest ride",
+        "required": false
+      }
+    ]
+  },
+  {
     "name": "run-review",
     "description": "Review a run as a coach: planned workout against the laps, rep fade, HR drift, recovery",
     "arguments": [

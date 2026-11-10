@@ -85,8 +85,9 @@ assistant chooses the tools and can combine their data. Some examples:
   coach, with your own widgets and languages. See [Dashboard](#dashboard).
 - **The dashboard in the chat**: in Claude Desktop, ask "show my training dashboard" and the page
   opens in the reply, with new data. See [Dashboard in the chat](#dashboard-in-the-chat).
-- **Coach prompts**: a review of one run or one strength session against its planned workout, a
-  review of the week, a readiness check before a race, and a check of today. See [Coach prompts](#coach-prompts).
+- **Coach prompts**: a review of one run, strength session, swim or ride against its planned
+  workout, a review of the week, a readiness check before a race or a swim event, and a check of
+  today. See [Coach prompts](#coach-prompts).
 
 ## Quick start
 
@@ -365,6 +366,7 @@ These prompts answer in the chat. They do not change a dashboard.
 | [strength-review](#strength-review) | reviews one strength session as a coach                     | `/mcp__garmin-personal__strength-review`                        |
 | [swim-review](#swim-review)         | reviews one swim as a coach                                 | `/mcp__garmin-personal__swim-review`                            |
 | [swim-readiness](#swim-readiness)   | tells if you are ready for a swim event                     | `/mcp__garmin-personal__swim-readiness 2026-08-01 1.9 km`       |
+| [ride-review](#ride-review)         | reviews one ride as a coach                                 | `/mcp__garmin-personal__ride-review`                            |
 | [train-today](#train-today)         | tells if you should train hard today, with fitness and form | `/mcp__garmin-personal__train-today`                            |
 | [week-review](#week-review)         | reviews your last whole week against the weeks before       | `/mcp__garmin-personal__week-review`                            |
 
@@ -453,6 +455,23 @@ server computes it: (400 m time - 200 m time) / 2. It is never estimated from yo
 In Claude Code, give the values in any order: a value in the form `yyyy-MM-dd` is the date, values in
 the form `3:10` are the test times (the larger one is the 400 m), and the other words are the
 distance. For example `/mcp__garmin-personal__swim-readiness 1.9 km 2026-08-01 3:10 6:40`.
+
+### ride-review
+
+The assistant gives the summary of one ride: distance, moving time, speed, ascent and ascent per
+hour, heart rate, training effect and load, and the time in the easy and hard HR zones. It shows the
+power only when the ride has power data, and the grit and flow of a mountain-bike ride. It shows the
+planned workout beside the laps, without hit or miss, and a table of the laps. It compares the ride
+with your earlier rides of the same name and a similar distance, because a hillier route changes
+speed and climbing at the same fitness. It ends with the sleep and HRV of the night after the ride,
+and a short coach note.
+
+| Argument   | Values                                                       | Default       |
+| ---------- | ------------------------------------------------------------ | ------------- |
+| `activity` | an activity id, or words of the activity name (`Trail Loop`) | the last ride |
+
+The laps need one .FIT file. Not checked on real data: power, a planned ride, an earlier ride of the
+same name, and the laps of a mountain-bike or indoor ride.
 
 ### train-today
 

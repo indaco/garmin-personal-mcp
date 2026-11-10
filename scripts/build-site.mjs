@@ -154,6 +154,7 @@ export function facts(root = ".") {
         "strength-review": "strength",
         "swim-review": "swimming",
         "swim-readiness": "swimming",
+        "ride-review": "cycling",
         "train-today": "every",
         "week-review": "every",
       }[p.name] ?? "running",
