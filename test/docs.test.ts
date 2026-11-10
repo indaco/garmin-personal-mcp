@@ -137,3 +137,15 @@ describe("setup steps", () => {
     }
   });
 });
+
+describe("README review texts", () => {
+  it("says in the README that a ride is compared with the last 20 activities of its name", () => {
+    const readme = readFileSync("README.md", "utf8");
+    expect(readme).toContain(
+      "It compares the ride\nwith your earlier rides of the same name and a similar distance, among the last 20 activities of that\nname before it, because a hillier route changes speed and climbing at the same fitness.",
+    );
+    expect(readme).toContain(
+      "It ends with\nthe sleep and HRV of the night after the ride, and a short coach note.",
+    );
+  });
+});
