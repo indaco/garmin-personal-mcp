@@ -3,7 +3,7 @@ import { append, h } from "../dom";
 import type { Key } from "../i18n";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
-import type { WorkoutMetric } from "../../analytics/running";
+import { LONG_RUN_SHARE_WARN, type WorkoutMetric } from "../../analytics/running";
 import { oneSession } from "./types";
 import {
   alpha,
@@ -509,7 +509,7 @@ register({
               label: t("lr.share"),
               data: share,
               backgroundColor: share.map((s) =>
-                ctx.color(s !== null && s > 35 ? "bad" : "running"),
+                ctx.color(s !== null && s > LONG_RUN_SHARE_WARN ? "bad" : "running"),
               ),
               yAxisID: "y",
             },

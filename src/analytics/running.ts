@@ -110,6 +110,9 @@ export function weeklyIntensity(acts: Activity[], weeks: string[], floors: numbe
   return { easy: share(0), hard: share(1), approximate };
 }
 
+/** The long-run share of the week's km above which the page marks the week. */
+export const LONG_RUN_SHARE_WARN = 35;
+
 /** The longest run's km in % of the week's km; null when the week has no km. */
 export function longestShare(week: Activity[]): number | null {
   const km = week.reduce((s, a) => s + (num(a.km) ?? 0), 0);

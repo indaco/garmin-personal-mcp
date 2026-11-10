@@ -3206,6 +3206,16 @@ describe("type boards", () => {
       { ...run, id: 3, name: "C", start: "2026-10-13 08:00:00", km: 8, duration: "40:00" },
     ];
     const gaps = Array.from({ length: 10 }, () => null);
+    /** Runs from day `monday` of October on, one a day, with these km. */
+    const week = (monday: number, kms: number[]) =>
+      kms.map((km, i) => ({
+        ...run,
+        id: monday * 10 + i,
+        name: `R${i}`,
+        start: `2026-10-${String(monday + i).padStart(2, "0")} 08:00:00`,
+        km,
+        duration: "30:00",
+      }));
 
     it("draws the fastest 5 km and 10 km effort of each week in Best efforts", async () => {
       // week of 10-19: A is faster over 5 km, B over 10 km; week of 10-12: C alone
@@ -3242,6 +3252,28 @@ describe("type boards", () => {
       expect(share[10]).toBe(100);
       expect(share[11]).toBeCloseTo((10 / 15) * 100, 6);
       expect(share[12]).toBeNull();
+      expect(errors).toEqual([]);
+    });
+
+    it("marks a Long runs week only above 35%, not at 35%", async () => {
+      const activities = [...week(5, [7, 7, 6]), ...week(12, [8, 6, 6]), ...week(19, [5, 5, 5, 5])];
+      const { page, errors } = await open(browser, onlyActivities(activities), {
+        hash: "#running",
+      });
+      const label = "Longest run share of weekly distance";
+      // the weeks of 10-05, 10-12 and 10-19
+      const share = (await chartDataset(page, "longRuns", label)).data as (number | null)[];
+      expect(share.slice(9, 12)).toEqual([35, 40, 25]);
+      const colors = (await page.evaluate(
+        (l) =>
+          Object.values(window.Chart!.instances)
+            .filter((c) => c.canvas.closest("[data-widget=longRuns]"))
+            .flatMap((c) => c.data.datasets)
+            .find((d) => d.label === l)!.backgroundColor,
+        label,
+      )) as string[];
+      expect(colors[9]).toBe(colors[11]);
+      expect(colors[10]).not.toBe(colors[11]);
       expect(errors).toEqual([]);
     });
 

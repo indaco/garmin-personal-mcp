@@ -4,8 +4,8 @@ import { digest, syncGaps } from "../src/digest";
 import { hms, round } from "../src/fit";
 import { type Activity, sessionSeconds } from "../src/analytics/calc";
 import type { Settings } from "../src/page/settings";
-import { fitnessFatigueFrom, loadRatio, readinessOf } from "../src/analytics/metrics";
-import { predictRaces, splitOf } from "../src/analytics/running";
+import { fitnessFatigueFrom, loadRatio, readinessOf, zonesOf } from "../src/analytics/metrics";
+import { predictRaces, splitOf, weeklyIntensity } from "../src/analytics/running";
 
 const squat = (sets: Record<string, number>[]) => ({ exercise: "Back Squat", sets });
 
@@ -51,6 +51,10 @@ const onBoard = (day: string, name: string, km: number, more: Record<string, unk
   km,
   ...more,
 });
+
+/** A run of the Run board with its km and seconds in zones 1-5. */
+const zoned = (day: string, km: number, hrZonesSec: number[]) =>
+  onBoard(day, "Run", km, { hrZonesSec });
 
 /** 6 km in 30:00 is 200 m a minute: the efficiency is 200 / avgHR. */
 const easyRun = (day: string, avgHR: number) => onBoard(day, "Easy", 6, { avgHR });
@@ -275,6 +279,10 @@ describe("digest", () => {
       load: 190,
       // the week before has no session
       rampPct: null,
+      // runs without zone seconds or zones; 10 km of 15.5
+      runEasyPct: null,
+      runHardPct: null,
+      longRunSharePct: 65,
     });
     expect(d.weekly["2026-10-26"]).toEqual({
       sessions: 1,
@@ -283,6 +291,9 @@ describe("digest", () => {
       hours: 0.6,
       load: null,
       rampPct: null,
+      runEasyPct: null,
+      runHardPct: null,
+      longRunSharePct: null,
     });
   });
 
@@ -809,6 +820,29 @@ describe("digest", () => {
     );
   });
 
+  it("counts a zone 3 run as an easy run of the aerobic efficiency: below zone 4, not below zone 3", () => {
+    const zones = [
+      {
+        sport: "DEFAULT",
+        zone1Floor: 94,
+        zone2Floor: 113,
+        zone3Floor: 132,
+        zone4Floor: 150,
+        zone5Floor: 169,
+      },
+    ];
+    const first = [
+      easyRun("2026-08-04", 125),
+      easyRun("2026-08-11", 125),
+      easyRun("2026-08-18", 125),
+    ];
+    // HR 140 is zone 3: between the zone 3 floor (132) and the zone 4 floor (150)
+    const activities = [...first, easyRun("2026-08-12", 140)];
+    expect(digest({ ...data, zones, activities }).aerobicEfficiency).toMatchObject({
+      firstRuns: 4,
+    });
+  });
+
   it.each([
     ["no HR zones", undefined],
     ["a zones row without floors", [{ sport: "DEFAULT", maxHeartRateUsed: 190 }]],
@@ -1161,6 +1195,186 @@ describe("digest", () => {
     // it grows with weeks, types and exercises, not with the number of sessions
     const many = Array.from({ length: 120 }, (_, i) => ({ ...data.activities[3], id: 100 + i }));
     expect(JSON.stringify(digest({ ...data, activities: many })).length).toBeLessThan(10_000);
+  });
+});
+
+describe("run intensity", () => {
+  const zones = [
+    {
+      sport: "DEFAULT",
+      zone1Floor: 94,
+      zone2Floor: 113,
+      zone3Floor: 132,
+      zone4Floor: 150,
+      zone5Floor: 169,
+    },
+  ];
+  const floors = zonesOf(zones).floors;
+  /** 3 whole weeks to Sunday 25 Oct. */
+  const WEEKS = ["2026-10-05", "2026-10-12", "2026-10-19"];
+  const period = { ...data, zones, start: "2026-10-05", end: "2026-10-25", previousActivities: [] };
+  const RUNS = [
+    zoned("2026-10-06", 8, [1800, 1800, 0, 400, 0]),
+    zoned("2026-10-13", 10, [3000, 0, 0, 0, 0]),
+    zoned("2026-10-15", 25, [3000, 0, 0, 0, 0]),
+  ];
+  const KEYS = ["runEasyPct", "runHardPct", "longRunSharePct"];
+  /** The weeks that have any of the three keys. */
+  const withKeys = (d: ReturnType<typeof digest>) =>
+    Object.entries(d.weekly)
+      .filter(([, w]) => KEYS.some((k) => k in w))
+      .map(([k]) => k);
+
+  it("gives each week's easy and hard zone share and long-run share of the page", () => {
+    const out = digest({ ...period, activities: RUNS });
+    expect(out.weekly["2026-10-05"]).toMatchObject({
+      runEasyPct: 90,
+      runHardPct: 10,
+      longRunSharePct: 100,
+    });
+    // 25 km of 35
+    expect(out.weekly["2026-10-12"]).toMatchObject({
+      runEasyPct: 100,
+      runHardPct: 0,
+      longRunSharePct: 71,
+    });
+    expect(out).not.toHaveProperty("runIntensityApproximate");
+  });
+
+  it("marks the intensity as approximate when a run counts in the zone of its average HR", () => {
+    const hrOnly = onBoard("2026-10-20", "Easy", 6, { avgHR: 120 });
+    const out = digest({ ...period, activities: [...RUNS, hrOnly] });
+    expect(out.runIntensityApproximate).toBe(true);
+    // 30:00 at 120 bpm is zone 2: easy
+    expect(out.weekly["2026-10-19"]).toMatchObject({ runEasyPct: 100, runHardPct: 0 });
+  });
+
+  it("gives null to a week of the period without a run", () => {
+    const out = digest({ ...period, activities: [...RUNS, strength("2026-10-20", [])] });
+    expect(out.weekly["2026-10-19"]).toMatchObject({
+      runEasyPct: null,
+      runHardPct: null,
+      longRunSharePct: null,
+    });
+  });
+
+  it("gives none of the keys to the partial first week, as the page does not show it", () => {
+    const out = digest({
+      ...period,
+      start: "2026-10-07",
+      activities: [zoned("2026-10-06", 8, [3000, 0, 0, 0, 0]), ...RUNS.slice(1)],
+    });
+    expect(out.weekly["2026-10-05"].partial).toBe(true);
+    expect(withKeys(out)).toEqual(["2026-10-12"]);
+  });
+
+  it("gives none of the keys and no approximate mark to a period without runs", () => {
+    const out = digest({
+      ...period,
+      activities: [
+        strength("2026-10-06", []),
+        { ...run("2026-10-13", "cycling"), sport: "cycling", avgHR: 120 },
+      ],
+    });
+    expect(withKeys(out)).toEqual([]);
+    expect(out).not.toHaveProperty("runIntensityApproximate");
+  });
+
+  it("gives a null long-run share to a week whose run has no km", () => {
+    const noKm = { ...zoned("2026-10-06", 8, [3000, 0, 0, 0, 0]), km: undefined };
+    const out = digest({ ...period, activities: [noKm] });
+    expect(out.weekly["2026-10-05"]).toMatchObject({ runEasyPct: 100, longRunSharePct: null });
+  });
+
+  it("gives the values of the page's function, rounded", () => {
+    const out = digest({ ...period, activities: RUNS });
+    const page = weeklyIntensity(RUNS as Activity[], WEEKS, floors);
+    for (const [i, w] of WEEKS.slice(0, 2).entries()) {
+      expect(out.weekly[w].runEasyPct).toBe(Math.round(page.easy[i]!));
+      expect(out.weekly[w].runHardPct).toBe(Math.round(page.hard[i]!));
+    }
+  });
+
+  it("gives a long-run share of 100 to a week of one run", () => {
+    const out = digest({ ...period, activities: [onBoard("2026-10-13", "Long", 12)] });
+    expect(out.weekly["2026-10-12"].longRunSharePct).toBe(100);
+  });
+
+  it("gives the page's value to a week whose only run has neither zone seconds nor HR", () => {
+    const bare = onBoard("2026-10-13", "Bare", 12);
+    const out = digest({ ...period, activities: [bare] });
+    const page = weeklyIntensity([bare] as Activity[], WEEKS, floors);
+    // no zone time: null, as on the page
+    expect(page.easy[1]).toBeNull();
+    expect(out.weekly["2026-10-12"].runEasyPct).toBe(page.easy[1]);
+    expect(out.weekly["2026-10-12"].runHardPct).toBe(page.hard[1]);
+  });
+
+  it("gives the page's value without HR zones in the data, and still no aerobic efficiency", () => {
+    const hrOnly = onBoard("2026-10-13", "Easy", 6, { avgHR: 120 });
+    const out = digest({ ...period, zones: undefined, activities: [hrOnly] });
+    const page = weeklyIntensity([hrOnly] as Activity[], WEEKS, zonesOf(undefined).floors);
+    expect(out.weekly["2026-10-12"]).toMatchObject({
+      runEasyPct: page.easy[1],
+      runHardPct: page.hard[1],
+      longRunSharePct: 100,
+    });
+    expect("runIntensityApproximate" in out).toBe(page.approximate);
+    expect(out).not.toHaveProperty("aerobicEfficiency");
+  });
+
+  it("rounds to whole numbers, not down", () => {
+    const out = digest({
+      ...period,
+      activities: [
+        zoned("2026-10-13", 10, [1000, 1000, 1000, 0, 0]),
+        zoned("2026-10-14", 10.5, [0, 0, 0, 0, 0]),
+      ],
+    });
+    // 2000 s of 3000 is 66.7% easy; 10.5 km of 20.5 is 51.2%
+    expect(out.weekly["2026-10-12"]).toMatchObject({
+      runEasyPct: 67,
+      runHardPct: 0,
+      longRunSharePct: Math.round((10.5 / 20.5) * 100),
+    });
+    expect(out.weekly["2026-10-12"].longRunSharePct).toBe(51);
+  });
+
+  it("counts only the runs: a ride of the week is in neither number", () => {
+    const ride = {
+      ...zoned("2026-10-14", 40, [0, 0, 0, 3000, 0]),
+      type: "cycling",
+      sport: "cycling",
+    };
+    const out = digest({
+      ...period,
+      activities: [zoned("2026-10-13", 10, [3000, 0, 0, 0, 0]), ride],
+    });
+    expect(out.weekly["2026-10-12"]).toMatchObject({
+      longRunSharePct: 100,
+      runEasyPct: 100,
+      runHardPct: 0,
+    });
+  });
+
+  it("takes each week's values by its place in the period, past a week without activity", () => {
+    const out = digest({
+      ...period,
+      activities: [
+        zoned("2026-10-06", 8, [3000, 0, 0, 0, 0]),
+        zoned("2026-10-20", 8, [1000, 0, 0, 1000, 1000]),
+      ],
+    });
+    expect(Object.keys(out.weekly)).toEqual(["2026-10-05", "2026-10-19"]);
+    expect(out.weekly["2026-10-19"]).toMatchObject({ runEasyPct: 33, runHardPct: 67 });
+  });
+
+  it("gives none of the keys without the start of the period", () => {
+    const hrOnly = onBoard("2026-10-20", "Easy", 6, { avgHR: 120 });
+    const out = digest({ ...period, start: undefined, activities: [...RUNS, hrOnly] });
+    expect(Object.keys(out.weekly).length).toBeGreaterThan(0);
+    expect(withKeys(out)).toEqual([]);
+    expect(out).not.toHaveProperty("runIntensityApproximate");
   });
 });
 

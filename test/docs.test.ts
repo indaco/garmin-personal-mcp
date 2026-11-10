@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { GROUPS } from "../src/analytics/calc";
+import { LONG_RUN_SHARE_WARN } from "../src/analytics/running";
 import { CATALOGUE } from "../src/page/catalogue";
 import { ABOUT } from "../src/page/catalogue-about";
 import { en } from "../src/page/i18n/en";
@@ -128,7 +129,7 @@ describe("guide", () => {
     // race-readiness and swim-readiness both say it
     expect(readme.split(preview12).length - 1).toBe(2);
     expect(readme).toContain(
-      `${preview12} It has the weekly run distance and load, the long runs with their pace split and HR drift, the aerobic efficiency (distance per heartbeat of the easy runs, last 4 weeks against the first 4) and the race predictions, as the dashboard computes them. The assistant gives the days to the race and these numbers, and tells whether your load drops in the last 2 weeks (the taper). The race prediction uses your best efforts of 5 km or more (Riegel, an estimate: the fastest prediction counts).`,
+      `${preview12} It has the weekly run distance and load, the weekly share of easy and hard zone time (zones 1-2 and 4-5), the share of the longest run in the weekly run distance (above ${LONG_RUN_SHARE_WARN}% is the page's warning level), the long runs with their pace split and HR drift, the aerobic efficiency (distance per heartbeat of the easy runs, last 4 weeks against the first 4) and the race predictions, as the dashboard computes them. The assistant gives the days to the race and these numbers, and tells whether your load drops in the last 2 weeks (the taper). The race prediction uses your best efforts of 5 km or more (Riegel, an estimate: the fastest prediction counts). The assistant compares it with your goal and checks the HRV and sleep of the last 7 nights. It ends with a target pace for each quarter of the race.`,
     );
     expect(readme).toContain(
       `${preview12} It gives the days to the event, the swims and km of each week, the longest swim against the event distance, and your recent pace, with pool and open water in separate tables.`,
