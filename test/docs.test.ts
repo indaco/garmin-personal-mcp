@@ -90,6 +90,12 @@ describe("guide", () => {
     );
   });
 
+  it("says in the tool guide that a rest-pause group is marked", () => {
+    expect(readFileSync("guide/tools.md", "utf8")).toContain(
+      "strength sets from the .FIT file: exercise, movement category, primary and secondary muscles, reps, weight (kg), set time and the rest after the set; the top set and the e1RM of each exercise; the planned workout that the watch ran, with the planned and done sets and reps and hit or miss of each planned exercise (a rest-pause group is marked, and only the first set of each pass is judged on reps), and the planned rest after each planned exercise. The empty set that the watch adds at the end of a workout is not shown",
+    );
+  });
+
   it("lists every widget", () => {
     check("guide/widgets.md", widgetsDoc());
   });
@@ -135,5 +141,17 @@ describe("setup steps", () => {
       expect(server).toEqual(readme);
       expect(Object.keys(env)).toEqual(["GARMIN_PERSONAL_API_KEY"]);
     }
+  });
+});
+
+describe("README review texts", () => {
+  it("says in the README that a ride is compared with the last 20 activities of its name", () => {
+    const readme = readFileSync("README.md", "utf8");
+    expect(readme).toContain(
+      "It compares the ride\nwith your earlier rides of the same name and a similar distance, among the last 20 activities of that\nname before it, because a hillier route changes speed and climbing at the same fitness.",
+    );
+    expect(readme).toContain(
+      "It ends with\nthe sleep and HRV of the night after the ride, and a short coach note.",
+    );
   });
 });

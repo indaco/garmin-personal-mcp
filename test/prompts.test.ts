@@ -652,8 +652,15 @@ describe("coach prompts", () => {
     expect(byName).toContain('`names` = ["Riverside"], and keep the runs');
     expect(byName).not.toContain("`limit` = 100");
     expect(byName).toContain(
-      "When no row is a run, say that none of my last 200 activities is a run with that name, and stop.",
+      "When no row is a run and the list has 20 rows, call it again with `endDate` = the day of the oldest row, at most 5 calls in all.",
     );
+    expect(byName).toContain(
+      "When no row is a run and the last list has fewer than 20 rows, say that none of my activities with that name is a run, and stop.",
+    );
+    expect(byName).toContain(
+      "After 5 calls without one, say that none of my last 100 activities with that name is a run, and stop.",
+    );
+    expect(byName).not.toContain("none of my last 200 activities");
     // the slash command can pass only the first word of the name
     expect(byName).toContain(
       "when the runs have more than one name, list the 5 most recent with date and name and ask me which one",
@@ -703,8 +710,15 @@ describe("coach prompts", () => {
     );
     expect(byName).not.toContain("`limit` = 100");
     expect(byName).toContain(
-      "When no row is a strength session, say that none of my last 200 activities is a strength session with that name, and stop.",
+      "When no row is a strength session and the list has 20 rows, call it again with `endDate` = the day of the oldest row, at most 5 calls in all.",
     );
+    expect(byName).toContain(
+      "When no row is a strength session and the last list has fewer than 20 rows, say that none of my activities with that name is a strength session, and stop.",
+    );
+    expect(byName).toContain(
+      "After 5 calls without one, say that none of my last 100 activities with that name is a strength session, and stop.",
+    );
+    expect(byName).not.toContain("none of my last 200 activities");
     expect(byName).toContain(
       "when the strength sessions have more than one name, list the 5 most recent",
     );
@@ -719,11 +733,17 @@ describe("coach prompts", () => {
     expect(text).toContain("The plan has no weights: do not show a planned weight.");
     expect(text).toContain("A set with 0 reps was not done");
     expect(text).toContain("the previous session when it has that exercise");
-    // a group starts after a rest over 20 s: the first value of plannedRestSec is the short rest
     expect(text).toContain(
-      "a group starts at the first set and at each set after a `restSec` over 20",
+      "The rep drop: the reps of the last set against the first set at the same weight, when the exercise has 2 or more of them.",
     );
-    expect(text).toContain("compare only the first set of each group");
+    // the tool marks a rest-pause row: the prompt does not compute the group from plannedRestSec
+    expect(text).toContain(
+      "When the exercise's row in `plan.exercises` has `restPause`, the exercise is done in rest-pause groups: a group starts at the first set and at each set after a `restSec` over 20.",
+    );
+    expect(text).toContain(
+      "A drop inside a group is the plan: compare only the first set of each group.",
+    );
+    expect(text).not.toContain("first value of the exercise's `plannedRestSec`");
     expect(text).toContain(
       'When it is empty, the plan has no rest right after the exercise (for example the first exercise of a superset): show "n/a (no planned rest)".',
     );
@@ -956,8 +976,15 @@ describe("coach prompts", () => {
     const byName = await render("swim-review", { activity: "Morning" });
     expect(byName).toContain('`names` = ["Morning"]');
     expect(byName).toContain(
-      "When no row is a swim, say that none of my last 200 activities is a swim with that name, and stop.",
+      "When no row is a swim and the list has 20 rows, call it again with `endDate` = the day of the oldest row, at most 5 calls in all.",
     );
+    expect(byName).toContain(
+      "When no row is a swim and the last list has fewer than 20 rows, say that none of my activities with that name is a swim, and stop.",
+    );
+    expect(byName).toContain(
+      "After 5 calls without one, say that none of my last 100 activities with that name is a swim, and stop.",
+    );
+    expect(byName).not.toContain("none of my last 200 activities");
     expect(await render("swim-review")).toContain(
       "at most 5 calls in all. When none of them has one, say that none of my last 100 activities is a swim, and stop.",
     );
@@ -1011,8 +1038,8 @@ describe("coach prompts", () => {
         "- **Same route**: the earlier rides of step 3, at most the 5 most recent: date, `km`, `kmh`,",
         "`ascentMPerHour`, average HR, and `grit` and `flow` for a mountain-bike ride. Say how many rides you compared",
         "and the date of the oldest. Wind, weather and the trail surface change speed and HR on one route:",
-        "say so in one line. The search reads only the 200 activities before this ride: without an",
-        'earlier ride, write "n/a: no earlier ride of this name in the 200 activities before it".',
+        "say so in one line. The search gives at most 20 rows of this name: without an earlier ride,",
+        'write "n/a: no earlier ride of this name in the search".',
         "- **Recovery**: the sleep score and hours of the night after the ride, and its HRV (`lastNightAvg`)",
         "against Garmin's 7-day average of that night (`weeklyAvg`).",
         'A `getSleep` row with only the `date` means that night has no sleep data: show its sleep as "n/a".',
@@ -1036,8 +1063,15 @@ describe("coach prompts", () => {
       "when the rides have more than one name, list the 5 most recent with date and name and ask me which one",
     );
     expect(byName).toContain(
-      "When no row is a ride, say that none of my last 200 activities is a ride with that name, and stop.",
+      "When no row is a ride and the list has 20 rows, call it again with `endDate` = the day of the oldest row, at most 5 calls in all.",
     );
+    expect(byName).toContain(
+      "When no row is a ride and the last list has fewer than 20 rows, say that none of my activities with that name is a ride, and stop.",
+    );
+    expect(byName).toContain(
+      "After 5 calls without one, say that none of my last 100 activities with that name is a ride, and stop.",
+    );
+    expect(byName).not.toContain("none of my last 200 activities");
     // a blank argument is no name: the latest ride, never a search for ""
     const latest = await render("ride-review", { activity: " \u2003\n" });
     expect(latest).toContain(
@@ -1177,5 +1211,18 @@ describe("coach prompts", () => {
       distance: "$'10k {{today}}",
     });
     expect(text).toContain("Race: $'10k {{today}} on 2026-12-06.");
+  });
+
+  it("the review prompts page past newer activities of another sport only when searching by name", async () => {
+    for (const name of ["run-review", "strength-review", "swim-review", "ride-review"]) {
+      expect(await render(name, { activity: "Morning" }), name).not.toContain(
+        "last 200 activities",
+      );
+      for (const activity of ["123", ""]) {
+        expect(await render(name, { activity }), `${name} ${activity}`).not.toContain(
+          "the list has 20 rows",
+        );
+      }
+    }
   });
 });

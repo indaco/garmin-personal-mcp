@@ -42,8 +42,8 @@ Then answer in chat, in this order, short:
 - **Same route**: the earlier rides of step 3, at most the 5 most recent: date, `km`, `kmh`,
   `ascentMPerHour`, average HR, and `grit` and `flow` for a mountain-bike ride. Say how many rides you compared
   and the date of the oldest. Wind, weather and the trail surface change speed and HR on one route:
-  say so in one line. The search reads only the 200 activities before this ride: without an
-  earlier ride, write "n/a: no earlier ride of this name in the 200 activities before it".
+  say so in one line. The search gives at most 20 rows of this name: without an earlier ride,
+  write "n/a: no earlier ride of this name in the search".
 - **Recovery**: the sleep score and hours of the night after the ride, and its HRV (`lastNightAvg`)
   against Garmin's 7-day average of that night (`weeklyAvg`).
   A `getSleep` row with only the `date` means that night has no sleep data: show its sleep as "n/a".

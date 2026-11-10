@@ -406,8 +406,8 @@ function findActivity(activity: string, one: string, many: string, type: string)
   if (/^\d+$/.test(activity))
     return `The ${one} is the activity with \`activityId\` = ${activity}.`;
   return activity
-    ? // the tool filters names in the newest 200 activities; 20 rows hold this one and the one before
-      `Call \`listActivities\` with \`names\` = ${JSON.stringify([activity])}, and keep the ${many} (${type}). My words can be only the start of the name: when the ${many} have more than one name, list the 5 most recent with date and name and ask me which one. Then take the most recent ${one} of that name. When no row is a ${one}, say that none of my last 200 activities is a ${one} with that name, and stop.`
+    ? // the tool filters names in the newest 200 activities of the window and gives 20 rows: a full list may hide older ones
+      `Call \`listActivities\` with \`names\` = ${JSON.stringify([activity])}, and keep the ${many} (${type}). My words can be only the start of the name: when the ${many} have more than one name, list the 5 most recent with date and name and ask me which one. Then take the most recent ${one} of that name. When no row is a ${one} and the list has 20 rows, call it again with \`endDate\` = the day of the oldest row, at most 5 calls in all. When no row is a ${one} and the last list has fewer than 20 rows, say that none of my activities with that name is a ${one}, and stop. After 5 calls without one, say that none of my last 100 activities with that name is a ${one}, and stop.`
     : // 100 activities answer about 55,000 characters, over a client's tool output limit: page by 20,
       // and stop after 5 pages: a user without such an activity must not page through all history
       `Call \`listActivities\` and take the most recent ${one} (${type}). When none of them is one, call it again with \`endDate\` = the day of the oldest activity in the list, at most 5 calls in all. When none of them has one, say that none of my last 100 activities is a ${one}, and stop.`;
