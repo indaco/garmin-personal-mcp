@@ -813,6 +813,99 @@ describe("activities", () => {
   });
 });
 
+const rideZones = (...z: number[]) =>
+  Object.fromEntries(z.map((v, i) => [`hrTimeInZone_${i + 1}`, v]));
+const rideRow = (extra: Record<string, unknown> = {}) => ({
+  activityId: 7,
+  activityName: "Loop",
+  sportTypeId: 2,
+  activityType: { typeKey: "cycling" },
+  distance: 40000,
+  movingDuration: 5400,
+  elevationGain: 455,
+  ...rideZones(600, 1500, 1800, 1200, 300),
+  ...extra,
+});
+const rideNumbers = async (a: Record<string, unknown>, raw?: boolean) => {
+  api.getJson.mockResolvedValue([a]);
+  return JSON.parse(await tools.listActivities(undefined, undefined, undefined, 5, raw))[0];
+};
+const withoutRideZones = (a: Record<string, unknown>) =>
+  Object.fromEntries(Object.entries(a).filter(([k]) => !k.startsWith("hrTimeInZone_")));
+const RIDE_FIELDS = ["kmh", "ascentMPerHour", "easyZonePct", "hardZonePct"];
+
+describe("listActivities ride numbers", () => {
+  it("gives km/h, ascent per hour and the easy and hard zone share of a road ride", async () => {
+    expect(await rideNumbers(rideRow())).toMatchObject({
+      kmh: 26.7,
+      ascentMPerHour: 303,
+      easyZonePct: 39,
+      hardZonePct: 28,
+    });
+  });
+
+  it("leaves out the zone shares when the five zones sum to 0", async () => {
+    const r = await rideNumbers(rideRow(rideZones(0, 0, 0, 0, 0)));
+    expect(r).not.toHaveProperty("easyZonePct");
+    expect(r).not.toHaveProperty("hardZonePct");
+    expect(r).toHaveProperty("kmh", 26.7);
+  });
+
+  it("gives km/h but no ascent per hour for both indoor types", async () => {
+    for (const typeKey of ["virtual_ride", "indoor_cycling"]) {
+      const r = await rideNumbers(rideRow({ activityType: { typeKey } }));
+      expect(r).toHaveProperty("kmh", 26.7);
+      expect(r).not.toHaveProperty("ascentMPerHour");
+    }
+  });
+
+  it("leaves out what the row cannot give", async () => {
+    const noZones = await rideNumbers(withoutRideZones(rideRow()));
+    expect(noZones).not.toHaveProperty("hrZonesSec");
+    expect(noZones).not.toHaveProperty("easyZonePct");
+    expect(noZones).not.toHaveProperty("hardZonePct");
+    const noDistance = await rideNumbers(rideRow({ distance: undefined }));
+    expect(noDistance).not.toHaveProperty("kmh");
+    expect(noDistance).toHaveProperty("ascentMPerHour", 303);
+    expect(await rideNumbers(rideRow({ elevationGain: undefined }))).not.toHaveProperty(
+      "ascentMPerHour",
+    );
+    const noTime = await rideNumbers(rideRow({ movingDuration: undefined }));
+    expect(noTime).not.toHaveProperty("kmh");
+    expect(noTime).not.toHaveProperty("ascentMPerHour");
+  });
+
+  it("gives no ride numbers to a run, to an unknown sport or to raw rows", async () => {
+    for (const a of [rideRow({ sportTypeId: 1 }), rideRow({ sportTypeId: 9999 })]) {
+      const r = await rideNumbers(a);
+      for (const f of RIDE_FIELDS) expect(r).not.toHaveProperty(f);
+    }
+    const raw = await rideNumbers(rideRow(), true);
+    for (const f of RIDE_FIELDS) expect(raw).not.toHaveProperty(f);
+  });
+
+  it("keeps a share of exactly 0", async () => {
+    const r = await rideNumbers(rideRow(rideZones(0, 0, 600, 0, 0)));
+    expect(r).toHaveProperty("easyZonePct", 0);
+    expect(r).toHaveProperty("hardZonePct", 0);
+  });
+
+  it("treats a ride without a type key as outdoors", async () => {
+    const r = await rideNumbers(rideRow({ activityType: undefined }));
+    expect(r).not.toHaveProperty("type");
+    expect(r).toHaveProperty("ascentMPerHour", 303);
+  });
+
+  it("gives all four numbers to a mountain-bike ride", async () => {
+    // 460 m in 1.5 h is 306.67 m/h: rounded to 307, not cut to 306
+    const r = await rideNumbers(
+      rideRow({ activityType: { typeKey: "mountain_biking" }, elevationGain: 460 }),
+    );
+    for (const f of RIDE_FIELDS) expect(r).toHaveProperty(f);
+    expect(r).toHaveProperty("ascentMPerHour", 307);
+  });
+});
+
 const strengthFit = () =>
   fitFile([
     Profile.MesgNum.SET,

@@ -84,6 +84,12 @@ describe("guide", () => {
     );
   });
 
+  it("says in the tool guide that listActivities gives a ride's numbers", () => {
+    expect(readFileSync("guide/tools.md", "utf8")).toContain(
+      "a compact summary of each activity: the Garmin type key and the FIT SDK sport name, km, moving and elapsed time, pace, HR, cadence, ascent, HR-zone seconds, Garmin training load and training effect, intensity minutes, race flag, best efforts, power, running form, run/walk segments, swim SWOLF, lengths and strokes, mountain-bike grit and flow, and for a ride: km/h, ascent per hour and the easy and hard zone share.",
+    );
+  });
+
   it("lists every widget", () => {
     check("guide/widgets.md", widgetsDoc());
   });
