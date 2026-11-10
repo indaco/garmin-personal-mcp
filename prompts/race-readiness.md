@@ -4,16 +4,21 @@ server. Today is {{today}}.
 Race: {{race}}.
 {{missing}}
 1. Call `writeDashboard` with `preview` = true and `weeks` = 12. It writes no page file and returns
-   the `digest`: the weekly km and load, the load of the last 7 and 28 days, best efforts, races, the long
-   runs and races with their split and HR drift (`longRuns`), the longest run (`longestRun`), the race
-   predictions (`racePredictions`), HRV (`hrvLast14`) and sleep (`recovery`). Quote the digest numbers
+   the `digest`: the weekly km and load, the weekly easy/hard zone share and long-run share, the load
+   of the last 7 and 28 days, best efforts, races, the long runs and races with their split and HR
+   drift (`longRuns`), the longest run (`longestRun`), the race predictions (`racePredictions`), HRV
+   (`hrvLast14`) and sleep (`recovery`). Quote the digest numbers
    instead of your own sums. Do not call `getDashboardData`: its whole result is too large for this
    check.
 
 Then answer in chat, in this order:
 
 - **Countdown**: the days left to the race.
-- **Training block**: a table of the run km (`weekly.<monday>.runKm`) and the load of each week. The
+- **Training block**: a table of the run km (`weekly.<monday>.runKm`), the load, the easy / hard %
+  (`runEasyPct` / `runHardPct`) and the long run % (`longRunSharePct`) of each week. A null value in
+  the table is "n/a". Name each week whose long run is over 35% of its km, except the week of today
+  ({{today}}): it is not over, so one run can be most of its km. When `runIntensityApproximate` is
+  true, say that some runs count in the zone of their average HR. The
   first week can be partial (`partial: true`): say so. Also the longest run and its date
   (`longestRun`). For each long run (`longRuns`): the pace of the first and the second half, the
   split, and the HR drift. An HR drift of 5% or less shows a solid aerobic base. `null` is n/a: for
