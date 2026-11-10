@@ -38,10 +38,10 @@ Then answer in chat, in this order, short:
   "n/a". For an exercise without weight, the most
   reps in a set; for a timed one, the longest set in seconds, without a change: its time follows the
   lap button or the plan, not strength. The rep drop: the reps of the last set against the first set
-  at the same weight, when the exercise has 2 or more of them. When the first value of the
-  exercise's `plannedRestSec` is 20 or less or null and a later value is over 20, the exercise is
-  done in rest-pause or cluster groups: a group starts at the first set and at each set after a
-  `restSec` over 20. A drop inside a group is the plan: compare only the first set of each group.
+  at the same weight, when the exercise has 2 or more of them. When the exercise's row in
+  `plan.exercises` has `restPause`, the exercise is done in rest-pause groups: a group starts at the
+  first set and at each set after a `restSec` over 20. A drop inside a group is the plan: compare
+  only the first set of each group.
 - **Rest**: for each exercise, the median `restSec` of its done sets against its planned rest:
   `plannedRestSec` of its rows in `plan.exercises`, in seconds (null is an OPEN rest step, with no
   planned time). When it has more than one value (a short rest inside a rest-pause group and a

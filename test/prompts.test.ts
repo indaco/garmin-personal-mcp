@@ -733,11 +733,17 @@ describe("coach prompts", () => {
     expect(text).toContain("The plan has no weights: do not show a planned weight.");
     expect(text).toContain("A set with 0 reps was not done");
     expect(text).toContain("the previous session when it has that exercise");
-    // a group starts after a rest over 20 s: the first value of plannedRestSec is the short rest
     expect(text).toContain(
-      "a group starts at the first set and at each set after a `restSec` over 20",
+      "The rep drop: the reps of the last set against the first set at the same weight, when the exercise has 2 or more of them.",
     );
-    expect(text).toContain("compare only the first set of each group");
+    // the tool marks a rest-pause row: the prompt does not compute the group from plannedRestSec
+    expect(text).toContain(
+      "When the exercise's row in `plan.exercises` has `restPause`, the exercise is done in rest-pause groups: a group starts at the first set and at each set after a `restSec` over 20.",
+    );
+    expect(text).toContain(
+      "A drop inside a group is the plan: compare only the first set of each group.",
+    );
+    expect(text).not.toContain("first value of the exercise's `plannedRestSec`");
     expect(text).toContain(
       'When it is empty, the plan has no rest right after the exercise (for example the first exercise of a superset): show "n/a (no planned rest)".',
     );

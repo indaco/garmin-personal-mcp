@@ -352,6 +352,8 @@ export interface PlanRow {
   extra: number;
   part?: "warmup" | "cooldown";
   notInPlan?: true;
+  /** A rest-pause group (restPauseSteps): only the first set of each pass is judged on reps. */
+  restPause?: true;
 }
 
 const REPEAT = "repeat_until_steps_cmplt";
@@ -436,8 +438,8 @@ function restsAfter(
  * per done exercise whose sets point at no exercise step. A row has the steps of one exercise with one
  * rep plan. A set is done when completed; a set under the low end is a miss, above the high end a hit
  * counted in over. A warm-up or cool-down step has its part and no verdict. In a rest-pause group
- * only the first set of each pass is judged on reps. Each planned row has its planned rests
- * (plannedRestSec).
+ * only the first set of each pass is judged on reps. A rest-pause row has restPause. Each planned row
+ * has its planned rests (plannedRestSec).
  */
 export function planOfSets(steps: PlanStep[], sets: PlanSet[]): PlanRow[] {
   // the times each step runs: the repeats of every block around it
@@ -457,6 +459,7 @@ export function planOfSets(steps: PlanStep[], sets: PlanSet[]): PlanRow[] {
     PlanRow & { plannedSets: number; plannedRestSec: (number | null)[] }
   >();
   const rowOf = new Map<number | undefined, PlanRow>();
+  const groups = restPauseSteps(steps);
   for (const s of steps) {
     const part = s.intensity === "warmup" || s.intensity === "cooldown" ? s.intensity : undefined;
     if (!s.exercise || !(part || s.intensity === "active")) continue;
@@ -478,6 +481,7 @@ export function planOfSets(steps: PlanStep[], sets: PlanSet[]): PlanRow[] {
       ...(part ? { part } : {}),
     };
     row.steps.push(s.index);
+    if (groups.has(s.index)) row.restPause = true;
     for (const sec of restsAfter(s, steps, byIndex))
       if (!row.plannedRestSec.includes(sec)) row.plannedRestSec.push(sec);
     row.plannedSets += times.get(s.index)!;
@@ -485,7 +489,6 @@ export function planOfSets(steps: PlanStep[], sets: PlanSet[]): PlanRow[] {
     rowOf.set(s.index, row);
   }
   const notInPlan = new Map<string, PlanRow>();
-  const groups = restPauseSteps(steps);
   const position = new Map<number | undefined, number>();
   const judged = new Map<PlanRow, number[]>();
   for (const set of sets) {

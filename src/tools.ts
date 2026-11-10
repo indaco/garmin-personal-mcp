@@ -789,6 +789,7 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
         "above the plan and above the high end); a warm-up or cool-down row (part) and a notInPlan row",
         "have verdict null. In a rest-pause group (a repeat of one exercise with a rest of 20 s or less",
         "inside it and a longer rest after it), only the first set of each pass is judged on reps.",
+        "Such a row has restPause true.",
         "Each planned row also has plannedRestSec: the planned rests right after its sets,",
         "in seconds and plan order (null: an open rest, ended with the lap button; empty: no",
         "rest right after it, such as the first exercise of a superset).",

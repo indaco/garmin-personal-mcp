@@ -684,6 +684,97 @@ describe("plan of the sets", () => {
       expect(verdictOf(restPause(restOf(1)), [10, 4])).toEqual(["hit", [], 0]);
     });
 
+    it("marks the row of a rest-pause group", () => {
+      expect(planOfSets(restPause(), squatSets(10, 4))[0].restPause).toBe(true);
+    });
+
+    it("does not mark a superset with a short rest inside the block", () => {
+      const steps: PlanStep[] = [
+        step(0, range(8, 12)),
+        { index: 1, intensity: "active", exercise: "Row", durationType: "reps", durationValue: 10 },
+        restOf(2, 15_000),
+        repeat(3, 0, 3),
+        restOf(4, 90_000),
+      ];
+      const out = planOfSets(steps, []);
+      for (const row of out) expect(row).not.toHaveProperty("restPause");
+      expect(out.find((r) => r.exercise === "Row")?.plannedRestSec).toEqual([15, 90]);
+    });
+
+    it("marks only the rest-pause row, not the rows before and after it", () => {
+      const steps = [
+        step(0, { exercise: "Row", ...range(8, 12) }),
+        rest(1),
+        repeat(2, 0, 3),
+        step(3, range(8, 12)),
+        restOf(4, 20_000),
+        repeat(5, 3, 2),
+        restOf(6, 120_000),
+        step(7, { exercise: "Curl", ...range(8, 12) }),
+        rest(8),
+        repeat(9, 7, 3),
+      ];
+      const out = planOfSets(steps, [done(0, 10, "Row"), done(3, 10), done(7, 10, "Curl")]);
+      const byName = (name: string) => out.find((r) => r.exercise === name);
+      expect(out.map((r) => r.exercise)).toEqual(["Row", "Back Squat", "Curl"]);
+      expect(byName("Back Squat")?.restPause).toBe(true);
+      expect(byName("Row")).not.toHaveProperty("restPause");
+      expect(byName("Curl")).not.toHaveProperty("restPause");
+    });
+
+    it.each<[string, PlanStep[], number[]]>([
+      [
+        "group first",
+        [
+          step(0, range(8, 12)),
+          restOf(1, 20_000),
+          repeat(2, 0, 2),
+          restOf(3, 120_000),
+          step(4, range(8, 12)),
+          rest(5),
+          repeat(6, 4, 2),
+        ],
+        [0, 4],
+      ],
+      [
+        "straight first",
+        [
+          step(0, range(8, 12)),
+          rest(1),
+          repeat(2, 0, 2),
+          step(3, range(8, 12)),
+          restOf(4, 20_000),
+          repeat(5, 3, 2),
+          restOf(6, 120_000),
+        ],
+        [0, 3],
+      ],
+    ])(
+      "marks a row that has a rest-pause step and a straight step of the same exercise (%s)",
+      (_, steps, indexes) => {
+        const out = planOfSets(steps, []);
+        expect(out).toHaveLength(1);
+        expect(out[0].steps).toEqual(indexes);
+        expect(out[0].restPause).toBe(true);
+      },
+    );
+
+    it("does not mark a warm-up row or a row that is not in the plan", () => {
+      const steps = [
+        step(0, { intensity: "warmup", ...range(8, 12) }),
+        restOf(1, 20_000),
+        repeat(2, 0, 2),
+        restOf(3, 120_000),
+      ];
+      const out = planOfSets(steps, [done(0, 10), done(9, 5, "Curl")]);
+      const warmup = out.find((r) => r.part === "warmup");
+      const extra = out.find((r) => r.notInPlan);
+      expect(warmup?.exercise).toBe("Back Squat");
+      expect(extra?.exercise).toBe("Curl");
+      expect(warmup).not.toHaveProperty("restPause");
+      expect(extra).not.toHaveProperty("restPause");
+    });
+
     it.each([
       ["an inner rest of 21 s", restPause(restOf(1, 21_000))],
       ["no rest after the block", restPause(undefined, null)],
@@ -735,6 +826,7 @@ describe("plan of the sets", () => {
       ],
     ])("judges %s as straight sets", (_, steps) => {
       const [verdict, why] = verdictOf(steps, [10, 4]);
+      expect(planOfSets(steps, squatSets(10, 4))[0]).not.toHaveProperty("restPause");
       expect(verdict).toBe("miss");
       expect(why).toContain("reps");
     });

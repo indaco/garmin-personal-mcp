@@ -90,6 +90,12 @@ describe("guide", () => {
     );
   });
 
+  it("says in the tool guide that a rest-pause group is marked", () => {
+    expect(readFileSync("guide/tools.md", "utf8")).toContain(
+      "strength sets from the .FIT file: exercise, movement category, primary and secondary muscles, reps, weight (kg), set time and the rest after the set; the top set and the e1RM of each exercise; the planned workout that the watch ran, with the planned and done sets and reps and hit or miss of each planned exercise (a rest-pause group is marked, and only the first set of each pass is judged on reps), and the planned rest after each planned exercise. The empty set that the watch adds at the end of a workout is not shown",
+    );
+  });
+
   it("lists every widget", () => {
     check("guide/widgets.md", widgetsDoc());
   });
