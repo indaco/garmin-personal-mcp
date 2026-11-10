@@ -1189,6 +1189,7 @@ describe("MCP tools", () => {
       "getActivitySets",
       "getDashboardData",
       "scheduleDashboardRefresh",
+      "showDashboard",
       "writeDashboard",
     ];
     for (const t of listed) {
