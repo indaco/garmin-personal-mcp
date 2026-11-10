@@ -6,6 +6,8 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { type GarminApiClient, GarminApiError } from "./api-client";
 import { type Catalogue, decodeFit, hms, lapsOf, paceText, round, setsOf, unzipFit } from "./fit";
+import { type Activity, isIndoor } from "./analytics/calc";
+import { kmPerHour, verticalPerHour, zoneShare } from "./analytics/sports";
 import { addDays } from "./dates";
 import { log } from "./log";
 
@@ -101,7 +103,11 @@ export class GarminTools {
           .slice(0, asked)
       : list;
     return toJson(
-      raw === true ? (filtered ? rows : json) : rows.map((a) => summarize(isObject(a) ? a : {})),
+      raw === true
+        ? filtered
+          ? rows
+          : json
+        : rows.map((a) => withRideNumbers(summarize(isObject(a) ? a : {}))),
     );
   }
 
@@ -306,6 +312,24 @@ export class GarminTools {
 // ------------------------------------------------------------------ summary
 
 const SPORTS = Profile.types.sport as Record<number, string | undefined>;
+
+/** A ride's km/h, ascent per hour and easy (Z1-2) and hard (Z4-5) zone share: the page's functions. */
+function withRideNumbers(row: Json): Json {
+  if (row.sport !== "cycling") return row;
+  const a = row as Activity;
+  const kmh = kmPerHour(a);
+  const up = isIndoor(String(row.type ?? "")) ? undefined : verticalPerHour(a);
+  const zones = Array.isArray(row.hrZonesSec) ? (row.hrZonesSec as number[]) : undefined;
+  const easy = zones && zoneShare(zones, [0, 1]);
+  const hard = zones && zoneShare(zones, [3, 4]);
+  return {
+    ...row,
+    ...(kmh === undefined ? {} : { kmh: round(kmh, 1) }),
+    ...(up === undefined ? {} : { ascentMPerHour: round(up, 0) }),
+    ...(easy == null ? {} : { easyZonePct: round(easy, 0) }),
+    ...(hard == null ? {} : { hardZonePct: round(hard, 0) }),
+  };
+}
 
 /** The compact activity summary of listActivities and the dashboard. */
 export function summarize(a: Json): Json {
@@ -629,9 +653,10 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
         "cadence, ascent; when Garmin has them: elapsed time (if longer than moving time), race flag,",
         "Garmin training load, aerobic/anaerobic training effect and label, seconds in HR zones 1-5,",
         "calories, moderate/vigorous intensity minutes, body battery change, steps, swim SWOLF, pool",
-        "length, lengths and strokes, power, mountain-bike grit and flow, running form (stride, ground",
-        "contact, vertical oscillation and ratio), grade-adjusted pace, best efforts (1k, mile, 5k,",
-        "10k, half, marathon) and run/walk segments. Dates are yyyy-MM-dd. Set raw=true for Garmin's",
+        "length, lengths and strokes, power, mountain-bike grit and flow, a ride's km/h, ascent per hour",
+        "and easy (zones 1-2) and hard (zones 4-5) share of the zone time, running form (stride,",
+        "ground contact, vertical oscillation and ratio), grade-adjusted pace, best efforts (1k,",
+        "mile, 5k, 10k, half, marathon) and run/walk segments. Dates are yyyy-MM-dd. Set raw=true for Garmin's",
         "full JSON. limit is at most 200; names filters the last 200 activities of the date window.",
         "Use it to find activity ids and to compare many activities. For the laps, sets or plan of one",
         "activity, give its id to getActivityLaps, getActivitySets or getActivityWorkouts.",
@@ -691,8 +716,8 @@ export function registerTools(server: McpServer, tools: GarminTools): void {
         "values), the exercise for strength steps, and the coach's notes. A step with durationType",
         "REPEAT_UNTIL_STEPS_CMPLT repeats the steps from stepIndex durationValue up to it, targetValue",
         "times in all. Use it for the whole plan and its notes. For plan against done (hit or miss),",
-        "read the plan field of getActivitySets (strength) or getActivityLaps (runs) instead; a swim",
-        "has no plan field.",
+        "read the plan field of getActivitySets (strength) or getActivityLaps (runs) instead; a ride",
+        "or a swim has no plan field.",
         "An empty list means the activity followed no planned workout. Null fields are left out.",
       ].join("\n"),
       inputSchema: z.object({ activityId }),
