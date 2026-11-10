@@ -195,3 +195,19 @@ describe("README review texts", () => {
     );
   });
 });
+
+describe("SECURITY.md", () => {
+  it("says in SECURITY.md that the server creates its data files private", () => {
+    const security = readFileSync("SECURITY.md", "utf8");
+    for (const sentence of [
+      "- **Local data**: the data folder has your .FIT files, the dashboard cache and the page, with your\n  health data.",
+      "A .FIT file can have your GPS track.",
+      "The server creates these files so that only you\n  can read them: mode 600 in folders of mode 700 on macOS and Linux.",
+      "A file that exists keeps its\n  mode.",
+      "On Windows, the files get the access of their folder.",
+      "To serve the page from a web server\n  that runs as another user, give the page mode 644 yourself.",
+      "`.gitignore` excludes `api-key`,\n  `*.fit` and `*.zip` files.",
+    ])
+      expect(security).toContain(sentence);
+  });
+});
