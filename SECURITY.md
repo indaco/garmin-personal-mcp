@@ -28,8 +28,12 @@
   because a shell keeps its arguments in the history. It saves the file so that only you can read
   it: mode 600 on macOS and Linux, an ACL with `icacls` on Windows. An administrator of the computer
   can still read it. When `icacls` fails, the key is saved and the output gives the command to run.
-- **Local data**: the data folder has your .FIT files. A .FIT file can have your GPS track, so
-  keep the data folder private. `.gitignore` excludes `api-key`, `*.fit` and `*.zip` files.
+- **Local data**: the data folder has your .FIT files, the dashboard cache and the page, with your
+  health data. A .FIT file can have your GPS track. The server creates these files so that only you
+  can read them: mode 600 in folders of mode 700 on macOS and Linux. A file that exists keeps its
+  mode. On Windows, the files get the access of their folder. To serve the page from a web server
+  that runs as another user, give the page mode 644 yourself. `.gitignore` excludes `api-key`,
+  `*.fit` and `*.zip` files.
 - **Paths**: `garminGet` accepts only a relative API path. It refuses a full URL and `..`, so
   the token goes only to the Personal API host.
 - **Revoke the key**: you can revoke the key at any time on the Garmin Connect page where you

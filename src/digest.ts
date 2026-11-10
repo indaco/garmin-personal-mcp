@@ -8,6 +8,7 @@ import {
   mondayOf,
   sessionSeconds,
   seconds,
+  weekIndex,
   weeksOf,
 } from "./analytics/calc";
 import {
@@ -23,11 +24,13 @@ import {
   aerobicTrend,
   bestProgression,
   isLongRun,
+  longestShare,
   racePredictionsOf,
   runPlanAdherence,
   type RunPlanMiss,
   type SplitKind,
   splitOf,
+  weeklyIntensity,
   workoutOf,
 } from "./analytics/running";
 import { strokesPerLength, swimPace, swimTrend } from "./analytics/sports";
@@ -63,6 +66,12 @@ interface Week {
    * progress.
    */
   rampPct: number | null;
+  /** The page's Intensity share: the runs' zone time in zones 1-2, in %, 0 decimals; null without zone time. */
+  runEasyPct?: number | null;
+  /** The page's Intensity share: the runs' zone time in zones 4-5, in %, 0 decimals; null without zone time. */
+  runHardPct?: number | null;
+  /** The page's Long runs: the longest run's km in % of the week's run km, 0 decimals; null without run km. */
+  longRunSharePct?: number | null;
   /** The period starts after this Monday: the week is not whole. */
   partial?: true;
 }
@@ -225,6 +234,11 @@ export interface Digest {
     lastRuns: number;
     changePct: number | null;
   };
+  /**
+   * A run without zone seconds counts in the zone of its average HR in `runEasyPct` and `runHardPct`,
+   * as on the page. Absent otherwise.
+   */
+  runIntensityApproximate?: true;
   /** Today's fitness, fatigue and form of the page, 1 decimal; null when no activity has a load. */
   fitnessFatigue: { fitness: number; fatigue: number; form: number } | null;
   hrvLast14: unknown[];
@@ -307,8 +321,23 @@ export function digest(data: Json): Digest {
       };
     });
   const weeks = start ? weeksOf(start, end) : [];
-  const z4 = zonesOf(data.zones).floors[3];
+  const floors = zonesOf(data.zones).floors;
+  const z4 = floors[3];
   const trend = aerobicTrend(runs as Activity[], weeks, z4);
+  // the page's Intensity share and Long runs
+  const intensity =
+    runs.length > 0 ? weeklyIntensity(runs as Activity[], weeks, floors) : undefined;
+  const runWeek = (k: string) => {
+    const i = weeks.indexOf(k);
+    // the page shows no week before the period start, and a digest without a start has no weeks
+    if (!intensity || k < start || i < 0) return {};
+    const ofWeek = runs.filter((a) => weekIndex(a as Activity, weeks) === i) as Activity[];
+    return {
+      runEasyPct: r0(intensity.easy[i]),
+      runHardPct: r0(intensity.hard[i]),
+      longRunSharePct: r0(longestShare(ofWeek)),
+    };
+  };
   // the page's Load safety
   const safety = loadSafety(acts as Activity[], weeks, end, maxHR);
   // a partial week before (or no week before: undefined) gives no ramp
@@ -410,7 +439,11 @@ export function digest(data: Json): Digest {
         // the period starts after this Monday: the week is not whole
         .map(([k, w]) => [
           k,
-          { ...roundWeek(w, rampOf(k)), ...(k < start ? { partial: true as const } : {}) },
+          {
+            ...roundWeek(w, rampOf(k)),
+            ...runWeek(k),
+            ...(k < start ? { partial: true as const } : {}),
+          },
         ]),
     ),
     load: {
@@ -454,6 +487,7 @@ export function digest(data: Json): Digest {
           },
         }
       : {}),
+    ...(intensity?.approximate ? { runIntensityApproximate: true as const } : {}),
     racePredictions,
     repeatedRuns: repeatedRuns(acts),
     strengthExercises,
@@ -577,6 +611,7 @@ function fastestEfforts(acts: Json[]): Digest["bestEfforts"] {
 }
 
 /** An efficiency to 2 decimals; null stays null. */
+const r0 = (v: number | null) => (v === null ? null : round(v, 0));
 const r2 = (v: number | null) => (v === null ? null : round(v, 2));
 
 function sum(): Sum {

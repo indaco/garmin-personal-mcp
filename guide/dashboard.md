@@ -197,7 +197,7 @@ chat". The tool has two optional arguments:
 
 - The page has the layout, the custom widgets, the languages and the settings of your saved page.
   Without a saved page, it has the preset widgets.
-- The server writes no file, and the page has no coach notes.
+- The server writes no page file (it updates the data cache), and the page has no coach notes.
 - When the client can show the page full screen, a button next to **Settings** does it. The same
   button goes back to the chat.
 - The data goes only to the page. The assistant gets the digest of the data, as with

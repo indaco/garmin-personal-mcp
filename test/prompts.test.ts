@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { LONG_RUN_SHARE_WARN } from "../src/analytics/running";
 import { en } from "../src/page/i18n/en";
 import { createServer } from "../src/server";
 import promptList from "./fixtures/prompt-list.json";
@@ -315,6 +316,56 @@ describe("prompts", () => {
     expect(await render("dashboard-setup")).toContain("last **12 weeks**");
   });
 
+  it("says that the dashboard preview writes no page file", async () => {
+    const today =
+      "Call `writeDashboard` with `preview` = true. Do not give `weeks`: the server then uses the weeks of the dashboard page, so the numbers match the page. It writes no page file and returns the `digest`. Do not call `getDashboardData`: its whole result is too large for this check.";
+    const cases: [string, Record<string, string>, string[]][] = [
+      [
+        "dashboard-setup",
+        {},
+        [
+          "3. Call `writeDashboard` with `preview` = true, `weeks` = 12 and the `path`. It writes no page file. Ask which sports to keep (multiple choice) from the boards of `boards`, with their number of activities. With more than 4 boards, show the 3 largest and say that I can type the others. Default: all.",
+        ],
+      ],
+      [
+        "race-readiness",
+        { date: "2026-11-15", distance: "half", goal: "1:45:00" },
+        [
+          "Call `writeDashboard` with `preview` = true and `weeks` = 12. It writes no page file and returns the `digest`: the weekly km and load, the weekly easy/hard zone share and long-run share, the load of the last 7 and 28 days, best efforts, races, the long runs and races with their split and HR drift (`longRuns`), the longest run (`longestRun`), the race predictions (`racePredictions`), HRV (`hrvLast14`) and sleep (`recovery`).",
+        ],
+      ],
+      [
+        "swim-readiness",
+        { date: "2026-08-01", distance: "1.9 km", tests: "" },
+        [
+          "Call `writeDashboard` with `preview` = true and `weeks` = 12. It writes no page file and returns the `digest`: the swims (`swims`), the load of the last 7 and 28 days (`load`), HRV (`hrvLast14`) and sleep (`recovery`). Quote the digest numbers instead of your own sums. Do not call `getDashboardData`: its whole result is too large for this check.",
+        ],
+      ],
+      ["train-today", {}, [today]],
+      ["week-review", {}, [today]],
+      [
+        "training-dashboard",
+        { weeks: "12", layout: "freeform" },
+        [
+          'First call `writeDashboard` with `preview` = true and `weeks` = 12. It writes no page file. If `repeatedRuns` of its `digest` is not empty, ask me one question before you design the page: whether to compare those workouts across weeks. Name them with their number of runs. If your client has a tool for questions with choices, use it: "No" (default) and "Yes, compare them across weeks". Say that a yes adds a Workout trend section, and that the page then downloads the laps of the last 8 runs of each workout, once: this build takes longer.',
+        ],
+      ],
+      [
+        "training-dashboard",
+        { weeks: "12" },
+        [
+          "1. Call `writeDashboard` with `preview` = true and `weeks` = 12. It writes no page file.",
+          'Its `settings` are the settings of the page, or none when there is no page, and its `digest` has `repeatedRuns`: the workouts with more than one run (a run name without the place that Garmin puts before " - ").',
+        ],
+      ],
+    ];
+    for (const [name, args, sentences] of cases) {
+      const text = (await render(name, args)).replace(/\s+/g, " ");
+      for (const sentence of sentences) expect(text, name).toContain(sentence);
+      expect(text, name).not.toContain("writes nothing");
+    }
+  });
+
   it("has the names, descriptions and arguments of the reference prompt list", async () => {
     const { prompts } = await client.listPrompts();
     const sorted = prompts.toSorted((a, b) => a.name.localeCompare(b.name));
@@ -506,7 +557,7 @@ describe("workout comparison", () => {
       expect(text).toContain("give `settings` with `workouts` = true");
     }
     const freeform = await render("training-dashboard", { layout: "freeform" });
-    expect(freeform).toContain("If\n`repeatedRuns` of its `digest` is not empty");
+    expect(freeform).toContain("If `repeatedRuns` of its `digest` is not empty");
     expect(freeform).toContain(
       "`window.GARMIN_SETTINGS = /* garmin-settings:start */null/* garmin-settings:end */;`",
     );
@@ -652,8 +703,15 @@ describe("coach prompts", () => {
     expect(byName).toContain('`names` = ["Riverside"], and keep the runs');
     expect(byName).not.toContain("`limit` = 100");
     expect(byName).toContain(
-      "When no row is a run, say that none of my last 200 activities is a run with that name, and stop.",
+      "When no row is a run and the list has 20 rows, call it again with `endDate` = the day of the oldest row, at most 5 calls in all.",
     );
+    expect(byName).toContain(
+      "When no row is a run and the last list has fewer than 20 rows, say that none of my activities with that name is a run, and stop.",
+    );
+    expect(byName).toContain(
+      "After 5 calls without one, say that none of my last 100 activities with that name is a run, and stop.",
+    );
+    expect(byName).not.toContain("none of my last 200 activities");
     // the slash command can pass only the first word of the name
     expect(byName).toContain(
       "when the runs have more than one name, list the 5 most recent with date and name and ask me which one",
@@ -703,8 +761,15 @@ describe("coach prompts", () => {
     );
     expect(byName).not.toContain("`limit` = 100");
     expect(byName).toContain(
-      "When no row is a strength session, say that none of my last 200 activities is a strength session with that name, and stop.",
+      "When no row is a strength session and the list has 20 rows, call it again with `endDate` = the day of the oldest row, at most 5 calls in all.",
     );
+    expect(byName).toContain(
+      "When no row is a strength session and the last list has fewer than 20 rows, say that none of my activities with that name is a strength session, and stop.",
+    );
+    expect(byName).toContain(
+      "After 5 calls without one, say that none of my last 100 activities with that name is a strength session, and stop.",
+    );
+    expect(byName).not.toContain("none of my last 200 activities");
     expect(byName).toContain(
       "when the strength sessions have more than one name, list the 5 most recent",
     );
@@ -719,11 +784,17 @@ describe("coach prompts", () => {
     expect(text).toContain("The plan has no weights: do not show a planned weight.");
     expect(text).toContain("A set with 0 reps was not done");
     expect(text).toContain("the previous session when it has that exercise");
-    // a group starts after a rest over 20 s: the first value of plannedRestSec is the short rest
     expect(text).toContain(
-      "a group starts at the first set and at each set after a `restSec` over 20",
+      "The rep drop: the reps of the last set against the first set at the same weight, when the exercise has 2 or more of them.",
     );
-    expect(text).toContain("compare only the first set of each group");
+    // the tool marks a rest-pause row: the prompt does not compute the group from plannedRestSec
+    expect(text).toContain(
+      "When the exercise's row in `plan.exercises` has `restPause`, the exercise is done in rest-pause groups: a group starts at the first set and at each set after a `restSec` over 20.",
+    );
+    expect(text).toContain(
+      "A drop inside a group is the plan: compare only the first set of each group.",
+    );
+    expect(text).not.toContain("first value of the exercise's `plannedRestSec`");
     expect(text).toContain(
       'When it is empty, the plan has no rest right after the exercise (for example the first exercise of a superset): show "n/a (no planned rest)".',
     );
@@ -801,7 +872,33 @@ describe("coach prompts", () => {
       text.indexOf("- **Load and taper**"),
     );
     expect(block).toBe(
-      "- **Training block**: a table of the run km (`weekly.<monday>.runKm`) and the load of each week. The first week can be partial (`partial: true`): say so. Also the longest run and its date (`longestRun`). For each long run (`longRuns`): the pace of the first and the second half, the split, and the HR drift. An HR drift of 5% or less shows a solid aerobic base. `null` is n/a: for example, a lap without heart rate. Then the aerobic efficiency (`aerobicEfficiency`): the metres per heartbeat of the runs below zone 4, the last `comparedWeeks` weeks against the first, and the change in % (`changePct`). A higher value is more distance for each heartbeat. A null value, or no `aerobicEfficiency`, is n/a. ",
+      '- **Training block**: a table of the run km (`weekly.<monday>.runKm`), the load, the easy / hard % (`runEasyPct` / `runHardPct`) and the long run % (`longRunSharePct`) of each week. A null value in the table is "n/a". Name each week whose long run is over 35% of its km, except the week of today (2026-10-28): it is not over, so one run can be most of its km. When `runIntensityApproximate` is true, say that some runs count in the zone of their average HR. The first week can be partial (`partial: true`): say so. Also the longest run and its date (`longestRun`). For each long run (`longRuns`): the pace of the first and the second half, the split, and the HR drift. An HR drift of 5% or less shows a solid aerobic base. `null` is n/a: for example, a lap without heart rate. Then the aerobic efficiency (`aerobicEfficiency`): the metres per heartbeat of the runs below zone 4, the last `comparedWeeks` weeks against the first, and the change in % (`changePct`). A higher value is more distance for each heartbeat. A null value, or no `aerobicEfficiency`, is n/a. ',
+    );
+  });
+
+  it("quotes the digest's weekly run intensity and long-run share, null as n/a", async () => {
+    const text = await render("race-readiness", { date: "2026-11-15" });
+    for (const key of ["runEasyPct", "runHardPct", "longRunSharePct", "runIntensityApproximate"]) {
+      expect(text).toContain(`\`${key}\``);
+    }
+    for (const sentence of [
+      "Call `writeDashboard` with `preview` = true and `weeks` = 12. It writes no page file and returns\n   the `digest`: the weekly km and load, the weekly easy/hard zone share and long-run share, the load\n   of the last 7 and 28 days, best efforts, races, the long runs and races with their split and HR\n   drift (`longRuns`), the longest run (`longestRun`), the race predictions (`racePredictions`), HRV\n   (`hrvLast14`) and sleep (`recovery`).",
+      "Quote the digest numbers\n   instead of your own sums.",
+      "- **Training block**: a table of the run km (`weekly.<monday>.runKm`), the load, the easy / hard %\n  (`runEasyPct` / `runHardPct`) and the long run % (`longRunSharePct`) of each week.",
+      'A null value in\n  the table is "n/a".',
+      `Name each week whose long run is over ${LONG_RUN_SHARE_WARN}% of its km, except the week of today\n  (2026-10-28): it is not over, so one run can be most of its km.`,
+      "When `runIntensityApproximate` is\n  true, say that some runs count in the zone of their average HR.",
+      "The\n  first week can be partial (`partial: true`): say so.",
+    ]) {
+      expect(text).toContain(sentence);
+    }
+  });
+
+  it("leaves the week of today out of the long-run warning, with today's date", async () => {
+    vi.setSystemTime(new Date(2026, 10, 4, 12));
+    const text = await render("race-readiness", { date: "2026-11-15" });
+    expect(text).toContain(
+      "Name each week whose long run is over 35% of its km, except the week of today\n  (2026-11-04): it is not over, so one run can be most of its km.",
     );
   });
 
@@ -956,8 +1053,15 @@ describe("coach prompts", () => {
     const byName = await render("swim-review", { activity: "Morning" });
     expect(byName).toContain('`names` = ["Morning"]');
     expect(byName).toContain(
-      "When no row is a swim, say that none of my last 200 activities is a swim with that name, and stop.",
+      "When no row is a swim and the list has 20 rows, call it again with `endDate` = the day of the oldest row, at most 5 calls in all.",
     );
+    expect(byName).toContain(
+      "When no row is a swim and the last list has fewer than 20 rows, say that none of my activities with that name is a swim, and stop.",
+    );
+    expect(byName).toContain(
+      "After 5 calls without one, say that none of my last 100 activities with that name is a swim, and stop.",
+    );
+    expect(byName).not.toContain("none of my last 200 activities");
     expect(await render("swim-review")).toContain(
       "at most 5 calls in all. When none of them has one, say that none of my last 100 activities is a swim, and stop.",
     );
@@ -979,24 +1083,26 @@ describe("coach prompts", () => {
         "summary. The earlier rides are the rows before this one with the same `type` and the same name,",
         "ignoring case. Same name does not prove the same route: leave out a ride whose `km` differs from",
         "this ride's by more than 10%, and say how many you left out.",
+        "When the summary row has no `sport`, or its `sport` is not `cycling`, say that the activity is not a",
+        "ride, and stop.",
         "4. Call `getSleep` with `date` = the day after the ride (the night after it), and `getHrvRange` with",
         "`fromDate` and `toDate` = that day. When that night has not come yet, skip both calls and show the",
         'recovery as "n/a".',
         "The ride is a mountain-bike ride when its type is `mountain_biking`. Else it is a road ride. An",
-        "indoor ride (type `indoor_cycling` or `virtual_ride`) has no real ascent: show its ascent per hour as",
-        '"n/a".',
+        "indoor ride (type `indoor_cycling` or `virtual_ride`) has no real ascent: show its `ascentM`, also",
+        'in the laps, and its ascent per hour as "n/a".',
         "Then answer in chat, in this order, short:",
         "- **Summary**, from the `listActivities` row: date, name, road or mountain bike, distance, the",
-        "moving time `duration` (and `elapsed` when the row has it), the speed in km/h (`km` / `duration`:",
-        "your own division, say so; the row's `pace` is for foot sports, do not quote it), ascent `ascentM`,",
-        "the ascent per hour (`ascentM` / `duration`: your own division), average and max HR, and the",
-        "training effect with its label and the `trainingLoad`.",
+        "moving time `duration` (and `elapsed` when the row has it), the speed `kmh` (the row's `pace` is",
+        "for foot sports, do not quote it), ascent `ascentM`, the ascent per hour `ascentMPerHour`, average",
+        "and max HR, and the",
+        "training effect (`aerobicTE`, `anaerobicTE` and its label `teLabel`) and the `trainingLoad`.",
         '- **Power**: `avgPowerW` and `normPowerW` of the row. When the row has neither, write "n/a: the ride',
         'has no power data" in one line, and give no power, IF or TSS from heart rate or speed.',
         "- **Trail**: for a mountain-bike ride, `grit` (how hard the trail was) and `flow` (how smoothly you",
         'rode it: lower is smoother). A missing value shows "n/a". Skip this part for a road ride.',
-        "- **Effort**: the share of `hrZonesSec` in Z1-2 and in Z4-5, in % of the sum of the 5 zones. Without",
-        '`hrZonesSec`, write "n/a".',
+        "- **Effort**: `easyZonePct` (the share of the zone time in Z1-2) and `hardZonePct`",
+        '(Z4-5). Without them, write "n/a".',
         "- **Plan against execution**: when `getActivityWorkouts` gives steps, a table with one row per lap",
         "that has a `step`: the step (its `intensity`, duration and target as `getActivityWorkouts` gives",
         "them) and what the lap did (`km`, `time`, `kmh`, `avgHR`, `avgPowerW`). A lap's `step` is the",
@@ -1006,18 +1112,18 @@ describe("coach prompts", () => {
         "- **Laps**: when the ride has 2 laps or more, a table with one row per lap: `km`, `time`, `kmh`,",
         '`avgHR`, `cadence`, `ascentM` and `avgPowerW`, "n/a" when a lap has no value. A lap\'s speed follows',
         "its climb: do not read a slower lap with more `ascentM` as a fade. With 1 lap, skip this part.",
-        "- **Same route**: the earlier rides of step 3, at most the 5 most recent: date, km, speed, ascent per",
-        "hour, average HR, and `grit` and `flow` for a mountain-bike ride. Say how many rides you compared",
+        "- **Same route**: the earlier rides of step 3, at most the 5 most recent: date, `km`, `kmh`,",
+        "`ascentMPerHour`, average HR, and `grit` and `flow` for a mountain-bike ride. Say how many rides you compared",
         "and the date of the oldest. Wind, weather and the trail surface change speed and HR on one route:",
-        "say so in one line. The search reads only the 200 activities before this ride: without an",
-        'earlier ride, write "n/a: no earlier ride of this name in the 200 activities before it".',
+        "say so in one line. The search gives at most 20 rows of this name: without an earlier ride,",
+        'write "n/a: no earlier ride of this name in the search".',
         "- **Recovery**: the sleep score and hours of the night after the ride, and its HRV (`lastNightAvg`)",
         "against Garmin's 7-day average of that night (`weeklyAvg`).",
         'A `getSleep` row with only the `date` means that night has no sleep data: show its sleep as "n/a".',
         "- **Coach note**: 2 or 3 sentences: what went well and what to change next time. Base each sentence",
         "on a number above. Compare speed, HR and ascent per hour only with the rides of **Same route**: a",
         "hillier route gives a lower speed and a higher ascent per hour at the same fitness.",
-        "Every number comes from a tool result or from the division that this prompt asks for. **Never invent",
+        "Every number comes from a tool result. **Never invent",
         'or estimate a missing value**: a missing value or a failed call shows as "n/a". If a call fails, say',
         "which one and why in one line. Do not create or change a dashboard.",
       ].join(" ") + " ",
@@ -1034,8 +1140,15 @@ describe("coach prompts", () => {
       "when the rides have more than one name, list the 5 most recent with date and name and ask me which one",
     );
     expect(byName).toContain(
-      "When no row is a ride, say that none of my last 200 activities is a ride with that name, and stop.",
+      "When no row is a ride and the list has 20 rows, call it again with `endDate` = the day of the oldest row, at most 5 calls in all.",
     );
+    expect(byName).toContain(
+      "When no row is a ride and the last list has fewer than 20 rows, say that none of my activities with that name is a ride, and stop.",
+    );
+    expect(byName).toContain(
+      "After 5 calls without one, say that none of my last 100 activities with that name is a ride, and stop.",
+    );
+    expect(byName).not.toContain("none of my last 200 activities");
     // a blank argument is no name: the latest ride, never a search for ""
     const latest = await render("ride-review", { activity: " \u2003\n" });
     expect(latest).toContain(
@@ -1044,6 +1157,34 @@ describe("coach prompts", () => {
     expect(latest).not.toContain('`names` = [""]');
     // digits inside a name are a name, not an id
     expect(await render("ride-review", { activity: "Loop 2" })).toContain('`names` = ["Loop 2"]');
+  });
+
+  it("ride-review shows no indoor ascent and stops on an activity that is not a ride", async () => {
+    const text = (await render("ride-review")).replace(/\s+/g, " ");
+    expect(text).toContain(
+      'An indoor ride (type `indoor_cycling` or `virtual_ride`) has no real ascent: show its `ascentM`, also in the laps, and its ascent per hour as "n/a".',
+    );
+    expect(text).toContain(
+      "the training effect (`aerobicTE`, `anaerobicTE` and its label `teLabel`) and the `trainingLoad`.",
+    );
+    expect(text).toContain(
+      "When the summary row has no `sport`, or its `sport` is not `cycling`, say that the activity is not a ride, and stop.",
+    );
+  });
+
+  it("ride-review quotes the numbers of the listActivities row and asks for no division", async () => {
+    const text = (await render("ride-review")).replace(/\s+/g, " ");
+    expect(text).toContain(
+      "the speed `kmh` (the row's `pace` is for foot sports, do not quote it), ascent `ascentM`, the ascent per hour `ascentMPerHour`, average and max HR,",
+    );
+    expect(text).toContain(
+      '- **Effort**: `easyZonePct` (the share of the zone time in Z1-2) and `hardZonePct` (Z4-5). Without them, write "n/a".',
+    );
+    expect(text).toContain(
+      "- **Same route**: the earlier rides of step 3, at most the 5 most recent: date, `km`, `kmh`, `ascentMPerHour`, average HR, and `grit` and `flow` for a mountain-bike ride.",
+    );
+    expect(text).toContain("Every number comes from a tool result. **Never invent or estimate");
+    expect(text).not.toContain("your own division");
   });
 
   describe("swim-readiness", () => {
@@ -1147,5 +1288,18 @@ describe("coach prompts", () => {
       distance: "$'10k {{today}}",
     });
     expect(text).toContain("Race: $'10k {{today}} on 2026-12-06.");
+  });
+
+  it("the review prompts page past newer activities of another sport only when searching by name", async () => {
+    for (const name of ["run-review", "strength-review", "swim-review", "ride-review"]) {
+      expect(await render(name, { activity: "Morning" }), name).not.toContain(
+        "last 200 activities",
+      );
+      for (const activity of ["123", ""]) {
+        expect(await render(name, { activity }), `${name} ${activity}`).not.toContain(
+          "the list has 20 rows",
+        );
+      }
+    }
   });
 });
