@@ -4,6 +4,65 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The changelog is generated and managed by [sley](https://github.com/indaco/sley).
 
+## v0.13.0 - 2026-11-11
+
+### Highlights
+
+This release adds a coach review of your rides, gives more data for your race preparation, and keeps your data files private.
+
+- **Get a coach's view of your rides.** The new `ride-review` prompt shows speed, climbing, power, trail grit and flow, and earlier rides of the same name.
+- **Check your race training block.** `race-readiness` shows the easy and hard share of each week, and names each week with a long run over 35% of its km.
+- **Get more complete reviews.** A review by activity name now also finds older activities, and `strength-review` marks the rest-pause sets of your plan.
+- **Keep your data private.** On macOS and Linux, only you can read new data files, and your coach can still open a new coach page in a shared folder.
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
+
+### 🚀 Enhancements
+
+- **digest:** give each week's run intensity and long-run share, and race-readiness quotes them ([9d7332a](https://github.com/indaco/garmin-personal-mcp/commit/9d7332a)) ([#256](https://github.com/indaco/garmin-personal-mcp/pull/256))
+- **prompts:** add ride-review, a coach review of one ride ([2ed90ea](https://github.com/indaco/garmin-personal-mcp/commit/2ed90ea)) ([#251](https://github.com/indaco/garmin-personal-mcp/pull/251))
+
+### 🩹 Fixes
+
+- **files:** the server creates its data files private, 0600 in 0700 folders ([9eb6511](https://github.com/indaco/garmin-personal-mcp/commit/9eb6511)) ([#255](https://github.com/indaco/garmin-personal-mcp/pull/255))
+- **tools:** showDashboard is not read-only, and network errors name their cause ([8cead05](https://github.com/indaco/garmin-personal-mcp/commit/8cead05)) ([#254](https://github.com/indaco/garmin-personal-mcp/pull/254))
+- **prompts:** a review by name finds older activities, and strength plans mark rest-pause rows ([7b67193](https://github.com/indaco/garmin-personal-mcp/commit/7b67193)) ([#253](https://github.com/indaco/garmin-personal-mcp/pull/253))
+- **prompts:** ride-review gaps, and listActivities gives a ride's km/h, ascent per hour and zone shares ([51f1ade](https://github.com/indaco/garmin-personal-mcp/commit/51f1ade)) ([#252](https://github.com/indaco/garmin-personal-mcp/pull/252))
+
+### 🏡 Chores
+
+- bump oxfmt from 0.75.0 to 0.76.0 in the dev-dependencies group ([f250ffe](https://github.com/indaco/garmin-personal-mcp/commit/f250ffe)) ([#258](https://github.com/indaco/garmin-personal-mcp/pull/258))
+
+### 🎉 New Contributors
+
+- [@dependabot[bot]](https://github.com/dependabot[bot]) made their first contribution in [#258](https://github.com/indaco/garmin-personal-mcp/pull/258)
+
+### ❤️ Contributors
+
+- [@dependabot[bot]](https://github.com/dependabot[bot])
+- [@indaco](https://github.com/indaco)
+
 ## v0.12.0 - 2026-11-09
 
 ### Highlights
