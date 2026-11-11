@@ -24,4 +24,6 @@ export interface Settings {
   workouts?: boolean;
   /** Keep the recovery rows of the whole period, not only the last 14 days. Off when not set. */
   recoveryHistory?: boolean;
+  /** A page for another person, e.g. a coach: the server makes a new file of it that other users can read (644). */
+  shared?: boolean;
 }

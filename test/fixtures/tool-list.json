@@ -582,6 +582,10 @@
             "recoveryHistory": {
               "type": "boolean",
               "description": "Keep the sleep and resting HR rows of the whole period in the page, not only the last 14 days; off when not set"
+            },
+            "shared": {
+              "type": "boolean",
+              "description": "A page for another person, e.g. a coach: a new page file is readable by other users of the computer; off when not set"
             }
           },
           "description": "The page settings; replaces the page's own"

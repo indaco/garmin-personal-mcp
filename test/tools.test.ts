@@ -1612,6 +1612,18 @@ describe("writeAtomically", () => {
     expect(readFileSync(f, "utf8")).toBe("new");
   });
 
+  it.skipIf(win)(
+    "gives a new file the mode it is asked for, and an existing file keeps its own",
+    async () => {
+      const f = join(dir, "a.html");
+      await writeAtomically(f, "new", 0o644);
+      expect(mode(f)).toBe(0o644);
+      chmodSync(f, 0o600);
+      await writeAtomically(f, "newer", 0o644);
+      expect(mode(f)).toBe(0o600);
+    },
+  );
+
   it.skipIf(win)("does not keep setuid", async () => {
     const f = join(dir, "a.html");
     writeFileSync(f, "old");

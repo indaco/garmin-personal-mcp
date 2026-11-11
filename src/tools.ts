@@ -530,12 +530,16 @@ export function firstArray(json: unknown): unknown[] | undefined {
 
 /**
  * Writes a temp file and moves it into place, so a stopped process never leaves a half-written file. A link stays
- * a link and an existing file keeps its mode. A new file is private (0600), and so is a folder it makes (0700):
- * the data folder holds health data and GPS tracks.
+ * a link and an existing file keeps its mode. A new file gets `newMode`, private (0600) by default, and a folder
+ * it makes is private (0700): the data folder holds health data and GPS tracks.
  */
-export async function writeAtomically(target: string, data: Uint8Array | string): Promise<void> {
+export async function writeAtomically(
+  target: string,
+  data: Uint8Array | string,
+  newMode = 0o600,
+): Promise<void> {
   const real = await realpath(target).catch(() => target);
-  const mode = ((await stat(real).catch(() => undefined))?.mode ?? 0o600) & 0o777;
+  const mode = ((await stat(real).catch(() => undefined))?.mode ?? newMode) & 0o777;
   await mkdir(dirname(resolve(real)), { recursive: true, mode: 0o700 });
   // a unique name: two writers of one file never share a temp file
   const tmp = `${real}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;

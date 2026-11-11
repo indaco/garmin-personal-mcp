@@ -31,8 +31,11 @@
 - **Local data**: the data folder has your .FIT files, the dashboard cache and the page, with your
   health data. A .FIT file can have your GPS track. The server creates these files so that only you
   can read them: mode 600 in folders of mode 700 on macOS and Linux. A file that exists keeps its
-  mode. On Windows, the files get the access of their folder. To serve the page from a web server
-  that runs as another user, give the page mode 644 yourself. `.gitignore` excludes `api-key`,
+  mode. On Windows, the files get the access of their folder. On macOS and Linux, a new page with
+  the `shared` setting (a page for your coach) gets mode 644, so that other users of the computer can
+  read it, for example through a shared folder or a web server. A folder that the server makes stays
+  700, so put the page in a folder that others can already open. To share another page in this way,
+  give it mode 644 yourself. `.gitignore` excludes `api-key`,
   `*.fit` and `*.zip` files.
 - **Paths**: `garminGet` accepts only a relative API path. It refuses a full URL and `..`, so
   the token goes only to the Personal API host.

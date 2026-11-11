@@ -542,6 +542,7 @@ export function checkSettings(s: Settings): Settings {
         "theme",
         "workouts",
         "recoveryHistory",
+        "shared",
       ].includes(k),
   );
   if (unknown.length > 0) problems.push(`unknown settings ${unknown.join(", ")}`);
@@ -563,6 +564,8 @@ export function checkSettings(s: Settings): Settings {
     problems.push("workouts: true or false");
   if (s.recoveryHistory !== undefined && typeof s.recoveryHistory !== "boolean")
     problems.push("recoveryHistory: true or false");
+  if (s.shared !== undefined && typeof s.shared !== "boolean")
+    problems.push("shared: true or false");
   if (problems.length > 0) throw new Error(`Settings: ${problems.join("; ")}`);
   return {
     ...s,
@@ -856,7 +859,8 @@ export class DashboardWriter {
       backup = `${target}.bak`;
       await copyFile(target, backup);
     }
-    await writeAtomically(target, next);
+    // a page for another person can be in a shared folder; the others stay private
+    await writeAtomically(target, next, own.shared === true ? 0o644 : 0o600);
     // the .bak keeps the page from before the build: only a write that made it, or kept it, starts the window
     this.#wrote =
       backup !== undefined || sameBuild ? { target, page: next, at: Date.now() } : undefined;
@@ -1436,6 +1440,12 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
               .boolean()
               .describe(
                 "Keep the sleep and resting HR rows of the whole period in the page, not only the last 14 days; off when not set",
+              )
+              .optional(),
+            shared: z
+              .boolean()
+              .describe(
+                "A page for another person, e.g. a coach: a new page file is readable by other users of the computer; off when not set",
               )
               .optional(),
           })

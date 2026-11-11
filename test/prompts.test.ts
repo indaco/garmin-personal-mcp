@@ -612,6 +612,9 @@ describe("recovery trend", () => {
       'ask about the **Recovery trend**, only when I kept the recovery data. Options "No" (default) and "Yes, add the Recovery trend".',
     );
     expect(setup).toContain("`recoveryHistory` (true when I said yes to the Recovery trend)");
+    expect(setup.replace(/\s+/g, " ")).toContain(
+      "`shared` (true when the page is for a person I share it with)",
+    );
   });
 
   it("pins the other sentences of the Recovery trend in the three prompts", async () => {
