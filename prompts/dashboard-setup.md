@@ -43,9 +43,9 @@ such a tool, ask the questions in chat as numbered lists, with the default first
    `title`, `headline`, `sports` (the boards to keep), `exclude` (from `recovery`, `fitnessAge`,
    `zones`, `names`, `notes`), `languages` (the codes to keep: {{languages}}), `language` (the one
    it opens in), `themes`, `theme`, `workouts` (true when I said yes to the workout comparison),
-   `recoveryHistory` (true when I said yes to the Recovery trend). Do
-   not give a setting that keeps its default. If there is no page at the path, also give `layout` =
-   "preset".
+   `recoveryHistory` (true when I said yes to the Recovery trend), `shared` (true when the page is
+   for a person I share it with). Do not give a setting that keeps its default. If there is no page
+   at the path, also give `layout` = "preset".
    If the reply has `addedWidgets` (board -> widget ids), tell me which widgets it added to which
    board, as the reply gives them; do not make up a title. Without it, say nothing about them.
 5. Unless I excluded the coach notes: write at most 5 coach notes from the digest. Each note names a

@@ -206,7 +206,9 @@ describe("SECURITY.md", () => {
       "The server creates these files so that only you\n  can read them: mode 600 in folders of mode 700 on macOS and Linux.",
       "A file that exists keeps its\n  mode.",
       "On Windows, the files get the access of their folder.",
-      "To serve the page from a web server\n  that runs as another user, give the page mode 644 yourself.",
+      "On macOS and Linux, a new page with\n  the `shared` setting (a page for your coach) gets mode 644, so that other users of the computer can\n  read it, for example through a shared folder or a web server.",
+      "A folder that the server makes stays\n  700, so put the page in a folder that others can already open.",
+      "To share another page in this way,\n  give it mode 644 yourself.",
       "`.gitignore` excludes `api-key`,\n  `*.fit` and `*.zip` files.",
     ])
       expect(security).toContain(sentence);

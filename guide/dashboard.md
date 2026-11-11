@@ -380,6 +380,7 @@ assistant calls `writeDashboard` with `settings`:
 | `theme`           | the theme that the page opens in                                           | `midnight`                                             |
 | `workouts`        | compare the same run workout across weeks (the Workout trend widget)       | off                                                    |
 | `recoveryHistory` | keep sleep and resting HR for the whole period (the Recovery trend widget) | off                                                    |
+| `shared`          | a page for another person: a new file of it is readable by other users     | off                                                    |
 
 The server leaves the excluded data and sports out of the file, and out of the digest for the coach
 notes. The server cannot remove data from the chat. If another tool showed the data earlier in the

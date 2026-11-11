@@ -1227,6 +1227,46 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
     expect(page()).toContain("<title>Road to Rome</title>");
   });
 
+  describe.skipIf(process.platform === "win32")("mode of a shared page", () => {
+    it("makes a new page private, and a new shared page readable by other users", async () => {
+      await writer.write({});
+      expect(mode(file)).toBe(0o600);
+      const coach = join(dir, "coach.html");
+      await writer.write({ path: "coach.html", settings: { shared: true } });
+      expect(mode(coach)).toBe(0o644);
+      expect(readBlock(readFileSync(coach, "utf8"), "settings")).toEqual({ shared: true });
+      await writer.write({ path: "off.html", settings: { shared: false } });
+      expect(mode(join(dir, "off.html"))).toBe(0o600);
+    });
+
+    it("keeps a shared page readable, and its setting, at an update and an upgrade", async () => {
+      await writer.write({ settings: { shared: true } });
+      await later(() => writer.write({ notes: ["n"] }));
+      expect(mode(file)).toBe(0o644);
+      templateText = styledTemplate.replace(ID_A, ID_B);
+      expect((await later(() => writer.write({}))).page).toBe("upgraded");
+      expect(mode(file)).toBe(0o644);
+      expect(readBlock(page(), "settings")).toEqual({ shared: true });
+    });
+
+    it("previews a shared page without a file", async () => {
+      await writer.preview({ settings: { shared: true } });
+      expect(existsSync(file)).toBe(false);
+    });
+
+    it("keeps a folder that it makes private, also for a shared page", async () => {
+      await writer.write({ path: "coach/page.html", settings: { shared: true } });
+      expect(mode(join(dir, "coach"))).toBe(0o700);
+      expect(mode(join(dir, "coach", "page.html"))).toBe(0o644);
+    });
+
+    it("keeps the mode of a page that exists when it becomes shared", async () => {
+      await writer.write({});
+      await later(() => writer.write({ settings: { shared: true } }));
+      expect(mode(file)).toBe(0o600);
+    });
+  });
+
   it("keeps the settings on an update and on a new layout; an argument replaces them", async () => {
     await writer.write({ settings: { exclude: ["zones"] } });
     expect(readBlock(page(), "settings")).toEqual({ exclude: ["zones"] });
@@ -1353,6 +1393,9 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
     await expect(
       writer.write({ settings: { recoveryHistory: "yes" as unknown as boolean } }),
     ).rejects.toThrow(/recoveryHistory: true or false/);
+    await expect(
+      writer.write({ settings: { shared: "yes" as unknown as boolean } }),
+    ).rejects.toThrow(/shared: true or false/);
     await expect(
       writer.write({ settings: { colour: "red" } as unknown as Record<string, never> }),
     ).rejects.toThrow(/unknown settings colour/);
