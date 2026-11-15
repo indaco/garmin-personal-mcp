@@ -573,7 +573,7 @@ describe("the page", () => {
       { hash: "#all@2026-08-03_2026-10-26" },
     );
     const sel = "[data-widget=periodComparison]";
-    expect(await page.textContent(`${sel} p`)).toContain("May 10 to Aug 2");
+    expect(await page.textContent(`${sel} p`)).toContain("May 10, 2026 to Aug 2, 2026");
     // 1 session now against 3 before: the row of 9 May is outside the 85 days
     expect(await page.textContent(`${sel} tbody tr:first-child td:nth-child(2)`)).toContain(
       "1 ▼ 67%",
@@ -596,7 +596,7 @@ describe("the page", () => {
       { hash: "#all@2026-08-03_2026-10-19" },
     );
     const sel = "[data-widget=periodComparison]";
-    expect(await page.textContent(`${sel} p`)).toContain("May 11 to Aug 2");
+    expect(await page.textContent(`${sel} p`)).toContain("May 11, 2026 to Aug 2, 2026");
     // 1 session now against 3 before; ending on the Monday would give 78 days from 17 May, so 1
     expect(await page.textContent(`${sel} tbody tr:first-child td:nth-child(2)`)).toContain(
       "1 ▼ 67%",
@@ -1965,7 +1965,21 @@ describe("phone", () => {
     await page.click(".window-toggle");
     expect(await page.getAttribute(".window-toggle", "aria-expanded")).toBe("true");
     await page.click(".window-bar .chip >> text=Last 4");
-    expect(await page.textContent(".window-toggle")).toBe("Weeks: Last 4 ▾");
+    expect(await page.textContent(".window-toggle")).toBe("Weeks: Last 4 weeks ▾");
+  });
+
+  it("shows the year in the week menus and in a custom range", async () => {
+    const { page } = await open(browser, pageFile(), phone);
+    const options = await page.$$eval("#from option", (list) =>
+      list.map((o) => o.textContent ?? ""),
+    );
+    expect(options.length).toBeGreaterThan(0);
+    for (const text of options) expect(text).toMatch(/, \d{4}/);
+    await page.click(".window-toggle");
+    await page.selectOption("#from", { index: 2 }); // 11 weeks: no preset
+    expect(await page.textContent(".window-toggle")).toMatch(
+      /^Weeks: \w{3} \d{1,2}, \d{4} – \w{3} \d{1,2}, \d{4} ▾$/,
+    );
   });
 
   it("keeps the header at the top, and fades the tabs that are out of view", async () => {
@@ -1989,7 +2003,7 @@ describe("focus", () => {
     const { page } = await open(browser, pageFile());
     await page.focus(".window-bar .chip >> text=Last 8");
     await page.keyboard.press("Enter");
-    expect(await focused(page)).toBe("Last 8");
+    expect(await focused(page)).toBe("Last 8 weeks");
     await page.click(".account summary");
     await page.focus("#theme");
     await page.selectOption("#theme", "light");

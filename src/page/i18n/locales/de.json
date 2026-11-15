@@ -33,7 +33,7 @@
   "theme.hcDark": "Hoher Kontrast dunkel",
   "theme.hcLight": "Hoher Kontrast hell",
   "window.label": "Wochen",
-  "window.last": "Letzte {n}",
+  "window.last": "Letzte {n} Wochen",
   "window.all": "Alle",
   "window.from": "Von Woche",
   "window.to": "Bis Woche",

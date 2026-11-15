@@ -519,7 +519,7 @@ function windowBar(inProgress: boolean): HTMLElement {
   const presets = [4, 8, 12].filter((n) => n < weeks.length);
   const isLast = (n: number) => view.to === weeks.at(-1) && view.from === weeks[weeks.length - n];
   const label = (w: string, i: number) =>
-    `${fmt.day(w)}${inProgress && i === weeks.length - 1 ? " *" : ""}`;
+    `${fmt.longDay(w)}${inProgress && i === weeks.length - 1 ? " *" : ""}`;
   const select = (id: string, value: string, onChange: (v: string) => void) =>
     h(
       "select",
@@ -532,7 +532,7 @@ function windowBar(inProgress: boolean): HTMLElement {
       ? t("window.last", { n: shown })
       : view.from === weeks[0] && view.to === weeks.at(-1)
         ? t("window.all")
-        : `${fmt.day(view.from)} – ${fmt.day(view.to)}`;
+        : `${fmt.longDay(view.from)} – ${fmt.longDay(view.to)}`;
   const toggle = h(
     "button",
     {
