@@ -1092,17 +1092,27 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
       expect(page()).not.toContain('"since"');
     });
 
-    it.each(["1/9/2026", "2026-9-1", "2026-02-30", "2026-13-01", "2026-11-19", 20261101])(
-      "refuses since %s",
+    it.each(["1/9/2026", "2026-9-1", "2026-02-30", "2026-13-01", 20261101])(
+      "refuses since %s, which is not a day",
       async (since) => {
         await on("2026-11-18", async () => {
           await expect(writer.write({ settings: { since: since as string } })).rejects.toThrow(
-            /^Settings: since: a day that is not in the future, as yyyy-MM-dd, e\.g\. 2026-09-01$/,
+            `Settings: since: ${since} is not a day as yyyy-MM-dd, e.g. 2026-09-01`,
           );
         });
         expect(existsSync(file)).toBe(false);
       },
     );
+
+    it("refuses a since after today, and takes today", async () => {
+      await on("2026-11-18", async () => {
+        await expect(writer.write({ settings: { since: "2026-11-19" } })).rejects.toThrow(
+          /^Settings: since: 2026-11-19 is after today$/,
+        );
+        await writer.write({ settings: { since: "2026-11-18" } });
+      });
+      expect(asks).toEqual([1]);
+    });
 
     it("keeps the page's weeks when a saved since is not a day", async () => {
       await on("2026-11-18", () => writer.write({ settings: { since: "2026-11-02" } }));

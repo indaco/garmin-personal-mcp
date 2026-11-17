@@ -644,9 +644,9 @@ describe("recovery trend", () => {
 
 describe("start day", () => {
   const rules =
-    'Start day: turn the day I chose into `since` = yyyy-MM-dd ("Since 1 January" is the first day of this year). If I typed only numbers that can be read as day/month and as month/day (01/09 is 1 September or 9 January), ask which one. A day after today is not allowed. When I typed the day, tell me the day with the month as a word, in my language, and the Monday that the page starts on, and wait for my yes before you write the page. With `since`, the `writeDashboard` calls that write the page give no `weeks`.';
+    'Start day: turn the day I chose into `since` = yyyy-MM-dd ("Since 1 January" is 1 January of the year of today). If I typed only numbers that can be read as day/month and as month/day (01/09 is 1 September or 9 January), ask which one. If my day does not exist (31 April) or is after today, tell me what is wrong and ask again. When I typed the day, tell me the day with the weekday and the month as words, in my language (for example "Tuesday 1 September 2026"), and the Monday that the page starts on, and wait for my yes before you write the page. With `since`, the `writeDashboard` calls that write the page give no `weeks`.';
   const period =
-    'options "The last 8 weeks" (default), "Since 1 January" and "From a day I choose". Say that I can type the day in my own words. Say that with a day, the page starts in the week of that day and gets one more week at each update, up to 52 weeks; after that it shows the last 52 weeks.';
+    'options "The last 8 weeks" (default), "Since 1 January" with the year of today (for example "Since 1 January 2026") and "From a day I choose". Say that I can type the day in my own words. Say that with a day, the page starts in the week of that day and gets one more week at each update, up to 52 weeks; after that it shows the last 52 weeks. Say that the page does not start again on 1 January: in a new year it keeps its start day.';
 
   it("is asked in the preset and blank prompts, read back and given as a setting", async () => {
     for (const layout of ["preset", "blank"]) {

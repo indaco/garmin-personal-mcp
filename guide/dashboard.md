@@ -429,11 +429,13 @@ workout. If the limit stops the recovery data of an update, the next update goes
 starts on the Monday of the week of that day, and each update adds the new week, up to 52 weeks.
 After 52 weeks, the page shows the last 52 weeks. A day in the week of today gives 1 week and the
 current week, the shortest page. The day cannot be in the future. The prompts ask for the period
-with the choices "the last 12 weeks", "since 1 January" and "from a day I choose". You can give the
-day in your own words; the assistant tells you the day with the month as a word and waits for your
-yes. A page with `since` refuses a `weeks` argument when it writes or shows the page. To go back to
-the last weeks, give new settings without `since`. A recent `since` also makes the first update
-cheaper: it asks Garmin only for the weeks since that day.
+with the choices "the last 12 weeks", "since 1 January" with the year of today, and "from a day I
+choose". `since` is a fixed day: a page since 1 January 2026 does not start again in January 2027,
+it keeps growing up to 52 weeks. You can give the day in your own words; the assistant tells you the
+day with the weekday and the month as words and waits for your yes. A page with `since` refuses a
+`weeks` argument when it writes or shows the page. To go back to the last weeks, give new settings
+without `since`. A recent `since` also makes the first update cheaper: it asks Garmin only for the
+weeks since that day.
 
 Settings need a page from the template, or a page that the assistant designed (`freeform`) with a
 `garmin-settings` block. The freeform prompt adds that block when you set `workouts` or `recoveryHistory`.

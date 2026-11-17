@@ -589,8 +589,10 @@ export function checkSettings(s: Settings): Settings {
     problems.push("recoveryHistory: true or false");
   if (s.shared !== undefined && typeof s.shared !== "boolean")
     problems.push("shared: true or false");
-  if (s.since !== undefined && (!isDay(s.since) || s.since > localToday()))
-    problems.push("since: a day that is not in the future, as yyyy-MM-dd, e.g. 2026-09-01");
+  if (s.since !== undefined && !isDay(s.since))
+    problems.push(`since: ${String(s.since)} is not a day as yyyy-MM-dd, e.g. 2026-09-01`);
+  else if (s.since !== undefined && s.since > localToday())
+    problems.push(`since: ${s.since} is after today`);
   if (problems.length > 0) throw new Error(`Settings: ${problems.join("; ")}`);
   return {
     ...s,

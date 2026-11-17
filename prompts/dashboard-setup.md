@@ -40,9 +40,10 @@ such a tool, ask the questions in chat as numbered lists, with the default first
    average of sleep, sleep score and resting HR for the whole period, and that the page file then
    holds these values for each day: this matters for a page that I share.
    In the same call, ask about the **Period**: options "The last {{weeks}} weeks" (default), "Since
-   1 January" and "From a day I choose". Say that I can type the day in my own words. Say that with
-   a day, the page starts in the week of that day and gets one more week at each update, up to 52
-   weeks; after that it shows the last 52 weeks.
+   1 January" with the year of today (for example "Since 1 January 2026") and "From a day I choose".
+   Say that I can type the day in my own words. Say that with a day, the page starts in the week of
+   that day and gets one more week at each update, up to 52 weeks; after that it shows the last 52
+   weeks. Say that the page does not start again on 1 January: in a new year it keeps its start day.
 4. Call `writeDashboard` with `weeks` = {{weeks}}, the `path` and `settings`. The settings are
    `title`, `headline`, `sports` (the boards to keep), `exclude` (from `recovery`, `fitnessAge`,
    `zones`, `names`, `notes`), `languages` (the codes to keep: {{languages}}), `language` (the one
@@ -57,12 +58,13 @@ such a tool, ask the questions in chat as numbered lists, with the default first
    language. Then call `writeDashboard` again with the same `weeks`, `path` and the `notes`, without
    `settings`: the page keeps them.
 
-Start day: turn the day I chose into `since` = yyyy-MM-dd ("Since 1 January" is the first day of
-this year). If I typed only numbers that can be read as day/month and as month/day (01/09 is 1
-September or 9 January), ask which one. A day after today is not allowed. When I typed the day, tell
-me the day with the month as a word, in my language, and the Monday that the page starts on, and
-wait for my yes before you write the page. With `since`, the `writeDashboard` calls that write the
-page give no `weeks`.
+Start day: turn the day I chose into `since` = yyyy-MM-dd ("Since 1 January" is 1 January of the
+year of today). If I typed only numbers that can be read as day/month and as month/day (01/09 is 1
+September or 9 January), ask which one. If my day does not exist (31 April) or is after today, tell
+me what is wrong and ask again. When I typed the day, tell me the day with the weekday and the month
+as words, in my language (for example "Tuesday 1 September 2026"), and the Monday that the page
+starts on, and wait for my yes before you write the page. With `since`, the `writeDashboard` calls
+that write the page give no `weeks`.
 
 If a `writeDashboard` result has `missingWidgetTexts`, call `editDashboard` with the same `path` without
 changes, translate the English texts of those widgets (`customWidgets[].texts.en`) into the listed
