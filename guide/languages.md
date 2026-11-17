@@ -89,7 +89,7 @@ out. To add one:
 | `theme.hcDark` | High contrast dark |
 | `theme.hcLight` | High contrast light |
 | `window.label` | Weeks |
-| `window.last` | Last {n} |
+| `window.last` | Last {n} weeks |
 | `window.all` | All |
 | `window.from` | From week |
 | `window.to` | To week |

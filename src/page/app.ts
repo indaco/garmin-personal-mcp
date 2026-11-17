@@ -67,7 +67,7 @@ import {
 } from "./registry";
 import type { Settings } from "./settings";
 import { formatHash, parseHash, type View } from "./state";
-import { typeName } from "./widgets/ui";
+import { rangeDays, typeName } from "./widgets/ui";
 import { DEFAULT_THEME, store, THEMES, themeKey, token } from "./theme";
 import "./widgets";
 
@@ -519,7 +519,7 @@ function windowBar(inProgress: boolean): HTMLElement {
   const presets = [4, 8, 12].filter((n) => n < weeks.length);
   const isLast = (n: number) => view.to === weeks.at(-1) && view.from === weeks[weeks.length - n];
   const label = (w: string, i: number) =>
-    `${fmt.day(w)}${inProgress && i === weeks.length - 1 ? " *" : ""}`;
+    `${fmt.longDay(w)}${inProgress && i === weeks.length - 1 ? " *" : ""}`;
   const select = (id: string, value: string, onChange: (v: string) => void) =>
     h(
       "select",
@@ -527,12 +527,14 @@ function windowBar(inProgress: boolean): HTMLElement {
       ...weeks.map((w, i) => h("option", { value: w, selected: w === value }, label(w, i))),
     );
   const shown = presets.find(isLast);
+  const all = view.from === weeks[0] && view.to === weeks.at(-1);
+  // only "All" needs the "Weeks" label: a preset and a date range are clear alone
   const current =
     shown !== undefined
       ? t("window.last", { n: shown })
-      : view.from === weeks[0] && view.to === weeks.at(-1)
-        ? t("window.all")
-        : `${fmt.day(view.from)} – ${fmt.day(view.to)}`;
+      : all
+        ? `${t("window.label")}: ${t("window.all")}`
+        : rangeDays(fmt, view.from, view.to).join(" – ");
   const toggle = h(
     "button",
     {
@@ -544,7 +546,7 @@ function windowBar(inProgress: boolean): HTMLElement {
         render();
       },
     },
-    `${t("window.label")}: ${current}`,
+    current,
     h("span", { "aria-hidden": "true" }, " ▾"),
   );
   const bar = h(

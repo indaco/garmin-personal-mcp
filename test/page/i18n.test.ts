@@ -98,8 +98,8 @@ describe("pickLang", () => {
 
 describe("translator", () => {
   it("fills placeholders", () => {
-    expect(translator("en")("window.last", { n: 4 })).toBe("Last 4");
-    expect(translator("it")("window.last", { n: 4 })).toBe("Ultime 4");
+    expect(translator("en")("window.last", { n: 4 })).toBe("Last 4 weeks");
+    expect(translator("it")("window.last", { n: 4 })).toBe("Ultime 4 settimane");
   });
 });
 

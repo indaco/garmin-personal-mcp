@@ -16,6 +16,7 @@ import {
   vsFourWeeks,
   table,
   loadText,
+  rangeDays,
   totals,
   typeName,
   windowEnd,
@@ -186,6 +187,8 @@ register({
     const now = ctx.activities;
     const before = ctx.ofType(between(everyActivity(ctx), prev.from, prev.to));
     const groups = groupsIn([...now, ...before]);
+    const [from, to] = rangeDays(fmt, ctx.from, end);
+    const [pfrom, pto] = rangeDays(fmt, prev.from, prev.to);
     const row = (label: Node | string, a: Activity[], b: Activity[]) => {
       const x = totals(ctx, a);
       const y = totals(ctx, b);
@@ -203,12 +206,7 @@ register({
       h(
         "p",
         { class: "muted small" },
-        t("pc.vs", {
-          from: fmt.day(ctx.from),
-          to: fmt.day(end),
-          pfrom: fmt.day(prev.from),
-          pto: fmt.day(prev.to),
-        }),
+        t("pc.vs", { from, to, pfrom, pto }),
         prev.partial && ` (${t("pc.partial")})`,
       ),
       table(

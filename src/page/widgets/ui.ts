@@ -163,6 +163,15 @@ export function windowEnd(ctx: Ctx): string {
   return sunday < ctx.data.end ? sunday : ctx.data.end;
 }
 
+/** The two ends of a date range; the first has no year when both ends are in the same year. */
+export function rangeDays(
+  fmt: Pick<Ctx["fmt"], "day" | "longDay">,
+  from: string,
+  to: string,
+): readonly [string, string] {
+  return [from.slice(0, 4) === to.slice(0, 4) ? fmt.day(from) : fmt.longDay(from), fmt.longDay(to)];
+}
+
 /** Every activity the page has: this period and the one before (compact, for comparisons). */
 export function everyActivity(ctx: Ctx): Activity[] {
   return [...ctx.data.activities, ...ctx.data.previousActivities];
