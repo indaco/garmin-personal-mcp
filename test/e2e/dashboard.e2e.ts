@@ -1,7 +1,7 @@
 import { readFileSync, statSync, writeFileSync } from "node:fs";
 import axe from "axe-core";
 import type { Browser, Page } from "playwright-core";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { addDays } from "../../src/dates";
 import { THEMES } from "../../src/page/theme";
 import { digest } from "../../src/digest";
@@ -10,12 +10,13 @@ import { preset } from "../../src/page/presets";
 import { fitnessFatigueFrom, zonesOf } from "../../src/analytics/metrics";
 import { DASHBOARD_VERSION } from "../../src/prompts";
 import { pageCode } from "../../src/dashboard-page";
-import { data, launch, open, pageFile } from "./page";
+import { data, closePages, launch, open, pageFile } from "./page";
 
 let browser: Browser;
 beforeAll(async () => {
   browser = await launch();
 });
+afterEach(() => closePages(browser));
 afterAll(async () => {
   await browser?.close();
 });

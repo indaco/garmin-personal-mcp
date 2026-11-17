@@ -68,3 +68,8 @@ export async function open(
 }
 
 export const launch = () => chromium.launch();
+
+/** Closes the pages of a test. Each test opens a new context, and open contexts stay in the browser
+ * until it closes: the 300 tests of a file filled the 16 GB of the CI runner, which then stopped. */
+export const closePages = (browser: Browser | undefined) =>
+  Promise.all(browser?.contexts().map((c) => c.close()) ?? []);

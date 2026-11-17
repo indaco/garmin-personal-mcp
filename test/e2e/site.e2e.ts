@@ -3,8 +3,8 @@ import { createServer, type Server } from "node:http";
 import { extname, join, normalize } from "node:path";
 import axe from "axe-core";
 import type { Browser, BrowserContextOptions, Page } from "playwright-core";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { launch } from "./page";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { closePages, launch } from "./page";
 
 // The project website in Chromium, from dist-site/ (`pnpm build:site`). A small server gives the page a
 // real origin: the clipboard needs one.
@@ -41,6 +41,7 @@ beforeAll(async () => {
   base = `http://127.0.0.1:${typeof address === "object" && address ? address.port : 0}/`;
   browser = await launch();
 });
+afterEach(() => closePages(browser));
 afterAll(async () => {
   await browser?.close();
   server?.close();

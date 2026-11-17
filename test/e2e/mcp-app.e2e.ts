@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Browser } from "playwright-core";
 import { build } from "tsdown";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
 import { DashboardWriter, pageCode, type ViewBlocks, writeBlock } from "../../src/dashboard-page";
-import { data, launch } from "./page";
+import { data, closePages, launch } from "./page";
 import { preset } from "../../src/page/presets";
 
 let browser: Browser;
@@ -25,6 +25,7 @@ beforeAll(async () => {
   host = readFileSync(join(outDir, "host.iife.js"), "utf8");
   browser = await launch();
 });
+afterEach(() => closePages(browser));
 afterAll(async () => {
   await browser?.close();
 });
