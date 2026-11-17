@@ -25,6 +25,7 @@ import {
   UnwritableBlockError,
   writeBlock,
 } from "../src/dashboard-page";
+import { weeksSince } from "../src/dashboard";
 import { digest } from "../src/digest";
 import { log } from "../src/log";
 import { preset } from "../src/page/presets";
@@ -113,6 +114,15 @@ function racingWriter(json: unknown, during: () => unknown) {
 /** Runs `run` 20 minutes later, past the reuse window of the page. */
 const later = async <T>(run: () => Promise<T>) => {
   vi.useFakeTimers({ now: Date.now() + 20 * 60_000, toFake: ["Date"] });
+  try {
+    return await run();
+  } finally {
+    vi.useRealTimers();
+  }
+};
+/** Runs on a fake day, at noon UTC: the same local day in every time zone of the tests. */
+const on = async <T>(day: string, run: () => Promise<T>) => {
+  vi.useFakeTimers({ now: new Date(`${day}T12:00:00Z`), toFake: ["Date"] });
   try {
     return await run();
   } finally {
@@ -1024,6 +1034,82 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
       expect(asks).toEqual([false]);
       expect((readBlock(page(), "data") as Full).recovery).toEqual([]);
       expect(r.digest.recovery).toEqual([]);
+    });
+  });
+
+  describe("since", () => {
+    const asks: (number | undefined)[] = [];
+
+    beforeEach(() => {
+      asks.length = 0;
+      writer = new DashboardWriter(
+        async (w) => {
+          asks.push(w);
+          return JSON.stringify(full);
+        },
+        dir,
+        async () => templateText,
+      );
+    });
+
+    // Wednesday 18 November 2026: its week starts on Monday 16 November
+    it.each([
+      ["2026-11-02", 2],
+      ["2026-11-08", 2],
+      ["2026-11-09", 1],
+      // the week of today: the shortest window, as weeks = 1
+      ["2026-11-16", 1],
+      ["2026-11-18", 1],
+      ["2025-11-17", 52],
+      ["2024-01-01", 52],
+    ])("covers the weeks from the week of %s", (since, weeks) => {
+      expect(weeksSince(since, "2026-11-18")).toBe(weeks);
+    });
+
+    it("grows by one week at each later write, preview and view, and stays in the settings", async () => {
+      await on("2026-11-18", () => writer.write({ settings: { since: "2026-11-04" } }));
+      await on("2026-12-02", () => writer.write({}));
+      await on("2026-12-09", () => writer.preview({}));
+      await on("2026-12-16", () => writer.view({}));
+      expect(asks).toEqual([2, 4, 5, 6]);
+      expect(page()).toContain('"since":"2026-11-04"');
+    });
+
+    it("refuses weeks on a page with since, and settings without since bring weeks back", async () => {
+      await on("2026-11-18", async () => {
+        await expect(writer.write({ weeks: 4, settings: { since: "2026-11-02" } })).rejects.toThrow(
+          /^Give either `weeks` or `settings.since`: the page starts on 2026-11-02/,
+        );
+        expect(existsSync(file)).toBe(false);
+        await writer.write({ settings: { since: "2026-11-02" } });
+        await expect(writer.write({ weeks: 4 })).rejects.toThrow(/the page starts on 2026-11-02/);
+        await expect(writer.view({ weeks: 4 })).rejects.toThrow(/the page starts on/);
+        // a preview only looks, so the creation prompts can ask for their weeks on any page
+        await writer.preview({ weeks: 5 });
+        await writer.write({ weeks: 4, settings: {} });
+      });
+      expect(asks).toEqual([2, 5, 4]);
+      expect(page()).not.toContain('"since"');
+    });
+
+    it.each(["1/9/2026", "2026-9-1", "2026-02-30", "2026-13-01", "2026-11-19", 20261101])(
+      "refuses since %s",
+      async (since) => {
+        await on("2026-11-18", async () => {
+          await expect(writer.write({ settings: { since: since as string } })).rejects.toThrow(
+            /^Settings: since: a day that is not in the future, as yyyy-MM-dd, e\.g\. 2026-09-01$/,
+          );
+        });
+        expect(existsSync(file)).toBe(false);
+      },
+    );
+
+    it("keeps the page's weeks when a saved since is not a day", async () => {
+      await on("2026-11-18", () => writer.write({ settings: { since: "2026-11-02" } }));
+      writeFileSync(file, page().replace('"since":"2026-11-02"', '"since":"last autumn"'));
+      await on("2026-12-02", () => writer.write({}));
+      // the data block of `full` has 12 weeks
+      expect(asks).toEqual([2, 12]);
     });
   });
 

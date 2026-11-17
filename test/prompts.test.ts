@@ -94,7 +94,7 @@ describe("prompts", () => {
       expect(text).toContain("only when `settings` has more than `title` and `headline`");
       expect(text).toContain('"Keep these settings" (default)');
       expect(text).toContain(
-        '"Use the defaults: all sports, all data, English and\n     the language of my Garmin profile, all themes, opens in midnight, no workout comparison, no\n     Recovery trend"',
+        '"Use the defaults: all sports, all data, English and\n     the language of my Garmin profile, all themes, opens in midnight, no workout comparison, no\n     Recovery trend, the last 8 weeks"',
       );
       expect(text).toContain('"all sports, keep the rest"');
       expect(text).toContain("name each item that it excludes. Say that the defaults add them to");
@@ -620,7 +620,7 @@ describe("recovery trend", () => {
   it("pins the other sentences of the Recovery trend in the three prompts", async () => {
     for (const layout of ["preset", "blank"]) {
       expect(await pageText("training-dashboard", { layout })).toContain(
-        'opens in midnight, no workout comparison, no Recovery trend". Say that I can type my own choice',
+        'opens in midnight, no workout comparison, no Recovery trend, the last 12 weeks". Say that I can type my own choice',
       );
     }
     expect(await pageText("dashboard-setup")).toContain(
@@ -639,6 +639,39 @@ describe("recovery trend", () => {
 
   it("is not asked in an update, which keeps the choice of the page", async () => {
     expect(await render("training-dashboard-update")).not.toContain("Recovery trend");
+  });
+});
+
+describe("start day", () => {
+  const rules =
+    'Start day: turn the day I chose into `since` = yyyy-MM-dd ("Since 1 January" is the first day of this year). If I typed only numbers that can be read as day/month and as month/day (01/09 is 1 September or 9 January), ask which one. A day after today is not allowed. When I typed the day, tell me the day with the month as a word, in my language, and the Monday that the page starts on, and wait for my yes before you write the page. With `since`, the `writeDashboard` calls that write the page give no `weeks`.';
+  const period =
+    'options "The last 8 weeks" (default), "Since 1 January" and "From a day I choose". Say that I can type the day in my own words. Say that with a day, the page starts in the week of that day and gets one more week at each update, up to 52 weeks; after that it shows the last 52 weeks.';
+
+  it("is asked in the preset and blank prompts, read back and given as a setting", async () => {
+    for (const layout of ["preset", "blank"]) {
+      const text = await pageText("training-dashboard", { weeks: "8", layout });
+      expect(text).toContain(
+        `**Period**: only when \`settings\` has no \`since\`. O${period.slice(1)}`,
+      );
+      expect(text).toContain(rules);
+      expect(text).toContain(
+        "Do the same with `since` if I chose a start day. Give no `weeks` when I chose a start day or keep the `since` of `settings`.",
+      );
+    }
+  });
+
+  it("is asked in the setup prompt, read back and given as a setting", async () => {
+    const setup = await pageText("dashboard-setup", { weeks: "8" });
+    expect(setup).toContain(`In the same call, ask about the **Period**: ${period}`);
+    expect(setup).toContain(rules);
+    expect(setup).toContain("`since` (the start day, when I chose one; then no `weeks`)");
+  });
+
+  it("keeps the start day of the page in an update", async () => {
+    expect(await pageText("training-dashboard-update")).toContain(
+      "If the call is refused because the page starts on a day (`since`), call it again without `weeks`, and tell me that the page keeps its start day: the `training-dashboard` prompt can change it.",
+    );
   });
 });
 

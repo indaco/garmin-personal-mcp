@@ -63,7 +63,7 @@ settings stay. The layout changes only when a release adds a preset widget to a 
 edited (see below). Use one of these procedures:
 
 - **Prompt**: run `training-dashboard-update`. The assistant writes new coach notes. Leave `weeks`
-  empty to keep the weeks of the page.
+  empty to keep the weeks of the page. A page with a start day (`since`) gets one more week.
 - **Your own words**: ask your assistant, for example "update my dashboard without coach notes".
   This also works in a client that does not show MCP prompts.
 - **Terminal**: run `npx -y @indaco/garmin-personal-mcp@latest refresh`. It removes the coach notes.
@@ -381,6 +381,7 @@ assistant calls `writeDashboard` with `settings`:
 | `workouts`        | compare the same run workout across weeks (the Workout trend widget)       | off                                                    |
 | `recoveryHistory` | keep sleep and resting HR for the whole period (the Recovery trend widget) | off                                                    |
 | `shared`          | a page for another person: a new file of it is readable by other users     | off                                                    |
+| `since`           | the first day of the page, as `yyyy-MM-dd`, in place of `weeks`            | none: the last `weeks` weeks                           |
 
 The server leaves the excluded data and sports out of the file, and out of the digest for the coach
 notes. The server cannot remove data from the chat. If another tool showed the data earlier in the
@@ -423,6 +424,16 @@ first update of a 52-week page asks Garmin for up to 24 ranges, and a later upda
 Garmin has a rate limit of about 100 requests in a short time. One real first update of a 52-week
 page sent 81 requests: 45 calls and 36 .FIT downloads. `workouts` can add up to 8 .FIT files for each
 workout. If the limit stops the recovery data of an update, the next update goes on from what it saved.
+
+`since` is for a page that starts on a day, for example the first day of a training plan. The page
+starts on the Monday of the week of that day, and each update adds the new week, up to 52 weeks.
+After 52 weeks, the page shows the last 52 weeks. A day in the week of today gives 1 week and the
+current week, the shortest page. The day cannot be in the future. The prompts ask for the period
+with the choices "the last 12 weeks", "since 1 January" and "from a day I choose". You can give the
+day in your own words; the assistant tells you the day with the month as a word and waits for your
+yes. A page with `since` refuses a `weeks` argument when it writes or shows the page. To go back to
+the last weeks, give new settings without `since`. A recent `since` also makes the first update
+cheaper: it asks Garmin only for the weeks since that day.
 
 Settings need a page from the template, or a page that the assistant designed (`freeform`) with a
 `garmin-settings` block. The freeform prompt adds that block when you set `workouts` or `recoveryHistory`.

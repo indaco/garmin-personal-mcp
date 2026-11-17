@@ -287,7 +287,9 @@ page is for:
   file, for example through a shared folder.
 
 Then the assistant asks for the file (any name or path), the title, the headline, the sports, the
-languages and the themes, and whether to compare the workouts that your runs repeat. A page can also keep the sleep and resting HR of the whole period (`recoveryHistory`, off by default). The server writes only the data that you select into the file. Other data
+languages and the themes, whether to compare the workouts that your runs repeat, and the period: the
+last `weeks` weeks, or from a day that you choose (`since`), with one more week at each update, up
+to 52. A page can also keep the sleep and resting HR of the whole period (`recoveryHistory`, off by default). The server writes only the data that you select into the file. Other data
 is not in the file, so you can send the file safely. A personal page and a shared page can be two
 files side by side. Each page keeps its settings on each update. The argument `weeks` is optional
 (default 12).
