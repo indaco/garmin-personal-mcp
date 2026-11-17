@@ -5,6 +5,8 @@ tools of the `garmin-personal` MCP server. Answer in my language.
    `page`. The server keeps the page with its layout, widgets and languages, and replaces its
    data and adds the new preset widgets of a release to a board that I edited. A page with different page code gets the page code of the server and keeps all of these. If there is no
    page yet, the server writes one from the template.
+   If the call is refused because the page starts on a day (`since`), call it again without `weeks`,
+   and tell me that the page keeps its start day: the `training-dashboard` prompt can change it.
    If the reply of this first call has `page: "upgraded"`, tell me that the page has the page code of
    server `server` now, and that server `previousServer` wrote it before. Show a value that is
    "n/a" as "n/a". The reply of step 3 does not have these values: do not guess a version.

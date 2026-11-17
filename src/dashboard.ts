@@ -38,6 +38,11 @@ export const WORKOUT_SESSIONS = 8;
 /** The weeks that getDashboardData covers for an asked number: 12 by default, 1 to 52. */
 export const weeksCovered = (weeks: number | undefined): number =>
   weeks == null ? DEFAULT_WEEKS : Math.min(Math.max(weeks, 1), MAX_WEEKS);
+/** The weeks of a page that starts in the week of `since` (yyyy-MM-dd): one more each week, up to 52. */
+export const weeksSince = (since: string, today: string): number =>
+  weeksCovered(
+    Math.round((Date.parse(mondayOf(today)) - Date.parse(mondayOf(since))) / (7 * 86_400_000)),
+  );
 /**
  * The last days of a cached range are fetched again: a watch can sync days late, and Garmin can still
  * change a session or finish a night's data. 14 days fit one search page, one HRV chunk and one recovery

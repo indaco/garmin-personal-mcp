@@ -4,7 +4,8 @@ import { homedir } from "node:os";
 import { resolve } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
-import { weeksCovered } from "./dashboard";
+import { weeksCovered, weeksSince } from "./dashboard";
+import { localToday } from "./dates";
 import { type Digest, digest, syncGaps } from "./digest";
 import { Profile } from "@garmin/fitsdk";
 import { type Activity, GROUPS, groupOf, tabsFor } from "./analytics/calc";
@@ -303,6 +304,27 @@ function weeksOf(page: string | undefined): number | undefined {
   }
 }
 
+/** A real day written as yyyy-MM-dd: Date.parse turns 2026-02-30 into March 2, and 2026-13-01 into NaN. */
+function isDay(v: unknown): v is string {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const t = Date.parse(`${v}T00:00:00Z`);
+  return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === v;
+}
+
+/**
+ * The weeks to fetch: the asked `weeks`, else the weeks since the page's `since`, else the page's own.
+ * A saved `since` that is not a day is ignored: the read path never refuses an update for it.
+ */
+function weeksFor(weeks: number | undefined, s: Settings, old: string | undefined) {
+  const since = isDay(s.since) ? s.since : undefined;
+  if (weeks !== undefined && since !== undefined) {
+    throw new Error(
+      `Give either \`weeks\` or \`settings.since\`: the page starts on ${since}. For the last weeks instead, give settings without \`since\``,
+    );
+  }
+  return weeks ?? (since === undefined ? weeksOf(old) : weeksSince(since, localToday()));
+}
+
 /** The server version in a page's data block; "n/a" unless it is x.y.z (the page file is editable). */
 function serverOf(page: string): string {
   try {
@@ -543,6 +565,7 @@ export function checkSettings(s: Settings): Settings {
         "workouts",
         "recoveryHistory",
         "shared",
+        "since",
       ].includes(k),
   );
   if (unknown.length > 0) problems.push(`unknown settings ${unknown.join(", ")}`);
@@ -566,6 +589,10 @@ export function checkSettings(s: Settings): Settings {
     problems.push("recoveryHistory: true or false");
   if (s.shared !== undefined && typeof s.shared !== "boolean")
     problems.push("shared: true or false");
+  if (s.since !== undefined && !isDay(s.since))
+    problems.push(`since: ${String(s.since)} is not a day as yyyy-MM-dd, e.g. 2026-09-01`);
+  else if (s.since !== undefined && s.since > localToday())
+    problems.push(`since: ${s.since} is after today`);
   if (problems.length > 0) throw new Error(`Settings: ${problems.join("; ")}`);
   return {
     ...s,
@@ -629,7 +656,8 @@ export class DashboardWriter {
       }
       const data = JSON.parse(
         await this.#data(
-          options.weeks ?? weeksOf(old),
+          // a preview only looks: the asked weeks win over the page's since
+          options.weeks ?? weeksFor(undefined, settings, old),
           settings.workouts === true,
           wantsHistory(settings),
         ),
@@ -680,7 +708,7 @@ export class DashboardWriter {
       page = await this.#withLibrary(page, old);
       const raw = JSON.parse(
         await this.#data(
-          options.weeks ?? weeksOf(old),
+          weeksFor(options.weeks, settings, old),
           settings.workouts === true,
           wantsHistory(settings),
         ),
@@ -778,7 +806,7 @@ export class DashboardWriter {
     }
     const raw = JSON.parse(
       await this.#data(
-        weeks ?? weeksOf(old),
+        weeksFor(weeks, own, old),
         own.workouts === true,
         wantsHistory(own),
         again || notes.length > 0,
@@ -1360,7 +1388,8 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
       _meta: MODEL_ONLY,
       description: [
         "Writes the training dashboard page (default <data-dir>/garmin-dashboard.html) with the data of the",
-        "last `weeks` weeks, and returns its path and a short digest of the data (totals, weekly sums, load,",
+        "last `weeks` weeks (or, with `settings.since`, from the week of that day: one week more at each",
+        "update, up to 52), and returns its path and a short digest of the data (totals, weekly sums, load,",
         "best efforts, races, long runs, race predictions, strength top sets, readiness, fitness and form,",
         "HRV, recovery, fitness age, sync) for the coach notes. Without HRV and sleep data the digest has",
         "no readiness: give the verdict as n/a.",
@@ -1388,7 +1417,11 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         "returns the digest, the activities of each board and the `settings` of the page.",
       ].join("\n"),
       inputSchema: z.object({
-        weeks: z.number().int().describe("Weeks to cover, default 12, max 52").optional(),
+        weeks: z
+          .number()
+          .int()
+          .describe("Weeks to cover, default 12, max 52; not with `settings.since`")
+          .optional(),
         notes: z
           .array(z.string())
           .max(MAX_NOTES)
@@ -1440,6 +1473,12 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
               .boolean()
               .describe(
                 "Keep the sleep and resting HR rows of the whole period in the page, not only the last 14 days; off when not set",
+              )
+              .optional(),
+            since: z
+              .string()
+              .describe(
+                "yyyy-MM-dd: the page starts in the week of this day and grows each week, up to 52 weeks; replaces `weeks`, which the call then leaves out",
               )
               .optional(),
             shared: z
@@ -1573,7 +1612,9 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         weeks: z
           .number()
           .int()
-          .describe("Weeks to cover, default the page's or 12, max 52")
+          .describe(
+            "Weeks to cover, default the page's or 12, max 52; not on a page with `settings.since`",
+          )
           .optional(),
         path: z
           .string()

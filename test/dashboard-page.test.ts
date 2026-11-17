@@ -25,6 +25,7 @@ import {
   UnwritableBlockError,
   writeBlock,
 } from "../src/dashboard-page";
+import { weeksSince } from "../src/dashboard";
 import { digest } from "../src/digest";
 import { log } from "../src/log";
 import { preset } from "../src/page/presets";
@@ -113,6 +114,15 @@ function racingWriter(json: unknown, during: () => unknown) {
 /** Runs `run` 20 minutes later, past the reuse window of the page. */
 const later = async <T>(run: () => Promise<T>) => {
   vi.useFakeTimers({ now: Date.now() + 20 * 60_000, toFake: ["Date"] });
+  try {
+    return await run();
+  } finally {
+    vi.useRealTimers();
+  }
+};
+/** Runs on a fake day, at noon UTC: the same local day in every time zone of the tests. */
+const on = async <T>(day: string, run: () => Promise<T>) => {
+  vi.useFakeTimers({ now: new Date(`${day}T12:00:00Z`), toFake: ["Date"] });
   try {
     return await run();
   } finally {
@@ -1024,6 +1034,112 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
       expect(asks).toEqual([false]);
       expect((readBlock(page(), "data") as Full).recovery).toEqual([]);
       expect(r.digest.recovery).toEqual([]);
+    });
+  });
+
+  describe("since", () => {
+    const asks: (number | undefined)[] = [];
+
+    beforeEach(() => {
+      asks.length = 0;
+      writer = new DashboardWriter(
+        async (w) => {
+          asks.push(w);
+          return JSON.stringify(full);
+        },
+        dir,
+        async () => templateText,
+      );
+    });
+
+    // Wednesday 18 November 2026: its week starts on Monday 16 November
+    it.each([
+      ["2026-11-02", 2],
+      ["2026-11-08", 2],
+      ["2026-11-09", 1],
+      // the week of today: the shortest window, as weeks = 1
+      ["2026-11-16", 1],
+      ["2026-11-18", 1],
+      ["2025-11-17", 52],
+      ["2024-01-01", 52],
+      // a saved day after today (a clock set back): the shortest window, never 0 or less
+      ["2026-12-01", 1],
+    ])("covers the weeks from the week of %s", (since, weeks) => {
+      expect(weeksSince(since, "2026-11-18")).toBe(weeks);
+    });
+
+    it.each([
+      // across New Year: Monday 28 December 2026 to Wednesday 6 January 2027
+      ["2026-12-31", "2027-01-06", 1],
+      // 2020 has an ISO week 53: Monday 21 December 2020 to Monday 4 January 2021
+      ["2020-12-21", "2021-01-04", 2],
+      // across the end of daylight saving time in Europe (25 October 2026)
+      ["2026-10-19", "2026-11-02", 2],
+    ])("counts the weeks from %s to %s across a year or a clock change", (since, today, weeks) => {
+      expect(weeksSince(since, today)).toBe(weeks);
+    });
+
+    it("grows by one week at each later write, preview and view, and stays in the settings", async () => {
+      await on("2026-11-18", () => writer.write({ settings: { since: "2026-11-04" } }));
+      await on("2026-12-02", () => writer.write({}));
+      await on("2026-12-09", () => writer.preview({}));
+      await on("2026-12-16", () => writer.view({}));
+      // the second write of a prompt (with the notes) uses the data that it already has
+      await on("2026-12-16", () => writer.write({ notes: ["Easy week."] }));
+      expect(asks).toEqual([2, 4, 5, 6]);
+      expect(page()).toContain('"since":"2026-11-04"');
+    });
+
+    it("refuses weeks on a page with since, and settings without since bring weeks back", async () => {
+      await on("2026-11-18", async () => {
+        await expect(writer.write({ weeks: 4, settings: { since: "2026-11-02" } })).rejects.toThrow(
+          /^Give either `weeks` or `settings.since`: the page starts on 2026-11-02/,
+        );
+        expect(existsSync(file)).toBe(false);
+        await writer.write({ settings: { since: "2026-11-02" } });
+        await expect(writer.write({ weeks: 4 })).rejects.toThrow(/the page starts on 2026-11-02/);
+        await expect(writer.view({ weeks: 4 })).rejects.toThrow(/the page starts on/);
+        // a preview only looks, so the creation prompts can ask for their weeks on any page
+        await writer.preview({ weeks: 5 });
+        await writer.write({ weeks: 4, settings: {} });
+      });
+      expect(asks).toEqual([2, 5, 4]);
+      expect(page()).not.toContain('"since"');
+    });
+
+    it.each(["1/9/2026", "2026-9-1", "2026-02-30", "2026-13-01", 20261101])(
+      "refuses since %s, which is not a day",
+      async (since) => {
+        await on("2026-11-18", async () => {
+          await expect(writer.write({ settings: { since: since as string } })).rejects.toThrow(
+            `Settings: since: ${since} is not a day as yyyy-MM-dd, e.g. 2026-09-01`,
+          );
+        });
+        expect(existsSync(file)).toBe(false);
+      },
+    );
+
+    it("refuses a since after today, and takes today", async () => {
+      await on("2026-11-18", async () => {
+        await expect(writer.write({ settings: { since: "2026-11-19" } })).rejects.toThrow(
+          /^Settings: since: 2026-11-19 is after today$/,
+        );
+        await writer.write({ settings: { since: "2026-11-18" } });
+      });
+      // 29 February is a day only in a leap year
+      await on("2028-03-01", () => writer.write({ settings: { since: "2028-02-29" } }));
+      await expect(
+        on("2026-11-18", () => writer.write({ settings: { since: "2026-02-29" } })),
+      ).rejects.toThrow("since: 2026-02-29 is not a day");
+      expect(asks).toEqual([1, 1]);
+    });
+
+    it("keeps the page's weeks when a saved since is not a day", async () => {
+      await on("2026-11-18", () => writer.write({ settings: { since: "2026-11-02" } }));
+      writeFileSync(file, page().replace('"since":"2026-11-02"', '"since":"last autumn"'));
+      await on("2026-12-02", () => writer.write({}));
+      // the data block of `full` has 12 weeks
+      expect(asks).toEqual([2, 12]);
     });
   });
 

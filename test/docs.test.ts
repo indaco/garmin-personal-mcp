@@ -111,7 +111,7 @@ describe("guide", () => {
 
   it("says that a writeDashboard preview writes no page file", () => {
     expect(readFileSync("guide/tools.md", "utf8")).toContain(
-      "`settings` set the title, the sports, the data, the languages, the themes, the workout comparison and the recovery history of the page; `preview` writes no page file (it updates the data cache, as `getDashboardData` does) and gives the activities of each board and the settings of the page.",
+      "`settings` set the title, the sports, the data, the languages, the themes, the workout comparison, the recovery history and the start day (`since`: the page starts in the week of that day and grows by one week at each update, up to 52) of the page; `preview` writes no page file (it updates the data cache, as `getDashboardData` does) and gives the activities of each board and the settings of the page.",
     );
     const readme = readFileSync("README.md", "utf8").replace(/\s+/g, " ");
     const preview =

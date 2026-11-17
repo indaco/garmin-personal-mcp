@@ -14,7 +14,8 @@ Answer in my language.
      the page again, also on each automatic update: this matters for a page that I share.
      Options "Keep these settings" (default) and "Use the defaults: all sports, all data, English and
      the language of my Garmin profile, all themes, opens in midnight, no workout comparison, no
-     Recovery trend". Say that I can type my own choice, for example "all sports, keep the rest".
+     Recovery trend, the last {{weeks}} weeks". Say that I can type my own choice, for example
+     "all sports, keep the rest".
    - **Title**: options "Keep the title" (default: the `title` of `settings`, else "{{title}}") and
      "Type my own".
    - **Headline** (the line under the title): options "Keep the headline" (default: the `headline`
@@ -28,15 +29,22 @@ Answer in my language.
      `recovery`. Options "No" (default) and "Yes, add the Recovery trend". Say that a yes adds a
      widget with the weekly average of sleep, sleep score and resting HR for the whole period, and
      that the page file then holds these values for each day: this matters for a page that I share.
+   - **Period**: only when `settings` has no `since`. Options "The last {{weeks}} weeks" (default),
+     "Since 1 January" with the year of today (for example "Since 1 January 2026") and "From a day I
+     choose". Say that I can type the day in my own words. Say that with a day, the page starts in
+     the week of that day and gets one more week at each update, up to 52 weeks; after that it shows
+     the last 52 weeks. Say that the page does not start again on 1 January: in a new year it keeps
+     its start day.
    When I choose "Type my own" and give no text, ask for the text in chat.
 3. Call `writeDashboard` with `weeks` = {{weeks}} and `layout` = "{{layout}}". If I chose the
    defaults, also give `settings` = only the `title` and `headline` of `settings`, the ones that it
    has. If I typed my own choice, give `settings` = `settings` changed as I said. If I said yes to
    the workout comparison, give `settings` with `workouts` = true: added to the settings of this
    step, or to `settings` when this step gives none. Do the same with `recoveryHistory` = true if I
-   said yes to the Recovery trend. The server gets the data, writes the page from
-   its template, and returns the path of the page and a digest of the data. An existing page stays
-   as a `.bak` file.
+   said yes to the Recovery trend. Do the same with `since` if I chose a start day. Give no `weeks`
+   when I chose a start day or keep the `since` of `settings`. The server gets the data, writes the
+   page from its template, and returns the path of the page and a digest of the data. An existing
+   page stays as a `.bak` file.
 4. Write at most 5 coach notes from the digest. Each note names a specific number of the digest, for
    example "load ratio 1.18 while HRV was under its weekly average on 3 of the last 7 nights".
    Training suggestions only, no medical advice. Plain text, in my language.
@@ -55,6 +63,14 @@ Answer in my language.
      the `settings` of the last result, with `languages` = the codes of `pageLanguages` that are `en`
      or built in, and the new code.
    - Any other language: tell me to run the `dashboard-language` prompt with it.
+
+Start day: turn the day I chose into `since` = yyyy-MM-dd ("Since 1 January" is 1 January of the
+year of today). If I typed only numbers that can be read as day/month and as month/day (01/09 is 1
+September or 9 January), ask which one. If my day does not exist (31 April) or is after today, tell
+me what is wrong and ask again. When I typed the day, tell me the day with the weekday and the month
+as words, in my language (for example "Tuesday 1 September 2026"), and the Monday that the page
+starts on, and wait for my yes before you write the page. With `since`, the `writeDashboard` calls
+that write the page give no `weeks`.
 
 If a `writeDashboard` result has `missingWidgetTexts`, call `editDashboard` without
 changes, translate the English texts of those widgets (`customWidgets[].texts.en`) into the listed
