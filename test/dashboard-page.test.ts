@@ -1062,8 +1062,21 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
       ["2026-11-18", 1],
       ["2025-11-17", 52],
       ["2024-01-01", 52],
+      // a saved day after today (a clock set back): the shortest window, never 0 or less
+      ["2026-12-01", 1],
     ])("covers the weeks from the week of %s", (since, weeks) => {
       expect(weeksSince(since, "2026-11-18")).toBe(weeks);
+    });
+
+    it.each([
+      // across New Year: Monday 28 December 2026 to Wednesday 6 January 2027
+      ["2026-12-31", "2027-01-06", 1],
+      // 2020 has an ISO week 53: Monday 21 December 2020 to Monday 4 January 2021
+      ["2020-12-21", "2021-01-04", 2],
+      // across the end of daylight saving time in Europe (25 October 2026)
+      ["2026-10-19", "2026-11-02", 2],
+    ])("counts the weeks from %s to %s across a year or a clock change", (since, today, weeks) => {
+      expect(weeksSince(since, today)).toBe(weeks);
     });
 
     it("grows by one week at each later write, preview and view, and stays in the settings", async () => {
@@ -1071,6 +1084,8 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
       await on("2026-12-02", () => writer.write({}));
       await on("2026-12-09", () => writer.preview({}));
       await on("2026-12-16", () => writer.view({}));
+      // the second write of a prompt (with the notes) uses the data that it already has
+      await on("2026-12-16", () => writer.write({ notes: ["Easy week."] }));
       expect(asks).toEqual([2, 4, 5, 6]);
       expect(page()).toContain('"since":"2026-11-04"');
     });
@@ -1111,7 +1126,12 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
         );
         await writer.write({ settings: { since: "2026-11-18" } });
       });
-      expect(asks).toEqual([1]);
+      // 29 February is a day only in a leap year
+      await on("2028-03-01", () => writer.write({ settings: { since: "2028-02-29" } }));
+      await expect(
+        on("2026-11-18", () => writer.write({ settings: { since: "2026-02-29" } })),
+      ).rejects.toThrow("since: 2026-02-29 is not a day");
+      expect(asks).toEqual([1, 1]);
     });
 
     it("keeps the page's weeks when a saved since is not a day", async () => {

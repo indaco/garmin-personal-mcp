@@ -161,6 +161,30 @@ describe("the page", () => {
     expect(errors).toEqual([]);
   });
 
+  it("opens the shortest page of a start day: 1 week and the week in progress", async () => {
+    // since in the week of Wednesday 2026-11-18 gives weeks = 1: the page starts on Monday 2026-11-09
+    const { page, errors } = await open(
+      browser,
+      pageFile({
+        data: {
+          ...data,
+          v: DASHBOARD_VERSION,
+          generated: "2026-11-18",
+          weeks: 1,
+          start: "2026-11-09",
+          end: "2026-11-18",
+          prevStart: "2026-10-26",
+          prevEnd: "2026-11-08",
+          activities: [row(9701, "Quarry Loop", "2026-11-17 07:00:00")],
+          previousActivities: [row(9711, "Quarry Loop", "2026-10-30 07:00:00")],
+        },
+      }),
+    );
+    expect(await page.locator("#from option").count()).toBe(2);
+    expect(await page.locator("[data-widget]").count()).toBeGreaterThan(0);
+    expect(errors).toEqual([]);
+  });
+
   it("gives the year of a range start only when the range ends in another year", async () => {
     // 2025-12-01 to 2026-01-25 is 56 days, so the previous period is 2025-10-06 to 2025-11-30
     const { page, errors } = await open(
