@@ -4,6 +4,63 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The changelog is generated and managed by [sley](https://github.com/indaco/sley).
 
+## v0.14.0 - 2026-11-17
+
+### Highlights
+
+This release adds a new period choice for your dashboard page and clearer labels on the page.
+
+- **Start your page on a day.** Choose a day, for example the first day of a plan, and each update adds the new week, up to 52 weeks.
+- **See the year in your dates.** The week menus, a custom range and the period comparison show the year, and the window buttons say "Last 4 weeks".
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
+
+### 🚀 Enhancements
+
+- **dashboard:** a page can start on a day and grow each week ([ec97b36](https://github.com/indaco/garmin-personal-mcp/commit/ec97b36)) ([#263](https://github.com/indaco/garmin-personal-mcp/pull/263))
+
+### 🩹 Fixes
+
+- **page:** name the unit of window buttons and show years in dates ([1342d6d](https://github.com/indaco/garmin-personal-mcp/commit/1342d6d)) ([#262](https://github.com/indaco/garmin-personal-mcp/pull/262))
+
+### ✅ Tests
+
+- close the page test contexts, split the dashboard tests, wait for the first Windows logon ([f22216a](https://github.com/indaco/garmin-personal-mcp/commit/f22216a)) ([#264](https://github.com/indaco/garmin-personal-mcp/pull/264))
+
+### 🏡 Chores
+
+- **deps:** update oxlint, playwright-core, tsdown and oxfmt ([56a52ce](https://github.com/indaco/garmin-personal-mcp/commit/56a52ce)) ([#265](https://github.com/indaco/garmin-personal-mcp/pull/265))
+
+### 🎉 New Contributors
+
+- [@robbiece](https://github.com/robbiece) made their first contribution in [#262](https://github.com/indaco/garmin-personal-mcp/pull/262)
+
+### ❤️ Contributors
+
+- [@indaco](https://github.com/indaco)
+- [@robbiece](https://github.com/robbiece)
+
 ## v0.13.0 - 2026-11-11
 
 ### Highlights
