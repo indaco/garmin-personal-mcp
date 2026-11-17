@@ -373,7 +373,7 @@ if (WINDOWS && process.env.E2E_SECOND_USER) {
   let script = 0;
 
   /** Runs the lines of a .cmd file as the second user: it has its own environment, so the file sets it. */
-  const asOther = (lines) =>
+  const asOther = (lines, timeout = TIMEOUT_MS) =>
     new Promise((done, fail) => {
       const file = join(base, `run-${++script}.cmd`);
       writeFileSync(file, ["@echo off", ...lines, "exit /b %errorlevel%", ""].join("\r\n"));
@@ -396,7 +396,7 @@ if (WINDOWS && process.env.E2E_SECOND_USER) {
       const timer = setTimeout(() => {
         p.kill();
         fail(new Error(`timeout as the second user: ${lines.join(" | ")}`));
-      }, TIMEOUT_MS);
+      }, timeout);
       p.on("close", (code) => {
         clearTimeout(timer);
         const out = readIfThere(stdout) + readIfThere(stderr);
@@ -412,7 +412,8 @@ if (WINDOWS && process.env.E2E_SECOND_USER) {
     cpSync(resolve("dist"), join(base, "dist"), { recursive: true });
 
     // these two controls prove that the commands really run as a user without administrator rights
-    let r = await asOther(["whoami"]);
+    // the first logon of a new account makes its profile: 18-30 s on CI, then each call takes 0.5 s
+    let r = await asOther(["whoami"], 120_000);
     check(
       "second user: runs as that user",
       r.code === 0 && r.out.toLowerCase().includes(other.toLowerCase()),
