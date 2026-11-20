@@ -244,6 +244,10 @@ const RAMP_DATA = {
 const ramps = (d: ReturnType<typeof digest>) =>
   Object.entries(d.weekly).map(([monday, w]) => [monday, w.rampPct]);
 
+/** The monotony and strain of each weekly row, oldest first. */
+const weekLoads = (d: ReturnType<typeof digest>) =>
+  Object.entries(d.weekly).map(([monday, w]) => [monday, w.monotony, w.strain]);
+
 describe("digest", () => {
   const d = digest(data);
 
@@ -303,6 +307,9 @@ describe("digest", () => {
       load: 190,
       // the week before has no session
       rampPct: null,
+      // 0, 50, 0, 40, 0, 0, 100
+      monotony: 0.76,
+      strain: 144.3,
       // runs without zone seconds or zones; 10 km of 15.5
       runEasyPct: null,
       runHardPct: null,
@@ -315,6 +322,9 @@ describe("digest", () => {
       hours: 0.6,
       load: null,
       rampPct: null,
+      // the period ends on its Monday: in progress
+      monotony: null,
+      strain: null,
       runEasyPct: null,
       runHardPct: null,
       longRunSharePct: null,
@@ -420,6 +430,43 @@ describe("digest", () => {
     expect(out.load).toMatchObject({ last7Days: 132, monotony: 0.63, strain: 83.5 });
     // a Friday: the last week is in progress
     expect(ramps(digest({ ...RAMP_DATA, end: "2026-10-23" })).at(-1)).toEqual(["2026-10-19", null]);
+  });
+
+  it("gives the page's monotony and strain of each week", () => {
+    // one session in a week: 1 / sqrt(6); 19 Oct to 25 Oct: 0, 66, 0, 66, 0, 0, 0
+    expect(weekLoads(digest(RAMP_DATA))).toEqual([
+      ["2026-10-05", 0.41, 40.8],
+      ["2026-10-12", 0.41, 44.9],
+      ["2026-10-19", 0.63, 83.5],
+    ]);
+    // a Friday: the last week is in progress
+    expect(weekLoads(digest({ ...RAMP_DATA, end: "2026-10-23" })).at(-1)).toEqual([
+      "2026-10-19",
+      null,
+      null,
+    ]);
+  });
+
+  it("gives no monotony to a partial first week", () => {
+    const partial = digest({
+      ...RAMP_DATA,
+      start: "2026-10-07",
+      activities: [...RAMP_DATA.activities.slice(0, 3), loaded("2026-10-08", 100)],
+    });
+    expect(weekLoads(partial)).toEqual([
+      ["2026-10-05", null, null],
+      ["2026-10-12", 0.41, 44.9],
+      ["2026-10-19", 0.63, 83.5],
+    ]);
+  });
+
+  it("gives no monotony without the start of the period", () => {
+    // the Load safety weeks start at the period's start: without it no week is known
+    expect(weekLoads(digest({ ...RAMP_DATA, start: undefined }))).toEqual([
+      ["2026-10-05", null, null],
+      ["2026-10-12", null, null],
+      ["2026-10-19", null, null],
+    ]);
   });
 
   it("gives no ramp to the week after a partial first week", () => {
