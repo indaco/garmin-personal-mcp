@@ -273,7 +273,9 @@ After a release, this prompt also writes the new page code. Restart the client f
 [Update the page code after a release](guide/dashboard.md#update-the-page-code-after-a-release).
 
 To update the page automatically, tell your assistant when, in your own words, for example "update
-my dashboard every Monday at 7". See
+my dashboard every Monday at 7". Before it writes the schedule, Claude Code asks you to confirm the
+next three updates in a form (tested with 2.1.329; Claude Desktop and the MCP Inspector: not
+tested). See
 [Update the dashboard on a schedule](guide/dashboard.md#update-the-dashboard-on-a-schedule).
 
 ### dashboard-setup
