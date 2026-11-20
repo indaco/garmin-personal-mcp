@@ -383,7 +383,8 @@ In a client that shows MCP completions, the `activity` argument of `run-review`,
 `swim-review` and `ride-review` suggests the names of your recent activities as you type. The
 names come from the dashboard data on your computer (your newest 200 activities), not from Garmin,
 so the suggestions start after your first dashboard update. Claude Code does not show them (tested
-with 2.1.329). Claude Desktop and the MCP Inspector: not tested.
+with 2.1.329). Claude Desktop does not show them (tested with 6.6395.1 on the `distance` argument of
+`race-readiness`). The MCP Inspector: not tested.
 
 ### run-review
 
