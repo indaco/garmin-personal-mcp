@@ -33,7 +33,10 @@ update with new texts, the update prompt tells the assistant which texts are mis
 To remove a language that you added, ask your assistant. For example: "Remove the Dutch language
 from the page". The assistant calls `editDashboard` with `removeLanguages`. Built-in languages stay:
 the [page settings](dashboard.md#page-settings) choose them. When the settings add a built-in
-language, the assistant translates your custom widgets into it.
+language, the assistant translates your custom widgets into it. Before the server deletes the texts
+of a language, your client can ask you to confirm in a form. When you decline, the server deletes
+nothing. Claude Code shows this form (tested with 2.1.329). Claude Desktop and the MCP Inspector:
+not tested. A client without the form deletes the texts at once.
 
 To change one text of a built-in language, ask your assistant. For example: "In Italian, call the
 readiness widget _Forma di oggi_".

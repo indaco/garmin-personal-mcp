@@ -27,6 +27,7 @@ import { DATA_ITEMS, type Settings } from "./page/settings";
 import { THEMES } from "./page/theme";
 import { WIDGET_API } from "./page/widget-api";
 import { version } from "../package.json";
+import { confirm } from "./confirm";
 import { log } from "./log";
 import { DASHBOARD_VERSION } from "./prompts";
 import { MODEL_ONLY, writeAtomically } from "./tools";
@@ -155,6 +156,12 @@ export interface EditOptions {
   removeLanguages?: string[];
   englishTexts?: boolean;
   path?: string;
+}
+
+/** What an edit deletes that has no backup: library entries by id and added languages by code. */
+export interface Removals {
+  widgets: string[];
+  languages: string[];
 }
 
 export interface EditResult {
@@ -909,6 +916,16 @@ export class DashboardWriter {
     return run.catch(this.#unwritable(options.path));
   }
 
+  /**
+   * What `edit` would delete with no backup. It runs every check of `edit` and writes no page, .bak
+   * or library; like a read, it can start a missing library.
+   */
+  removals(options: EditOptions): Promise<Removals> {
+    const run = this.#queue.then(async () => (await this.#check(options)).removals);
+    this.#queue = run.catch(() => {});
+    return run.catch(this.#unwritable(options.path));
+  }
+
   /** The second write of a build (notes, a typed title, a new layout) must not overwrite the page from before the build. */
   #inBuild(target: string, old: string): boolean {
     return (
@@ -919,6 +936,48 @@ export class DashboardWriter {
   }
 
   async #edit(o: EditOptions): Promise<EditResult> {
+    const { target, old, page, layout, widgets, library, settings, changed } = await this.#check(o);
+    // before the library is saved: a copy that fails changes no file
+    let backup: string | undefined;
+    if (o.layout !== undefined && !this.#inBuild(target, old)) {
+      backup = `${target}.bak`;
+      await copyFile(target, backup);
+    }
+    if (o.widgets !== undefined || o.forgetWidgets !== undefined || o.widgetTexts !== undefined) {
+      await this.#saveLibrary(library);
+    }
+    if (changed) await writeAtomically(target, page);
+    return {
+      path: target,
+      changed,
+      ...(backup ? { backup } : {}),
+      layout,
+      customWidgets: widgets.map((w) => ({
+        id: w.id,
+        title: w.title,
+        span: spanOf(w.span),
+        ...(w.types ? { types: w.types } : {}),
+        ...(w.texts ? { texts: w.texts } : {}),
+        library: library.some((l) => l.id === w.id),
+      })),
+      pageLanguages: pageLanguages(page, settings),
+      languages: missingTexts(page),
+      // a widget whose data the page leaves out, or that the page has not turned on, shows nothing there
+      catalogue: CATALOGUE.filter((c) => inPage(c, settings)).map((c) => ({
+        id: c.id,
+        title: en[c.title],
+        ...(c.types ? { types: c.types } : {}),
+        span: c.span,
+        about: ABOUT[c.id],
+      })),
+      widgetApi: WIDGET_API,
+      ...(o.englishTexts ? { englishTexts: en } : {}),
+      ...this.#skippedReport(),
+    };
+  }
+
+  /** Every check and change of an edit, in memory: the page, the library and what they lose. */
+  async #check(o: EditOptions) {
     const target = this.#target(o.path);
     const old = await readExisting(target);
     if (old === undefined) {
@@ -951,6 +1010,8 @@ export class DashboardWriter {
       throw unreadable(e, target);
     }
     library = await this.#library(widgets);
+    // the entries of the file before this call, also those that cannot run
+    const saved = new Set([...library, ...this.#skipped].map((w) => w.id));
     widgets = merged(widgets, library);
     let layoutChanged = false;
 
@@ -1040,43 +1101,11 @@ export class DashboardWriter {
         page = writeBlock(page, "i18n", texts);
       }
     }
-    // before the library is saved: a copy that fails changes no file
-    let backup: string | undefined;
-    if (o.layout !== undefined && !this.#inBuild(target, old)) {
-      backup = `${target}.bak`;
-      await copyFile(target, backup);
-    }
-    if (o.widgets !== undefined || o.forgetWidgets !== undefined || o.widgetTexts !== undefined) {
-      await this.#saveLibrary(library);
-    }
-    if (changed) await writeAtomically(target, page);
-    return {
-      path: target,
-      changed,
-      ...(backup ? { backup } : {}),
-      layout,
-      customWidgets: widgets.map((w) => ({
-        id: w.id,
-        title: w.title,
-        span: spanOf(w.span),
-        ...(w.types ? { types: w.types } : {}),
-        ...(w.texts ? { texts: w.texts } : {}),
-        library: library.some((l) => l.id === w.id),
-      })),
-      pageLanguages: pageLanguages(page, settings),
-      languages: missingTexts(page),
-      // a widget whose data the page leaves out, or that the page has not turned on, shows nothing there
-      catalogue: CATALOGUE.filter((c) => inPage(c, settings)).map((c) => ({
-        id: c.id,
-        title: en[c.title],
-        ...(c.types ? { types: c.types } : {}),
-        span: c.span,
-        about: ABOUT[c.id],
-      })),
-      widgetApi: WIDGET_API,
-      ...(o.englishTexts ? { englishTexts: en } : {}),
-      ...this.#skippedReport(),
+    const removals: Removals = {
+      widgets: [...forget].filter((id) => saved.has(id)),
+      languages: o.removeLanguages ?? [],
     };
+    return { target, old, page, layout, widgets, library, settings, changed, removals };
   }
 
   /**
@@ -1592,9 +1621,29 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
           .optional(),
       }),
     },
-    async (a) => ({
-      content: [{ type: "text" as const, text: JSON.stringify(await writer.edit(a)) }],
-    }),
+    async (a, ctx) => {
+      if (a.forgetWidgets !== undefined || a.removeLanguages !== undefined) {
+        // checked before the question: the SDK calls this handler again with the answer
+        const { widgets, languages } = await writer.removals(a);
+        const parts = [
+          ...(widgets.length > 0 ? [`Delete from the widget library: ${widgets.join(", ")}.`] : []),
+          ...(languages.length > 0 ? [`Delete the added texts of: ${languages.join(", ")}.`] : []),
+        ];
+        if (parts.length > 0) {
+          const c = confirm(server, ctx, "confirm", `${parts.join(" ")} No backup. Confirm?`);
+          if ("ask" in c) return c.ask;
+          if (c.answer === "no") {
+            const read = await writer.edit({ path: a.path, englishTexts: a.englishTexts });
+            return {
+              content: [
+                { type: "text" as const, text: JSON.stringify({ ...read, declined: true }) },
+              ],
+            };
+          }
+        }
+      }
+      return { content: [{ type: "text" as const, text: JSON.stringify(await writer.edit(a)) }] };
+    },
   );
 
   server.registerTool(

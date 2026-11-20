@@ -52,6 +52,9 @@ does not send it anywhere.
 - A widget removed from one page (`removeWidgets`) stays in the library. A forgotten widget
   (`forgetWidgets`) leaves the library and this page; other pages keep their copy until you remove
   it there.
+- Before a widget leaves the library, your client can ask you to confirm in a form. When you
+  decline, the server deletes nothing. Claude Code shows this form (tested with 2.1.329). Claude
+  Desktop and the MCP Inspector: not tested. A client without the form deletes the widget at once.
 - An entry that the server cannot use, for example because a new release has a built-in widget
   with the same id, stays in the file. The updates go on without it. The update tells you its id
   and the problem. Give the widget another id with `editDashboard`, or remove it with

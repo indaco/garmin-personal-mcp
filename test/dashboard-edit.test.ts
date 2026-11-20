@@ -11,8 +11,14 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DashboardWriter, readBlock, writeBlock } from "../src/dashboard-page";
+import {
+  DashboardWriter,
+  readBlock,
+  registerDashboardWriter,
+  writeBlock,
+} from "../src/dashboard-page";
 import { en } from "../src/page/i18n/en";
+import { type Answer, closeAll, connect, type Era } from "./elicitation-client";
 
 const template = `<!doctype html>
 <meta name="garmin-template" content="bbbbbbbbbbbbbbbb">
@@ -859,3 +865,203 @@ describe("missing texts and built-in languages", () => {
     expect(r.languages["pt-BR"].missing).toHaveLength(total - 1);
   });
 });
+
+/** The page, the library and whether a .bak exists. */
+const files = () => [page(), readFileSync(libraryFile(), "utf8"), existsSync(`${file}.bak`)];
+/** The questions that the client was shown. */
+const messages = (asked: unknown[]) => asked.map((a) => (a as { message: string }).message);
+
+describe("removals", () => {
+  const other = { ...widget, id: "other-ride" };
+  const bad = { ...widget, id: "hrv" };
+
+  beforeEach(async () => {
+    await writer.edit({
+      widgets: [widget],
+      place: [{ board: "all", widget: "longest-ride" }],
+      languages: { de: { title: "Training + Erholung" }, fr: { title: "Entraînement" } },
+    });
+  });
+
+  it("lists what edit would delete, and changes no file", async () => {
+    const before = files();
+    const r = await writer.removals({
+      forgetWidgets: ["longest-ride", "nothing-here"],
+      removeLanguages: ["de"],
+      layout: { base: "blank", boards: { all: [] } },
+    });
+    expect(r).toEqual({ widgets: ["longest-ride"], languages: ["de"] });
+    expect(files()).toEqual(before);
+  });
+
+  it("lists a library widget that is not on this page, and a library entry that cannot run", async () => {
+    put([widget, other, bad]);
+    expect(await writer.removals({ forgetWidgets: ["other-ride", "hrv"] })).toEqual({
+      widgets: ["other-ride", "hrv"],
+      languages: [],
+    });
+  });
+
+  it("lists a repeated id once, and not a built-in widget or empty lists", async () => {
+    expect(
+      await writer.removals({ forgetWidgets: ["longest-ride", "longest-ride", "kpis"] }),
+    ).toEqual({ widgets: ["longest-ride"], languages: [] });
+    expect(await writer.removals({ forgetWidgets: [], removeLanguages: [] })).toEqual({
+      widgets: [],
+      languages: [],
+    });
+  });
+
+  it("starts a missing library from the page, as a read does", async () => {
+    unlinkSync(libraryFile());
+    expect(await writer.removals({ forgetWidgets: ["longest-ride"] })).toEqual({
+      widgets: ["longest-ride"],
+      languages: [],
+    });
+    expect(library()).toEqual([expect.objectContaining({ id: "longest-ride" })]);
+  });
+
+  it("does not list a widget that the same call adds", async () => {
+    expect(await writer.removals({ widgets: [other], forgetWidgets: ["other-ride"] })).toEqual({
+      widgets: [],
+      languages: [],
+    });
+  });
+
+  it("refuses what edit refuses, with the same text", async () => {
+    const before = files();
+    const calls = [
+      { removeLanguages: ["it"] },
+      { removeLanguages: ["de", "de"] },
+      { forgetWidgets: ["longest-ride"], place: [{ board: "nope", widget: "kpis" }] },
+      { forgetWidgets: ["longest-ride"], path: "missing.html" },
+    ];
+    for (const call of calls) {
+      const edited = await writer.edit(call).catch((e: Error) => e.message);
+      await expect(writer.removals(call)).rejects.toThrow(edited as string);
+    }
+    expect(files()).toEqual(before);
+  });
+
+  it("names the file when a block is damaged, as edit does", async () => {
+    writeFileSync(
+      file,
+      page().replace(/(garmin-i18n:start \*\/)[\s\S]*?(\/\* garmin-i18n:end)/, "$1{bad$2"),
+    );
+    await expect(writer.removals({ removeLanguages: ["de"] })).rejects.toThrow(
+      /garmin-i18n.*garmin-dashboard\.html/,
+    );
+  });
+
+  it("leaves the next edit as it would be without it", async () => {
+    put([widget, bad]);
+    await writer.removals({ forgetWidgets: ["hrv"] });
+    const r = await writer.edit({});
+    expect(r.skippedWidgets).toEqual([{ id: "hrv", problem: expect.stringContaining("built-in") }]);
+    expect(raw()).toEqual([widget, bad]);
+  });
+});
+
+describe.each<Era>(["2025", "2026-07-28"])(
+  "editDashboard on the %s era asks before it deletes",
+  (era) => {
+    const yes: Answer = { action: "accept", content: { confirm: true } };
+
+    afterEach(closeAll);
+    beforeEach(async () => {
+      await writer.edit({
+        widgets: [widget, { ...widget, id: "other-ride" }],
+        place: [{ board: "all", widget: "longest-ride" }],
+        languages: { de: { title: "Training + Erholung" }, fr: { title: "Entraînement" } },
+      });
+    });
+
+    async function call(answer: Answer | undefined, args: Record<string, unknown>) {
+      const { client, asked } = await connect(era, answer, (s) =>
+        registerDashboardWriter(s, writer),
+      );
+      const r = await client.callTool({ name: "editDashboard", arguments: args });
+      const text = (r.content as { text: string }[])[0]?.text ?? "";
+      return { r, asked, text };
+    }
+
+    it("deletes a library widget and a language after a yes", async () => {
+      const { asked, text } = await call(yes, {
+        forgetWidgets: ["longest-ride", "nothing-here"],
+        removeLanguages: ["de"],
+      });
+      expect(messages(asked)).toEqual([
+        "Delete from the widget library: longest-ride. Delete the added texts of: de. No backup. Confirm?",
+      ]);
+      const r = JSON.parse(text) as { changed: boolean; languages: object };
+      expect(r.changed).toBe(true);
+      expect(Object.keys(r.languages)).toEqual(["fr"]);
+      expect(library().map((w) => w.id)).toEqual(["other-ride"]);
+      expect(ids(page())).toEqual(["other-ride"]);
+      expect(Object.keys(readBlock(page(), "i18n") as object)).toEqual(["fr"]);
+    });
+
+    it.each([
+      [
+        { forgetWidgets: ["longest-ride"] },
+        "Delete from the widget library: longest-ride. No backup. Confirm?",
+      ],
+      [{ removeLanguages: ["de"] }, "Delete the added texts of: de. No backup. Confirm?"],
+      [
+        { forgetWidgets: ["longest-ride", "other-ride"], removeLanguages: ["de", "fr"] },
+        "Delete from the widget library: longest-ride, other-ride. Delete the added texts of: de, fr. No backup. Confirm?",
+      ],
+    ])("names only what %j deletes", async (args, message) => {
+      expect(messages((await call({ action: "decline" }, args)).asked)).toEqual([message]);
+    });
+
+    it("changes no file after a no, and replies what a read replies", async () => {
+      const before = files();
+      const read = await writer.edit({ englishTexts: true });
+      const { r, text } = await call(
+        { action: "decline" },
+        {
+          forgetWidgets: ["longest-ride"],
+          removeLanguages: ["de"],
+          englishTexts: true,
+        },
+      );
+      expect(r.isError).toBeUndefined();
+      expect(JSON.parse(text)).toEqual({ ...read, declined: true });
+      expect(files()).toEqual(before);
+    });
+
+    it("asks nothing and refuses as before when a check fails", async () => {
+      const before = files();
+      const { r, asked, text } = await call(yes, {
+        forgetWidgets: ["longest-ride"],
+        removeLanguages: ["it"],
+      });
+      expect(r.isError).toBe(true);
+      expect(text).toContain("The page has no added texts for it");
+      expect(asked).toEqual([]);
+      expect(files()).toEqual(before);
+    });
+
+    it.each<[string, Answer | undefined, Record<string, unknown>]>([
+      ["an edit that deletes nothing", yes, { place: [{ board: "all", widget: "kpis" }] }],
+      ["an id that is not in the library", yes, { forgetWidgets: ["nothing-here"] }],
+      ["empty lists", yes, { forgetWidgets: [], removeLanguages: [] }],
+      [
+        "a client without the form",
+        undefined,
+        { forgetWidgets: ["longest-ride"], removeLanguages: ["de"] },
+      ],
+    ])("edits at once for %s", async (_name, answer, args) => {
+      const { asked, text } = await call(answer, args);
+      expect(asked).toEqual([]);
+      expect(JSON.parse(text)).toMatchObject({ changed: true });
+    });
+
+    it("deletes at once without the form", async () => {
+      await call(undefined, { forgetWidgets: ["longest-ride"], removeLanguages: ["de"] });
+      expect(library().map((w) => w.id)).toEqual(["other-ride"]);
+      expect(Object.keys(readBlock(page(), "i18n") as object)).toEqual(["fr"]);
+    });
+  },
+);
