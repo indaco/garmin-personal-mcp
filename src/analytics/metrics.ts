@@ -300,11 +300,19 @@ export interface ReadinessInputs {
   ratio?: number | null;
 }
 
+/** The "easy" limits of the readiness verdict; the warning signs use the same ones. */
+const SLEEP_LOW = 60;
+const RHR_HIGH_BPM = 5;
+
 /** The dashboard's own heuristic, not Garmin's readiness. */
 export function readiness(x: ReadinessInputs): "easy" | "push" | "normal" | null {
   if (x.hrvStatus === undefined && x.sleepScore === undefined) return null;
-  const rhrHigh = x.rhr !== undefined && x.rhrAvg !== undefined && x.rhr >= x.rhrAvg + 5;
-  if (x.hrvStatus === "LOW" || (x.sleepScore !== undefined && x.sleepScore < 60) || rhrHigh) {
+  const rhrHigh = x.rhr !== undefined && x.rhrAvg !== undefined && x.rhr >= x.rhrAvg + RHR_HIGH_BPM;
+  if (
+    x.hrvStatus === "LOW" ||
+    (x.sleepScore !== undefined && x.sleepScore < SLEEP_LOW) ||
+    rhrHigh
+  ) {
     return "easy";
   }
   if (
@@ -321,6 +329,15 @@ export function readiness(x: ReadinessInputs): "easy" | "push" | "normal" | null
 /** Fewer values than this make no base and no trend, on any board: one good day would decide it. */
 export const MIN_SESSIONS = 3;
 
+/** The mean resting HR of the 7 recovery rows before `index` (rows, not days); none under MIN_SESSIONS values. */
+function rhrBase(recovery: Record<string, unknown>[], index: number): number | undefined {
+  const before = recovery
+    .slice(Math.max(0, index - 7), index)
+    .map((r) => finite(r.rhr))
+    .filter((v): v is number => v !== undefined);
+  return mean(before.length >= MIN_SESSIONS ? before : []) ?? undefined;
+}
+
 /**
  * The readiness inputs as the page reads them, with the dates of their rows, and the verdict: the last
  * HRV row and the last recovery row of any date, and the mean resting HR of the 7 rows before the last
@@ -333,15 +350,11 @@ export function readinessOf(
 ) {
   const night = hrv.at(-1);
   const today = recovery.at(-1);
-  const before = recovery
-    .slice(-8, -1)
-    .map((r) => finite(r.rhr))
-    .filter((v): v is number => v !== undefined);
   const inputs: ReadinessInputs = {
     hrvStatus: typeof night?.status === "string" ? night.status : undefined,
     sleepScore: finite(today?.sleepScore),
     rhr: finite(today?.rhr),
-    rhrAvg: mean(before.length >= MIN_SESSIONS ? before : []) ?? undefined,
+    rhrAvg: rhrBase(recovery, recovery.length - 1),
     ratio,
   };
   return {

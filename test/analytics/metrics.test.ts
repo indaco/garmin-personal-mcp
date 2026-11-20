@@ -463,6 +463,15 @@ describe("readiness inputs", () => {
     expect(readinessOf(balanced, recoveryRows([undefined, undefined]), 1).rhrAvg).toBeUndefined();
     expect(readinessOf(balanced, recoveryRows([]), 1).rhrAvg).toBeUndefined();
   });
+
+  it("leaves a resting HR of the wrong type out of the 7-row average", () => {
+    const rows = [50, "90", Number.POSITIVE_INFINITY, 52, 54, 60].map((rhr, i) => ({
+      date: `2026-10-2${i}`,
+      rhr,
+    }));
+    // the mean of 50, 52 and 54; the last row is today's
+    expect(readinessOf(balanced, rows, 1).rhrAvg).toBe(52);
+  });
 });
 
 describe("fitness, fatigue and form of a window", () => {
