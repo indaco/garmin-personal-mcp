@@ -151,8 +151,8 @@ update is every day at 07:00. All the pages that update automatically use the sa
 
 Before the server writes a new or changed schedule, your client can ask you in a form. The form
 shows the cron expression, the pages and the next three updates. When you decline, the server
-writes nothing. Claude Code shows this form (tested with 2.1.329). Claude Desktop and the MCP
-Inspector: not tested. A client without the form writes the schedule at once.
+writes nothing. Claude Code (tested with 2.1.329) and the MCP Inspector (tested with 2.16.0) show
+this form. Claude Desktop: not tested. A client without the form writes the schedule at once.
 
 - The update replaces the data of the page. It keeps the weeks, the layout, the custom widgets, the
   languages and the settings.
