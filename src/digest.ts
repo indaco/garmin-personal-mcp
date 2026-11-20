@@ -69,6 +69,14 @@ interface Week {
    * progress.
    */
   rampPct: number | null;
+  /**
+   * The page's Load safety: Foster's monotony of the week's 7 daily loads, 2 decimals; above 2 is the
+   * page's flag. Null for a week in progress, a week that starts before the period, and a week whose
+   * loads have no spread (no session, or no session with a load).
+   */
+  monotony: number | null;
+  /** The week's load x its monotony, 1 decimal; null when the monotony is null. */
+  strain: number | null;
   /** The page's Intensity share: the runs' zone time in zones 1-2, in %, 0 decimals; null without zone time. */
   runEasyPct?: number | null;
   /** The page's Intensity share: the runs' zone time in zones 4-5, in %, 0 decimals; null without zone time. */
@@ -352,12 +360,20 @@ export function digest(data: Json): Digest {
     };
   };
   // the page's Load safety
-  const safety = loadSafety(acts as Activity[], weeks, end, maxHR);
+  const safety = loadSafety(acts as Activity[], weeks, end, maxHR, start);
   // a partial week before (or no week before: undefined) gives no ramp
   const rampOf = (monday: string) => {
     const i = weeks.indexOf(monday);
     const r = weeks[i - 1] >= start ? safety.ramp[i] : null;
     return r === null ? null : round(r, 1);
+  };
+  const weekLoadOf = (monday: string) => {
+    const i = weeks.indexOf(monday);
+    const strain = i < 0 ? null : safety.weekStrain[i];
+    return {
+      monotony: r2(i < 0 ? null : safety.weekMonotony[i]),
+      strain: strain === null ? null : round(strain, 1),
+    };
   };
   // the first one wins a tie
   const longest = runs.reduce<Json | undefined>(
@@ -455,7 +471,7 @@ export function digest(data: Json): Digest {
         .map(([k, w]) => [
           k,
           {
-            ...roundWeek(w, rampOf(k)),
+            ...roundWeek(w, rampOf(k), weekLoadOf(k)),
             ...runWeek(k),
             ...(k < start ? { partial: true as const } : {}),
           },
@@ -653,7 +669,11 @@ function loadPart(s: Sum): Pick<Totals, "load" | "estimatedLoads"> {
   };
 }
 
-function roundWeek(w: Sum, rampPct: number | null): Week {
+function roundWeek(
+  w: Sum,
+  rampPct: number | null,
+  weekLoad: Pick<Week, "monotony" | "strain">,
+): Week {
   return {
     sessions: w.sessions,
     km: round(w.km, 1),
@@ -661,6 +681,7 @@ function roundWeek(w: Sum, rampPct: number | null): Week {
     hours: round(w.hours, 1),
     ...loadPart(w),
     rampPct,
+    ...weekLoad,
   };
 }
 

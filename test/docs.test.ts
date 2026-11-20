@@ -154,6 +154,12 @@ describe("guide", () => {
     );
   });
 
+  it("names the weekly monotony and strain of Load safety in the widget API", () => {
+    expect(WIDGET_API).toContain(
+      "loadSafety(activities, weeks, end, maxHR, dataStart?) (the Load safety numbers: { load, ramp, flagged, weekLoad, monotony, strain, unknown, weekMonotony, weekStrain }; weekMonotony and weekStrain give each week's monotony and strain, null for a week in progress, a week that starts before dataStart and a week whose loads have no spread; a week in progress has no ramp)",
+    );
+  });
+
   it("lists every text", () => {
     check("guide/languages.md", between("guide/languages.md", "keys", keysPart()));
   });

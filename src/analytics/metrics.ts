@@ -89,24 +89,41 @@ export function monotony(daily: number[]) {
  * The page's Load safety: the weekly load (null for a week whose sessions have no load), its ramp in %
  * against the week before (flagged above 10%), and the monotony and strain of the 7 days that end on
  * `end`. A last week that `end` cuts before its Sunday is in progress and has no ramp. `unknown`: the 7
- * days have sessions and none of them has a load.
+ * days have sessions and none of them has a load. `weekMonotony` and `weekStrain`: the same numbers for
+ * each Monday-Sunday week; null for a week in progress, a week that starts before `dataStart`, and a
+ * week whose loads have no spread (no session, or no session with a load).
  */
-export function loadSafety(acts: Activity[], weeks: string[], end: string, maxHR?: number) {
+export function loadSafety(
+  acts: Activity[],
+  weeks: string[],
+  end: string,
+  maxHR?: number,
+  dataStart?: string,
+) {
   const load = weeklyKnown(acts, weeks, (a) => loadOf(a, maxHR)?.value);
   const rampPct = ramp(load);
-  if (new Date(`${end}T00:00:00Z`).getUTCDay() !== 0 && weeks.at(-1) === mondayOf(end))
-    rampPct[rampPct.length - 1] = null;
+  const inProgress =
+    new Date(`${end}T00:00:00Z`).getUTCDay() !== 0 && weeks.at(-1) === mondayOf(end);
+  if (inProgress) rampPct[rampPct.length - 1] = null;
   const from = addDays(end, -6);
   const days = acts.filter((a) => {
     const d = dayOf(a);
     return d !== undefined && d >= from && d <= end;
   });
+  // days still to come, or days before the data, would read as rest
+  const byWeek = weeks.map((monday, i) =>
+    (inProgress && i === weeks.length - 1) || (dataStart !== undefined && monday < dataStart)
+      ? { monotony: null, strain: null }
+      : monotony(dailyLoads(acts, monday, addDays(monday, 6), maxHR)),
+  );
   return {
     load,
     ramp: rampPct,
     flagged: rampPct.map((r) => r !== null && r > 10),
     ...monotony(dailyLoads(acts, from, end, maxHR)),
     unknown: days.length > 0 && !days.some((a) => loadOf(a, maxHR)),
+    weekMonotony: byWeek.map((w) => w.monotony),
+    weekStrain: byWeek.map((w) => w.strain),
   };
 }
 

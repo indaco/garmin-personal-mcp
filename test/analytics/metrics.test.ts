@@ -238,6 +238,105 @@ describe("load safety", () => {
   });
 });
 
+/**
+ * The weeks of SAFETY_WEEKS: loads 100, 0, 50, 0, 80, 0, 30; no session; 40 on each of the 7 days;
+ * one session of 50 on the Monday.
+ */
+const WEEKLY_ACTS = [
+  act("2026-10-05", { trainingLoad: 100 }),
+  act("2026-10-07", { trainingLoad: 50 }),
+  act("2026-10-09", { trainingLoad: 80 }),
+  act("2026-10-11", { trainingLoad: 30 }),
+  ...[0, 1, 2, 3, 4, 5, 6].map((i) => act(addDays("2026-10-19", i), { trainingLoad: 40 })),
+  act("2026-10-26", { trainingLoad: 50 }),
+];
+
+describe("load safety weekly monotony", () => {
+  it("gives the monotony and strain of each Monday-Sunday week", () => {
+    const s = loadSafety(WEEKLY_ACTS, SAFETY_WEEKS, "2026-11-01");
+    // mean 260 / 7 = 37.143, SD sqrt(19800 / 7 - 37.143^2) = 38.065
+    expect(s.weekMonotony[0]).toBeCloseTo(0.9758, 4);
+    expect(s.weekStrain[0]).toBeCloseTo(253.7, 1);
+    // one session in the week: 1 / sqrt(6), whatever the load
+    expect(s.weekMonotony[3]).toBeCloseTo(0.4082, 4);
+    expect(s.weekStrain[3]).toBeCloseTo(20.41, 2);
+  });
+
+  // the Sunday that closes the last week gives it a value (the test above)
+  it.each([
+    ["on the Wednesday of the last week", "2026-10-28"],
+    ["on the Saturday of the last week", "2026-10-31"],
+  ])("gives no monotony to the week in progress: window ends %s", (_name, end) => {
+    const s = loadSafety(WEEKLY_ACTS, SAFETY_WEEKS, end);
+    expect(s.weekMonotony[3]).toBeNull();
+    expect(s.weekStrain[3]).toBeNull();
+    // the whole weeks before keep their values
+    expect(s.weekMonotony[0]).toBeCloseTo(0.9758, 4);
+  });
+
+  it("gives no monotony to a week that starts before the data", () => {
+    // the data starts on the Tuesday: the Monday of the first week reads as rest
+    const s = loadSafety(WEEKLY_ACTS, SAFETY_WEEKS, "2026-11-01", undefined, "2026-10-06");
+    expect(s.weekMonotony[0]).toBeNull();
+    expect(s.weekStrain[0]).toBeNull();
+    expect(s.weekMonotony[3]).toBeCloseTo(0.4082, 4);
+  });
+
+  it("gives a monotony to a week that starts on the first day of the data", () => {
+    const s = loadSafety(WEEKLY_ACTS, SAFETY_WEEKS, "2026-11-01", undefined, "2026-10-05");
+    expect(s.weekMonotony[0]).toBeCloseTo(0.9758, 4);
+  });
+
+  it("keeps the other Load safety numbers with a data start", () => {
+    const { weekMonotony, weekStrain, ...rest } = loadSafety(
+      WEEKLY_ACTS,
+      SAFETY_WEEKS,
+      "2026-10-28",
+      180,
+      "2026-10-20",
+    );
+    const {
+      weekMonotony: m,
+      weekStrain: s,
+      ...before
+    } = loadSafety(WEEKLY_ACTS, SAFETY_WEEKS, "2026-10-28", 180);
+    expect(rest).toEqual(before);
+    expect([weekMonotony[0], weekStrain[0], m[0] === null, s[0] === null]).toEqual([
+      null,
+      null,
+      false,
+      false,
+    ]);
+  });
+
+  it("gives no monotony to a week without sessions or with 7 equal loads", () => {
+    const s = loadSafety(WEEKLY_ACTS, SAFETY_WEEKS, "2026-11-01");
+    expect([s.weekMonotony[1], s.weekMonotony[2]]).toEqual([null, null]);
+    expect([s.weekStrain[1], s.weekStrain[2]]).toEqual([null, null]);
+  });
+
+  it("gives no monotony to a week whose sessions have no load", () => {
+    const acts = [act("2026-10-06"), act("2026-10-08"), act("2026-10-13", { trainingLoad: 60 })];
+    const s = loadSafety(acts, SAFETY_WEEKS, "2026-11-01");
+    expect(s.load.slice(0, 2)).toEqual([null, 60]);
+    expect(s.weekMonotony[0]).toBeNull();
+    expect(s.weekStrain[0]).toBeNull();
+    expect(s.weekMonotony[1]).toBeCloseTo(0.4082, 4);
+  });
+
+  it("gives a monotony to the last week when the window ends on a weekday after it", () => {
+    // a Wednesday of the next week: the last week has ended
+    const s = loadSafety(WEEKLY_ACTS, SAFETY_WEEKS, "2026-11-04");
+    expect(s.weekMonotony[3]).toBeCloseTo(0.4082, 4);
+    expect(s.weekStrain[3]).toBeCloseTo(20.41, 2);
+  });
+
+  it("gives no weekly monotony without weeks", () => {
+    const s = loadSafety(WEEKLY_ACTS, [], "2026-11-01");
+    expect([s.weekMonotony, s.weekStrain]).toEqual([[], []]);
+  });
+});
+
 describe("statistics", () => {
   it("gives mean, standard deviation and a rolling mean", () => {
     expect(mean([2, 4, 6])).toBe(4);
