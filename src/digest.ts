@@ -375,8 +375,8 @@ export function digest(data: Json): Digest {
   const z4 = floors[3];
   const trend = aerobicTrend(runs as Activity[], weeks, z4);
   // the block review counts whole weeks only: the weeks end with the week of `end`, which is in
-  // progress unless `end` is a Sunday
-  const wholeWeeks = new Date(`${end}T00:00:00Z`).getUTCDay() === 0 ? weeks : weeks.slice(0, -1);
+  // progress until `end` is over, also on a Sunday, so the block is the same on each day of a week
+  const wholeWeeks = weeks.slice(0, -1);
   const blockRuns =
     runs.length > 0 && z4 !== undefined
       ? aerobicTrend(runs as Activity[], wholeWeeks, z4)

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { filterData } from "../src/dashboard-page";
 import { digest, syncGaps } from "../src/digest";
@@ -13,6 +14,7 @@ import {
   zonesOf,
 } from "../src/analytics/metrics";
 import { addDays } from "../src/dates";
+import { isObject } from "../src/tools";
 import { predictRaces, splitOf, weeklyIntensity } from "../src/analytics/running";
 
 const squat = (sets: Record<string, number>[]) => ({ exercise: "Back Squat", sets });
@@ -1632,7 +1634,7 @@ describe("block efficiency", () => {
   ];
   /** 9 weeks from Monday 31 Aug to Wednesday 28 Oct: the week of 26 Oct is in progress. */
   const period = { ...data, zones, start: "2026-08-31", end: "2026-10-28", previousActivities: [] };
-  /** 8 whole weeks to Sunday 25 Oct. */
+  /** 8 weeks to Sunday 25 Oct: the week of 19 Oct is in progress until the day ends. */
   const toSunday = { ...period, end: "2026-10-25" };
   // 200 m a minute: 2 m per beat at 100 bpm, 2.5 at 80, 3.33 at 60
   const RUNS = [
@@ -1680,10 +1682,21 @@ describe("block efficiency", () => {
     });
   });
 
-  it("counts the last week of a period that ends on a Sunday", () => {
-    const out = digest({ ...toSunday, activities: RUNS });
-    expect(out.blockEfficiency).toEqual({ runs: WHOLE_RUNS });
-    expect(out.aerobicEfficiency).toEqual(WHOLE_RUNS);
+  it("leaves out the week of a period that ends on a Sunday, as the block review's table does", () => {
+    const out = digest({ ...toSunday, activities: [...RUNS, easyRun("2026-10-25", 60)] });
+    // 7 whole weeks: 3 at each end, and the last 3 have 2 runs, so no change
+    expect(out.blockEfficiency).toEqual({
+      runs: { comparedWeeks: 3, first: 2, last: 2.5, firstRuns: 3, lastRuns: 2, changePct: null },
+    });
+    // the page's 4 last weeks end with this week, Sunday's run included
+    expect(out.aerobicEfficiency).toEqual({
+      comparedWeeks: 4,
+      first: 2,
+      last: 2.71,
+      firstRuns: 4,
+      lastRuns: 4,
+      changePct: 35.4,
+    });
   });
 
   it("gives the power per heartbeat of the rides below zone 4 of the whole weeks", () => {
@@ -1721,7 +1734,7 @@ describe("block efficiency", () => {
   });
 
   it("gives both parts to a period with runs and rides", () => {
-    const out = digest({ ...toSunday, activities: [...RUNS, ...RIDES] });
+    const out = digest({ ...period, activities: [...RUNS, ...RIDES] });
     expect(out.blockEfficiency?.runs).toEqual(WHOLE_RUNS);
     expect(out.blockEfficiency?.rides).toMatchObject({ first: 2, last: 2.5, ridesWithPower: 7 });
   });
@@ -1731,6 +1744,26 @@ describe("block efficiency", () => {
     ["a zones row without floors", [{ sport: "DEFAULT", maxHeartRateUsed: 190 }]],
   ])("has no block efficiency with %s: the values would count every session", (_name, z) => {
     const out = digest({ ...period, zones: z, activities: [...RUNS, ...RIDES] });
+    expect(out).not.toHaveProperty("blockEfficiency");
+  });
+
+  // the block review reads the share key without `blockEfficiency` as "no HR zones"
+  it.each([
+    ["run", RUNS, "runEasyPct"],
+    ["ride", RIDES, "rideEasyPct"],
+  ])("keeps the %s share key in each week of the block without HR zones", (_name, acts, key) => {
+    const out = digest({ ...period, zones: undefined, activities: acts });
+    const block = Object.entries(out.weekly).filter(([monday]) => monday < "2026-10-26");
+    expect(block.map(([monday]) => monday)).toEqual([
+      "2026-08-31",
+      "2026-09-07",
+      "2026-09-14",
+      "2026-09-21",
+      "2026-10-05",
+      "2026-10-12",
+      "2026-10-19",
+    ]);
+    expect(block.filter(([, week]) => !Object.hasOwn(week, key))).toEqual([]);
     expect(out).not.toHaveProperty("blockEfficiency");
   });
 
@@ -1766,6 +1799,50 @@ describe("block efficiency", () => {
   it("has no block efficiency without runs and rides", () => {
     const out = digest({ ...period, activities: [strength("2026-09-01", [])] });
     expect(out).not.toHaveProperty("blockEfficiency");
+    // and no share key, so the block review does not read the absence as "no HR zones"
+    const keyed = Object.values(out.weekly).filter(
+      (week) => Object.hasOwn(week, "runEasyPct") || Object.hasOwn(week, "rideEasyPct"),
+    );
+    expect(Object.keys(out.weekly)).toEqual(["2026-08-31"]);
+    expect(keyed).toEqual([]);
+  });
+
+  it("gives every digest field that the block-review prompt quotes", () => {
+    const out = digest({
+      ...period,
+      // a max HR estimates the loads of sessions without Garmin's load
+      zones: [{ ...zones[0], maxHeartRateUsed: 190 }],
+      // a ride without power, and runs and rides in the week in progress
+      activities: [...RUNS, RUN_NOW, ...RIDES, poweredRide("2026-10-07", 90), RIDE_NOW],
+    });
+    const block = out.blockEfficiency;
+    const rows = Object.values(out.weekly);
+    /** Where the prompt reads each name: a dotted path from the reply, or a key of a part. */
+    const parts: object[] = [out, ...rows, block ?? {}, block?.runs ?? {}, block?.rides ?? {}];
+    const reply = { digest: out, blockEfficiency: block };
+    const has = (name: string): boolean =>
+      name.includes(".")
+        ? name.split(".").reduce<unknown>((o, k) => (isObject(o) ? o[k] : undefined), reply) !==
+          undefined
+        : parts.some((p) => Object.hasOwn(p, name));
+    // the names of tools, arguments, the server, the markers and the reply's own settings
+    const notDigest = new Set([
+      "garmin-personal",
+      "{{first}}",
+      "{{last}}",
+      "writeDashboard",
+      "preview",
+      "weeks",
+      "getDashboardData",
+      "digest",
+      "settings",
+    ]);
+    const template = readFileSync(new URL("../prompts/block-review.md", import.meta.url), "utf8");
+    const quoted = [...template.matchAll(/`([^`]+)`/g)]
+      .map((m) => m[1])
+      .filter((name) => !notDigest.has(name));
+    expect(quoted.length).toBeGreaterThan(20);
+    expect(quoted.filter((name) => !has(name))).toEqual([]);
   });
 });
 

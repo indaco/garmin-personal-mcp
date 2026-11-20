@@ -369,6 +369,8 @@ describe("site sections", () => {
     expect(await shown()).toEqual(["strength-review"]);
     await page.click(".picker [data-sport=cycling]");
     expect(await shown()).toEqual(["ride-review"]);
+    await page.click(".picker [data-sport=every]");
+    expect(await shown()).toEqual(["train-today", "week-review", "block-review"]);
     await page.click(".picker [data-sport=padel]");
     expect(await shown()).toEqual([]);
     expect(await page.isVisible(".coach")).toBe(false);

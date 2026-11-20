@@ -376,6 +376,7 @@ These prompts answer in the chat. They do not change a dashboard.
 | [ride-review](#ride-review)         | reviews one ride as a coach                                 | `/mcp__garmin-personal__ride-review`                            |
 | [train-today](#train-today)         | tells if you should train hard today, with fitness and form | `/mcp__garmin-personal__train-today`                            |
 | [week-review](#week-review)         | reviews your last whole week against the weeks before       | `/mcp__garmin-personal__week-review`                            |
+| [block-review](#block-review)       | reviews your last 4 to 12 whole weeks as one training block | `/mcp__garmin-personal__block-review 8`                         |
 
 A missing value shows as "n/a": the assistant does not estimate it.
 
@@ -527,6 +528,23 @@ leaves no file and is not seen. It gives the laps of the week's runs on the plan
 it, the drills that miss most, and how many runs it could not read (the page setting `workouts`
 reads more of them). It ends with a short coach note. The summary has no split by sport for each
 week, so the review has none. The prompt has no arguments.
+
+### block-review
+
+The assistant reads the server's summary of the block (a `writeDashboard` preview, which writes no
+page file). The block is your last 4 to 12 whole weeks, Monday to Sunday, 8 by default. The week in
+progress is not in it. The assistant gives a table of the weeks with their sessions, hours, km,
+load, load ramp against the week before, monotony, strain, and the easy and hard share of the runs
+and of the rides. It names the weeks that the page flags (a ramp above 10%, a monotony above 2) and
+the strain of the first and the last week. It compares the easy and hard share of the first and the
+last week. Then it compares the aerobic efficiency at the start and at the end of the block: the
+metres per heartbeat of the runs and the normalized power per heartbeat of the rides, both below
+zone 4. Each end is 4 weeks, or half of a shorter block. The change needs 3 sessions at each end, so
+in a short block it is often "n/a", with the session count of each end. Both values need your HR
+zones, and the ride value needs a power meter. It ends with a short coach note.
+
+The argument `weeks` is optional (default 8): the number of whole weeks in the block. A value under
+4 gives 4, a value over 12 gives 12, and a value that is not a whole number gives 8.
 
 ## Configuration
 

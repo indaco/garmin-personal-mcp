@@ -157,6 +157,7 @@ export function facts(root = ".") {
         "ride-review": "cycling",
         "train-today": "every",
         "week-review": "every",
+        "block-review": "every",
       }[p.name] ?? "running",
   }));
   const themes = [

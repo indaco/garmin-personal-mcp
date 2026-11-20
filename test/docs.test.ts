@@ -137,6 +137,16 @@ describe("guide", () => {
     expect(readme).not.toContain("which writes nothing");
   });
 
+  it("documents the block-review prompt and its weeks argument in the README", () => {
+    const readme = readFileSync("README.md", "utf8").replace(/\s+/g, " ");
+    expect(readme).toContain(
+      "| [block-review](#block-review) | reviews your last 4 to 12 whole weeks as one training block | `/mcp__garmin-personal__block-review 8` |",
+    );
+    expect(readme).toContain(
+      '### block-review The assistant reads the server\'s summary of the block (a `writeDashboard` preview, which writes no page file). The block is your last 4 to 12 whole weeks, Monday to Sunday, 8 by default. The week in progress is not in it. The assistant gives a table of the weeks with their sessions, hours, km, load, load ramp against the week before, monotony, strain, and the easy and hard share of the runs and of the rides. It names the weeks that the page flags (a ramp above 10%, a monotony above 2) and the strain of the first and the last week. It compares the easy and hard share of the first and the last week. Then it compares the aerobic efficiency at the start and at the end of the block: the metres per heartbeat of the runs and the normalized power per heartbeat of the rides, both below zone 4. Each end is 4 weeks, or half of a shorter block. The change needs 3 sessions at each end, so in a short block it is often "n/a", with the session count of each end. Both values need your HR zones, and the ride value needs a power meter. It ends with a short coach note. The argument `weeks` is optional (default 8): the number of whole weeks in the block. A value under 4 gives 4, a value over 12 gives 12, and a value that is not a whole number gives 8. ## Configuration',
+    );
+  });
+
   it("names the warning signs on the Recovery board in the dashboard guide", () => {
     expect(readFileSync("guide/dashboard.md", "utf8").replace(/\s+/g, " ")).toContain(
       "The Recovery board shows readiness, fitness age, the warning signs, load against recovery and the 14-day recovery widgets: HRV, resting HR, stress, sleep, sleep need, bedtime and Body Battery.",
