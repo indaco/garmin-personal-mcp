@@ -22,6 +22,26 @@ describe("widget catalogue", () => {
     }
   });
 
+  it("describes the weekly chart of Load safety", () => {
+    expect(ABOUT.loadSafety).toBe(
+      "Weekly load with its change against the week before (flagged above +10%), and 7-day monotony and strain (Foster). A second chart gives the monotony and strain of each week; a monotony above 2 is red.",
+    );
+  });
+
+  it("has the Ride efficiency right after Intensity share, full width, only for rides", () => {
+    const at = CATALOGUE.findIndex((c) => c.id === "rideEfficiency");
+    expect(CATALOGUE[at - 1]?.id).toBe("intensityShare");
+    expect(CATALOGUE[at]).toEqual({
+      id: "rideEfficiency",
+      title: "w.rideEfficiency",
+      types: ["cycling"],
+      span: 3,
+    });
+    expect(ABOUT.rideEfficiency).toBe(
+      "The efficiency (normalized power per heartbeat) of the rides below Z4: each ride, the weekly mean and the last weeks against the first. It needs a power meter.",
+    );
+  });
+
   it("has a description for exactly the catalogue widgets", () => {
     expect(Object.keys(ABOUT).toSorted()).toEqual(CATALOGUE.map((c) => c.id).toSorted());
   });

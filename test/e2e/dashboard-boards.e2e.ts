@@ -71,6 +71,45 @@ const loadSafety = async (rides: object[]) => {
   };
 };
 
+const nulls = (n: number) => Array.from({ length: n }, () => null);
+const round = (v: number | null) => (v === null ? null : Math.round(v * 100) / 100);
+/** One ride a day from `from`, with each of `values` as its load. */
+const dailyRides = (from: string, values: number[]) =>
+  values.map((trainingLoad, i) => {
+    const day = new Date(`${from}T00:00:00Z`);
+    day.setUTCDate(day.getUTCDate() + i);
+    return bikeRide(day.toISOString().slice(0, 10), { trainingLoad });
+  });
+/** The datasets of the second Load safety chart, with values to 2 decimals, and the colour tokens. */
+async function weekChart(page: Page) {
+  const got = await page.evaluate(() => {
+    const css = getComputedStyle(document.documentElement);
+    const charts = Object.values(window.Chart!.instances).filter((c) =>
+      c.canvas.closest("[data-widget=loadSafety]"),
+    );
+    return {
+      charts: charts.length,
+      sets: (charts[1]?.data.datasets ?? []).map((d) => {
+        const x = d as unknown as Record<string, unknown>;
+        return {
+          label: d.label,
+          type: d.type,
+          data: d.data as (number | null)[],
+          border: x.borderColor ?? null,
+          background: x.backgroundColor ?? null,
+          points: x.pointBackgroundColor ?? null,
+          axis: x.yAxisID,
+          gaps: x.spanGaps ?? null,
+        };
+      }),
+      token: Object.fromEntries(
+        ["accent", "text", "warn", "bad"].map((n) => [n, css.getPropertyValue(`--${n}`).trim()]),
+      ),
+    };
+  });
+  return { ...got, sets: got.sets.map((s) => ({ ...s, data: s.data.map(round) })) };
+}
+
 describe("overview widgets", () => {
   it("shows a tooltip on every chart", async () => {
     const { page, errors } = await open(browser, pageFile());
@@ -646,6 +685,158 @@ describe("overview widgets", () => {
     });
   });
 
+  describe("each week's monotony and strain in Load safety", () => {
+    // the last 5 weeks: one ride (09-28), a week of exactly 2.0 (10-05), a week above 2 (10-12),
+    // one ride (10-19) and the week in progress (10-26)
+    const RIDES = [
+      bikeRide("2026-09-30", { trainingLoad: 200 }),
+      ...dailyRides("2026-10-05", [60, 60, 50, 50, 30, 30]),
+      ...dailyRides("2026-10-12", [40, 40, 40, 40, 40, 40]),
+      bikeRide("2026-10-21", { trainingLoad: 50 }),
+      bikeRide("2026-10-26", { trainingLoad: 30 }),
+    ];
+
+    it("draws each week's strain as bars and monotony as a line, with a line at 2", async () => {
+      const { page, errors } = await open(
+        browser,
+        pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: RIDES } }),
+      );
+      const { charts, sets, token: c } = await weekChart(page);
+      expect(charts).toBe(2);
+      // a week with one session: 1 / sqrt(6); 6 equal days and a rest day: sqrt(6); the week of
+      // 60, 60, 50, 50, 30, 30 and a rest day: mean 40, SD 20
+      expect(sets).toEqual([
+        {
+          label: "Weekly strain",
+          type: "bar",
+          data: [...nulls(8), 81.65, 560, 587.88, 20.41, null],
+          border: null,
+          background: `${c.accent}99`,
+          points: null,
+          axis: "y1",
+          gaps: null,
+        },
+        {
+          label: "Weekly monotony",
+          type: "line",
+          data: [...nulls(8), 0.41, 2, 2.45, 0.41, null],
+          border: c.text,
+          background: null,
+          points: [...Array.from({ length: 10 }, () => c.text), c.bad, c.text, c.text],
+          axis: "y",
+          gaps: false,
+        },
+        {
+          label: "Monotony 2.0",
+          type: "line",
+          data: Array.from({ length: 13 }, () => 2),
+          border: c.warn,
+          background: null,
+          points: null,
+          axis: "y",
+          gaps: null,
+        },
+      ]);
+      expect(new Set([c.accent, c.text, c.warn]).size).toBe(3);
+      // the screen-reader table of the second chart
+      const table = await page.$$eval("[data-id=loadSafety] .sr-only table", (ts) =>
+        [...(ts[1]?.querySelectorAll("tr") ?? [])].map((r) =>
+          [...r.children].map((x) => x.textContent),
+        ),
+      );
+      expect(table[0]).toEqual(["", "Weekly strain", "Weekly monotony", "Monotony 2.0"]);
+      expect(table.slice(-5)).toEqual([
+        ["Sep 28", "81.65", "0.41", "2"],
+        ["Oct 5", "560", "2", "2"],
+        ["Oct 12", "587.88", "2.45", "2"],
+        ["Oct 19", "20.41", "0.41", "2"],
+        ["Oct 26*", "", "", "2"],
+      ]);
+      // the tiles and the first chart do not change: 7 days of 50 and 30, one flagged week
+      expect(await kpiTexts(page, "loadSafety")).toEqual({
+        "Load · last 7 days": ["80", null],
+        "Monotony · 7 days": ["0.61", null],
+        "Strain · 7 days": ["49", null],
+        "Weeks above +10%": ["1", null],
+      });
+      const first = async (label: string) =>
+        ((await chartDataset(page, "loadSafety", label)).data as (number | null)[])
+          .slice(-5)
+          .map(round);
+      expect(await first("Weekly load")).toEqual([200, 280, 240, 50, 30]);
+      expect(await first("Change vs week before (%)")).toEqual([null, 40, -14.29, -79.17, null]);
+      expect(errors).toEqual([]);
+    });
+
+    it("gives no monotony to the first week of a page whose data starts on a Tuesday", async () => {
+      // the Monday before the data would read as a rest day
+      const rides = [
+        bikeRide("2026-08-04", { trainingLoad: 40 }),
+        bikeRide("2026-08-06", { trainingLoad: 20 }),
+        bikeRide("2026-08-11", { trainingLoad: 30 }),
+      ];
+      const { page, errors } = await open(
+        browser,
+        pageFile({
+          data: { ...data, v: DASHBOARD_VERSION, start: "2026-08-04", activities: rides },
+        }),
+      );
+      const { sets } = await weekChart(page);
+      expect(sets.slice(0, 2).map((s) => s.data.slice(0, 2))).toEqual([
+        [null, 12.25],
+        [null, 0.41],
+      ]);
+      expect(errors).toEqual([]);
+    });
+
+    it.each([
+      [
+        "en-US",
+        ["Weekly strain", "Weekly monotony", "Monotony 2.0"],
+        "All activities. Red weeks rose more than 10%; a week in progress is not flagged. Monotony and strain (Foster) are estimates. The second chart shows the monotony and strain of each week; a week in progress and a week before the data have none.",
+      ],
+      [
+        "it-IT",
+        ["Strain settimanale", "Monotonia settimanale", "Monotonia 2,0"],
+        "Tutte le attività. Le settimane rosse sono salite più del 10%; una settimana in corso non viene segnalata. Monotonia e strain (Foster) sono stime. Il secondo grafico mostra monotonia e strain di ogni settimana; una settimana in corso e una settimana prima dei dati non li hanno.",
+      ],
+      [
+        "de-DE",
+        ["Wochen-Strain", "Wochenmonotonie", "Monotonie 2,0"],
+        "Alle Aktivitäten. Rote Wochen sind um mehr als 10% gestiegen; eine laufende Woche wird nicht markiert. Monotonie und Strain (Foster) sind Schätzungen. Das zweite Diagramm zeigt Monotonie und Strain jeder Woche; eine laufende Woche und eine Woche vor den Daten haben keine.",
+      ],
+      [
+        "es-ES",
+        ["Strain semanal", "Monotonía semanal", "Monotonía 2,0"],
+        "Todas las actividades. Las semanas en rojo subieron más del 10%; una semana en curso no se marca. La monotonía y el strain (Foster) son estimaciones. El segundo gráfico muestra la monotonía y el strain de cada semana; una semana en curso y una semana anterior a los datos no los tienen.",
+      ],
+      [
+        "fr-FR",
+        ["Contrainte hebdomadaire", "Monotonie hebdomadaire", "Monotonie 2,0"],
+        "Toutes les activités. Les semaines en rouge ont augmenté de plus de 10 % ; une semaine en cours n'est pas signalée. La monotonie et la contrainte (Foster) sont des estimations. Le second graphique montre la monotonie et la contrainte de chaque semaine ; une semaine en cours et une semaine avant les données n'en ont pas.",
+      ],
+      [
+        "pt-BR",
+        ["Strain semanal", "Monotonia semanal", "Monotonia 2,0"],
+        "Todas as atividades. As semanas vermelhas subiram mais de 10%; uma semana em andamento não é sinalizada. Monotonia e strain (Foster) são estimativas. O segundo gráfico mostra a monotonia e o strain de cada semana; uma semana em andamento e uma semana antes dos dados não os têm.",
+      ],
+    ])("names the weekly series and their gaps in %s", async (locale, labels, text) => {
+      const { page, errors } = await open(
+        browser,
+        pageFile({
+          data: { ...data, v: DASHBOARD_VERSION, activities: RIDES },
+          settings: { languages: ["en", "de", "es", "fr", "it", "pt"] },
+        }),
+        { locale },
+      );
+      expect((await weekChart(page)).sets.map((s) => s.label)).toEqual(labels);
+      expect(
+        await page.$$eval("[data-id=loadSafety] .note", (n) => n.map((x) => x.textContent)),
+      ).toEqual([text]);
+      expect(errors).toEqual([]);
+    });
+  });
+
   it("shows the widgets in Italian", async () => {
     const { page, errors } = await open(
       browser,
@@ -698,6 +889,22 @@ describe("type boards", () => {
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
       ]).toEqual([tab, true]);
     }
+  });
+
+  it("shows the Bike widgets, the ride efficiency after the intensity share", async () => {
+    const { page, errors } = await open(browser, pageFile(), { hash: "#cycling" });
+    expect(await tiles(page)).toEqual([
+      "typeKpis",
+      "typeWeekly",
+      "hrZones",
+      "records",
+      "intensityShare",
+      "rideEfficiency",
+      "hikeVertical",
+      "bikeDetails",
+      "activities",
+    ]);
+    expect(errors).toEqual([]);
   });
 
   it("shows the Run widgets", async () => {

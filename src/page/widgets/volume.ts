@@ -146,8 +146,8 @@ register({
     const max = maxHR(ctx);
     const acts = ctx.allActivities;
     // the same numbers as the digest's weekly rampPct and load.monotony
-    const week = calc.loadSafety(acts, ctx.weeks, windowEnd(ctx), max);
-    const { load, ramp, flagged } = week;
+    const week = calc.loadSafety(acts, ctx.weeks, windowEnd(ctx), max, ctx.data.start);
+    const { load, ramp, flagged, weekMonotony, weekStrain } = week;
     // none of the week's activities has a load: show n/a, not a 0 that was never measured
     const weekNa = week.unknown;
     const estimated = acts.some((a) => calc.loadOf(a, max)?.estimate);
@@ -198,6 +198,52 @@ register({
             position: "right",
             grid: { drawOnChartArea: false },
             title: { display: true, text: "%" },
+          },
+        },
+      },
+    });
+    ctx.chart(el, {
+      type: "bar",
+      data: {
+        labels: ctx.weeks.map((w) => weekLabel(ctx, w)),
+        datasets: [
+          {
+            type: "bar",
+            label: t("ls.weekStrain"),
+            data: weekStrain,
+            backgroundColor: alpha(ctx.color("accent"), 0.6),
+            yAxisID: "y1",
+          },
+          {
+            type: "line",
+            label: t("ls.weekMonotony"),
+            data: weekMonotony,
+            borderColor: ctx.color("text"),
+            pointBackgroundColor: weekMonotony.map((m) =>
+              ctx.color(m !== null && m > 2 ? "bad" : "text"),
+            ),
+            yAxisID: "y",
+            // a week in progress or before the data has no value, not a low one
+            spanGaps: false,
+          },
+          {
+            type: "line",
+            label: t("ls.monotonyLimit"),
+            data: ctx.weeks.map(() => 2),
+            borderColor: ctx.color("warn"),
+            borderDash: [5, 4],
+            pointRadius: 0,
+            yAxisID: "y",
+          },
+        ],
+      },
+      options: {
+        scales: {
+          y: { title: { display: true, text: t("ls.weekMonotony") } },
+          y1: {
+            position: "right",
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: t("ls.weekStrain") },
           },
         },
       },

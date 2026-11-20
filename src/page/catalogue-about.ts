@@ -16,7 +16,7 @@ export const ABOUT: Record<string, string> = {
   intensityMinutes:
     "Moderate + 2 x vigorous minutes of the activities each week, against 150 minutes.",
   loadSafety:
-    "Weekly load with its change against the week before (flagged above +10%), and 7-day monotony and strain (Foster).",
+    "Weekly load with its change against the week before (flagged above +10%), and 7-day monotony and strain (Foster). A second chart gives the monotony and strain of each week; a monotony above 2 is red.",
   fitnessFatigue:
     "Fitness (42-day) and fatigue (7-day) averages of the daily load, and form: fitness minus fatigue, to time a taper.",
   calendar:
@@ -44,6 +44,8 @@ export const ABOUT: Record<string, string> = {
   aerobicFitness:
     "Pace against HR of each run (older runs paler), weekly pace, and the efficiency (metres per heartbeat) of the runs below Z4: each run, the weekly mean and the last weeks against the first.",
   intensityShare: "The share of time in Z1-2 (easy) and Z4-5 (hard) each week, of runs or rides.",
+  rideEfficiency:
+    "The efficiency (normalized power per heartbeat) of the rides below Z4: each ride, the weekly mean and the last weeks against the first. It needs a power meter.",
   runningForm:
     "Weekly cadence, ground contact, stride, vertical oscillation and ratio, and power, one small chart for each: cadence and ground contact first, the others under Show all.",
   runWalk:

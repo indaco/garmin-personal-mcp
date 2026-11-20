@@ -2004,6 +2004,28 @@ describe("writeDashboard new preset widgets", () => {
     expect(await writer.write({})).not.toHaveProperty("addedWidgets");
   });
 
+  it("reports the ride efficiency once for an edited Bike board", async () => {
+    templateText = template(
+      ID_B,
+      "window.S = /* garmin-settings:start */null/* garmin-settings:end */;\n",
+    );
+    rmSync(file);
+    // a ride in the data gives the cycling tab
+    const ride = { ...data.activities[0], type: "cycling", sport: "cycling" };
+    writer = new DashboardWriter(
+      async () => JSON.stringify({ ...data, activities: [ride] }),
+      dir,
+      async () => templateText,
+    );
+    await writer.write({});
+    const board = preset("cycling").filter((i) => i.widget !== "rideEfficiency");
+    setLayout(
+      edited({ boards: { cycling: board }, seen: { cycling: board.map((i) => i.widget) } }),
+    );
+    expect(await writer.write({})).toMatchObject({ addedWidgets: { cycling: ["rideEfficiency"] } });
+    expect(await writer.write({})).not.toHaveProperty("addedWidgets");
+  });
+
   it("reports the boards of the sports that the page keeps, and all and recovery", async () => {
     templateText = template(
       ID_B,

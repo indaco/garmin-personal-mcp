@@ -526,6 +526,36 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     expect((await sub(3)).delta).not.toBeNull();
   });
 
+  it("places each aerobic run on the week of its day, a Monday and a Sunday included", async () => {
+    const runs = [
+      // 5:00/km is 200 m/min, so the efficiency is 200 / HR; a Sunday, a Monday, the first week
+      { ...easyRun(42_000, "2026-10-25"), pace: "5:00/km", avgHR: 100 },
+      { ...easyRun(42_001, "2026-09-07"), pace: "5:00/km", avgHR: 125 },
+      { ...easyRun(42_002, "2026-08-05"), pace: "5:00/km", avgHR: 100 },
+    ];
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: runs } }),
+      { hash: "#running" },
+    );
+    const points = await page.evaluate(() =>
+      Object.values(window.Chart!.instances)
+        .filter((c) => c.canvas.closest("[data-widget=aerobicFitness]"))
+        .flatMap((c) => c.data.datasets)
+        .filter((d) => d.label === "Aerobic runs")
+        .map((d) => d.data),
+    );
+    // oldest first, each point on its week's label
+    expect(points).toEqual([
+      [
+        { x: "Aug 3", y: 2 },
+        { x: "Sep 7", y: 1.6 },
+        { x: "Oct 19", y: 2 },
+      ],
+    ]);
+    expect(errors).toEqual([]);
+  });
+
   it("gives every sport its longest session, by distance or else by time", async () => {
     const { page, errors } = await open(
       browser,
@@ -2289,4 +2319,389 @@ describe("board rows", () => {
     expect(new Set(widths)).toEqual(new Set([grid]));
     expect(errors).toEqual([]);
   });
+});
+
+/** A ride with a normalized power (W) and an average HR, at 07:00 on `start`. */
+const powerRide = (start: string, normPowerW: number, avgHR: number) => ({
+  id: Number(start.replace(/\D/g, "")),
+  name: "Road ride",
+  type: "cycling",
+  sport: "cycling",
+  start: `${start} 07:00:00`,
+  km: 30,
+  duration: "1:00:00",
+  avgHR,
+  normPowerW,
+});
+// newest first, as the page data is; the weeks start on Monday 08-03 and end with 10-26 (in progress)
+const POWER = [
+  powerRide("2026-10-26", 320, 160), // at or above zone 4 (150): left out with zones
+  powerRide("2026-10-21", 300, 150),
+  powerRide("2026-10-20", 140, 140), // 1.0
+  powerRide("2026-10-13", 130, 100), // 1.3
+  powerRide("2026-10-06", 180, 120), // 1.5
+  powerRide("2026-08-18", 112, 140), // 0.8
+  powerRide("2026-08-11", 120, 100), // 1.2
+  powerRide("2026-08-04", 130, 130), // 1.0
+];
+/** The page data with `activities` before the fixture's activities (3 rides without power). */
+const withRides = (activities: unknown[], extra: object = {}) => ({
+  ...data,
+  v: DASHBOARD_VERSION,
+  activities: [...activities, ...data.activities],
+  ...extra,
+});
+/** The Ride efficiency chart: its count, its datasets with values to 2 decimals, and its axis. */
+async function rideChart(page: Page, tips: [number, number][] = []) {
+  return page.evaluate((at) => {
+    const round = (v: unknown): unknown =>
+      typeof v === "number"
+        ? Math.round(v * 100) / 100
+        : v && typeof v === "object"
+          ? { ...v, y: round((v as { y: unknown }).y) }
+          : v;
+    const charts = Object.values(window.Chart!.instances).filter((c) =>
+      c.canvas.closest("[data-widget=rideEfficiency]"),
+    );
+    const c = charts[0];
+    const tip = (datasetIndex: number, dataIndex: number) => {
+      const d = c!.data.datasets[datasetIndex]!;
+      const v = d.data[dataIndex] as number | { y: number };
+      const label = c!.options.plugins!.tooltip!.callbacks!.label as unknown as (
+        x: object,
+      ) => string;
+      return label({
+        datasetIndex,
+        dataIndex,
+        dataset: d,
+        parsed: { y: typeof v === "number" ? v : v.y },
+      });
+    };
+    return {
+      charts: charts.length,
+      good: getComputedStyle(document.documentElement).getPropertyValue("--good").trim(),
+      axis: (c?.options.scales?.y as { title?: { text?: string } } | undefined)?.title?.text,
+      sets: (c?.data.datasets ?? []).map((d) => {
+        const x = d as unknown as Record<string, unknown>;
+        return {
+          label: d.label,
+          data: d.data.map(round),
+          border: x.borderColor,
+          background: x.backgroundColor ?? null,
+          line: x.showLine ?? null,
+          gaps: x.spanGaps ?? null,
+        };
+      }),
+      tips: at.map(([d, i]) => tip(d, i)),
+    };
+  }, tips);
+}
+const rideNotes = (page: Page) =>
+  page.$$eval("[data-id=rideEfficiency] .note", (n) => n.map((x) => x.textContent));
+const RIDE_NOTE =
+  "Efficiency (normalized power per heartbeat) counts only aerobic rides, with an average HR below zone 4: intervals and races raise HR for other reasons. Higher is better.";
+
+const LANGUAGES = ["en", "de", "es", "fr", "it", "pt"] as const;
+/** The four notes, in this order: aerobic rides, no zones, no power, no ride below zone 4. */
+const NOTE_CASES = [
+  ["aerobic rides", POWER, {}, false],
+  ["no zones", POWER, { zones: [] }, false],
+  ["no power", [], {}, true],
+  [
+    "no ride below zone 4",
+    [powerRide("2026-10-20", 300, 150), powerRide("2026-10-13", 300, 165)],
+    {},
+    true,
+  ],
+] as const;
+/** The texts of the Ride efficiency tile in each page language. */
+const RIDE_TEXTS: Record<
+  string,
+  {
+    title: string;
+    lastWeek: string;
+    last4: string;
+    axis: string;
+    efficiency: string;
+    rides: string;
+    notes: string[];
+  }
+> = {
+  "en-US": {
+    title: "Ride efficiency",
+    lastWeek: "Aerobic-ride efficiency · last week",
+    last4: "Aerobic-ride efficiency · last 4 weeks",
+    axis: "W per heartbeat",
+    efficiency: "Efficiency",
+    rides: "Aerobic rides",
+    notes: [
+      RIDE_NOTE,
+      "Efficiency (normalized power per heartbeat) counts every ride with power: the data has no HR zones to pick the aerobic rides. Higher is better.",
+      "The trend needs a power meter: no ride has a normalized power and an average HR.",
+      "No ride with power has an average HR below zone 4, so no ride is aerobic.",
+    ],
+  },
+  "de-DE": {
+    title: "Rad-Effizienz",
+    lastWeek: "Effizienz aerober Fahrten · letzte Woche",
+    last4: "Effizienz aerober Fahrten · letzte 4 Wochen",
+    axis: "W pro Herzschlag",
+    efficiency: "Effizienz",
+    rides: "Aerobe Fahrten",
+    notes: [
+      "Die Effizienz (normalisierte Leistung pro Herzschlag) zählt nur aerobe Fahrten mit einer Durchschnitts-HF unter Zone 4: Intervalle und Rennen erhöhen die HF aus anderen Gründen. Höher ist besser.",
+      "Die Effizienz (normalisierte Leistung pro Herzschlag) zählt alle Fahrten mit Leistung: Die Daten haben keine HF-Zonen, um die aeroben Fahrten zu wählen. Höher ist besser.",
+      "Der Trend braucht einen Leistungsmesser: Keine Fahrt hat eine normalisierte Leistung und eine Durchschnitts-HF.",
+      "Keine Fahrt mit Leistung hat eine Durchschnitts-HF unter Zone 4, also ist keine Fahrt aerob.",
+    ],
+  },
+  "es-ES": {
+    title: "Eficiencia en bici",
+    lastWeek: "Eficiencia de las salidas aeróbicas · última semana",
+    last4: "Eficiencia de las salidas aeróbicas · últimas 4 semanas",
+    axis: "W por latido",
+    efficiency: "Eficiencia",
+    rides: "Salidas aeróbicas",
+    notes: [
+      "La eficiencia (potencia normalizada por latido) solo cuenta las salidas aeróbicas, con una FC media por debajo de la zona 4: las series y las competiciones suben la FC por otros motivos. Más alto es mejor.",
+      "La eficiencia (potencia normalizada por latido) cuenta todas las salidas con potencia: los datos no tienen zonas de FC para elegir las salidas aeróbicas. Más alto es mejor.",
+      "La tendencia necesita un medidor de potencia: ninguna salida tiene potencia normalizada y FC media.",
+      "Ninguna salida con potencia tiene una FC media por debajo de la zona 4, así que ninguna salida es aeróbica.",
+    ],
+  },
+  "fr-FR": {
+    title: "Efficacité à vélo",
+    lastWeek: "Efficacité des sorties à vélo aérobies · dernière semaine",
+    last4: "Efficacité des sorties à vélo aérobies · 4 dernières semaines",
+    axis: "W par battement",
+    efficiency: "Efficacité",
+    rides: "Sorties aérobies",
+    notes: [
+      "L'efficacité (puissance normalisée par battement) ne compte que les sorties aérobies, avec une FC moyenne sous la zone 4 : les fractionnés et les compétitions font monter la FC pour d'autres raisons. Plus haut, c'est mieux.",
+      "L'efficacité (puissance normalisée par battement) compte toutes les sorties avec puissance : les données n'ont pas de zones FC pour choisir les sorties aérobies. Plus haut, c'est mieux.",
+      "La tendance a besoin d'un capteur de puissance : aucune sortie n'a de puissance normalisée et de FC moyenne.",
+      "Aucune sortie avec puissance n'a une FC moyenne sous la zone 4 : aucune sortie n'est aérobie.",
+    ],
+  },
+  "it-IT": {
+    title: "Efficienza in bici",
+    lastWeek: "Efficienza delle uscite aerobiche · ultima settimana",
+    last4: "Efficienza delle uscite aerobiche · ultime 4 settimane",
+    axis: "W per battito",
+    efficiency: "Efficienza",
+    rides: "Uscite aerobiche",
+    notes: [
+      "L'efficienza (potenza normalizzata per battito) conta solo le uscite aerobiche, con FC media sotto la zona 4: ripetute e gare alzano la FC per altri motivi. Più alta è meglio.",
+      "L'efficienza (potenza normalizzata per battito) conta tutte le uscite con potenza: i dati non hanno zone FC per scegliere le uscite aerobiche. Più alta è meglio.",
+      "Il trend richiede un misuratore di potenza: nessuna uscita ha potenza normalizzata e FC media.",
+      "Nessuna uscita con potenza ha una FC media sotto la zona 4, quindi nessuna uscita è aerobica.",
+    ],
+  },
+  "pt-BR": {
+    title: "Eficiência no ciclismo",
+    lastWeek: "Eficiência das pedaladas aeróbicas · última semana",
+    last4: "Eficiência das pedaladas aeróbicas · últimas 4 semanas",
+    axis: "W por batimento",
+    efficiency: "Eficiência",
+    rides: "Pedaladas aeróbicas",
+    notes: [
+      "A eficiência (potência normalizada por batimento) conta só as pedaladas aeróbicas, com FC média abaixo da zona 4: intervalados e provas sobem a FC por outros motivos. Mais alto é melhor.",
+      "A eficiência (potência normalizada por batimento) conta todas as pedaladas com potência: os dados não têm zonas de FC para escolher as pedaladas aeróbicas. Mais alto é melhor.",
+      "A tendência precisa de um medidor de potência: nenhuma pedalada tem potência normalizada e FC média.",
+      "Nenhuma pedalada com potência tem FC média abaixo da zona 4, então nenhuma pedalada é aeróbica.",
+    ],
+  },
+};
+
+describe("ride efficiency", () => {
+  it("gives the efficiency of the rides below zone 4, week by week, and the last 4 weeks against the first", async () => {
+    const { page, errors } = await open(browser, pageFile({ data: withRides(POWER) }), {
+      hash: "#cycling",
+    });
+    // last 4 weeks: 1.5, 1.3, 1.0 (mean 1.27); first 4 weeks: 1.0, 1.2, 0.8 (mean 1.0): +27%
+    expect(await kpiTexts(page, "rideEfficiency")).toEqual({
+      "Aerobic-ride efficiency · last 4 weeks": ["1.27", "▲ 27% (better) vs first 4 weeks"],
+    });
+    const { charts, good, axis, sets, tips } = await rideChart(page, [
+      [0, 9],
+      [1, 3],
+    ]);
+    expect(charts).toBe(1);
+    expect(axis).toBe("W per heartbeat");
+    expect(sets).toEqual([
+      {
+        label: "Efficiency",
+        data: [1, 1.2, 0.8, ...Array.from({ length: 6 }, () => null), 1.5, 1.3, 1, null],
+        border: good,
+        background: null,
+        line: null,
+        gaps: true,
+      },
+      {
+        label: "Aerobic rides",
+        data: [
+          { x: "Aug 3", y: 1 },
+          { x: "Aug 10", y: 1.2 },
+          { x: "Aug 17", y: 0.8 },
+          { x: "Oct 5", y: 1.5 },
+          { x: "Oct 12", y: 1.3 },
+          { x: "Oct 19", y: 1 },
+        ],
+        border: `${good}80`,
+        background: `${good}80`,
+        line: false,
+        gaps: null,
+      },
+    ]);
+    expect(tips).toEqual(["Efficiency: 1.50", "Oct 6 Road ride: 1.50"]);
+    expect(await rideNotes(page)).toEqual([RIDE_NOTE]);
+    expect(errors).toEqual([]);
+  });
+
+  it("counts every ride with power on a page without HR zones", async () => {
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: withRides(POWER, { zones: [] }) }),
+      { hash: "#cycling" },
+    );
+    // the rides at 150 and 160 bpm count too: last 4 weeks 1.5, 1.3, 1.0, 2.0, 2.0 (mean 1.56)
+    expect(await kpiTexts(page, "rideEfficiency")).toEqual({
+      "Aerobic-ride efficiency · last 4 weeks": ["1.56", "▲ 56% (better) vs first 4 weeks"],
+    });
+    expect((await rideChart(page)).sets[0]?.data.slice(-4)).toEqual([1.5, 1.3, 1.5, 2]);
+    expect(errors).toEqual([]);
+  });
+
+  it("gives one ride with power its tile and no chart, and no change without 3 rides at each end", async () => {
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: withRides([powerRide("2026-10-20", 130, 100)]) }),
+      { hash: "#cycling" },
+    );
+    expect(await kpiTexts(page, "rideEfficiency")).toEqual({
+      "Aerobic-ride efficiency · last 4 weeks": ["1.30", null],
+    });
+    expect(await page.$("[data-id=rideEfficiency] .kpi-sub")).toBeNull();
+    expect(await page.$$("[data-id=rideEfficiency] canvas")).toEqual([]);
+    expect(await rideNotes(page)).toEqual([RIDE_NOTE]);
+    expect(errors).toEqual([]);
+  });
+
+  it("shows n/a without a ride in the last 4 weeks, and a ride without a name by its day only", async () => {
+    const { page, errors } = await open(
+      browser,
+      pageFile({
+        data: withRides([
+          powerRide("2026-08-18", 112, 140),
+          powerRide("2026-08-11", 120, 100),
+          { ...powerRide("2026-08-04", 130, 130), name: undefined },
+        ]),
+      }),
+      { hash: "#cycling" },
+    );
+    expect(await kpiTexts(page, "rideEfficiency")).toEqual({
+      "Aerobic-ride efficiency · last 4 weeks": ["n/a", null],
+    });
+    expect(await page.$("[data-id=rideEfficiency] .kpi-sub")).toBeNull();
+    const { charts, sets, tips } = await rideChart(page, [
+      [0, 0],
+      [1, 0],
+      [1, 2],
+    ]);
+    expect(charts).toBe(1);
+    expect(sets.map((s) => s.data)).toEqual([
+      [1, 1.2, 0.8, ...Array.from({ length: 10 }, () => null)],
+      [
+        { x: "Aug 3", y: 1 },
+        { x: "Aug 10", y: 1.2 },
+        { x: "Aug 17", y: 0.8 },
+      ],
+    ]);
+    expect(tips).toEqual(["Efficiency: 1.00", "Aug 4 : 1.00", "Aug 18 Road ride: 0.80"]);
+    expect(await rideNotes(page)).toEqual([RIDE_NOTE]);
+    expect(errors).toEqual([]);
+  });
+
+  it("draws the chart without a tile on a view of one week", async () => {
+    const { page, errors } = await open(
+      browser,
+      pageFile({
+        data: withRides([powerRide("2026-10-22", 130, 100), powerRide("2026-10-20", 140, 140)]),
+      }),
+      { hash: "#cycling@2026-10-19_2026-10-19" },
+    );
+    expect(await page.$$("[data-id=rideEfficiency] .kpi")).toEqual([]);
+    const { charts, sets } = await rideChart(page);
+    expect([charts, sets[0]?.data]).toEqual([1, [1.15]]);
+    expect(errors).toEqual([]);
+  });
+
+  it("counts only rides, also on a board of all activities", async () => {
+    // the fixture's runs have a normalized power and an average HR below zone 4
+    const layout = on("rideEfficiency");
+    const all = await open(browser, pageFile({ data: withRides(POWER), layout }));
+    expect(await kpiTexts(all.page, "rideEfficiency")).toEqual({
+      "Aerobic-ride efficiency · last 4 weeks": ["1.27", "▲ 27% (better) vs first 4 weeks"],
+    });
+    const runs = data.activities.filter((a: { sport?: string }) => a.sport !== "cycling");
+    const none = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: runs }, layout }),
+    );
+    expect(await none.page.textContent("[data-id=rideEfficiency] .tile-body")).toBe(
+      "No sessions in the selected weeks.",
+    );
+    expect([...all.errors, ...none.errors]).toEqual([]);
+  });
+
+  it.each(
+    Object.entries(RIDE_TEXTS).flatMap(([locale, { notes }]) =>
+      NOTE_CASES.map(
+        ([name, rides, extra, empty], i) => [locale, name, rides, extra, empty, notes[i]!] as const,
+      ),
+    ),
+  )("gives its note in %s with %s", async (locale, _case, rides, extra, empty, text) => {
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: withRides([...rides], extra), settings: { languages: [...LANGUAGES] } }),
+      { hash: "#cycling", locale },
+    );
+    expect(await rideNotes(page)).toEqual([text]);
+    // an empty state has no tile and no chart
+    expect([
+      (await page.$$("[data-id=rideEfficiency] .kpi")).length > 0,
+      (await rideChart(page)).charts,
+    ]).toEqual(empty ? [false, 0] : [true, 1]);
+    expect(errors).toEqual([]);
+  });
+
+  it.each(Object.entries(RIDE_TEXTS))(
+    "names the tile and the chart in %s",
+    async (locale, { title, last4, axis, efficiency, rides }) => {
+      const { page, errors } = await open(
+        browser,
+        pageFile({ data: withRides(POWER), settings: { languages: [...LANGUAGES] } }),
+        { hash: "#cycling", locale },
+      );
+      expect(await page.textContent("[data-id=rideEfficiency] h2")).toBe(title);
+      expect(Object.keys(await kpiTexts(page, "rideEfficiency"))).toEqual([last4]);
+      const { axis: shown, sets } = await rideChart(page);
+      expect([shown, ...sets.map((s) => s.label)]).toEqual([axis, efficiency, rides]);
+      expect(errors).toEqual([]);
+    },
+  );
+
+  it.each(Object.entries(RIDE_TEXTS))(
+    "names the last week alone on a view of 2 weeks in %s",
+    async (locale, { lastWeek }) => {
+      // 2 weeks give 1 week at each end
+      const { page, errors } = await open(
+        browser,
+        pageFile({ data: withRides(POWER), settings: { languages: [...LANGUAGES] } }),
+        { hash: "#cycling@2026-10-12_2026-10-19", locale },
+      );
+      expect(Object.keys(await kpiTexts(page, "rideEfficiency"))).toEqual([lastWeek]);
+      expect(errors).toEqual([]);
+    },
+  );
 });

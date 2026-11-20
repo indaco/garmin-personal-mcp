@@ -64,6 +64,8 @@ const FROZEN: Record<string, string[]> = {
 const INHERITED = ["constructor", "__proto__", "toString", "hasOwnProperty"];
 const order = (r: ReturnType<typeof withPresetWidgets>) =>
   r.layout.boards.recovery?.map((i) => [i.widget, i.span]);
+const cyclingOrder = (r: ReturnType<typeof withPresetWidgets>) =>
+  r.layout.boards.cycling?.map((i) => [i.widget, i.span]);
 const names = (board: string) => preset(board).map((i) => i.widget);
 
 describe("preset", () => {
@@ -76,6 +78,20 @@ describe("preset", () => {
     const i = list.findIndex((x) => x.widget === "planAdherence");
     expect(list[i - 1]?.widget).toBe("muscleBalance");
     expect(list[i]?.span).toBe(3);
+  });
+
+  it("has the ride efficiency on a row of its own on the Bike board, right after Intensity share", () => {
+    expect(preset("cycling").map((i) => [i.widget, i.span])).toEqual([
+      ["typeKpis", 3],
+      ["typeWeekly", 2],
+      ["hrZones", 1],
+      ["records", 3],
+      ["intensityShare", 3],
+      ["rideEfficiency", 3],
+      ["hikeVertical", 3],
+      ["bikeDetails", 3],
+      ["activities", 3],
+    ]);
   });
 
   it("has the warning signs on a row of their own on the Recovery board, right after Fitness age", () => {
@@ -144,7 +160,9 @@ describe("withPresetWidgets with the real preset", () => {
   it("gives a Bike board from an older release the new widgets once", () => {
     const cycling = preset("cycling").filter((i) => baseline("cycling").includes(i.widget));
     const r = withPresetWidgets(parseLayout({ boards: { cycling } }), preset, baseline);
-    expect(r.added).toEqual({ cycling: ["records", "intensityShare", "hikeVertical"] });
+    expect(r.added).toEqual({
+      cycling: ["records", "intensityShare", "rideEfficiency", "hikeVertical"],
+    });
     expect(withPresetWidgets(r.layout, preset, baseline).added).toEqual({});
   });
 
@@ -155,6 +173,32 @@ describe("withPresetWidgets with the real preset", () => {
     const r = withPresetWidgets(parseLayout({ boards: { strengthTraining } }), preset, baseline);
     expect(r.added).toEqual({ strengthTraining: ["records", "planAdherence"] });
     expect(withPresetWidgets(r.layout, preset, baseline).added).toEqual({});
+  });
+
+  describe("the ride efficiency on an edited Bike board", () => {
+    const without = preset("cycling").filter((i) => i.widget !== "rideEfficiency");
+    const seen = { cycling: without.map((i) => i.widget) };
+
+    it("adds it once after Intensity share to a board with a record", () => {
+      const r = withPresetWidgets(
+        parseLayout({ boards: { cycling: without }, seen }),
+        preset,
+        baseline,
+      );
+      expect(r.added).toEqual({ cycling: ["rideEfficiency"] });
+      expect(cyclingOrder(r)).toEqual(preset("cycling").map((i) => [i.widget, i.span]));
+      expect(withPresetWidgets(r.layout, preset, baseline).added).toEqual({});
+    });
+
+    it("guard: does not bring it back to a board that removed it", () => {
+      const r = withPresetWidgets(
+        parseLayout({ boards: { cycling: without }, seen: { cycling: names("cycling") } }),
+        preset,
+        baseline,
+      );
+      expect(r.added).toEqual({});
+      expect(r.layout.boards.cycling?.map((i) => i.widget)).not.toContain("rideEfficiency");
+    });
   });
 
   describe("the warning signs on an edited Recovery board", () => {
