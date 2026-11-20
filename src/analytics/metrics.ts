@@ -365,6 +365,116 @@ export function readinessOf(
   };
 }
 
+/** The days that signDays gives, up to the newest one. */
+export const SIGN_WINDOW = 14;
+
+/** One calendar day of the warning signs: the values behind each signal, and the signals. */
+export interface SignDay {
+  readonly date: string;
+  readonly rhr: number | null;
+  /** The mean resting HR of the 7 recovery rows before, 1 decimal; null under MIN_SESSIONS values. */
+  readonly rhrBase: number | null;
+  /** Last night's HRV. */
+  readonly hrv: number | null;
+  /** The low end of that night's balanced range. */
+  readonly hrvLow: number | null;
+  readonly sleepScore: number | null;
+  /** null when a value is missing: a missing night is no sign. */
+  readonly signals: {
+    readonly rhrHigh: boolean | null;
+    readonly hrvLow: boolean | null;
+    readonly sleepLow: boolean | null;
+  };
+}
+
+/** A real day written as yyyy-MM-dd: Date.parse turns 2026-02-30 into March 2. */
+function isDay(v: unknown): v is string {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const t = Date.parse(`${v}T00:00:00Z`);
+  return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === v;
+}
+
+/** The rows by date, oldest first; the last row of a repeated date wins. */
+function rowsByDay(rows: Record<string, unknown>[]): Map<string, Record<string, unknown>> {
+  const out = new Map<string, Record<string, unknown>>();
+  for (const r of rows) if (isDay(r.date)) out.set(r.date, r);
+  return new Map([...out].toSorted(([a], [b]) => (a < b ? -1 : 1)));
+}
+
+/**
+ * Each calendar day of the last SIGN_WINDOW, oldest first, ending on the newest HRV or recovery row;
+ * fewer days when the rows start later. A day without a row has no values and no signals.
+ */
+export function signDays(
+  hrv: Record<string, unknown>[],
+  recovery: Record<string, unknown>[],
+): SignDay[] {
+  const nights = rowsByDay(hrv);
+  const days = rowsByDay(recovery);
+  const dates = [...nights.keys(), ...days.keys()].toSorted();
+  const first = dates.at(0);
+  const last = dates.at(-1);
+  if (first === undefined || last === undefined) return [];
+  // the base takes the rows before a day's row, also the rows before the window
+  const rows = [...days.values()];
+  const index = new Map([...days.keys()].map((d, i) => [d, i]));
+  const out: SignDay[] = [];
+  const start = addDays(last, 1 - SIGN_WINDOW);
+  for (let d = first > start ? first : start; d <= last; d = addDays(d, 1)) {
+    const night = nights.get(d);
+    const day = days.get(d);
+    const i = index.get(d);
+    const rhr = finite(day?.rhr) ?? null;
+    const base = i === undefined ? undefined : rhrBase(rows, i);
+    const hrvValue = finite(night?.hrv) ?? null;
+    const low = finite(night?.low) ?? null;
+    const sleepScore = finite(day?.sleepScore) ?? null;
+    out.push({
+      date: d,
+      rhr,
+      rhrBase: base === undefined ? null : Math.round(base * 10) / 10,
+      hrv: hrvValue,
+      hrvLow: low,
+      sleepScore,
+      signals: {
+        rhrHigh: rhr === null || base === undefined ? null : rhr >= base + RHR_HIGH_BPM,
+        hrvLow: hrvValue === null || low === null ? null : hrvValue < low,
+        sleepLow: sleepScore === null ? null : sleepScore < SLEEP_LOW,
+      },
+    });
+  }
+  return out;
+}
+
+/** A sign day has 2 or more signals; a missing value is never one. */
+const isSignDay = (d: SignDay) => Object.values(d.signals).filter((s) => s === true).length >= 2;
+
+const hasHrv = (d: SignDay) => d.hrv !== null || d.hrvLow !== null;
+const hasRecovery = (d: SignDay) => d.rhr !== null || d.sleepScore !== null;
+
+/**
+ * The sign days in a row up to the last day; the flag from 2 of them, so one bad night stays quiet.
+ * A last day with only HRV or only recovery data after a day with both is a sync still to come: the
+ * streak then ends on the day before, and `date` names that day. A last day with 2 signs on its own
+ * still counts, so the wait never hides a flag.
+ */
+export function warningSignsOf(
+  days: readonly SignDay[],
+): { date: string; streak: number; flag: boolean } | null {
+  const last = days.at(-1);
+  const before = days.at(-2);
+  if (last === undefined) return null;
+  const lagging =
+    before !== undefined &&
+    !isSignDay(last) &&
+    hasHrv(last) !== hasRecovery(last) &&
+    hasHrv(before) &&
+    hasRecovery(before);
+  const counted = lagging ? days.slice(0, -1) : days;
+  const streak = counted.length - 1 - counted.findLastIndex((d) => !isSignDay(d));
+  return { date: (lagging ? before : last).date, streak, flag: streak >= 2 };
+}
+
 /** As many days as the window, right before it, as the digest does; partial when they start before the data. */
 export function periodWindow(from: string, end: string, dataStart: string | undefined) {
   const days = (Date.parse(end) - Date.parse(from)) / 86_400_000 + 1;
