@@ -21,12 +21,16 @@ import {
   riegel,
   rolling,
   sd,
+  SIGN_WINDOW,
+  signDays,
   totalsOf,
+  warningSignsOf,
   weekly,
   weeklyKnown,
   weeklyMeans,
   zonesOf,
 } from "../../src/analytics/metrics";
+import { addDays } from "../../src/dates";
 
 const act = (start: string, extra: Record<string, unknown> = {}) => ({
   type: "running",
@@ -462,6 +466,341 @@ describe("readiness inputs", () => {
     expect(few.verdict).toBe("normal");
     expect(readinessOf(balanced, recoveryRows([undefined, undefined]), 1).rhrAvg).toBeUndefined();
     expect(readinessOf(balanced, recoveryRows([]), 1).rhrAvg).toBeUndefined();
+  });
+
+  it("leaves a resting HR of the wrong type out of the 7-row average", () => {
+    const rows = [50, "90", Number.POSITIVE_INFINITY, 52, 54, 60].map((rhr, i) => ({
+      date: `2026-10-2${i}`,
+      rhr,
+    }));
+    // the mean of 50, 52 and 54; the last row is today's
+    expect(readinessOf(balanced, rows, 1).rhrAvg).toBe(52);
+  });
+});
+
+/** One row a day from `from`, with the fields of each entry. */
+const daily = (from: string, rows: Record<string, unknown>[]) =>
+  rows.map((r, i) => ({ date: addDays(from, i), ...r }));
+
+/** A day of signDays without any value. */
+const emptyDay = (date: string) => ({
+  date,
+  rhr: null,
+  rhrBase: null,
+  hrv: null,
+  hrvLow: null,
+  sleepScore: null,
+  signals: { rhrHigh: null, hrvLow: null, sleepLow: null },
+});
+
+/** The last day of 7 rows at 50 bpm, then one with `today`. */
+const after50 = (today: Record<string, unknown>) =>
+  signDays([], daily("2026-10-27", [...week50.map((rhr) => ({ rhr })), today])).at(-1);
+
+/** The HRV signal of one night. */
+const night = (hrv: unknown, low: unknown) =>
+  signDays([{ date: "2026-11-03", hrv, low }], []).at(-1)?.signals.hrvLow;
+
+/** The sleep signal of one day. */
+const score = (sleepScore: unknown) =>
+  signDays([], [{ date: "2026-11-03", sleepScore }]).at(-1)?.signals.sleepLow;
+
+describe("signDays", () => {
+  it("has no days without rows or without a valid date", () => {
+    expect(signDays([], [])).toEqual([]);
+    expect(signDays([{ date: "x", hrv: 50 }], [{ sleepScore: 50 }])).toEqual([]);
+  });
+
+  it("skips the rows whose date is not a real yyyy-MM-dd day, without a throw", () => {
+    const bad = ["2026-11-31", "2026-13-01", "2026-11-4", "2026-11-04 07:00", "x", 20261105];
+    const recovery = [
+      { date: "2026-11-03", sleepScore: 70 },
+      ...bad.map((date) => ({ date, sleepScore: 40, rhr: 90 })),
+      { sleepScore: 40 },
+    ];
+    expect(signDays([], recovery)).toEqual([
+      { ...emptyDay("2026-11-03"), sleepScore: 70, signals: expect.any(Object) },
+    ]);
+  });
+
+  it("takes the last row of a repeated date", () => {
+    const recovery = [
+      { date: "2026-11-03", sleepScore: 50 },
+      { date: "2026-11-03", sleepScore: 70 },
+    ];
+    expect(signDays([], recovery).map((d) => d.sleepScore)).toEqual([70]);
+  });
+
+  it("gives the last 14 days, oldest first, ending on the newest date", () => {
+    const rows = daily(
+      "2026-10-15",
+      Array.from({ length: 20 }, (_, i) => ({ sleepScore: 70 + i, rhr: 50 + i })),
+    );
+    const days = signDays([], rows);
+    expect(days).toHaveLength(SIGN_WINDOW);
+    expect(days.map((d) => d.date)).toEqual(
+      Array.from({ length: 14 }, (_, i) => addDays("2026-10-21", i)),
+    );
+    expect(days.at(0)?.sleepScore).toBe(76);
+    // the base of the last day: the rows at 62 to 68 bpm
+    expect(days.at(-1)).toMatchObject({ date: "2026-11-03", sleepScore: 89, rhrBase: 65 });
+    // the same days from rows in any order
+    expect(signDays([], rows.toReversed())).toEqual(days);
+  });
+
+  it("gives fewer days when the data starts later", () => {
+    const days = signDays(
+      [],
+      daily(
+        "2026-10-30",
+        Array.from({ length: 5 }, () => ({})),
+      ),
+    );
+    expect(days.map((d) => d.date)).toEqual([
+      "2026-10-30",
+      "2026-10-31",
+      "2026-11-01",
+      "2026-11-02",
+      "2026-11-03",
+    ]);
+  });
+
+  it("ends the window on the newer of the two lists", () => {
+    const hrv = [{ date: "2026-11-05", hrv: 50, low: 45 }];
+    const recovery = [{ date: "2026-11-03", sleepScore: 70 }];
+    const later = signDays(hrv, recovery);
+    expect(later.map((d) => d.date)).toEqual(["2026-11-03", "2026-11-04", "2026-11-05"]);
+    expect(later.at(-1)).toMatchObject({ hrv: 50, hrvLow: 45, sleepScore: null });
+    const earlier = signDays([{ date: "2026-11-01", hrv: 50 }], recovery);
+    expect(earlier.map((d) => d.date)).toEqual(["2026-11-01", "2026-11-02", "2026-11-03"]);
+    expect(earlier.at(-1)).toMatchObject({ hrv: null, sleepScore: 70 });
+  });
+
+  it("gives a day without a row no values and no signals", () => {
+    // 7 rows at 50 bpm to 2026-11-01, then 2026-11-03: the days around the gap have a base
+    const recovery = [
+      ...daily(
+        "2026-10-26",
+        week50.map((rhr) => ({ rhr, sleepScore: 50 })),
+      ),
+      { date: "2026-11-03", rhr: 50, sleepScore: 50 },
+    ];
+    const days = signDays([{ date: "2026-11-01", hrv: 40, low: 45 }], recovery);
+    expect(days.map((d) => d.date).slice(-3)).toEqual(["2026-11-01", "2026-11-02", "2026-11-03"]);
+    expect(days.at(-2)).toEqual(emptyDay("2026-11-02"));
+  });
+
+  it("marks the resting HR high from 5 bpm over the base of the 7 rows before", () => {
+    expect(after50({ rhr: 55 })).toMatchObject({
+      rhr: 55,
+      rhrBase: 50,
+      signals: { rhrHigh: true },
+    });
+    expect(after50({ rhr: 54.9 })?.signals.rhrHigh).toBe(false);
+  });
+
+  it("has no resting HR signal without the day's value or under 3 values in the base", () => {
+    expect(after50({ sleepScore: 70 })).toMatchObject({
+      rhr: null,
+      rhrBase: 50,
+      signals: { rhrHigh: null },
+    });
+    const few = signDays([], daily("2026-11-01", [{ rhr: 50 }, { rhr: 50 }, { rhr: 60 }])).at(-1);
+    expect(few).toMatchObject({ rhr: 60, rhrBase: null, signals: { rhrHigh: null } });
+  });
+
+  it("takes the base from the 7 rows before, not from 7 calendar days, also before the window", () => {
+    const recovery = [
+      ...daily("2026-10-10", [{ rhr: 40 }, { rhr: 40 }, { rhr: 40 }]),
+      ...daily("2026-10-25", [{ rhr: 60 }, { rhr: 60 }, { rhr: 60 }, { rhr: 60 }, { rhr: 62 }]),
+    ];
+    // (3 x 40 + 4 x 60) / 7 = 51.43; the 7 calendar days before would give 60
+    expect(signDays([], recovery).at(-1)).toMatchObject({
+      date: "2026-10-29",
+      rhrBase: 51.4,
+      signals: { rhrHigh: true },
+    });
+  });
+
+  it("shows the base with 1 decimal and marks the signal from the exact base", () => {
+    const rows = [52, 52, 52, 52, 53, 53, 53.01].map((rhr) => ({ rhr }));
+    // the base is 52.43: 57.42 is under 57.43, over the 57.4 that the shown base gives
+    const day = signDays([], daily("2026-10-27", [...rows, { rhr: 57.42 }])).at(-1);
+    expect(day).toMatchObject({ rhrBase: 52.4, signals: { rhrHigh: false } });
+  });
+
+  it("marks the HRV low under the low end of its range", () => {
+    expect(night(45, 45)).toBe(false);
+    expect(night(44, 45)).toBe(true);
+    expect(night(44, undefined)).toBeNull();
+    expect(night(undefined, 45)).toBeNull();
+  });
+
+  it("marks the sleep low under a score of 60", () => {
+    expect(score(60)).toBe(false);
+    expect(score(59)).toBe(true);
+    expect(score(undefined)).toBeNull();
+  });
+
+  it.each([["55"], [Number.NaN], [Number.POSITIVE_INFINITY]])("reads %s as no value", (v) => {
+    const recovery = [
+      ...daily(
+        "2026-10-27",
+        week50.map((rhr) => ({ rhr })),
+      ),
+      { date: "2026-11-03", rhr: v, sleepScore: v },
+    ];
+    const day = signDays([{ date: "2026-11-03", hrv: v, low: v }], recovery).at(-1);
+    expect(day).toEqual({ ...emptyDay("2026-11-03"), rhrBase: 50 });
+  });
+});
+
+/** Days from 2026-11-01 with these signals, as rhrHigh, hrvLow, sleepLow. */
+const signed = (...signals: [boolean | null, boolean | null, boolean | null][]) =>
+  signals.map(([rhrHigh, hrvLow, sleepLow], i) => ({
+    ...emptyDay(addDays("2026-11-01", i)),
+    signals: { rhrHigh, hrvLow, sleepLow },
+  }));
+const sign: [boolean, boolean, boolean] = [true, true, false];
+const clear: [boolean, boolean, boolean] = [false, false, false];
+
+/** A day with every value and all three signals. */
+const full = (date: string) => ({
+  date,
+  rhr: 56,
+  rhrBase: 50,
+  hrv: 40,
+  hrvLow: 45,
+  sleepScore: 50,
+  signals: { rhrHigh: true, hrvLow: true, sleepLow: true },
+});
+
+describe("warningSignsOf", () => {
+  it("has no value without days", () => {
+    expect(warningSignsOf([])).toBeNull();
+  });
+
+  it("keeps the flag down for 1 sign day", () => {
+    expect(warningSignsOf(signed(clear, sign))).toEqual({
+      date: "2026-11-02",
+      streak: 1,
+      flag: false,
+    });
+  });
+
+  it("raises the flag for 2 sign days in a row up to the last day", () => {
+    // the streak starts after the last clear day, not the first
+    expect(warningSignsOf(signed(clear, sign, clear, sign, sign))).toEqual({
+      date: "2026-11-05",
+      streak: 2,
+      flag: true,
+    });
+  });
+
+  it("ends the streak on a day without rows", () => {
+    expect(warningSignsOf(signed(sign, sign, [null, null, null]))).toEqual({
+      date: "2026-11-03",
+      streak: 0,
+      flag: false,
+    });
+  });
+
+  it("needs 2 signals: 1 sign and 2 missing values make no sign day", () => {
+    expect(warningSignsOf(signed(sign, [true, null, null]))?.streak).toBe(0);
+    expect(warningSignsOf(signed([null, true, true]))?.streak).toBe(1);
+  });
+
+  it("counts all 14 days when every day has signs", () => {
+    const days = signed(...Array.from({ length: SIGN_WINDOW }, () => sign));
+    expect(warningSignsOf(days)).toEqual({ date: "2026-11-14", streak: 14, flag: true });
+  });
+
+  it.each([
+    ["HRV only", { hrv: 40 }],
+    ["the HRV range only", { hrvLow: 45 }],
+    ["resting HR only", { rhr: 56 }],
+    ["sleep score only", { sleepScore: 50 }],
+  ])("counts from the day before when the last day has %s", (_, values) => {
+    const days = [full("2026-11-01"), full("2026-11-02"), { ...emptyDay("2026-11-03"), ...values }];
+    expect(warningSignsOf(days)).toEqual({ date: "2026-11-02", streak: 2, flag: true });
+  });
+
+  it("counts a last day with one kind of data when it has 2 signs on its own", () => {
+    const recoveryOnly = {
+      ...emptyDay("2026-11-02"),
+      rhr: 56,
+      sleepScore: 50,
+      signals: { rhrHigh: true, hrvLow: null, sleepLow: true },
+    };
+    expect(warningSignsOf([full("2026-11-01"), recoveryOnly])).toEqual({
+      date: "2026-11-02",
+      streak: 2,
+      flag: true,
+    });
+  });
+
+  it("skips a last day with one kind of data and 1 sign", () => {
+    const recoveryOnly = {
+      ...emptyDay("2026-11-02"),
+      rhr: 56,
+      sleepScore: 70,
+      signals: { rhrHigh: true, hrvLow: null, sleepLow: false },
+    };
+    expect(warningSignsOf([full("2026-11-01"), recoveryOnly])).toEqual({
+      date: "2026-11-01",
+      streak: 1,
+      flag: false,
+    });
+  });
+
+  it.each([
+    ["HRV only", { hrv: 40, hrvLow: 45 }],
+    ["recovery only", { rhr: 56, sleepScore: 50 }],
+    ["no rows", {}],
+  ])("keeps the last day when the day before has %s", (_, values) => {
+    const days = [
+      full("2026-11-01"),
+      { ...emptyDay("2026-11-02"), ...values },
+      { ...emptyDay("2026-11-03"), hrv: 40 },
+    ];
+    expect(warningSignsOf(days)).toEqual({ date: "2026-11-03", streak: 0, flag: false });
+  });
+
+  it("keeps a last day with both kinds of data", () => {
+    const clearDay = {
+      ...full("2026-11-02"),
+      signals: { rhrHigh: false, hrvLow: false, sleepLow: false },
+    };
+    expect(warningSignsOf([full("2026-11-01"), clearDay])).toEqual({
+      date: "2026-11-02",
+      streak: 0,
+      flag: false,
+    });
+  });
+
+  it("keeps a last day without rows after complete days", () => {
+    const days = [full("2026-11-01"), full("2026-11-02"), emptyDay("2026-11-03")];
+    expect(warningSignsOf(days)).toEqual({ date: "2026-11-03", streak: 0, flag: false });
+  });
+
+  it("keeps a single day with one kind of data", () => {
+    const recoveryOnly = {
+      ...emptyDay("2026-11-01"),
+      rhr: 56,
+      sleepScore: 50,
+      signals: { rhrHigh: true, hrvLow: null, sleepLow: true },
+    };
+    expect(warningSignsOf([recoveryOnly])).toEqual({ date: "2026-11-01", streak: 1, flag: false });
+  });
+
+  it("keeps a single day with one kind of data and 1 sign", () => {
+    const hrvOnly = {
+      ...emptyDay("2026-11-01"),
+      hrv: 40,
+      hrvLow: 45,
+      signals: { rhrHigh: null, hrvLow: true, sleepLow: null },
+    };
+    expect(warningSignsOf([hrvOnly])).toEqual({ date: "2026-11-01", streak: 0, flag: false });
   });
 });
 

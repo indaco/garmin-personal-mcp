@@ -4,7 +4,15 @@ import { digest, syncGaps } from "../src/digest";
 import { hms, round } from "../src/fit";
 import { type Activity, sessionSeconds } from "../src/analytics/calc";
 import type { Settings } from "../src/page/settings";
-import { fitnessFatigueFrom, loadRatio, readinessOf, zonesOf } from "../src/analytics/metrics";
+import {
+  fitnessFatigueFrom,
+  loadRatio,
+  readinessOf,
+  signDays,
+  warningSignsOf,
+  zonesOf,
+} from "../src/analytics/metrics";
+import { addDays } from "../src/dates";
 import { predictRaces, splitOf, weeklyIntensity } from "../src/analytics/running";
 
 const squat = (sets: Record<string, number>[]) => ({ exercise: "Back Squat", sets });
@@ -91,6 +99,22 @@ const recoveryTo = (today: Record<string, unknown>) => [
   ...Array.from({ length: 7 }, (_, i) => ({ date: `2026-10-${19 + i}`, rhr: 50 })),
   today,
 ];
+
+/** 7 rows at 50 bpm, then 14 full days to 2026-11-03; the last `signs` days have a high resting HR, a low HRV and a poor sleep. */
+const signRows = (signs: number) => ({
+  hrv: Array.from({ length: 14 }, (_, i) => ({
+    date: addDays("2026-10-21", i),
+    hrv: i >= 14 - signs ? 40 : 60,
+    low: 45,
+    high: 70,
+    status: "BALANCED",
+  })),
+  recovery: Array.from({ length: 21 }, (_, i) => ({
+    date: addDays("2026-10-14", i),
+    rhr: i >= 21 - signs ? 56 : 50,
+    sleepScore: i >= 21 - signs ? 50 : 80,
+  })),
+});
 
 /** Runs with an acute load in the last 7 days and the rest of the 28 days before them. */
 const loads = (acute: number, rest: number) => [
@@ -1122,6 +1146,7 @@ describe("digest", () => {
   it("has no readiness without HRV and recovery rows, and no sleep or HRV text then", () => {
     const out = digest({ ...data, hrv: [], recovery: [] });
     expect(out).not.toHaveProperty("readiness");
+    expect(out).not.toHaveProperty("warningSigns");
     // the page leaves both lists empty when it excludes recovery
     expect(JSON.stringify(out)).not.toMatch(/sleep|"hrv(Status|Date)"/i);
     expect(JSON.stringify(out.fitnessFatigue)).not.toMatch(/sleep|hrv/i);
@@ -1152,6 +1177,42 @@ describe("digest", () => {
       recoveryDate: "2026-10-26",
       loadRatio: 4,
     });
+  });
+
+  it("names the days in a row with warning signs, as the analytics give them", () => {
+    const { hrv, recovery } = signRows(3);
+    const out = digest({ ...data, hrv, recovery });
+    const days = signDays(hrv, recovery);
+    expect(out.warningSigns).toEqual({ ...warningSignsOf(days), days });
+    expect(out.warningSigns).toMatchObject({ date: "2026-11-03", streak: 3, flag: true });
+    expect(out.warningSigns?.days).toHaveLength(14);
+  });
+
+  it("has no warning signs when no row has a valid date", () => {
+    const out = digest({ ...data, hrv: [{ date: "x", hrv: 40 }], recovery: [{ sleepScore: 40 }] });
+    expect(out).toHaveProperty("readiness");
+    expect(out).not.toHaveProperty("warningSigns");
+  });
+
+  it("counts the streak from the day before when the last day has only last night's HRV", () => {
+    const { hrv, recovery } = signRows(3);
+    const lagging = [...hrv, { date: "2026-11-04", hrv: 40, low: 45, status: "BALANCED" }];
+    const out = digest({ ...data, hrv: lagging, recovery }).warningSigns;
+    expect(out).toMatchObject({ date: "2026-11-03", streak: 3, flag: true });
+    expect(out?.days.at(-1)).toMatchObject({
+      date: "2026-11-04",
+      hrv: 40,
+      rhr: null,
+      sleepScore: null,
+    });
+    expect(out?.days).toHaveLength(14);
+  });
+
+  it("keeps the warning signs of 14 full days under 2,500 characters", () => {
+    const { hrv, recovery } = signRows(14);
+    expect(JSON.stringify(digest({ ...data, hrv, recovery }).warningSigns).length).toBeLessThan(
+      2_500,
+    );
   });
 
   it("gives today's fitness, fatigue and form as the page, warmed up by the weeks before", () => {

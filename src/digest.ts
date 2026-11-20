@@ -18,6 +18,9 @@ import {
   loadSafety,
   periodWindow,
   readinessOf,
+  type SignDay,
+  signDays,
+  warningSignsOf,
   zonesOf,
 } from "./analytics/metrics";
 import {
@@ -221,6 +224,16 @@ export interface Digest {
     loadRatio: number | null;
   };
   /**
+   * The last 14 days with their warning signs: resting HR 5 bpm or more over the mean of the 7 rows
+   * before, last night's HRV under its balanced range, sleep score under 60. A day with 2 or more is
+   * a sign day; `streak` counts the sign days in a row up to `date` (a streak of 14 means 14 or
+   * more), and `flag` is a streak of 2 or more. `date` is the last day, or the day before when the
+   * last day has only HRV or only recovery data (a sync still to come), fewer than 2 signs, and the
+   * day before has both. A day without rows has null values and ends the streak. Absent without HRV and recovery rows
+   * (also when the page leaves out the recovery data).
+   */
+  warningSigns?: { date: string; streak: number; flag: boolean; days: SignDay[] };
+  /**
    * The page's Aerobic fitness: metres per heartbeat of the runs below zone 4, the first and the
    * last `comparedWeeks` of the period, 2 decimals; null without such a run on that side. The change
    * in % needs 3 runs on each side. Absent without runs, and without a zone 4 floor (no zones, or
@@ -422,6 +435,8 @@ export function digest(data: Json): Digest {
   const hrv = list(data.hrv);
   const recovery = list(data.recovery);
   const ready = readinessOf(hrv, recovery, ratio.ratio);
+  const signs = signDays(hrv, recovery);
+  const warning = warningSignsOf(signs);
   // without a start (the server always gives one) fitness has no window
   const ff = start ? fitnessFatigueFrom(every, start, end, maxHR) : null;
 
@@ -507,6 +522,7 @@ export function digest(data: Json): Digest {
           },
         }
       : {}),
+    ...(warning ? { warningSigns: { ...warning, days: signs } } : {}),
     fitnessFatigue: ff && {
       fitness: round(ff.fitness.at(-1)!, 1),
       fatigue: round(ff.fatigue.at(-1)!, 1),
