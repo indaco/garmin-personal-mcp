@@ -16,6 +16,8 @@ type Json = Record<string, unknown>;
 const DAY_MS = 24 * 3600_000;
 /** The activities of one search page: Garmin answers HTTP 500 to a page of about 190 or more, also in a date window. */
 export const SEARCH_PAGE = 100;
+/** The newest activities that `listActivities` filters by `names`; the prompt suggestions use the same window. */
+export const NAME_SEARCH = 200;
 
 /**
  * MCP tools over the Garmin Connect Personal API (read-only). Every tool returns a JSON string.
@@ -65,7 +67,7 @@ export class GarminTools {
     const refused = (e: unknown) =>
       activityType !== undefined && e instanceof GarminApiError && /-> HTTP 400\b/.test(e.message);
     // shortcut: names are filtered in the last 200 activities of the window; page with start= when a window holds more
-    const max = wanted.length > 0 ? 200 : asked;
+    const max = wanted.length > 0 ? NAME_SEARCH : asked;
     let json: unknown;
     let local = false;
     try {
@@ -569,7 +571,7 @@ function copy(from: Json, to: Json, name: string, as: string): void {
   }
 }
 
-function isObject(v: unknown): v is Json {
+export function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 

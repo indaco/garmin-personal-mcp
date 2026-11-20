@@ -375,6 +375,12 @@ These prompts answer in the chat. They do not change a dashboard.
 
 A missing value shows as "n/a": the assistant does not estimate it.
 
+In a client that shows MCP completions, the `activity` argument of `run-review`, `strength-review`,
+`swim-review` and `ride-review` suggests the names of your recent activities as you type. The
+names come from the dashboard data on your computer (your newest 200 activities), not from Garmin,
+so the suggestions start after your first dashboard update. Claude Code does not show them (tested
+with 2.1.329). Claude Desktop and the MCP Inspector: not tested.
+
 ### run-review
 
 The assistant compares the planned workout that your watch ran with the laps of the run: the target,

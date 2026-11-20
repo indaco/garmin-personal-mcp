@@ -36,6 +36,6 @@ export function createServer(config: Config): McpServer {
   registerDashboard(server, dashboard);
   registerDashboardWriter(server, writer);
   registerSchedule(server, auto);
-  registerPrompts(server);
+  registerPrompts(server, () => dashboard.load());
   return server;
 }
