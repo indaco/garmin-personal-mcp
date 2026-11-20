@@ -3,6 +3,8 @@ export const ABOUT: Record<string, string> = {
   kpis: "Window totals; the last 7 days against the 4-week average for distance and time; the 7:28 load ratio; last night's HRV against its 7-day average.",
   readiness:
     "Today's verdict (go easy, normal, ready to push) from HRV status, sleep score, resting HR and the load ratio. The dashboard's own rule.",
+  warningSigns:
+    "The days in a row with warning signs, up to the newest day: a day has them when 2 or more of resting HR 5 bpm or more above its 7-day average, last night's HRV under its range and a sleep score under 60 are true. One day is a note, 2 in a row a warning. The numbers of that day and a 7-day strip. The dashboard's own rule, not a diagnosis.",
   fitnessAge:
     "Garmin fitness age against actual age, the achievable age, and, under Details, its components with Garmin's targets.",
   periodComparison:

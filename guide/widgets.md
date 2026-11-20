@@ -7,6 +7,7 @@ it by hand.
 | ------ | -- | ----- | ----- | ----- |
 | Overview | `kpis` | Window totals; the last 7 days against the 4-week average for distance and time; the 7:28 load ratio; last night's HRV against its 7-day average. | all and each type | 3 |
 | Readiness today | `readiness` | Today's verdict (go easy, normal, ready to push) from HRV status, sleep score, resting HR and the load ratio. The dashboard's own rule. | - | 2 |
+| Warning signs | `warningSigns` | The days in a row with warning signs, up to the newest day: a day has them when 2 or more of resting HR 5 bpm or more above its 7-day average, last night's HRV under its range and a sleep score under 60 are true. One day is a note, 2 in a row a warning. The numbers of that day and a 7-day strip. The dashboard's own rule, not a diagnosis. | - | 3 |
 | Fitness age | `fitnessAge` | Garmin fitness age against actual age, the achievable age, and, under Details, its components with Garmin's targets. | - | 1 |
 | Period comparison | `periodComparison` | Sessions, distance, time and load of the window against the same number of days right before it, per type and in total. | all and each type | 3 |
 | Records | `records` | The longest session of each sport (by distance, else by time) and the heaviest set. On the all board also best efforts and the best estimated 1RM of each exercise: 4 first, the others under Show all. | all and each type | 3 |

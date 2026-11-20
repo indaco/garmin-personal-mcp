@@ -234,9 +234,9 @@ column on a phone. Each widget is 1, 2 or 3 columns wide.
 The page uses the training load, HR zones and training effect from Garmin. It labels each value that
 it calculates as an estimate, and a missing value shows as "n/a".
 
-The All board shows all types. The Recovery board shows readiness, fitness age, load against
-recovery and the 14-day recovery widgets: HRV, resting HR, stress, sleep, sleep need, bedtime and
-Body Battery. With the `recoveryHistory` setting, it also shows the Recovery trend widget. Each type
+The All board shows all types. The Recovery board shows readiness, fitness age, the warning signs,
+load against recovery and the 14-day recovery widgets: HRV, resting HR, stress, sleep, sleep need,
+bedtime and Body Battery. With the `recoveryHistory` setting, it also shows the Recovery trend widget. Each type
 board shows one sport. The board of an activity is its
 sport in the Garmin FIT SDK. Garmin sends that sport as a number with each activity. The server
 gives it the SDK name, for example `running` or `racket`.

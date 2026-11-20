@@ -39,6 +39,12 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
     span: 2,
   },
   {
+    id: "warningSigns",
+    title: "w.warningSigns",
+    needs: "recovery",
+    span: 3,
+  },
+  {
     id: "fitnessAge",
     title: "w.fitnessAge",
     needs: "fitnessAge",

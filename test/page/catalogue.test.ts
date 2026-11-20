@@ -47,6 +47,22 @@ describe("widget catalogue", () => {
     expect(inPage(trend, { recoveryHistory: true, exclude: ["recovery"] })).toBe(false);
   });
 
+  it("has the Warning signs right after Readiness, full width, only on a page with the recovery data", () => {
+    const at = CATALOGUE.findIndex((c) => c.id === "warningSigns");
+    expect(CATALOGUE[at - 1]?.id).toBe("readiness");
+    expect(CATALOGUE[at]).toEqual({
+      id: "warningSigns",
+      title: "w.warningSigns",
+      needs: "recovery",
+      span: 3,
+    });
+    expect(ABOUT.warningSigns).toBe(
+      "The days in a row with warning signs, up to the newest day: a day has them when 2 or more of resting HR 5 bpm or more above its 7-day average, last night's HRV under its range and a sleep score under 60 are true. One day is a note, 2 in a row a warning. The numbers of that day and a 7-day strip. The dashboard's own rule, not a diagnosis.",
+    );
+    expect(inPage(CATALOGUE[at]!, {})).toBe(true);
+    expect(inPage(CATALOGUE[at]!, { exclude: ["recovery"] })).toBe(false);
+  });
+
   it("gives a board of any other SDK sport the preset of the Other board", () => {
     expect(preset("alpineSkiing")).toEqual(preset("generic"));
     expect(preset("generic").length).toBeGreaterThan(0);

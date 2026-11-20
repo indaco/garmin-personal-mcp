@@ -137,6 +137,12 @@ describe("guide", () => {
     expect(readme).not.toContain("which writes nothing");
   });
 
+  it("names the warning signs on the Recovery board in the dashboard guide", () => {
+    expect(readFileSync("guide/dashboard.md", "utf8").replace(/\s+/g, " ")).toContain(
+      "The Recovery board shows readiness, fitness age, the warning signs, load against recovery and the 14-day recovery widgets: HRV, resting HR, stress, sleep, sleep need, bedtime and Body Battery.",
+    );
+  });
+
   it("lists every widget", () => {
     check("guide/widgets.md", widgetsDoc());
   });
