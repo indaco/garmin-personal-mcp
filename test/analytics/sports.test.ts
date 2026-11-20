@@ -4,6 +4,7 @@ import {
   distancePerStroke,
   kmPerHour,
   perHour,
+  powerPerBeat,
   runLoadPerMinute,
   strokesPerLength,
   swimPace,
@@ -176,5 +177,34 @@ describe("kmPerHour", () => {
     ["no duration", { km: 30 }, undefined],
   ])("with %s", (_, a, expected) => {
     expect(kmPerHour(a as Activity)).toBe(expected);
+  });
+});
+
+/** A ride with these fields. */
+const rideOf = (fields: Record<string, unknown>) => ({ sport: "cycling", ...fields }) as Activity;
+
+describe("powerPerBeat", () => {
+  it("gives normalized power over average HR", () => {
+    // 200 W at 140 bpm
+    expect(powerPerBeat(rideOf({ normPowerW: 200, avgPowerW: 180, avgHR: 140 }))).toBeCloseTo(
+      1.4286,
+      4,
+    );
+  });
+
+  it.each([
+    ["no normalized power", { avgHR: 140 }],
+    ["average power only", { avgPowerW: 180, avgHR: 140 }],
+    ["a normalized power of 0", { normPowerW: 0, avgHR: 140 }],
+    ["a negative normalized power", { normPowerW: -200, avgHR: 140 }],
+    ["a normalized power that is a string", { normPowerW: "200", avgHR: 140 }],
+    ["a normalized power that is NaN", { normPowerW: Number.NaN, avgHR: 140 }],
+    ["an infinite normalized power", { normPowerW: Number.POSITIVE_INFINITY, avgHR: 140 }],
+    ["no average HR", { normPowerW: 200 }],
+    ["an average HR of 0", { normPowerW: 200, avgHR: 0 }],
+    ["a negative average HR", { normPowerW: 200, avgHR: -140 }],
+    ["an infinite average HR", { normPowerW: 200, avgHR: Number.POSITIVE_INFINITY }],
+  ])("gives nothing with %s", (_, fields) => {
+    expect(powerPerBeat(rideOf(fields))).toBeUndefined();
   });
 });

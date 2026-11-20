@@ -166,6 +166,12 @@ describe("guide", () => {
     );
   });
 
+  it("names the power per heartbeat of a ride in the widget API", () => {
+    expect(WIDGET_API).toContain(
+      "verticalPerHour(activity), powerPerBeat(activity) (normalized power over average HR, in W per bpm; undefined without both).",
+    );
+  });
+
   it("lists every text", () => {
     check("guide/languages.md", between("guide/languages.md", "keys", keysPart()));
   });

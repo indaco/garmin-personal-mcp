@@ -90,6 +90,23 @@ export function perHour(value: number, a: Activity): number | undefined {
   return h > 0 ? value / h : undefined;
 }
 
+/**
+ * Normalized power per heartbeat, in W per bpm (the efficiency factor of a ride): undefined
+ * without a normalized power and an average HR that are both finite and above 0.
+ */
+export function powerPerBeat(a: Activity): number | undefined {
+  const np = a.normPowerW;
+  const hr = a.avgHR;
+  return typeof np === "number" &&
+    Number.isFinite(np) &&
+    np > 0 &&
+    typeof hr === "number" &&
+    Number.isFinite(hr) &&
+    hr > 0
+    ? np / hr
+    : undefined;
+}
+
 /** km/h over moving time. */
 export function kmPerHour(a: Activity): number | undefined {
   const hours = seconds(a.duration) / 3600;
