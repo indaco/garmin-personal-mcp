@@ -251,7 +251,10 @@ export function registerPrompts(server: McpServer, cache: () => Promise<unknown>
       description: readinessDescription,
       argsSchema: z.object({
         date: z.string().describe("The race date, yyyy-MM-dd").optional(),
-        distance: z.string().describe("5k, 10k, half, marathon, or a distance in km").optional(),
+        distance: completable(
+          z.string().describe("5k, 10k, half, marathon, or a distance in km"),
+          (typed) => DISTANCES.filter((d) => d.startsWith(arg(typed).toLowerCase())),
+        ).optional(),
         goal: z.string().describe("Your goal time, e.g. 1:45:00; empty = no goal").optional(),
       }),
     },
@@ -519,6 +522,9 @@ export function activityNames(cache: unknown, board: string, typed: string): str
   }
   return [...names.values()];
 }
+
+/** The race distances that the race-readiness prompt text knows. */
+const DISTANCES = ["5k", "10k", "half", "marathon"];
 
 const startOf = (r: Record<string, unknown>) => (typeof r.start === "string" ? r.start : "");
 

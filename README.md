@@ -413,6 +413,9 @@ a target pace for each quarter of the race.
 | `distance` | `5k`, `10k`, `half`, `marathon`, or a distance | none: the assistant asks |
 | `goal`     | your goal time, for example `1:45:00`          | no goal: prediction only |
 
+In a client that shows MCP completions, `distance` suggests `5k`, `10k`, `half` and `marathon` as
+you type (the clients are in [Coach prompts](#coach-prompts)).
+
 In Claude Code, give the values in any order: a value in the form `yyyy-MM-dd` is the date, a value
 in the form `1:45:00` is the goal, and the other words are the distance. For example
 `/mcp__garmin-personal__race-readiness half marathon 2026-11-15`.

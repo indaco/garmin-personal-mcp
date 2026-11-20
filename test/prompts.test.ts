@@ -1540,4 +1540,20 @@ describe("completions", () => {
   it("suggests nothing for an argument without suggestions", async () => {
     expect((await complete(folder(cache), "race-readiness", "goal", "1")).values).toEqual([]);
   });
+
+  it.each([
+    ["", ["5k", "10k", "half", "marathon"]],
+    ["  ", ["5k", "10k", "half", "marathon"]],
+    ["h", ["half"]],
+    ["H", ["half"]],
+    ["MAR", ["marathon"]],
+    ["1", ["10k"]],
+    ["5", ["5k"]],
+    ["10k", ["10k"]],
+    ["k", []],
+    ["21", []],
+    ["half marathon", []],
+  ])("race-readiness suggests the distances that start with %j", async (typed, values) => {
+    expect((await complete("/none", "race-readiness", "distance", typed)).values).toEqual(values);
+  });
 });
