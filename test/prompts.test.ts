@@ -997,6 +997,38 @@ describe("coach prompts", () => {
     );
   });
 
+  it("train-today names the days in a row with warning signs between Why and Fitness and form", async () => {
+    const text = (await render("train-today")).replace(/\s+/g, " ");
+    const why = text.indexOf("- **Why**");
+    const start = text.indexOf("- **Warning signs**");
+    expect(why).toBeGreaterThan(-1);
+    expect(start).toBeGreaterThan(why);
+    expect(text.slice(start, text.indexOf("- **Fitness and form**"))).toBe(
+      '- **Warning signs**: from `warningSigns`, the days in a row up to `warningSigns.date` when 2 or more of these were off: the resting HR 5 bpm or more above its 7-day base, last night\'s HRV under the low end of its range, and a sleep score under 60. Call the HRV "last night\'s HRV": it is not the HRV status above. When `warningSigns.date` is not 2026-10-28, give that date. The verdict reads the newest rows (`hrvDate`, `recoveryDate`), so it can be from a newer day than the signs: then say so, and do not change the verdict. 1. When `flag` is true, write "N days in a row with warning signs", where N is `streak`; a `streak` of 14 is "14 or more days". Then, for each sign day of the streak, newest first, from `warningSigns.days`: its date and each signal that is true, with its numbers: the resting HR (`rhr`) and its base (`rhrBase`), last night\'s HRV (`hrv`) and the low end of its range (`hrvLow`), the sleep score (`sleepScore`). 2. When `streak` is 1: one line that one day had warning signs, with its numbers as above, and "watch the next one". 3. When `streak` is 0: "none". Without `warningSigns`, write "n/a". Say in one line that the signs do not change the verdict and are not a diagnosis. ',
+    );
+    for (const line of template("train-today").split("\n")) {
+      expect(line.length).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it("train-today lets the coach note name the warning signs, never against the verdict", async () => {
+    const text = (await render("train-today")).replace(/\s+/g, " ");
+    expect(text.slice(text.indexOf("- **Coach note**"), text.indexOf("Every number"))).toBe(
+      "- **Coach note**: 1 or 2 sentences: what to do today. Base each sentence on a number above; it can name the warning signs. Do not go against the verdict. ",
+    );
+  });
+
+  it("week-review names the warning-sign days of the reviewed week after Now", async () => {
+    const text = (await render("week-review")).replace(/\s+/g, " ");
+    const now = text.indexOf("- **Now**");
+    const start = text.indexOf("- **Recovery**");
+    expect(now).toBeGreaterThan(-1);
+    expect(start).toBeGreaterThan(now);
+    expect(text.slice(start, text.indexOf("- **New bests**"))).toBe(
+      '- **Recovery**: the warning-sign days of the week of `2026-10-19`, Monday to Sunday, from `warningSigns.days`: the days when 2 or more of their `signals` are true. Give each one with its date, its true signals and their numbers: the resting HR (`rhr`) and its 7-day base (`rhrBase`), last night\'s HRV (`hrv`) and the low end of its range (`hrvLow`), the sleep score (`sleepScore`). A day of that week that is not in `warningSigns.days` is "n/a". Without a sign day in the week, write "none". Then the days in a row with warning signs up to `warningSigns.date` (`streak`; 14 is "14 or more"), and when `flag` is true, that 2 or more in a row is the page\'s warning. Without `warningSigns`, write "n/a"; if `settings.exclude` has `recovery`, say that the dashboard leaves out the recovery data. Say in one line that the signs are not a diagnosis. ',
+    );
+  });
+
   it("reviews the last whole week with the page's numbers from one call", async () => {
     const { prompts } = await client.listPrompts();
     expect(prompts.find((p) => p.name === "week-review")?.arguments ?? []).toEqual([]);
@@ -1025,7 +1057,7 @@ describe("coach prompts", () => {
     const text = (await render("week-review")).replace(/\s+/g, " ");
     const part = text.slice(
       text.indexOf("- **Against the weeks before**"),
-      text.indexOf("- **New bests**"),
+      text.indexOf("- **Recovery**"),
     );
     expect(part).toBe(
       '- **Against the weeks before**: how the week\'s load and hours compare with the mean of the weeks before it in the table, as a percent. Without an earlier week or with a null load, write "n/a". Then the page\'s load ramp of the week (`rampPct`): its load against the week before, in %. A ramp of more than 10% is the page\'s warning level: say so. A null `rampPct` is "n/a". - **Now**: the load ratio of 7 to 28 days (`load.acuteToChronic`), the monotony and strain of the last 7 days (`load.monotony`, `load.strain`), and `fitnessFatigue.form` (below 0 you carry fatigue). A monotony above 2 is the page\'s flag: the days are too alike. Say that these describe today, not the reviewed week. A null value is "n/a". If `fitnessFatigue` is null, write "n/a". ',

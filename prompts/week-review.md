@@ -25,6 +25,15 @@ Then answer in chat, in this order, short:
   last 7 days (`load.monotony`, `load.strain`), and `fitnessFatigue.form` (below 0 you carry
   fatigue). A monotony above 2 is the page's flag: the days are too alike. Say that these describe
   today, not the reviewed week. A null value is "n/a". If `fitnessFatigue` is null, write "n/a".
+- **Recovery**: the warning-sign days of the week of `{{week}}`, Monday to Sunday, from
+  `warningSigns.days`: the days when 2 or more of their `signals` are true. Give each one with its
+  date, its true signals and their numbers: the resting HR (`rhr`) and its 7-day base (`rhrBase`),
+  last night's HRV (`hrv`) and the low end of its range (`hrvLow`), the sleep score (`sleepScore`).
+  A day of that week that is not in `warningSigns.days` is "n/a". Without a sign day in the week,
+  write "none". Then the days in a row with warning signs up to `warningSigns.date` (`streak`; 14
+  is "14 or more"), and when `flag` is true, that 2 or more in a row is the page's warning. Without
+  `warningSigns`, write "n/a"; if `settings.exclude` has `recovery`, say that the dashboard leaves
+  out the recovery data. Say in one line that the signs are not a diagnosis.
 - **New bests**: the run bests of the week of `{{week}}`: each entry of `recordProgression` with a
   date in that week, with the distance, the time and the `previous` time it beat. These are bests
   since `digest.period.start` only: an older, faster run can sit before that date, so name each one
