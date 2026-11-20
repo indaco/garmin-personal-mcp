@@ -500,7 +500,11 @@ the page. It gives the verdict of the dashboard's Readiness widget: go easy, nor
 push. This verdict is the dashboard's own rule, not Garmin's Training Readiness. A table shows each
 input and the rule it meets: the HRV status, the sleep score, the resting HR against the average of
 the 7 days before, and the load ratio of 7 to 28 days. When a value is from an older night, the
-assistant gives its date. Then it gives your fitness, fatigue and form, and a short coach note.
+assistant gives its date. Then it names the days in a row with warning signs, when 2 or more of
+these were off: the resting HR 5 bpm or more above its 7-day base, last night's HRV under the low
+end of its range, and a sleep score under 60. One such day is a note; 2 in a row are a warning. Each
+day comes with its numbers. The signs do not change the verdict and are not a diagnosis. Then it
+gives your fitness, fatigue and form, and a short coach note.
 
 Without HRV and sleep data, for example when the page leaves out the recovery data, the summary has
 no readiness: the verdict and its inputs show as "n/a". The prompt has no arguments.
@@ -512,9 +516,17 @@ writes no page file). It uses the weeks of your dashboard page, so the numbers a
 the page. It compares your last whole week, Monday to Sunday, with up to 4 weeks before it:
 sessions, hours, km, run km and load, and the load ramp against the week before (above 10% is the
 page's warning level). Then it gives the load ratio, the monotony and strain of the last 7 days and
-the form of today, and the new run bests of the week with the time each one beat. These are bests since the
-page's first week, not all-time records: a faster run before that week is not counted. It gives the planned strength exercises hit and missed in the week, and the exercises that miss most. These count only the sessions you did: a skipped planned session leaves no file and is not seen. It gives the laps of the week's runs on the planned target and off it, the drills that miss most, and how many runs it could not read (the page setting `workouts` reads more of them). It ends with a short coach note. The summary has no split by sport for each week, so the review has none. The prompt has no
-arguments.
+the form of today. It names the warning-sign days of the week (2 or more of these in one day: the
+resting HR 5 bpm or more above its 7-day base, last night's HRV under the low end of its range, a
+sleep score under 60) with their numbers, and the days in a row with signs up to the newest day: 2
+in a row are a warning, not a diagnosis. Then it gives the new run bests of the week with the time
+each one beat. These are bests since the page's first week, not all-time records: a faster run
+before that week is not counted. It gives the planned strength exercises hit and missed in the week,
+and the exercises that miss most. These count only the sessions you did: a skipped planned session
+leaves no file and is not seen. It gives the laps of the week's runs on the planned target and off
+it, the drills that miss most, and how many runs it could not read (the page setting `workouts`
+reads more of them). It ends with a short coach note. The summary has no split by sport for each
+week, so the review has none. The prompt has no arguments.
 
 ## Configuration
 

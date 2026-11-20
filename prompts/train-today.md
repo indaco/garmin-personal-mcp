@@ -25,12 +25,28 @@ Then answer in chat, in this order, short:
   "n/a". When `hrvDate` or `recoveryDate` is not {{today}}, give that date: the value is from an
   older night. If `settings.exclude` has `recovery`, say that the dashboard leaves out the recovery
   data.
+- **Warning signs**: from `warningSigns`, the days in a row up to `warningSigns.date` when 2 or more
+  of these were off: the resting HR 5 bpm or more above its 7-day base, last night's HRV under the
+  low end of its range, and a sleep score under 60. Call the HRV "last night's HRV": it is not the
+  HRV status above. When `warningSigns.date` is not {{today}}, give that date. The verdict reads the
+  newest rows (`hrvDate`, `recoveryDate`), so it can be from a newer day than the signs: then say
+  so, and do not change the verdict.
+  1. When `flag` is true, write "N days in a row with warning signs", where N is `streak`; a
+     `streak` of 14 is "14 or more days". Then, for each sign day of the streak, newest first, from
+     `warningSigns.days`: its date and each signal that is true, with its numbers: the resting HR
+     (`rhr`) and its base (`rhrBase`), last night's HRV (`hrv`) and the low end of its range
+     (`hrvLow`), the sleep score (`sleepScore`).
+  2. When `streak` is 1: one line that one day had warning signs, with its numbers as above, and
+     "watch the next one".
+  3. When `streak` is 0: "none".
+  Without `warningSigns`, write "n/a". Say in one line that the signs do not change the verdict and
+  are not a diagnosis.
 - **Fitness and form**: from `fitnessFatigue`: the fitness (the load average of about 42 days), the
   fatigue (about 7 days) and the form (the fitness minus the fatigue of the day before). Below 0 you
   carry fatigue; above 0 you are fresh. If `fitnessFatigue` is null, write "n/a". If
   `load.estimatedLoads` is more than 0, say that some loads are estimates from heart rate.
-- **Coach note**: 1 or 2 sentences: what to do today. Base each sentence on a number above. Do not
-  go against the verdict.
+- **Coach note**: 1 or 2 sentences: what to do today. Base each sentence on a number above; it can
+  name the warning signs. Do not go against the verdict.
 
 Every number comes from the tool result. **Never invent or estimate a missing value**: a missing
 value or a failed call shows as "n/a". If a call fails, say which one and why in one line. Do not
