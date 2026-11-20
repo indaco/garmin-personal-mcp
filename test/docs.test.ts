@@ -160,6 +160,12 @@ describe("guide", () => {
     );
   });
 
+  it("names the measure of the aerobic trend in the widget API", () => {
+    expect(WIDGET_API).toContain(
+      "aerobicTrend(activities, weeks, z4, measure?) (the efficiency of the activities below the zone 4 floor z4, by measure(activity), efficiency by default: { weekly, runs, n, first, last, firstRuns, lastRuns, change })",
+    );
+  });
+
   it("lists every text", () => {
     check("guide/languages.md", between("guide/languages.md", "keys", keysPart()));
   });

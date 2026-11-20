@@ -83,6 +83,35 @@ describe("aerobic efficiency trend", () => {
     });
   });
 
+  it("averages the measure it is given", () => {
+    const t = aerobicTrend(BLOCK, EIGHT_WEEKS, 150, (a) => a.avgHR);
+    expect(t).toEqual({
+      weekly: [125, 125, 125, null, 100, 100, null, 100],
+      runs: [BLOCK[1], BLOCK[4], BLOCK[5], BLOCK[6], BLOCK[7], BLOCK[8]],
+      n: 4,
+      first: 125,
+      last: 100,
+      firstRuns: 3,
+      lastRuns: 3,
+      change: -20,
+    });
+  });
+
+  it("gives the same trend with the efficiency passed as its measure", () => {
+    for (const z4 of [150, undefined])
+      expect(aerobicTrend(BLOCK, EIGHT_WEEKS, z4, efficiency)).toEqual(
+        aerobicTrend(BLOCK, EIGHT_WEEKS, z4),
+      );
+  });
+
+  it("leaves out an activity without a value of the measure", () => {
+    const t = aerobicTrend(BLOCK, EIGHT_WEEKS, 150, (a) => (a.avgHR === 100 ? undefined : 1));
+    expect([t.runs, t.weekly]).toEqual([
+      [BLOCK[1], BLOCK[4], BLOCK[5]],
+      [1, 1, 1, null, null, null, null, null],
+    ]);
+  });
+
   it("gives no change with fewer than 3 runs on one side", () => {
     const t = aerobicTrend(BLOCK.slice(0, -1), EIGHT_WEEKS, 150);
     expect([t.last, t.lastRuns, t.change]).toEqual([2, 2, null]);
