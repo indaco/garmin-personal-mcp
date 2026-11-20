@@ -526,6 +526,36 @@ describe("walk, hike, bike, swim and racket sport boards", () => {
     expect((await sub(3)).delta).not.toBeNull();
   });
 
+  it("places each aerobic run on the week of its day, a Monday and a Sunday included", async () => {
+    const runs = [
+      // 5:00/km is 200 m/min, so the efficiency is 200 / HR; a Sunday, a Monday, the first week
+      { ...easyRun(42_000, "2026-10-25"), pace: "5:00/km", avgHR: 100 },
+      { ...easyRun(42_001, "2026-09-07"), pace: "5:00/km", avgHR: 125 },
+      { ...easyRun(42_002, "2026-08-05"), pace: "5:00/km", avgHR: 100 },
+    ];
+    const { page, errors } = await open(
+      browser,
+      pageFile({ data: { ...data, v: DASHBOARD_VERSION, activities: runs } }),
+      { hash: "#running" },
+    );
+    const points = await page.evaluate(() =>
+      Object.values(window.Chart!.instances)
+        .filter((c) => c.canvas.closest("[data-widget=aerobicFitness]"))
+        .flatMap((c) => c.data.datasets)
+        .filter((d) => d.label === "Aerobic runs")
+        .map((d) => d.data),
+    );
+    // oldest first, each point on its week's label
+    expect(points).toEqual([
+      [
+        { x: "Aug 3", y: 2 },
+        { x: "Sep 7", y: 1.6 },
+        { x: "Oct 19", y: 2 },
+      ],
+    ]);
+    expect(errors).toEqual([]);
+  });
+
   it("gives every sport its longest session, by distance or else by time", async () => {
     const { page, errors } = await open(
       browser,

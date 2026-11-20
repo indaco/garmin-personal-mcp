@@ -5,7 +5,8 @@ import {
   CategoryScale,
   Chart,
   type ChartConfiguration,
-  type ChartDataset,
+  type ChartType,
+  type DefaultDataPoint,
   DoughnutController,
   Filler,
   Legend,
@@ -75,7 +76,7 @@ Chart.defaults.plugins.legend.onClick = legendClick;
 Chart.overrides.doughnut.plugins.legend.onClick = legendClick;
 Chart.overrides.pie.plugins.legend.onClick = legendClick;
 
-const live: Chart[] = [];
+const live: PageChart[] = [];
 
 /** Chart.js defaults from the theme tokens and the language; called before each render, so a theme change draws again. */
 export function themeCharts(language: string): void {
@@ -96,12 +97,23 @@ export function themeCharts(language: string): void {
   tip.borderWidth = 1;
 }
 
+/** A point on a category axis: Chart.js places it by its label, but types its x as a number only. */
+export type LabelPoint = { x: string; y: number };
+type Points = DefaultDataPoint<ChartType> | LabelPoint[];
+/** A chart's configuration: Chart.js data points, or label points. */
+export type ChartConfig = ChartConfiguration<ChartType, Points>;
+/** A chart drawn from a {@link ChartConfig}. */
+export type PageChart = Chart<ChartType, Points>;
+
 export const CHART_TYPES = ["bar", "line", "scatter", "doughnut", "pie"];
 
 type Tick = (value: number) => unknown;
 
 /** The tick text of the axis that holds a dataset's values: the table reads as the chart does. */
-function axisText(config: ChartConfiguration, set: ChartDataset): Tick | undefined {
+function axisText(
+  config: ChartConfig,
+  set: ChartConfig["data"]["datasets"][number],
+): Tick | undefined {
   const horizontal = config.options?.indexAxis === "y";
   const axis = horizontal
     ? ((set as { xAxisID?: string }).xAxisID ?? "x")
@@ -155,7 +167,7 @@ function cell(
 }
 
 /** The data of a chart as a table that only screen readers get: one row per label, one column per series. */
-function dataTable(config: ChartConfiguration, title: string): HTMLElement {
+function dataTable(config: ChartConfig, title: string): HTMLElement {
   const sets = config.data.datasets;
   const labels = config.data.labels ?? (sets[0]?.data ?? []).map((_, i) => i + 1);
   // the wrapper hides it: a table grows to its content whatever its width
@@ -198,7 +210,7 @@ function dataTable(config: ChartConfiguration, title: string): HTMLElement {
   );
 }
 
-export function chart(el: HTMLElement, config: ChartConfiguration, height = 220): Chart {
+export function chart(el: HTMLElement, config: ChartConfig, height = 220): PageChart {
   // Chart.js builds the chart only when the canvas is in the page, after the widget's try/catch:
   // check the types now, so a wrong type shows in the widget's tile
   const types = [config.type, ...config.data.datasets.map((d) => d.type)].filter(Boolean);

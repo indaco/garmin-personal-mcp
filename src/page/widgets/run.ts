@@ -234,8 +234,7 @@ register({
             {
               label: t("af.aerobicRuns"),
               data: points.map((a) => ({
-                // the category axis places a point by its label; Chart.js types only number
-                x: weekLabel(ctx, ctx.weeks[weekOf(ctx, a)]) as unknown as number,
+                x: weekLabel(ctx, ctx.weeks[weekOf(ctx, a)]),
                 y: calc.efficiency(a)!,
               })),
               borderColor: alpha(ctx.color("good"), 0.5),

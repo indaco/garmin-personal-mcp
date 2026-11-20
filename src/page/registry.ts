@@ -1,4 +1,4 @@
-import type { Chart, ChartConfiguration } from "chart.js";
+import type { ChartConfig, PageChart } from "./charts";
 import type * as calc from "../analytics/calc";
 import type * as metrics from "../analytics/metrics";
 import type * as running from "../analytics/running";
@@ -61,7 +61,7 @@ export interface Ctx {
   fmt: Fmt;
   calc: typeof calc & typeof metrics & typeof running & typeof strength & typeof sports;
   /** A Chart.js chart in `el` that follows the theme; `height` in px. */
-  chart: (el: HTMLElement, config: ChartConfiguration, height?: number) => Chart;
+  chart: (el: HTMLElement, config: ChartConfig, height?: number) => PageChart;
   /** A colour token of the theme, e.g. "text", "good", or a group for its type colour. */
   color: (token: string) => string;
   /** A text of a custom widget in the page language, else in English, with its {placeholders} filled. */
