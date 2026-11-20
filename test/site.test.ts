@@ -232,6 +232,7 @@ describe("site facts", () => {
       ["ride-review", "cycling"],
       ["train-today", "every"],
       ["week-review", "every"],
+      ["block-review", "every"],
     ]);
     for (const p of f.coachPrompts) expect(prompts).toContain(p.name);
     expect(f.prompts.map((p) => p.name)).not.toContain("run-review");

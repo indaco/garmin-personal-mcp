@@ -16,6 +16,10 @@ import { isObject, NAME_SEARCH } from "./tools";
 
 const DEFAULT_WEEKS = 12;
 const MAX_WEEKS = 52;
+/** The block review: 4 weeks give 2 weeks at each end of the efficiency trend, 12 give 4. */
+const BLOCK_WEEKS = 8;
+const BLOCK_MIN_WEEKS = 4;
+const BLOCK_MAX_WEEKS = 12;
 /** Version of the dashboard data contract, written into each page as `v`. */
 export const DASHBOARD_VERSION = 3;
 
@@ -43,6 +47,7 @@ export function registerPrompts(server: McpServer, cache: () => Promise<unknown>
   const rideReviewPrompt = load("ride-review.md");
   const trainPrompt = load("train-today.md");
   const weekPrompt = load("week-review.md");
+  const blockPrompt = load("block-review.md");
 
   const dashboardDescription =
     "Build a personal training + recovery dashboard (volume, load, HRV, sleep) from Garmin data";
@@ -383,6 +388,37 @@ export function registerPrompts(server: McpServer, cache: () => Promise<unknown>
       render(weekPrompt, { today, week: addDays(mondayOf(today), -7) }),
     );
   });
+
+  const blockDescription =
+    "Review the last 4 to 12 weeks as one block: load, monotony, intensity and aerobic efficiency";
+  server.registerPrompt(
+    "block-review",
+    {
+      description: blockDescription,
+      argsSchema: z.object({
+        weeks: z
+          .string()
+          .describe(
+            `Number of whole weeks in the block, ${BLOCK_MIN_WEEKS} to ${BLOCK_MAX_WEEKS}, default ${BLOCK_WEEKS}`,
+          )
+          .optional(),
+      }),
+    },
+    (args) => {
+      const today = localToday();
+      const n = weeks(args.weeks, BLOCK_MIN_WEEKS, BLOCK_MAX_WEEKS, BLOCK_WEEKS);
+      const monday = mondayOf(today);
+      return result(
+        blockDescription,
+        render(blockPrompt, {
+          today,
+          weeks: String(n),
+          first: addDays(monday, -7 * n),
+          last: addDays(monday, -7),
+        }),
+      );
+    },
+  );
 }
 
 /** A swim test time, m:ss. */
@@ -490,13 +526,13 @@ function pathWith(path: string): string {
   return path ? ` with \`path\` = "${path}"` : "";
 }
 
-/** weeks clamped to 1..52; the default when empty or not a whole number. */
-function weeks(v: string | undefined): number {
+/** weeks clamped to min..max; the fallback when empty or not a whole number. */
+function weeks(v: string | undefined, min = 1, max = MAX_WEEKS, fallback = DEFAULT_WEEKS): number {
   const s = arg(v);
   if (!/^[+-]?\d+$/.test(s)) {
-    return DEFAULT_WEEKS;
+    return fallback;
   }
-  return Math.min(Math.max(Number(s), 1), MAX_WEEKS);
+  return Math.min(Math.max(Number(s), min), max);
 }
 
 /**

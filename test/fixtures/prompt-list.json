@@ -1,5 +1,16 @@
 [
   {
+    "name": "block-review",
+    "description": "Review the last 4 to 12 weeks as one block: load, monotony, intensity and aerobic efficiency",
+    "arguments": [
+      {
+        "name": "weeks",
+        "description": "Number of whole weeks in the block, 4 to 12, default 8",
+        "required": false
+      }
+    ]
+  },
+  {
     "name": "dashboard-language",
     "description": "Add a language to the training dashboard (the assistant translates its texts)",
     "arguments": [
