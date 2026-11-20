@@ -1634,7 +1634,7 @@ describe("block efficiency", () => {
   ];
   /** 9 weeks from Monday 31 Aug to Wednesday 28 Oct: the week of 26 Oct is in progress. */
   const period = { ...data, zones, start: "2026-08-31", end: "2026-10-28", previousActivities: [] };
-  /** 8 whole weeks to Sunday 25 Oct. */
+  /** 8 weeks to Sunday 25 Oct: the week of 19 Oct is in progress until the day ends. */
   const toSunday = { ...period, end: "2026-10-25" };
   // 200 m a minute: 2 m per beat at 100 bpm, 2.5 at 80, 3.33 at 60
   const RUNS = [
@@ -1682,10 +1682,21 @@ describe("block efficiency", () => {
     });
   });
 
-  it("counts the last week of a period that ends on a Sunday", () => {
-    const out = digest({ ...toSunday, activities: RUNS });
-    expect(out.blockEfficiency).toEqual({ runs: WHOLE_RUNS });
-    expect(out.aerobicEfficiency).toEqual(WHOLE_RUNS);
+  it("leaves out the week of a period that ends on a Sunday, as the block review's table does", () => {
+    const out = digest({ ...toSunday, activities: [...RUNS, easyRun("2026-10-25", 60)] });
+    // 7 whole weeks: 3 at each end, and the last 3 have 2 runs, so no change
+    expect(out.blockEfficiency).toEqual({
+      runs: { comparedWeeks: 3, first: 2, last: 2.5, firstRuns: 3, lastRuns: 2, changePct: null },
+    });
+    // the page's 4 last weeks end with this week, Sunday's run included
+    expect(out.aerobicEfficiency).toEqual({
+      comparedWeeks: 4,
+      first: 2,
+      last: 2.71,
+      firstRuns: 4,
+      lastRuns: 4,
+      changePct: 35.4,
+    });
   });
 
   it("gives the power per heartbeat of the rides below zone 4 of the whole weeks", () => {
@@ -1723,7 +1734,7 @@ describe("block efficiency", () => {
   });
 
   it("gives both parts to a period with runs and rides", () => {
-    const out = digest({ ...toSunday, activities: [...RUNS, ...RIDES] });
+    const out = digest({ ...period, activities: [...RUNS, ...RIDES] });
     expect(out.blockEfficiency?.runs).toEqual(WHOLE_RUNS);
     expect(out.blockEfficiency?.rides).toMatchObject({ first: 2, last: 2.5, ridesWithPower: 7 });
   });
