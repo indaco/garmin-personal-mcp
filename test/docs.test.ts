@@ -147,6 +147,12 @@ describe("guide", () => {
     );
   });
 
+  it("names the weekly monotony and strain of Load safety in the dashboard guide", () => {
+    expect(readFileSync("guide/dashboard.md", "utf8").replace(/\s+/g, " ")).toContain(
+      "The All board shows all types. Its Load safety widget has a second chart: the monotony and strain of each week.",
+    );
+  });
+
   it("names the warning signs on the Recovery board in the dashboard guide", () => {
     expect(readFileSync("guide/dashboard.md", "utf8").replace(/\s+/g, " ")).toContain(
       "The Recovery board shows readiness, fitness age, the warning signs, load against recovery and the 14-day recovery widgets: HRV, resting HR, stress, sleep, sleep need, bedtime and Body Battery.",

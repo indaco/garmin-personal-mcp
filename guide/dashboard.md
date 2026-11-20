@@ -234,7 +234,8 @@ column on a phone. Each widget is 1, 2 or 3 columns wide.
 The page uses the training load, HR zones and training effect from Garmin. It labels each value that
 it calculates as an estimate, and a missing value shows as "n/a".
 
-The All board shows all types. The Recovery board shows readiness, fitness age, the warning signs,
+The All board shows all types. Its Load safety widget has a second chart: the monotony and
+strain of each week. The Recovery board shows readiness, fitness age, the warning signs,
 load against recovery and the 14-day recovery widgets: HRV, resting HR, stress, sleep, sleep need,
 bedtime and Body Battery. With the `recoveryHistory` setting, it also shows the Recovery trend widget. Each type
 board shows one sport. The board of an activity is its

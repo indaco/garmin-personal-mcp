@@ -13,7 +13,7 @@ it by hand.
 | Records | `records` | The longest session of each sport (by distance, else by time) and the heaviest set. On the all board also best efforts and the best estimated 1RM of each exercise: 4 first, the others under Show all. | all and each type | 3 |
 | Weekly volume | `weeklyVolume` | Time, distance, sessions or load of each week, stacked by type, with a 4-week average line. | all and each type | 2 |
 | Intensity minutes | `intensityMinutes` | Moderate + 2 x vigorous minutes of the activities each week, against 150 minutes. | all and each type | 1 |
-| Load safety | `loadSafety` | Weekly load with its change against the week before (flagged above +10%), and 7-day monotony and strain (Foster). | - | 3 |
+| Load safety | `loadSafety` | Weekly load with its change against the week before (flagged above +10%), and 7-day monotony and strain (Foster). A second chart gives the monotony and strain of each week; a monotony above 2 is red. | - | 3 |
 | Fitness, fatigue and form | `fitnessFatigue` | Fitness (42-day) and fatigue (7-day) averages of the daily load, and form: fitness minus fatigue, to time a taper. | - | 3 |
 | Consistency | `calendar` | A heatmap of the training minutes of each day; a day shows its activities on hover or touch. | all and each type | 3 |
 | Load vs recovery | `loadVsRecovery` | Daily load by type (bars) with nightly HRV (line). | all and each type | 3 |

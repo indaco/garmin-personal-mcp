@@ -22,6 +22,12 @@ describe("widget catalogue", () => {
     }
   });
 
+  it("describes the weekly chart of Load safety", () => {
+    expect(ABOUT.loadSafety).toBe(
+      "Weekly load with its change against the week before (flagged above +10%), and 7-day monotony and strain (Foster). A second chart gives the monotony and strain of each week; a monotony above 2 is red.",
+    );
+  });
+
   it("has a description for exactly the catalogue widgets", () => {
     expect(Object.keys(ABOUT).toSorted()).toEqual(CATALOGUE.map((c) => c.id).toSorted());
   });
