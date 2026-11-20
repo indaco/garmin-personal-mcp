@@ -673,6 +673,7 @@ describe("type boards", () => {
     expect(await tiles(page)).toEqual([
       "readiness",
       "fitnessAge",
+      "warningSigns",
       "loadVsRecovery",
       "hrv",
       "restingHr",

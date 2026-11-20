@@ -894,6 +894,47 @@
   .verdict-normal {
     color: var(--text);
   }
+  /* Warning signs: one sign day is a note, the warning colour starts at 2 in a row */
+  :is(.ws-head, .ws-from) {
+    margin: 0 0 4px;
+  }
+  .ws-head {
+    font-size: 20px;
+    font-weight: 700;
+  }
+  :is(.ws-lines, .ws-dots) {
+    list-style: none;
+    padding: 0;
+    display: flex;
+  }
+  .ws-lines {
+    margin: 8px 0 12px;
+    flex-wrap: wrap;
+    gap: 4px 28px;
+  }
+  .ws-days {
+    margin: 0 0 6px;
+    font-size: 12px;
+  }
+  /* filled: a sign day; empty: a clear day; grey: no data. Each dot has its text for screen readers */
+  .ws-dots {
+    margin: 0 0 10px;
+    gap: 10px;
+    & .dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid var(--warn);
+      &.sign {
+        background: var(--warn);
+      }
+      &.none {
+        border-color: var(--muted);
+        background: var(--muted);
+        opacity: 0.4;
+      }
+    }
+  }
   .badges {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));

@@ -1663,6 +1663,358 @@ describe("small numbers on the boards", () => {
   });
 });
 
+/** Changes of one day of the page data: fields to set, or null to drop that day's row. */
+type SignEdit = Record<string, { hrv?: object | null; rec?: object | null }>;
+const edited = (list: { date: string }[], edits: SignEdit, key: "hrv" | "rec", from: string) =>
+  list
+    .filter((r) => r.date >= from)
+    .flatMap((r) => {
+      const e = edits[r.date]?.[key];
+      return e === null ? [] : [{ ...r, ...e }];
+    });
+/** The synthetic page with these days changed; rows before `from` dropped. */
+const signsPage = (edits: SignEdit, from = "", settings = {}) =>
+  pageFile({
+    data: {
+      ...data,
+      hrv: edited(data.hrv, edits, "hrv", from),
+      recovery: edited(data.recovery, edits, "rec", from),
+    },
+    settings,
+  });
+/** A sign day: last night's HRV under the low end of its range (58) and a sleep score under 60. */
+const BAD = { hrv: { hrv: 50 }, rec: { sleepScore: 55 } };
+const signsTile = async (page: Page) =>
+  page.$eval("[data-id=warningSigns] .tile-body", (b) => ({
+    head: b.querySelector(".ws-head")?.textContent,
+    warn: b.querySelector(".ws-head")?.classList.contains("warn"),
+    from: b.querySelector(".ws-from")?.textContent ?? null,
+    lines: [...b.querySelectorAll(".ws-lines li")].map((li) => [li.textContent, li.className]),
+    dots: [...b.querySelectorAll(".ws-dots li")].map((li) => li.className),
+    titles: [...b.querySelectorAll(".ws-dots li")].map((li) => li.getAttribute("title")),
+    alt: [...b.querySelectorAll(".ws-dots li .sr-only")].map((s) => s.textContent),
+    label: b.querySelector(".ws-days")?.textContent,
+    note: b.querySelector(".note")?.textContent,
+  }));
+const openSigns = async (file: string, options = {}) => {
+  const opened = await open(browser, file, { hash: "#recovery", ...options });
+  expect(await opened.page.$$(".tile .error")).toEqual([]);
+  expect(opened.errors).toEqual([]);
+  return opened.page;
+};
+const SIGNS_NOTE =
+  "Signs: resting HR 5 bpm or more above its 7-day average, last night's HRV under its range, a sleep score under 60. A day with 2 or more signs is a sign day; 2 sign days in a row are a warning. The dashboard's own rule, not a diagnosis.";
+
+describe("warning signs", () => {
+  it("flags 2 sign days in a row, with the numbers of the newest day and a 7-day strip", async () => {
+    const page = await openSigns(
+      signsPage({
+        "2026-10-25": BAD,
+        "2026-10-26": { hrv: { hrv: 50 }, rec: { sleepScore: 55, rhr: 58 } },
+      }),
+    );
+    const clear =
+      "Oct 20 · no signs · Resting HR 55 bpm, 7-day average 51.9 bpm · HRV last night 69 ms, range low 58 ms · Sleep score 79";
+    const sign =
+      "Oct 26 · warning signs · Resting HR 58 bpm, 7-day average 52.1 bpm · HRV last night 50 ms, range low 58 ms · Sleep score 55";
+    const tile = await signsTile(page);
+    expect(tile).toEqual({
+      head: "2 days in a row with warning signs",
+      warn: true,
+      from: null,
+      lines: [
+        ["⚠ Resting HR 58 bpm, 7-day average 52.1 bpm", "warn"],
+        ["⚠ HRV last night 50 ms, range low 58 ms", "warn"],
+        ["⚠ Sleep score 55", "warn"],
+      ],
+      dots: [...Array(5).fill("dot clear"), "dot sign", "dot sign"],
+      titles: [clear, ...tile.titles.slice(1, 6), sign],
+      alt: tile.titles,
+      label: "Last 7 days",
+      note: SIGNS_NOTE,
+    });
+    expect(await page.textContent("[data-id=warningSigns] h2")).toBe("Warning signs");
+  });
+
+  it.each([
+    ["2026-10-14", "13 days in a row with warning signs"],
+    ["2026-10-13", "14 or more days in a row with warning signs"],
+  ])("counts the sign days from %s up to the newest day", async (first, head) => {
+    const edits = Object.fromEntries(
+      Array.from({ length: 14 }, (_, i) => addDays("2026-10-13", i))
+        .filter((d) => d >= first)
+        .map((d) => [d, BAD]),
+    );
+    const tile = await signsTile(await openSigns(signsPage(edits)));
+    expect([tile.head, tile.warn]).toEqual([head, true]);
+  });
+
+  it("gives one sign day a soft note, and fewer dots when the rows start later", async () => {
+    const page = await openSigns(signsPage({ "2026-10-26": BAD }, "2026-10-24"));
+    const tile = await signsTile(page);
+    expect([tile.head, tile.warn, tile.from, tile.lines, tile.dots]).toEqual([
+      "1 day with signs: watch the next one",
+      false,
+      null,
+      [
+        ["Resting HR 55 bpm, 7-day average n/a", ""],
+        ["⚠ HRV last night 50 ms, range low 58 ms", "warn"],
+        ["⚠ Sleep score 55", "warn"],
+      ],
+      ["dot clear", "dot clear", "dot sign"],
+    ]);
+  });
+
+  it("says that there are no warning signs", async () => {
+    const tile = await signsTile(await openSigns(pageFile()));
+    expect([tile.head, tile.warn, tile.lines, tile.dots]).toEqual([
+      "No warning signs",
+      false,
+      [
+        ["Resting HR 55 bpm, 7-day average 52.1 bpm", ""],
+        ["HRV last night 66 ms, range low 58 ms", ""],
+        ["Sleep score 77", ""],
+      ],
+      Array(7).fill("dot clear"),
+    ]);
+  });
+
+  it("marks one sign on its line, but a day with one sign is a clear day", async () => {
+    const tile = await signsTile(
+      await openSigns(signsPage({ "2026-10-26": { hrv: { hrv: 50 } } })),
+    );
+    expect([tile.head, tile.warn, tile.from, tile.lines, tile.dots]).toEqual([
+      "No warning signs",
+      false,
+      null,
+      [
+        ["Resting HR 55 bpm, 7-day average 52.1 bpm", ""],
+        ["⚠ HRV last night 50 ms, range low 58 ms", "warn"],
+        ["Sleep score 77", ""],
+      ],
+      Array(7).fill("dot clear"),
+    ]);
+  });
+
+  it("keeps an older sign day on the strip when the newest day is clear", async () => {
+    const tile = await signsTile(await openSigns(signsPage({ "2026-10-24": BAD })));
+    expect([tile.head, tile.warn, tile.from, tile.dots]).toEqual([
+      "No warning signs",
+      false,
+      null,
+      [...Array(4).fill("dot clear"), "dot sign", "dot clear", "dot clear"],
+    ]);
+    expect(tile.titles[4]).toBe(
+      "Oct 24 · warning signs · Resting HR 52 bpm, 7-day average 52.4 bpm · HRV last night 50 ms, range low 58 ms · Sleep score 55",
+    );
+  });
+
+  it("flags 2 days of resting HR and sleep without any HRV rows", async () => {
+    const edits = {
+      "2026-10-25": { rec: { rhr: 58, sleepScore: 55 } },
+      "2026-10-26": { rec: { rhr: 60, sleepScore: 55 } },
+    };
+    const recovery = edited(data.recovery, edits, "rec", "");
+    const page = await openSigns(pageFile({ data: { ...data, hrv: [], recovery } }));
+    const tile = await signsTile(page);
+    expect([tile.head, tile.warn, tile.from, tile.lines, tile.dots]).toEqual([
+      "2 days in a row with warning signs",
+      true,
+      null,
+      [
+        ["⚠ Resting HR 60 bpm, 7-day average 53.1 bpm", "warn"],
+        ["HRV last night n/a, range low n/a", ""],
+        ["⚠ Sleep score 55", "warn"],
+      ],
+      [...Array(5).fill("dot clear"), "dot sign", "dot sign"],
+    ]);
+  });
+
+  it("never flags HRV alone, without any recovery rows", async () => {
+    const edits = { "2026-10-25": { hrv: { hrv: 50 } }, "2026-10-26": { hrv: { hrv: 50 } } };
+    const hrv = edited(data.hrv, edits, "hrv", "");
+    const page = await openSigns(pageFile({ data: { ...data, hrv, recovery: [] } }));
+    const tile = await signsTile(page);
+    expect([tile.head, tile.warn, tile.from, tile.lines, tile.dots]).toEqual([
+      "No warning signs",
+      false,
+      null,
+      [
+        ["Resting HR n/a, 7-day average n/a", ""],
+        ["⚠ HRV last night 50 ms, range low 58 ms", "warn"],
+        ["Sleep score n/a", ""],
+      ],
+      Array(7).fill("dot clear"),
+    ]);
+  });
+
+  it("shows a day without rows as a grey dot with n/a", async () => {
+    const page = await openSigns(signsPage({ "2026-10-23": { hrv: null, rec: null } }));
+    const tile = await signsTile(page);
+    expect([tile.dots[3], tile.titles[3], tile.alt[3]]).toEqual([
+      "dot none",
+      "Oct 23 · no data · Resting HR n/a, 7-day average n/a · HRV last night n/a, range low n/a · Sleep score n/a",
+      "Oct 23 · no data · Resting HR n/a, 7-day average n/a · HRV last night n/a, range low n/a · Sleep score n/a",
+    ]);
+  });
+
+  it("draws a sign day filled, a clear day as a ring and a day without data grey", async () => {
+    const page = await openSigns(
+      signsPage({
+        "2026-10-23": { hrv: null, rec: null },
+        "2026-10-25": BAD,
+        "2026-10-26": { hrv: null },
+      }),
+    );
+    const style = await page.$eval("[data-id=warningSigns] .tile-body", (b) => {
+      const css = (sel: string, ...keys: string[]) => {
+        const s = getComputedStyle(b.querySelector(sel)!);
+        return Object.fromEntries(keys.map((k) => [k, s.getPropertyValue(k)]));
+      };
+      // the colours of the theme, resolved the same way as the dots
+      const colour = (v: string) => {
+        const tag = document.createElement("i");
+        tag.style.color = `var(${v})`;
+        b.append(tag);
+        const c = getComputedStyle(tag).color;
+        tag.remove();
+        return c;
+      };
+      const dot = ["width", "height", "border-radius", "border-top", "box-sizing"];
+      const fill = ["background-color", "border-top-color", "opacity"];
+      return {
+        warn: colour("--warn"),
+        muted: colour("--muted"),
+        head: css(".ws-head", "font-size", "font-weight", "margin"),
+        from: css(".ws-from", "margin"),
+        lines: css(
+          ".ws-lines",
+          "list-style-type",
+          "padding",
+          "margin",
+          "display",
+          "flex-wrap",
+          "gap",
+        ),
+        days: css(".ws-days", "margin", "font-size"),
+        strip: css(".ws-dots", "list-style-type", "padding", "margin", "display", "gap"),
+        dots: [".dot.clear", ".dot.none", ".dot.sign"].map((s) => css(s, ...dot, ...fill)),
+      };
+    });
+    const { warn, muted } = style;
+    const ring = {
+      width: "16px",
+      height: "16px",
+      "border-radius": "50%",
+      "border-top": `2px solid ${warn}`,
+      "box-sizing": "border-box",
+    };
+    expect(warn).not.toBe(muted);
+    expect(style).toEqual({
+      warn,
+      muted,
+      head: { "font-size": "20px", "font-weight": "700", margin: "0px 0px 4px" },
+      from: { margin: "0px 0px 4px" },
+      lines: {
+        "list-style-type": "none",
+        padding: "0px",
+        margin: "8px 0px 12px",
+        display: "flex",
+        "flex-wrap": "wrap",
+        gap: "4px 28px",
+      },
+      days: { margin: "0px 0px 6px", "font-size": "12px" },
+      strip: {
+        "list-style-type": "none",
+        padding: "0px",
+        margin: "0px 0px 10px",
+        display: "flex",
+        gap: "10px",
+      },
+      dots: [
+        {
+          ...ring,
+          "background-color": "rgba(0, 0, 0, 0)",
+          "border-top-color": warn,
+          opacity: "1",
+        },
+        {
+          ...ring,
+          "border-top": `2px solid ${muted}`,
+          "background-color": muted,
+          "border-top-color": muted,
+          opacity: "0.4",
+        },
+        { ...ring, "background-color": warn, "border-top-color": warn, opacity: "1" },
+      ],
+    });
+  });
+
+  it("does not mark the HRV of a night without its range", async () => {
+    const edits = { "2026-10-26": { hrv: { hrv: 50, low: null }, rec: { sleepScore: 55 } } };
+    const tile = await signsTile(await openSigns(signsPage(edits)));
+    expect([tile.head, tile.lines]).toEqual([
+      "No warning signs",
+      [
+        ["Resting HR 55 bpm, 7-day average 52.1 bpm", ""],
+        ["HRV last night 50 ms, range low n/a", ""],
+        ["⚠ Sleep score 55", "warn"],
+      ],
+    ]);
+  });
+
+  it("names the day of the signs when the newest night has not synced", async () => {
+    const page = await openSigns(signsPage({ "2026-10-25": BAD, "2026-10-26": { hrv: null } }));
+    const tile = await signsTile(page);
+    expect([tile.head, tile.from, tile.lines, tile.dots.at(-1)]).toEqual([
+      "1 day with signs: watch the next one",
+      "from Oct 25",
+      [
+        ["Resting HR 51 bpm, 7-day average 52.7 bpm", ""],
+        ["⚠ HRV last night 50 ms, range low 58 ms", "warn"],
+        ["⚠ Sleep score 55", "warn"],
+      ],
+      "dot clear",
+    ]);
+  });
+
+  it("shows n/a without HRV and recovery rows", async () => {
+    const page = await openSigns(pageFile({ data: { ...data, hrv: [], recovery: [] } }));
+    expect(await page.innerText("[data-id=warningSigns] .tile-body")).toBe("n/a");
+    expect(await page.$("[data-id=warningSigns] .empty")).not.toBeNull();
+  });
+
+  it("is not on a page that leaves out the recovery data", async () => {
+    const layout = on("warningSigns", "kpis");
+    const shown = await open(browser, pageFile({ layout }));
+    expect(await tiles(shown.page)).toEqual(["warningSigns", "kpis"]);
+    const page = await openSigns(pageFile({ layout, settings: { exclude: ["recovery"] } }), {
+      hash: "",
+    });
+    expect(await tiles(page)).toEqual(["kpis"]);
+  });
+
+  it("writes its texts and numbers in the language of the page", async () => {
+    const edits = {
+      "2026-10-25": BAD,
+      "2026-10-26": { hrv: { hrv: 50 }, rec: { sleepScore: 55, rhr: 58 } },
+    };
+    const page = await openSigns(signsPage(edits, "", { languages: ["en", "it"] }), {
+      locale: "it-IT",
+    });
+    expect(await page.textContent("[data-id=warningSigns] h2")).toBe("Segnali di allarme");
+    const tile = await signsTile(page);
+    expect([tile.head, tile.lines]).toEqual([
+      "2 giorni di fila con segnali di allarme",
+      [
+        ["⚠ FC a riposo 58 bpm, media dei 7 giorni 52,1 bpm", "warn"],
+        ["⚠ HRV della notte scorsa 50 ms, minimo dell'intervallo 58 ms", "warn"],
+        ["⚠ Punteggio sonno 55", "warn"],
+      ],
+    ]);
+  });
+});
+
 /** The body rows of the screen-reader table of a tile, as the texts of their cells. */
 const tableRows = (page: Page, id: string) =>
   page.$$eval(`[data-id=${id}] .sr-only tbody tr`, (trs) =>

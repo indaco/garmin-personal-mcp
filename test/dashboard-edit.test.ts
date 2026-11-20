@@ -114,6 +114,7 @@ describe("editDashboard", () => {
       expect(seen()).toHaveProperty("recovery", [
         "readiness",
         "fitnessAge",
+        "warningSigns",
         "loadVsRecovery",
         "hrv",
         "restingHr",

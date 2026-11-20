@@ -62,6 +62,8 @@ const FROZEN: Record<string, string[]> = {
 };
 
 const INHERITED = ["constructor", "__proto__", "toString", "hasOwnProperty"];
+const order = (r: ReturnType<typeof withPresetWidgets>) =>
+  r.layout.boards.recovery?.map((i) => [i.widget, i.span]);
 const names = (board: string) => preset(board).map((i) => i.widget);
 
 describe("preset", () => {
@@ -74,6 +76,23 @@ describe("preset", () => {
     const i = list.findIndex((x) => x.widget === "planAdherence");
     expect(list[i - 1]?.widget).toBe("muscleBalance");
     expect(list[i]?.span).toBe(3);
+  });
+
+  it("has the warning signs on a row of their own on the Recovery board, right after Fitness age", () => {
+    expect(preset("recovery").map((i) => [i.widget, i.span])).toEqual([
+      ["readiness", 2],
+      ["fitnessAge", 1],
+      ["warningSigns", 3],
+      ["loadVsRecovery", 3],
+      ["hrv", 1],
+      ["restingHr", 1],
+      ["sleep", 1],
+      ["sleepNeed", 1],
+      ["bedtime", 1],
+      ["bodyBattery", 1],
+      ["stress", 3],
+      ["recoveryTrend", 3],
+    ]);
   });
 });
 
@@ -138,6 +157,61 @@ describe("withPresetWidgets with the real preset", () => {
     expect(withPresetWidgets(r.layout, preset, baseline).added).toEqual({});
   });
 
+  describe("the warning signs on an edited Recovery board", () => {
+    const without = preset("recovery").filter((i) => i.widget !== "warningSigns");
+
+    it("adds them once after Fitness age to a board with a record", () => {
+      const seen = { recovery: without.map((i) => i.widget) };
+      const r = withPresetWidgets(
+        parseLayout({ boards: { recovery: without }, seen }),
+        preset,
+        baseline,
+      );
+      expect(r.added).toEqual({ recovery: ["warningSigns"] });
+      expect(order(r)).toEqual(preset("recovery").map((i) => [i.widget, i.span]));
+      expect(withPresetWidgets(r.layout, preset, baseline).added).toEqual({});
+    });
+
+    it("adds them after Fitness age to a board from before the record", () => {
+      const old = without.filter((i) => baseline("recovery").includes(i.widget));
+      const r = withPresetWidgets(parseLayout({ boards: { recovery: old } }), preset, baseline);
+      expect(r.added).toEqual({ recovery: ["warningSigns", "stress", "recoveryTrend"] });
+      expect(order(r)).toEqual(preset("recovery").map((i) => [i.widget, i.span]));
+    });
+
+    it("adds them after Fitness age where you moved it, and at the end without it", () => {
+      const moved = [...without.filter((i) => i.widget !== "fitnessAge"), without[1]!];
+      const seen = { recovery: without.map((i) => i.widget) };
+      const r = withPresetWidgets(
+        parseLayout({ boards: { recovery: moved }, seen }),
+        preset,
+        baseline,
+      );
+      expect(r.layout.boards.recovery?.slice(-2).map((i) => i.widget)).toEqual([
+        "fitnessAge",
+        "warningSigns",
+      ]);
+      const gone = without.filter((i) => i.widget !== "fitnessAge" && i.widget !== "readiness");
+      const r2 = withPresetWidgets(
+        parseLayout({ boards: { recovery: gone }, seen }),
+        preset,
+        baseline,
+      );
+      expect(r2.layout.boards.recovery?.at(-1)?.widget).toBe("warningSigns");
+    });
+
+    it("guard: does not bring them back to a board that removed them", () => {
+      const seen = { recovery: names("recovery") };
+      const r = withPresetWidgets(
+        parseLayout({ boards: { recovery: without }, seen }),
+        preset,
+        baseline,
+      );
+      expect(r.added).toEqual({});
+      expect(r.layout.boards.recovery?.map((i) => i.widget)).not.toContain("warningSigns");
+    });
+  });
+
   it("does not throw on an inherited board name, and adds only what a release added", () => {
     for (const board of INHERITED) {
       const layout = parseLayout(JSON.parse(`{"boards":{"${board}":[]}}`));
@@ -172,7 +246,7 @@ describe("withPresetWidgets with the real preset", () => {
 
 // the order of meaning a preset follows; every widget not named here is analysis
 const ZONES = [
-  ["kpis", "typeKpis", "readiness", "fitnessAge", "calendar", "periodComparison"],
+  ["kpis", "typeKpis", "readiness", "fitnessAge", "warningSigns", "calendar", "periodComparison"],
   ["weeklyVolume", "typeWeekly", "hrZones", "intensityMinutes"],
   ["records"],
   [],

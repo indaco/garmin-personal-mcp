@@ -1,4 +1,5 @@
-import { append } from "../dom";
+import type { SignDay } from "../../analytics/metrics";
+import { append, h } from "../dom";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
 import { alpha, kpi, kpiRow, note, weekLabel } from "./ui";
@@ -315,5 +316,60 @@ register({
       options: { scales: { y: { min: 0, max: 100 } } },
     });
     rec14(el, ctx);
+  },
+});
+
+/** The texts of a day of the strip: a sign day, a clear day, a day without values. */
+const DAY_TEXT = { sign: "ws.daySign", clear: "ws.dayClear", none: "ws.dayNone" } as const;
+
+register({
+  id: "warningSigns",
+  render(el, ctx) {
+    const { t, fmt, calc, data } = ctx;
+    const days = calc.signDays(data.hrv, data.recovery);
+    const signs = calc.warningSignsOf(days);
+    const day = days.find((d) => d.date === signs?.date);
+    if (signs === null || day === undefined) return ctx.empty(el, fmt.na);
+    const value = (v: number | null, unit: string, digits = 0) =>
+      v === null ? fmt.na : `${fmt.num(v, digits)} ${unit}`;
+    const lines = (d: SignDay): [boolean | null, string][] => [
+      [
+        d.signals.rhrHigh,
+        t("ws.rhr", { rhr: value(d.rhr, "bpm"), base: value(d.rhrBase, "bpm", 1) }),
+      ],
+      [d.signals.hrvLow, t("ws.hrv", { hrv: value(d.hrv, "ms"), low: value(d.hrvLow, "ms") })],
+      [d.signals.sleepLow, t("ws.sleep", { score: fmt.num(d.sleepScore ?? undefined) })],
+    ];
+    // a single day has a streak of 1 when it is a sign day: the rule stays in one place
+    const kind = (d: SignDay) =>
+      Object.values(d.signals).every((s) => s === null)
+        ? "none"
+        : calc.warningSignsOf([d])?.streak === 1
+          ? "sign"
+          : "clear";
+    const dot = (d: SignDay) => {
+      const k = kind(d);
+      const text = [fmt.day(d.date), t(DAY_TEXT[k]), ...lines(d).map(([, l]) => l)].join(" · ");
+      return h("li", { class: `dot ${k}`, title: text }, h("span", { class: "sr-only" }, text));
+    };
+    const head = signs.flag
+      ? t(signs.streak >= calc.SIGN_WINDOW ? "ws.flagMax" : "ws.flag", { n: signs.streak })
+      : t(signs.streak === 1 ? "ws.one" : "ws.none");
+    append(
+      el,
+      h("p", { class: signs.flag ? "ws-head warn" : "ws-head" }, head),
+      signs.date !== data.end &&
+        h("p", { class: "ws-from muted" }, t("ready.from", { day: fmt.day(signs.date) })),
+      h(
+        "ul",
+        { class: "ws-lines" },
+        ...lines(day).map(([on, text]) =>
+          h("li", { class: on === true && "warn" }, on === true && "⚠ ", text),
+        ),
+      ),
+      h("p", { class: "ws-days muted" }, t("ws.days")),
+      h("ol", { class: "ws-dots" }, ...days.slice(-7).map(dot)),
+      note(t("ws.note")),
+    );
   },
 });

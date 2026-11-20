@@ -280,6 +280,19 @@ out. To add one:
 | `ready.from` | from {day} |
 | `ready.ratio` | Load ratio 7:28 |
 | `ready.note` | The dashboard's own rule, not Garmin's readiness. It uses the newest data: the week window does not change it. |
+| `w.warningSigns` | Warning signs |
+| `ws.flag` | {n} days in a row with warning signs |
+| `ws.flagMax` | {n} or more days in a row with warning signs |
+| `ws.one` | 1 day with signs: watch the next one |
+| `ws.none` | No warning signs |
+| `ws.rhr` | Resting HR {rhr}, 7-day average {base} |
+| `ws.hrv` | HRV last night {hrv}, range low {low} |
+| `ws.sleep` | Sleep score {score} |
+| `ws.days` | Last 7 days |
+| `ws.daySign` | warning signs |
+| `ws.dayClear` | no signs |
+| `ws.dayNone` | no data |
+| `ws.note` | Signs: resting HR 5 bpm or more above its 7-day average, last night's HRV under its range, a sleep score under 60. A day with 2 or more signs is a sign day; 2 sign days in a row are a warning. The dashboard's own rule, not a diagnosis. |
 | `w.fitnessAge` | Fitness age |
 | `fa.age` | Fitness age |
 | `fa.actual` | Actual age |

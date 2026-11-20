@@ -1989,6 +1989,21 @@ describe("writeDashboard new preset widgets", () => {
     });
   });
 
+  it("reports the warning signs once for an edited Recovery board", async () => {
+    templateText = template(
+      ID_B,
+      "window.S = /* garmin-settings:start */null/* garmin-settings:end */;\n",
+    );
+    rmSync(file);
+    await writer.write({});
+    const board = preset("recovery").filter((i) => i.widget !== "warningSigns");
+    setLayout(
+      edited({ boards: { recovery: board }, seen: { recovery: board.map((i) => i.widget) } }),
+    );
+    expect(await writer.write({})).toMatchObject({ addedWidgets: { recovery: ["warningSigns"] } });
+    expect(await writer.write({})).not.toHaveProperty("addedWidgets");
+  });
+
   it("reports the boards of the sports that the page keeps, and all and recovery", async () => {
     templateText = template(
       ID_B,

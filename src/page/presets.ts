@@ -20,6 +20,7 @@ const PRESETS: Record<string, Row> & { generic: Row } = {
   recovery: [
     ["readiness", 2],
     ["fitnessAge", 1],
+    ["warningSigns", 3],
     ["loadVsRecovery", 3],
     ["hrv", 1],
     ["restingHr", 1],
