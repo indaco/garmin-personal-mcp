@@ -36,7 +36,7 @@ import {
   weeklyIntensity,
   workoutOf,
 } from "./analytics/running";
-import { strokesPerLength, swimPace, swimTrend } from "./analytics/sports";
+import { powerPerBeat, strokesPerLength, swimPace, swimTrend } from "./analytics/sports";
 import {
   completed,
   planAdherence,
@@ -83,6 +83,10 @@ interface Week {
   runHardPct?: number | null;
   /** The page's Long runs: the longest run's km in % of the week's run km, 0 decimals; null without run km. */
   longRunSharePct?: number | null;
+  /** The Bike board's Intensity share: the rides' zone time in zones 1-2, in %, 0 decimals; null without zone time. */
+  rideEasyPct?: number | null;
+  /** The Bike board's Intensity share: the rides' zone time in zones 4-5, in %, 0 decimals; null without zone time. */
+  rideHardPct?: number | null;
   /** The period starts after this Monday: the week is not whole. */
   partial?: true;
 }
@@ -256,10 +260,34 @@ export interface Digest {
     changePct: number | null;
   };
   /**
+   * The efficiency trend of the block over the whole weeks of the period: a week in progress is left
+   * out, so its first days do not change the last weeks. The first and the last `comparedWeeks` (4,
+   * or half the whole weeks), 2 decimals, null without a session on that side; the change in %, 1
+   * decimal, needs 3 sessions on each side. `runs`: metres per heartbeat of the runs below zone 4, as
+   * `aerobicEfficiency`. `rides`: normalized power per heartbeat (W per bpm) of the rides below zone
+   * 4; `ridesWithPower` counts the rides of the whole weeks with a normalized power and an average
+   * HR, in any zone (0: no power meter). A part is absent without its sport; the key is absent
+   * without both, and without a zone 4 floor.
+   */
+  blockEfficiency?: {
+    runs?: NonNullable<Digest["aerobicEfficiency"]>;
+    rides?: {
+      comparedWeeks: number;
+      first: number | null;
+      last: number | null;
+      firstRides: number;
+      lastRides: number;
+      changePct: number | null;
+      ridesWithPower: number;
+    };
+  };
+  /**
    * A run without zone seconds counts in the zone of its average HR in `runEasyPct` and `runHardPct`,
    * as on the page. Absent otherwise.
    */
   runIntensityApproximate?: true;
+  /** The same mark for `rideEasyPct` and `rideHardPct`: a ride without zone seconds. Absent otherwise. */
+  rideIntensityApproximate?: true;
   /** Today's fitness, fatigue and form of the page, 1 decimal; null when no activity has a load. */
   fitnessFatigue: { fitness: number; fatigue: number; form: number } | null;
   hrvLast14: unknown[];
@@ -325,6 +353,7 @@ export function digest(data: Json): Digest {
 
   // the page's Long runs and Race predictor: the same functions, so the coach quotes the page
   const runs = acts.filter((a) => groupOf(a as Activity) === "running");
+  const rides = acts.filter((a) => groupOf(a as Activity) === "cycling") as Activity[];
   const longRuns: Digest["longRuns"] = runs
     .filter((a) => isLongRun(a as Activity))
     .map((a) => {
@@ -345,19 +374,70 @@ export function digest(data: Json): Digest {
   const floors = zonesOf(data.zones).floors;
   const z4 = floors[3];
   const trend = aerobicTrend(runs as Activity[], weeks, z4);
+  // the block review counts whole weeks only: the weeks end with the week of `end`, which is in
+  // progress unless `end` is a Sunday
+  const wholeWeeks = new Date(`${end}T00:00:00Z`).getUTCDay() === 0 ? weeks : weeks.slice(0, -1);
+  const blockRuns =
+    runs.length > 0 && z4 !== undefined
+      ? aerobicTrend(runs as Activity[], wholeWeeks, z4)
+      : undefined;
+  const blockRides =
+    rides.length > 0 && z4 !== undefined
+      ? aerobicTrend(rides, wholeWeeks, z4, powerPerBeat)
+      : undefined;
+  const blockEfficiency: Digest["blockEfficiency"] =
+    blockRuns || blockRides
+      ? {
+          ...(blockRuns
+            ? {
+                runs: {
+                  comparedWeeks: blockRuns.n,
+                  first: r2(blockRuns.first),
+                  last: r2(blockRuns.last),
+                  firstRuns: blockRuns.firstRuns,
+                  lastRuns: blockRuns.lastRuns,
+                  changePct: changePct(blockRuns),
+                },
+              }
+            : {}),
+          ...(blockRides
+            ? {
+                rides: {
+                  comparedWeeks: blockRides.n,
+                  first: r2(blockRides.first),
+                  last: r2(blockRides.last),
+                  firstRides: blockRides.firstRuns,
+                  lastRides: blockRides.lastRuns,
+                  changePct: changePct(blockRides),
+                  ridesWithPower: rides.filter(
+                    (a) => weekIndex(a, wholeWeeks) >= 0 && powerPerBeat(a) !== undefined,
+                  ).length,
+                },
+              }
+            : {}),
+        }
+      : undefined;
   // the page's Intensity share and Long runs
   const intensity =
     runs.length > 0 ? weeklyIntensity(runs as Activity[], weeks, floors) : undefined;
+  // the Bike board's Intensity share: the same function on the rides
+  const rideIntensity = rides.length > 0 ? weeklyIntensity(rides, weeks, floors) : undefined;
+  // the page shows no week before the period start, and a digest without a start has no weeks
+  const shownWeek = (k: string) => (k < start ? -1 : weeks.indexOf(k));
   const runWeek = (k: string) => {
-    const i = weeks.indexOf(k);
-    // the page shows no week before the period start, and a digest without a start has no weeks
-    if (!intensity || k < start || i < 0) return {};
+    const i = shownWeek(k);
+    if (!intensity || i < 0) return {};
     const ofWeek = runs.filter((a) => weekIndex(a as Activity, weeks) === i) as Activity[];
     return {
       runEasyPct: r0(intensity.easy[i]),
       runHardPct: r0(intensity.hard[i]),
       longRunSharePct: r0(longestShare(ofWeek)),
     };
+  };
+  const rideWeek = (k: string) => {
+    const i = shownWeek(k);
+    if (!rideIntensity || i < 0) return {};
+    return { rideEasyPct: r0(rideIntensity.easy[i]), rideHardPct: r0(rideIntensity.hard[i]) };
   };
   // the page's Load safety
   const safety = loadSafety(acts as Activity[], weeks, end, maxHR, start);
@@ -473,6 +553,7 @@ export function digest(data: Json): Digest {
           {
             ...roundWeek(w, rampOf(k), weekLoadOf(k)),
             ...runWeek(k),
+            ...rideWeek(k),
             ...(k < start ? { partial: true as const } : {}),
           },
         ]),
@@ -514,11 +595,13 @@ export function digest(data: Json): Digest {
             last: r2(trend.last),
             firstRuns: trend.firstRuns,
             lastRuns: trend.lastRuns,
-            changePct: trend.change === null ? null : round(trend.change, 1),
+            changePct: changePct(trend),
           },
         }
       : {}),
+    ...(blockEfficiency ? { blockEfficiency } : {}),
     ...(intensity?.approximate ? { runIntensityApproximate: true as const } : {}),
+    ...(rideIntensity?.approximate ? { rideIntensityApproximate: true as const } : {}),
     racePredictions,
     repeatedRuns: repeatedRuns(acts),
     strengthExercises,
@@ -645,6 +728,8 @@ function fastestEfforts(acts: Json[]): Digest["bestEfforts"] {
 /** An efficiency to 2 decimals; null stays null. */
 const r0 = (v: number | null) => (v === null ? null : round(v, 0));
 const r2 = (v: number | null) => (v === null ? null : round(v, 2));
+/** A change in %, 1 decimal; null without one. */
+const changePct = (t: { change: number | null }) => (t.change === null ? null : round(t.change, 1));
 
 function sum(): Sum {
   return { sessions: 0, km: 0, runKm: 0, hours: 0, load: 0, known: 0, estimated: 0 };

@@ -1486,6 +1486,289 @@ describe("run intensity", () => {
   });
 });
 
+/** A ride of the Bike board with its seconds in zones 1-5 and its type key. */
+const zonedRide = (day: string, hrZonesSec: number[] | undefined, type = "cycling") => ({
+  ...run(day, type),
+  sport: "cycling",
+  name: "Ride",
+  km: 30,
+  ...(hrZonesSec ? { hrZonesSec } : {}),
+});
+/** A ride of the Bike board with its average HR and, when given, its normalized power. */
+const poweredRide = (day: string, avgHR: number, normPowerW?: number) => ({
+  ...run(day, "cycling"),
+  sport: "cycling",
+  name: "Ride",
+  km: 30,
+  avgHR,
+  ...(normPowerW === undefined ? {} : { normPowerW }),
+});
+
+describe("ride intensity", () => {
+  const zones = [
+    {
+      sport: "DEFAULT",
+      zone1Floor: 94,
+      zone2Floor: 113,
+      zone3Floor: 132,
+      zone4Floor: 150,
+      zone5Floor: 169,
+    },
+  ];
+  const floors = zonesOf(zones).floors;
+  /** 3 whole weeks to Sunday 25 Oct. */
+  const WEEKS = ["2026-10-05", "2026-10-12", "2026-10-19"];
+  const period = { ...data, zones, start: "2026-10-05", end: "2026-10-25", previousActivities: [] };
+  const RIDES = [
+    zonedRide("2026-10-06", [1800, 1800, 0, 400, 0]),
+    zonedRide("2026-10-13", [3000, 0, 0, 0, 0], "mountain_biking"),
+    zonedRide("2026-10-15", [0, 0, 0, 1000, 1000]),
+  ];
+  const KEYS = ["rideEasyPct", "rideHardPct"];
+  /** The weeks that have either ride key. */
+  const withKeys = (d: ReturnType<typeof digest>) =>
+    Object.entries(d.weekly)
+      .filter(([, w]) => KEYS.some((k) => k in w))
+      .map(([k]) => k);
+
+  it("gives each week's easy and hard zone share of the rides, as the Bike board", () => {
+    const out = digest({ ...period, activities: [...RIDES, strength("2026-10-20", [])] });
+    expect(out.weekly["2026-10-05"]).toMatchObject({ rideEasyPct: 90, rideHardPct: 10 });
+    // 3000 s easy and 2000 s hard of 5000 s, a mountain-bike ride included
+    expect(out.weekly["2026-10-12"]).toMatchObject({ rideEasyPct: 60, rideHardPct: 40 });
+    expect(out.weekly["2026-10-19"]).toMatchObject({ rideEasyPct: null, rideHardPct: null });
+    expect(out.weekly["2026-10-05"]).not.toHaveProperty("runEasyPct");
+    expect(out).not.toHaveProperty("rideIntensityApproximate");
+  });
+
+  it("gives the shares to the week in progress, as the Bike board", () => {
+    const out = digest({
+      ...period,
+      end: "2026-10-21",
+      activities: [zonedRide("2026-10-20", [0, 0, 0, 0, 600])],
+    });
+    expect(out.weekly["2026-10-19"]).toMatchObject({ rideEasyPct: 0, rideHardPct: 100 });
+  });
+
+  it("gives the values of the page's function, rounded", () => {
+    const out = digest({ ...period, activities: RIDES });
+    const page = weeklyIntensity(RIDES as Activity[], WEEKS, floors);
+    for (const [i, w] of WEEKS.slice(0, 2).entries()) {
+      expect(out.weekly[w].rideEasyPct).toBe(Math.round(page.easy[i]!));
+      expect(out.weekly[w].rideHardPct).toBe(Math.round(page.hard[i]!));
+    }
+  });
+
+  it("keeps the runs and the rides of a week apart", () => {
+    const out = digest({
+      ...period,
+      activities: [
+        zoned("2026-10-06", 8, [0, 0, 0, 3000, 0]),
+        zonedRide("2026-10-07", [3000, 0, 0, 0, 0]),
+      ],
+    });
+    expect(out.weekly["2026-10-05"]).toMatchObject({
+      runEasyPct: 0,
+      runHardPct: 100,
+      rideEasyPct: 100,
+      rideHardPct: 0,
+    });
+  });
+
+  it("marks the ride intensity as approximate when a ride counts in the zone of its average HR", () => {
+    const hrOnly = { ...zonedRide("2026-10-20", undefined), avgHR: 120 };
+    const out = digest({
+      ...period,
+      activities: [...RIDES, hrOnly, zoned("2026-10-21", 8, [3000, 0, 0, 0, 0])],
+    });
+    expect(out.rideIntensityApproximate).toBe(true);
+    expect(out).not.toHaveProperty("runIntensityApproximate");
+    // 30:00 at 120 bpm is zone 2: easy
+    expect(out.weekly["2026-10-19"]).toMatchObject({ rideEasyPct: 100, rideHardPct: 0 });
+  });
+
+  it("does not mark the rides when only a run counts by its average HR", () => {
+    const hrOnly = onBoard("2026-10-20", "Easy", 6, { avgHR: 120 });
+    const out = digest({ ...period, activities: [...RIDES, hrOnly] });
+    expect(out.runIntensityApproximate).toBe(true);
+    expect(out).not.toHaveProperty("rideIntensityApproximate");
+  });
+
+  it("gives none of the keys to the partial first week, as the page does not show it", () => {
+    const out = digest({ ...period, start: "2026-10-07", activities: RIDES });
+    expect(out.weekly["2026-10-05"].partial).toBe(true);
+    expect(withKeys(out)).toEqual(["2026-10-12"]);
+  });
+
+  it("gives none of the keys and no approximate mark to a period without rides", () => {
+    const hrOnly = onBoard("2026-10-20", "Easy", 6, { avgHR: 120 });
+    const out = digest({
+      ...period,
+      activities: [zoned("2026-10-06", 8, [3000, 0, 0, 0, 0]), hrOnly],
+    });
+    expect(withKeys(out)).toEqual([]);
+    expect(out).not.toHaveProperty("rideIntensityApproximate");
+  });
+
+  it("gives none of the keys without the start of the period", () => {
+    const hrOnly = { ...zonedRide("2026-10-20", undefined), avgHR: 120 };
+    const out = digest({ ...period, start: undefined, activities: [...RIDES, hrOnly] });
+    expect(Object.keys(out.weekly).length).toBeGreaterThan(0);
+    expect(withKeys(out)).toEqual([]);
+    expect(out).not.toHaveProperty("rideIntensityApproximate");
+  });
+});
+
+describe("block efficiency", () => {
+  const zones = [
+    {
+      sport: "DEFAULT",
+      zone1Floor: 94,
+      zone2Floor: 113,
+      zone3Floor: 132,
+      zone4Floor: 150,
+      zone5Floor: 169,
+    },
+  ];
+  /** 9 weeks from Monday 31 Aug to Wednesday 28 Oct: the week of 26 Oct is in progress. */
+  const period = { ...data, zones, start: "2026-08-31", end: "2026-10-28", previousActivities: [] };
+  /** 8 whole weeks to Sunday 25 Oct. */
+  const toSunday = { ...period, end: "2026-10-25" };
+  // 200 m a minute: 2 m per beat at 100 bpm, 2.5 at 80, 3.33 at 60
+  const RUNS = [
+    easyRun("2026-09-01", 100),
+    easyRun("2026-09-08", 100),
+    easyRun("2026-09-15", 100),
+    easyRun("2026-09-22", 100),
+    easyRun("2026-10-06", 80),
+    easyRun("2026-10-13", 80),
+    easyRun("2026-10-20", 80),
+  ];
+  const RUN_NOW = easyRun("2026-10-27", 60);
+  // 200 W: 2 W per beat at 100 bpm, 2.5 at 80, 3.33 at 60
+  const RIDES = [
+    poweredRide("2026-09-01", 100, 200),
+    poweredRide("2026-09-08", 100, 200),
+    poweredRide("2026-09-15", 100, 200),
+    poweredRide("2026-09-22", 100, 200),
+    poweredRide("2026-10-06", 80, 200),
+    poweredRide("2026-10-13", 80, 200),
+    poweredRide("2026-10-20", 80, 200),
+  ];
+  const RIDE_NOW = poweredRide("2026-10-27", 60, 200);
+  /** The runs of the whole weeks: 4 weeks of each side, +25%. */
+  const WHOLE_RUNS = {
+    comparedWeeks: 4,
+    first: 2,
+    last: 2.5,
+    firstRuns: 4,
+    lastRuns: 3,
+    changePct: 25,
+  };
+
+  it("leaves the week in progress out of the runs, and the page's aerobic efficiency keeps it", () => {
+    const out = digest({ ...period, activities: [...RUNS, RUN_NOW] });
+    expect(out.blockEfficiency).toEqual({ runs: WHOLE_RUNS });
+    // the page's 4 last weeks end with this week: (3 x 2.5 + 3.33) / 4 = 2.71, +35.4%
+    expect(out.aerobicEfficiency).toEqual({
+      comparedWeeks: 4,
+      first: 2,
+      last: 2.71,
+      firstRuns: 4,
+      lastRuns: 4,
+      changePct: 35.4,
+    });
+  });
+
+  it("counts the last week of a period that ends on a Sunday", () => {
+    const out = digest({ ...toSunday, activities: RUNS });
+    expect(out.blockEfficiency).toEqual({ runs: WHOLE_RUNS });
+    expect(out.aerobicEfficiency).toEqual(WHOLE_RUNS);
+  });
+
+  it("gives the power per heartbeat of the rides below zone 4 of the whole weeks", () => {
+    const hard = poweredRide("2026-09-02", 160, 300);
+    const noPower = poweredRide("2026-09-09", 100);
+    const out = digest({ ...period, activities: [...RIDES, RIDE_NOW, hard, noPower] });
+    // the ride above zone 4 has power: it counts in ridesWithPower, not in the trend
+    expect(out.blockEfficiency).toEqual({
+      rides: {
+        comparedWeeks: 4,
+        first: 2,
+        last: 2.5,
+        firstRides: 4,
+        lastRides: 3,
+        changePct: 25,
+        ridesWithPower: 8,
+      },
+    });
+  });
+
+  it("gives no ride values without a power meter, and says that no ride has power", () => {
+    const noPower = RIDES.map((r) => ({ ...r, normPowerW: undefined }));
+    const out = digest({ ...period, activities: noPower });
+    expect(out.blockEfficiency).toEqual({
+      rides: {
+        comparedWeeks: 4,
+        first: null,
+        last: null,
+        firstRides: 0,
+        lastRides: 0,
+        changePct: null,
+        ridesWithPower: 0,
+      },
+    });
+  });
+
+  it("gives both parts to a period with runs and rides", () => {
+    const out = digest({ ...toSunday, activities: [...RUNS, ...RIDES] });
+    expect(out.blockEfficiency?.runs).toEqual(WHOLE_RUNS);
+    expect(out.blockEfficiency?.rides).toMatchObject({ first: 2, last: 2.5, ridesWithPower: 7 });
+  });
+
+  it.each([
+    ["no HR zones", undefined],
+    ["a zones row without floors", [{ sport: "DEFAULT", maxHeartRateUsed: 190 }]],
+  ])("has no block efficiency with %s: the values would count every session", (_name, z) => {
+    const out = digest({ ...period, zones: z, activities: [...RUNS, ...RIDES] });
+    expect(out).not.toHaveProperty("blockEfficiency");
+  });
+
+  it("compares no weeks when the period is only the week in progress", () => {
+    const out = digest({ ...period, start: "2026-10-26", activities: [RUN_NOW, RIDE_NOW] });
+    expect(out.blockEfficiency).toEqual({
+      runs: {
+        comparedWeeks: 0,
+        first: null,
+        last: null,
+        firstRuns: 0,
+        lastRuns: 0,
+        changePct: null,
+      },
+      rides: {
+        comparedWeeks: 0,
+        first: null,
+        last: null,
+        firstRides: 0,
+        lastRides: 0,
+        changePct: null,
+        ridesWithPower: 0,
+      },
+    });
+  });
+
+  it("compares no weeks without the start of the period", () => {
+    const out = digest({ ...period, start: undefined, activities: [...RUNS, ...RIDES] });
+    expect(out.blockEfficiency?.runs).toMatchObject({ comparedWeeks: 0, first: null, last: null });
+    expect(out.blockEfficiency?.rides).toMatchObject({ comparedWeeks: 0, ridesWithPower: 0 });
+  });
+
+  it("has no block efficiency without runs and rides", () => {
+    const out = digest({ ...period, activities: [strength("2026-09-01", [])] });
+    expect(out).not.toHaveProperty("blockEfficiency");
+  });
+});
+
 describe("syncGaps", () => {
   it("gives nothing for no sync, a non-object, an empty object or a clean sync", () => {
     for (const sync of [undefined, null, "x", 3, [], {}, { failedDays: 0, failedSections: [] }])
