@@ -240,7 +240,8 @@ load against recovery and the 14-day recovery widgets: HRV, resting HR, stress, 
 bedtime and Body Battery. With the `recoveryHistory` setting, it also shows the Recovery trend widget. Each type
 board shows one sport. The board of an activity is its
 sport in the Garmin FIT SDK. Garmin sends that sport as a number with each activity. The server
-gives it the SDK name, for example `running` or `racket`.
+gives it the SDK name, for example `running` or `racket`. The Bike board has a Ride efficiency
+widget: the normalized power per heartbeat of the rides below zone 4. It needs a power meter.
 
 The All and Recovery tabs are always there. A sport tab shows only when you have activities of that
 sport. [Page settings](#page-settings) can keep fewer sport tabs, and remove the Recovery tab.

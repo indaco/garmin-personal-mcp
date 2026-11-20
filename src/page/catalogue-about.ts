@@ -44,6 +44,8 @@ export const ABOUT: Record<string, string> = {
   aerobicFitness:
     "Pace against HR of each run (older runs paler), weekly pace, and the efficiency (metres per heartbeat) of the runs below Z4: each run, the weekly mean and the last weeks against the first.",
   intensityShare: "The share of time in Z1-2 (easy) and Z4-5 (hard) each week, of runs or rides.",
+  rideEfficiency:
+    "The efficiency (normalized power per heartbeat) of the rides below Z4: each ride, the weekly mean and the last weeks against the first. It needs a power meter.",
   runningForm:
     "Weekly cadence, ground contact, stride, vertical oscillation and ratio, and power, one small chart for each: cadence and ground contact first, the others under Show all.",
   runWalk:

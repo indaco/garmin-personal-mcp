@@ -153,6 +153,12 @@ describe("guide", () => {
     );
   });
 
+  it("names the ride efficiency of the Bike board in the dashboard guide", () => {
+    expect(readFileSync("guide/dashboard.md", "utf8").replace(/\s+/g, " ")).toContain(
+      "The server gives it the SDK name, for example `running` or `racket`. The Bike board has a Ride efficiency widget: the normalized power per heartbeat of the rides below zone 4. It needs a power meter.",
+    );
+  });
+
   it("names the warning signs on the Recovery board in the dashboard guide", () => {
     expect(readFileSync("guide/dashboard.md", "utf8").replace(/\s+/g, " ")).toContain(
       "The Recovery board shows readiness, fitness age, the warning signs, load against recovery and the 14-day recovery widgets: HRV, resting HR, stress, sleep, sleep need, bedtime and Body Battery.",

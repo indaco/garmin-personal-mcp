@@ -193,6 +193,12 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
     span: 1,
   },
   {
+    id: "rideEfficiency",
+    title: "w.rideEfficiency",
+    types: ["cycling"],
+    span: 3,
+  },
+  {
     id: "runningForm",
     title: "w.runningForm",
     types: ["running"],

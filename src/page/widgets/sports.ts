@@ -1,12 +1,22 @@
-import { type Activity, isIndoor, sessionSeconds, sportOf } from "../../analytics/calc";
+import { type Activity, groupOf, isIndoor, sessionSeconds, sportOf } from "../../analytics/calc";
 import { append, h } from "../dom";
 import type { Key } from "../i18n";
 import { register } from "../registry";
 import type { Ctx } from "../registry";
 import { oneSession } from "./types";
-import { delta, everyActivity, kpi, kpiRow, note, sessionTable, weekLabel, withUnit } from "./ui";
+import {
+  alpha,
+  delta,
+  everyActivity,
+  kpi,
+  kpiRow,
+  note,
+  sessionTable,
+  weekLabel,
+  withUnit,
+} from "./ui";
 
-/** The extras of the Walk, Hike, Bike, Swim and Racket sports boards. */
+/** The extras of the Walk, Hike, Bike, Swim and Racket sports boards, and the ride efficiency. */
 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 const day = (a: Activity) => String(a.start).slice(0, 10);
@@ -313,6 +323,82 @@ register({
       ),
       dynamics && note(t("bd.trailNote")),
     );
+  },
+});
+
+register({
+  id: "rideEfficiency",
+  render(el, ctx) {
+    const { t, fmt, calc } = ctx;
+    const rides = ctx.activities.filter((a) => groupOf(a) === "cycling");
+    if (rides.length === 0) return ctx.empty(el);
+    if (!rides.some((a) => calc.powerPerBeat(a) !== undefined)) {
+      append(el, note(t("re.noPower")));
+      return;
+    }
+    // the same rides and zones as the digest's blockEfficiency
+    const z4 = calc.zonesOf(ctx.data.zones).floors[3];
+    const trend = calc.aerobicTrend(rides, ctx.weeks, z4, calc.powerPerBeat);
+    if (trend.runs.length === 0) {
+      append(el, note(t("re.noneBelow")));
+      return;
+    }
+    const { n } = trend;
+    if (n > 0) {
+      append(
+        el,
+        kpiRow(
+          kpi(
+            t("re.aerobicEff", { n }),
+            trend.last === null ? fmt.na : fmt.num(trend.last, 2),
+            trend.change !== null &&
+              h("span", {}, delta(ctx, trend.change, "up"), " ", t("af.vsFirst", { n })),
+          ),
+        ),
+      );
+    }
+    // a chart needs two values
+    if (trend.runs.length > 1) {
+      const points = trend.runs.toReversed();
+      const good = ctx.color("good");
+      ctx.chart(
+        el,
+        {
+          type: "line",
+          data: {
+            labels: ctx.weeks.map((w) => weekLabel(ctx, w)),
+            datasets: [
+              { label: t("af.efficiency"), data: trend.weekly, borderColor: good, spanGaps: true },
+              {
+                label: t("re.rides"),
+                data: points.map((a) => ({
+                  x: weekLabel(ctx, ctx.weeks[weekOf(ctx, a)]),
+                  y: calc.powerPerBeat(a)!,
+                })),
+                borderColor: alpha(good, 0.5),
+                backgroundColor: alpha(good, 0.5),
+                showLine: false,
+              },
+            ],
+          },
+          options: {
+            scales: { y: { title: { display: true, text: t("re.effUnit") } } },
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  label: (c) =>
+                    c.datasetIndex === 1
+                      ? `${fmt.day(day(points[c.dataIndex]))} ${points[c.dataIndex].name ?? ""}: ${fmt.num(c.parsed.y ?? undefined, 2)}`
+                      : `${c.dataset.label}: ${fmt.num(c.parsed.y ?? undefined, 2)}`,
+                },
+              },
+            },
+          },
+        },
+        180,
+      );
+    }
+    append(el, note(t(z4 === undefined ? "re.noZones" : "re.note")));
   },
 });
 

@@ -891,6 +891,22 @@ describe("type boards", () => {
     }
   });
 
+  it("shows the Bike widgets, the ride efficiency after the intensity share", async () => {
+    const { page, errors } = await open(browser, pageFile(), { hash: "#cycling" });
+    expect(await tiles(page)).toEqual([
+      "typeKpis",
+      "typeWeekly",
+      "hrZones",
+      "records",
+      "intensityShare",
+      "rideEfficiency",
+      "hikeVertical",
+      "bikeDetails",
+      "activities",
+    ]);
+    expect(errors).toEqual([]);
+  });
+
   it("shows the Run widgets", async () => {
     const { page } = await open(browser, pageFile(), { hash: "#running" });
     expect(await tiles(page)).toEqual([

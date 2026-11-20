@@ -28,6 +28,20 @@ describe("widget catalogue", () => {
     );
   });
 
+  it("has the Ride efficiency right after Intensity share, full width, only for rides", () => {
+    const at = CATALOGUE.findIndex((c) => c.id === "rideEfficiency");
+    expect(CATALOGUE[at - 1]?.id).toBe("intensityShare");
+    expect(CATALOGUE[at]).toEqual({
+      id: "rideEfficiency",
+      title: "w.rideEfficiency",
+      types: ["cycling"],
+      span: 3,
+    });
+    expect(ABOUT.rideEfficiency).toBe(
+      "The efficiency (normalized power per heartbeat) of the rides below Z4: each ride, the weekly mean and the last weeks against the first. It needs a power meter.",
+    );
+  });
+
   it("has a description for exactly the catalogue widgets", () => {
     expect(Object.keys(ABOUT).toSorted()).toEqual(CATALOGUE.map((c) => c.id).toSorted());
   });
