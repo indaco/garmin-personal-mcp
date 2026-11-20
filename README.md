@@ -317,8 +317,9 @@ language of the conversation. The argument `path` is optional: it is the file of
 example `coach.html`. In Claude Code: `/mcp__garmin-personal__dashboard-language Dutch coach.html`.
 A text without a translation shows in English. To remove an added language, ask your assistant to
 remove it: `editDashboard` with `removeLanguages`. Before it deletes the texts, Claude Code asks you
-to confirm in a form (tested with 2.1.329; Claude Desktop and the MCP Inspector: not tested).
-[Languages](guide/languages.md) tells more.
+to confirm in a form (tested with 2.1.329). Claude Desktop shows no form and deletes the texts at
+once (tested with 6.6395.1). The MCP Inspector: not tested. [Languages](guide/languages.md) tells
+more.
 
 ### Presets or freeform
 

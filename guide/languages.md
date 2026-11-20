@@ -35,8 +35,8 @@ from the page". The assistant calls `editDashboard` with `removeLanguages`. Buil
 the [page settings](dashboard.md#page-settings) choose them. When the settings add a built-in
 language, the assistant translates your custom widgets into it. Before the server deletes the texts
 of a language, your client can ask you to confirm in a form. When you decline, the server deletes
-nothing. Claude Code shows this form (tested with 2.1.329). Claude Desktop and the MCP Inspector:
-not tested. A client without the form deletes the texts at once.
+nothing. Claude Code shows this form (tested with 2.1.329). A client without the form deletes the
+texts at once: Claude Desktop does this (tested with 6.6395.1). The MCP Inspector: not tested.
 
 To change one text of a built-in language, ask your assistant. For example: "In Italian, call the
 readiness widget _Forma di oggi_".
