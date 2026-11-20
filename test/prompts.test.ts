@@ -1,10 +1,15 @@
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { LONG_RUN_SHARE_WARN } from "../src/analytics/running";
 import { en } from "../src/page/i18n/en";
+import { addDays } from "../src/dates";
+import { activityNames } from "../src/prompts";
 import { createServer } from "../src/server";
+import { NAME_SEARCH } from "../src/tools";
 import promptList from "./fixtures/prompt-list.json";
 
 vi.mock("../src/log", () => ({ log: vi.fn() }));
@@ -1337,5 +1342,218 @@ describe("coach prompts", () => {
         );
       }
     }
+  });
+});
+
+/** A cache row as summarize writes it. */
+const row = (name: unknown, start: unknown, sport: unknown = "running", type = "running") => ({
+  name,
+  start,
+  sport,
+  type,
+});
+/** The start of a row `n` days after 1 Jan 2025. */
+const day = (n: number) => `${addDays("2025-01-01", n)} 07:00:00`;
+const cacheOf = (...rows: object[]) => ({
+  activities: Object.fromEntries(rows.map((r, i) => [String(i), r])),
+});
+
+describe("activityNames", () => {
+  it("gives the names of one board only", () => {
+    const cache = cacheOf(
+      row("Park - Easy", "2026-10-20 07:00:00"),
+      row("Gravel loop", "2026-10-19 07:00:00", "cycling", "mountain_biking"),
+      row("Push day", "2026-10-18 07:00:00", "fitnessEquipment", "strength_training"),
+      row("Lake swim", "2026-10-17 07:00:00", "swimming", "open_water_swimming"),
+    );
+    expect(activityNames(cache, "running", "")).toEqual(["Park - Easy"]);
+    expect(activityNames(cache, "cycling", "")).toEqual(["Gravel loop"]);
+    expect(activityNames(cache, "strengthTraining", "")).toEqual(["Push day"]);
+    expect(activityNames(cache, "swimming", "")).toEqual(["Lake swim"]);
+  });
+
+  it("gives the newest first, and a row without a start last", () => {
+    const cache = cacheOf(
+      row("Old", "2026-01-01 07:00:00"),
+      row("No start", undefined),
+      row("New", "2026-10-01 07:00:00"),
+    );
+    expect(activityNames(cache, "running", "")).toEqual(["New", "Old", "No start"]);
+  });
+
+  it("gives a repeated name once, in the spelling of its newest row", () => {
+    const cache = cacheOf(
+      row("long run", "2026-01-01 07:00:00"),
+      row("Long Run", "2026-10-01 07:00:00"),
+      row("LONG RUN", "2026-05-01 07:00:00"),
+    );
+    expect(activityNames(cache, "running", "")).toEqual(["Long Run"]);
+  });
+
+  it("keeps the names that contain the typed text, case ignored", () => {
+    const cache = cacheOf(
+      row("Park - 5x1k", "2026-10-03 07:00:00"),
+      row("Track - 5X1K", "2026-10-02 07:00:00"),
+      row("Long Run", "2026-10-01 07:00:00"),
+    );
+    expect(activityNames(cache, "running", "5x1")).toEqual(["Park - 5x1k", "Track - 5X1K"]);
+    expect(activityNames(cache, "running", "  LONG ")).toEqual(["Long Run"]);
+    expect(activityNames(cache, "running", "tempo")).toEqual([]);
+    expect(activityNames(cache, "running", "   ")).toHaveLength(3);
+  });
+
+  it("reads regex characters in the typed text as plain text", () => {
+    const cache = cacheOf(row("Hills (6x)", "2026-10-01 07:00:00"), row("Easy", "2026-09-01"));
+    expect(activityNames(cache, "running", "(6")).toEqual(["Hills (6x)"]);
+    expect(activityNames(cache, "running", ".*")).toEqual([]);
+  });
+});
+
+describe("activityNames on bad cache data", () => {
+  it("cleans the ends of a name and skips a row whose name is empty or whose fields are not text", () => {
+    const cache = cacheOf(
+      row(" \u0007Park - Easy\t", "2026-10-05 07:00:00"),
+      row("   ", "2026-10-04 07:00:00"),
+      row(42, "2026-10-03 07:00:00"),
+      { start: "2026-10-02 07:00:00", sport: "running", type: "running" },
+      row("Tempo", 20261001),
+      row("Hills", "2026-10-01 07:00:00", 3),
+    );
+    expect(activityNames(cache, "running", "")).toEqual(["Park - Easy"]);
+  });
+
+  it("gives no names for a cache of the wrong shape", () => {
+    for (const cache of [null, "x", 7, [], {}, { activities: [] }, { activities: "x" }])
+      expect(activityNames(cache, "running", ""), JSON.stringify(cache)).toEqual([]);
+    expect(activityNames({ activities: { a: 1, b: null, c: [] } }, "running", "")).toEqual([]);
+  });
+
+  it("keeps the rows of an older cache that have a sport, and skips rows without one", () => {
+    const cache = {
+      activitiesSummary: 1,
+      activities: {
+        a: row("With sport", "2026-10-02 07:00:00"),
+        b: { name: "No sport", start: "2026-10-01 07:00:00", type: "running" },
+      },
+    };
+    expect(activityNames(cache, "running", "")).toEqual(["With sport"]);
+  });
+});
+
+describe("activityNames search window", () => {
+  it("takes only the newest activities that listActivities searches by name, of every sport", () => {
+    // newest first: NAME_SEARCH - 1 strength rows, then the last run inside the window, then one outside
+    const strength = Array.from({ length: NAME_SEARCH - 1 }, (_, i) =>
+      row(`Push ${i}`, day(300 - i), "fitnessEquipment", "strength_training"),
+    );
+    const cache = cacheOf(
+      ...strength,
+      row("Inside", day(300 - NAME_SEARCH + 1)),
+      row("Outside", day(300 - NAME_SEARCH)),
+    );
+    expect(activityNames(cache, "running", "")).toEqual(["Inside"]);
+    expect(activityNames(cache, "strengthTraining", "")).toHaveLength(NAME_SEARCH - 1);
+  });
+
+  it("puts a row whose start is not text after the window, so it does not push a name out", () => {
+    const strength = Array.from({ length: NAME_SEARCH - 1 }, (_, i) =>
+      row(`Push ${i}`, day(300 - i), "fitnessEquipment", "strength_training"),
+    );
+    const cache = cacheOf(row("Broken", 99_999), ...strength, row("Inside", day(1)));
+    expect(activityNames(cache, "running", "")).toEqual(["Inside"]);
+  });
+});
+
+/** The completion of one prompt argument, from a server on `dataDir`. */
+async function complete(dataDir: string, prompt: string, argument: string, value: string) {
+  const [clientEnd, serverEnd] = InMemoryTransport.createLinkedPair();
+  const server = createServer({ baseUrl: "https://api.test", apiKeyFile: "/none", dataDir });
+  const c = new Client({ name: "test", version: "1" });
+  await server.connect(serverEnd);
+  await c.connect(clientEnd);
+  try {
+    return {
+      completions: c.getServerCapabilities()?.completions,
+      ...(
+        await c.complete({
+          ref: { type: "ref/prompt", name: prompt },
+          argument: { name: argument, value },
+        })
+      ).completion,
+    };
+  } finally {
+    await c.close();
+  }
+}
+/** A data folder with this dashboard cache. */
+const folder = (cache: string) => {
+  const dir = mkdtempSync(join(tmpdir(), "garmin-complete-"));
+  writeFileSync(join(dir, "dashboard-cache.json"), cache);
+  return dir;
+};
+
+describe("completions", () => {
+  const cache = JSON.stringify(
+    cacheOf(
+      row("Park - 5x1k", "2026-10-06 07:00:00"),
+      row("Track - 5x1k", "2026-10-05 07:00:00"),
+      row("Long Run", "2026-10-04 07:00:00"),
+      row("Push day", "2026-10-03 07:00:00", "training", "strength_training"),
+      row("Lake swim", "2026-10-02 07:00:00", "swimming", "open_water_swimming"),
+      row("Gravel loop", "2026-10-01 07:00:00", "cycling", "mountain_biking"),
+    ),
+  );
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    fetchSpy = vi.spyOn(globalThis, "fetch");
+  });
+  afterEach(() => {
+    expect(fetchSpy, "a completion makes no Garmin call").not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it("suggests the run names that contain the typed text, and announces the capability", async () => {
+    const answer = await complete(folder(cache), "run-review", "activity", "5x");
+    expect(answer.values).toEqual(["Park - 5x1k", "Track - 5x1k"]);
+    expect(answer.completions).toEqual({});
+  });
+
+  it("suggests the names of each review's own board", async () => {
+    const dir = folder(cache);
+    expect((await complete(dir, "strength-review", "activity", "")).values).toEqual(["Push day"]);
+    expect((await complete(dir, "swim-review", "activity", "")).values).toEqual(["Lake swim"]);
+    expect((await complete(dir, "ride-review", "activity", "")).values).toEqual(["Gravel loop"]);
+  });
+
+  it("suggests nothing, with no error, without a cache or with an unreadable one", async () => {
+    expect((await complete("/none", "run-review", "activity", "")).values).toEqual([]);
+    expect((await complete(folder("{not json"), "run-review", "activity", "")).values).toEqual([]);
+  });
+
+  it("gives the first 100 of more names and says that there are more", async () => {
+    const many = cacheOf(...Array.from({ length: 120 }, (_, i) => row(`Run ${i}`, day(i))));
+    const answer = await complete(folder(JSON.stringify(many)), "run-review", "activity", "");
+    expect(answer.values).toHaveLength(100);
+    expect(answer).toMatchObject({ total: 120, hasMore: true });
+  });
+
+  it("suggests nothing for an argument without suggestions", async () => {
+    expect((await complete(folder(cache), "race-readiness", "goal", "1")).values).toEqual([]);
+  });
+
+  it.each([
+    ["", ["5k", "10k", "half", "marathon"]],
+    ["  ", ["5k", "10k", "half", "marathon"]],
+    ["h", ["half"]],
+    ["H", ["half"]],
+    ["MAR", ["marathon"]],
+    ["1", ["10k"]],
+    ["5", ["5k"]],
+    ["10k", ["10k"]],
+    ["k", []],
+    ["21", []],
+    ["half marathon", []],
+  ])("race-readiness suggests the distances that start with %j", async (typed, values) => {
+    expect((await complete("/none", "race-readiness", "distance", typed)).values).toEqual(values);
   });
 });

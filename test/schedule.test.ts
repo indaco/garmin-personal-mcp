@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { McpServer } from "@modelcontextprotocol/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Config } from "../src/config";
 import { DashboardWriter, pageCode, readBlock, writeBlock } from "../src/dashboard-page";
 import { preset } from "../src/page/presets";
@@ -26,6 +26,7 @@ import {
   lastRunTime,
   nextRuns,
   parseCron,
+  type Plan,
   plist,
   realEntry,
   refreshPages,
@@ -37,6 +38,8 @@ import {
   windowsScript,
   withCronLine,
 } from "../src/schedule";
+
+import { type Answer, closeAll, connect, type Era } from "./elicitation-client";
 
 vi.mock("../src/log", () => ({ LOG_DIR: ".cache/garmin-personal-mcp", log: vi.fn() }));
 
@@ -686,6 +689,7 @@ describe("AutoRefresh", () => {
       const a = auto("linux");
       await expect(a.status(), text).rejects.toThrow(damaged);
       await expect(a.set({}), text).rejects.toThrow(damaged);
+      await expect(a.plan({}), text).rejects.toThrow(damaged);
       await expect(a.missed(), text).rejects.toThrow(damaged);
       await expect(a.pages(), text).rejects.toThrow(damaged);
       await expect(a.saveRun({ at: new Date().toISOString(), failed: [] }), text).rejects.toThrow(
@@ -809,6 +813,55 @@ describe("AutoRefresh", () => {
     rmSync(config.apiKeyFile);
     await expect(auto("darwin").set({})).rejects.toThrow(/Save the API key/);
     expect(calls).toEqual([]);
+  });
+
+  it("plans a schedule with the checks of set, and writes nothing", async () => {
+    const main = join(config.dataDir, "garmin-dashboard.html");
+    const coach = join(config.dataDir, "coach.html");
+    const planned = await auto("linux").plan({ cron: "0 6 * * *" });
+    expect(planned).toEqual({
+      cron: "0 6 * * *",
+      pages: [main],
+      next: [expect.stringMatching(/ 06:00$/), expect.any(String), expect.any(String)],
+      changed: true,
+    });
+    expect(existsSync(join(config.dataDir, "auto-refresh.json"))).toBe(false);
+    expect(readFileSync(main, "utf8")).toBe("page");
+    expect(calls).toEqual([]);
+
+    await auto("linux").set({ cron: "0 7 * * 1" });
+    const before = {
+      state: readFileSync(join(config.dataDir, "auto-refresh.json"), "utf8"),
+      crontab,
+    };
+    calls = [];
+    const a = auto("linux");
+    expect(await a.plan({})).toMatchObject({ cron: "0 7 * * 1", pages: [main], changed: false });
+    expect((await a.plan({ cron: " 0 7  * * 1 " })).changed).toBe(false);
+    expect((await a.plan({ path: "garmin-dashboard.html" })).changed).toBe(false);
+    expect(await a.plan({ path: "coach.html" })).toMatchObject({
+      pages: [main, coach],
+      changed: true,
+    });
+    expect(await a.plan({ cron: "0 8 * * 1" })).toMatchObject({ cron: "0 8 * * 1", changed: true });
+    expect(readFileSync(join(config.dataDir, "auto-refresh.json"), "utf8")).toBe(before.state);
+    expect(crontab).toBe(before.crontab);
+    expect(calls.filter((c) => c.args[0] !== "-l")).toEqual([]);
+  });
+
+  it.each<[string, () => void, Parameters<AutoRefresh["plan"]>[0], RegExp]>([
+    ["no page", () => {}, { path: "nope.html" }, /nope\.html does not exist/],
+    ["no key file", () => rmSync(config.apiKeyFile), {}, /^Save the API key in .*api-key first/],
+    ["a bad cron", () => {}, { cron: "*/15 * * * *" }, /1 hour apart/],
+  ])("plan refuses %s as set does", async (_name, setup, options, error) => {
+    setup();
+    await expect(auto("linux").plan(options)).rejects.toThrow(error);
+    await expect(auto("linux").set(options)).rejects.toThrow(error);
+    expect(calls).toEqual([]);
+  });
+
+  it("plan refuses a system without a scheduler", async () => {
+    await expect(auto("freebsd").plan({})).rejects.toThrow(/macOS, Linux and Windows/);
   });
 
   onPosix("reports an error of the scheduler, and keeps the schedule it had", async () => {
@@ -1223,10 +1276,17 @@ it("realEntry gives the real path of the script, or nothing", () => {
 
 describe("scheduleDashboardRefresh", () => {
   const status: Status = { scheduled: true, cron: "0 7 * * *", pages: ["p"] };
+  const planned: Plan = {
+    cron: "0 18 * * 1,4",
+    pages: ["/data/coach.html"],
+    next: ["2026-11-23 18:00", "2026-11-26 18:00", "2026-11-30 18:00"],
+    changed: true,
+  };
   const fake = {
     status: vi.fn(async () => status),
     set: vi.fn(async () => status),
     off: vi.fn(async (): Promise<Status> => ({ scheduled: false })),
+    plan: vi.fn(async (): Promise<Plan> => planned),
   };
 
   async function call(args: Record<string, unknown>): Promise<unknown> {
@@ -1249,5 +1309,65 @@ describe("scheduleDashboardRefresh", () => {
     expect(fake.set).toHaveBeenLastCalledWith({ cron: undefined, path: "coach.html" });
     expect(await call({ off: true, path: "coach.html" })).toEqual({ scheduled: false });
     expect(fake.off).toHaveBeenCalledWith("coach.html");
+  });
+
+  describe.each<Era>(["2025", "2026-07-28"])("asks the user first, on the %s era", (era) => {
+    beforeEach(() => vi.clearAllMocks());
+    afterEach(closeAll);
+
+    async function ask(args: Record<string, unknown>, answer: Answer | undefined) {
+      const { client, asked } = await connect(era, answer, (server) =>
+        registerSchedule(server, fake as unknown as AutoRefresh),
+      );
+      const r = await client.callTool({ name: "scheduleDashboardRefresh", arguments: args });
+      const text = (r.content as { text: string }[])[0]?.text ?? "";
+      return { reply: r.isError ? text : JSON.parse(text), isError: r.isError, asked };
+    }
+    const yes: Answer = { action: "accept", content: { confirm: true } };
+
+    it("shows the cron, the pages and the next runs, and sets the schedule on yes", async () => {
+      const { reply, asked } = await ask({ cron: "0 18 * * 1,4", path: "coach.html" }, yes);
+      expect(asked).toEqual([
+        expect.objectContaining({
+          message:
+            'Automatic refresh "0 18 * * 1,4" for /data/coach.html. Next runs: 2026-11-23 18:00, 2026-11-26 18:00, 2026-11-30 18:00. Confirm?',
+        }),
+      ]);
+      expect(fake.plan).toHaveBeenCalledWith({ cron: "0 18 * * 1,4", path: "coach.html" });
+      expect(fake.set).toHaveBeenCalledOnce();
+      expect(fake.set).toHaveBeenCalledWith({ cron: "0 18 * * 1,4", path: "coach.html" });
+      expect(reply).toEqual(status);
+    });
+
+    it("writes nothing on no, and says that the user declined", async () => {
+      const { reply, asked } = await ask({ cron: "0 18 * * 1,4" }, { action: "decline" });
+      expect(asked).toHaveLength(1);
+      expect(fake.set).not.toHaveBeenCalled();
+      expect(reply).toEqual({ ...status, declined: true });
+    });
+
+    it("gives the refusal of the plan without a question", async () => {
+      fake.plan.mockRejectedValueOnce(new Error("Cron needs 5 fields"));
+      const { reply, isError, asked } = await ask({ cron: "0 7" }, yes);
+      expect({ reply, isError, asked }).toEqual({
+        reply: "Cron needs 5 fields",
+        isError: true,
+        asked: [],
+      });
+      expect(fake.set).not.toHaveBeenCalled();
+    });
+
+    it("does not ask when the schedule does not change, or when the client cannot ask", async () => {
+      fake.plan.mockResolvedValueOnce({ ...planned, changed: false });
+      expect((await ask({ path: "coach.html" }, yes)).asked).toEqual([]);
+      expect((await ask({ path: "coach.html" }, undefined)).reply).toEqual(status);
+      expect(fake.set).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not ask to read or to stop", async () => {
+      expect((await ask({}, yes)).asked).toEqual([]);
+      expect((await ask({ off: true }, yes)).asked).toEqual([]);
+      expect(fake.plan).not.toHaveBeenCalled();
+    });
   });
 });

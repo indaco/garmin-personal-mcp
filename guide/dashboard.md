@@ -149,6 +149,11 @@ The assistant turns your words into a cron expression and tells you the next thr
 can check that it understood you. Two updates must be at least 1 hour apart. Without a time, the
 update is every day at 07:00. All the pages that update automatically use the same schedule.
 
+Before the server writes a new or changed schedule, your client can ask you in a form. The form
+shows the cron expression, the pages and the next three updates. When you decline, the server
+writes nothing. Claude Code (tested with 2.1.329) and the MCP Inspector (tested with 2.16.0) show
+this form. Claude Desktop: not tested. A client without the form writes the schedule at once.
+
 - The update replaces the data of the page. It keeps the weeks, the layout, the custom widgets, the
   languages and the settings.
 - It removes the coach notes, because old notes do not agree with the new data. To get new notes,

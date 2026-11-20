@@ -273,7 +273,9 @@ After a release, this prompt also writes the new page code. Restart the client f
 [Update the page code after a release](guide/dashboard.md#update-the-page-code-after-a-release).
 
 To update the page automatically, tell your assistant when, in your own words, for example "update
-my dashboard every Monday at 7". See
+my dashboard every Monday at 7". Before it writes the schedule, Claude Code and the MCP Inspector
+ask you to confirm the next three updates in a form (tested with 2.1.329 and 2.16.0; Claude
+Desktop: not tested). See
 [Update the dashboard on a schedule](guide/dashboard.md#update-the-dashboard-on-a-schedule).
 
 ### dashboard-setup
@@ -314,7 +316,9 @@ This prompt adds a language to the dashboard. The assistant translates the texts
 language of the conversation. The argument `path` is optional: it is the file of the page, for
 example `coach.html`. In Claude Code: `/mcp__garmin-personal__dashboard-language Dutch coach.html`.
 A text without a translation shows in English. To remove an added language, ask your assistant to
-remove it: `editDashboard` with `removeLanguages`.
+remove it: `editDashboard` with `removeLanguages`. Before it deletes the texts, Claude Code asks you
+to confirm in a form (tested with 2.1.329), and so does the MCP Inspector (tested with 2.16.0).
+Claude Desktop shows no form and deletes the texts at once (tested with 6.6395.1).
 [Languages](guide/languages.md) tells more.
 
 ### Presets or freeform
@@ -375,6 +379,13 @@ These prompts answer in the chat. They do not change a dashboard.
 
 A missing value shows as "n/a": the assistant does not estimate it.
 
+In a client that shows MCP completions, the `activity` argument of `run-review`, `strength-review`,
+`swim-review` and `ride-review` suggests the names of your recent activities as you type. The
+names come from the dashboard data on your computer (your newest 200 activities), not from Garmin,
+so the suggestions start after your first dashboard update. The MCP Inspector shows suggestions
+(tested with 2.16.0 on the `distance` argument of `race-readiness`). Claude Code (tested with
+2.1.329) and Claude Desktop (tested with 6.6395.1 on `distance`) do not show them.
+
 ### run-review
 
 The assistant compares the planned workout that your watch ran with the laps of the run: the target,
@@ -406,6 +417,9 @@ a target pace for each quarter of the race.
 | `date`     | the race date, `yyyy-MM-dd`                    | none: the assistant asks |
 | `distance` | `5k`, `10k`, `half`, `marathon`, or a distance | none: the assistant asks |
 | `goal`     | your goal time, for example `1:45:00`          | no goal: prediction only |
+
+In a client that shows MCP completions, `distance` suggests `5k`, `10k`, `half` and `marathon` as
+you type (the clients are in [Coach prompts](#coach-prompts)).
 
 In Claude Code, give the values in any order: a value in the form `yyyy-MM-dd` is the date, a value
 in the form `1:45:00` is the goal, and the other words are the distance. For example

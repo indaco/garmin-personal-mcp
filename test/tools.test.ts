@@ -1349,12 +1349,13 @@ describe("MCP tools", () => {
   });
 
   describe("dashboard tools", () => {
-    const writer = { write: vi.fn(), preview: vi.fn(), edit: vi.fn() };
+    const writer = { write: vi.fn(), preview: vi.fn(), edit: vi.fn(), removals: vi.fn() };
     const dashboard = { getDashboardData: vi.fn() };
     beforeEach(() => {
       writer.write.mockResolvedValue({ wrote: 1 });
       writer.preview.mockResolvedValue({ previewed: 1 });
       writer.edit.mockResolvedValue({ edited: 1 });
+      writer.removals.mockResolvedValue({ widgets: [], languages: ["de"] });
       dashboard.getDashboardData.mockResolvedValue('{"end":"2026-10-26"}');
     });
 
@@ -1411,6 +1412,8 @@ describe("MCP tools", () => {
       const client = await connectHandlers(writer, dashboard);
       const args = { removeLanguages: ["de"], path: "a.html" };
       const result = await client.callTool({ name: "editDashboard", arguments: args });
+      // a client without the form: the checks run, then the edit as before
+      expect(writer.removals).toHaveBeenCalledWith(args);
       expect(writer.edit).toHaveBeenCalledWith(args);
       expect(textOf(result)).toBe('{"edited":1}');
     });

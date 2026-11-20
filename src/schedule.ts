@@ -7,6 +7,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { name } from "../package.json";
 import type { Config } from "./config";
+import { confirm } from "./confirm";
 import { type DashboardWriter, pageTarget, patchDue } from "./dashboard-page";
 import { syncGaps } from "./digest";
 import { LOG_DIR, log } from "./log";
@@ -494,8 +495,19 @@ export class AutoRefresh {
     if (state) await this.#save({ ...state, last });
   }
 
-  /** Adds the page (default: the main dashboard) and sets the cron, or keeps the current one. */
-  async set(o: { cron?: string; path?: string }): Promise<Status> {
+  /** The schedule that `set` would save, with the same checks and no write. */
+  async plan(o: { cron?: string; path?: string }): Promise<Plan> {
+    const { old, cron, pages } = await this.#check(o);
+    return {
+      cron: cron.text,
+      pages,
+      next: nextRuns(cron, new Date(), 3),
+      changed: old?.cron !== cron.text || pages.length !== old.pages.length,
+    };
+  }
+
+  /** The refusals of `set`, before it changes anything. */
+  async #check(o: { cron?: string; path?: string }) {
     if (!this.#scheduler) throw new Error("Automatic refresh works on macOS, Linux and Windows");
     if (!existsSync(this.config.apiKeyFile)) {
       // the job must never hold the key, so it reads the key file
@@ -510,6 +522,12 @@ export class AutoRefresh {
     const old = await this.#state();
     const cron = parseCron(o.cron ?? old?.cron ?? DEFAULT_CRON);
     const pages = [...new Set([...(old?.pages ?? []), page])];
+    return { old, cron, pages };
+  }
+
+  /** Adds the page (default: the main dashboard) and sets the cron, or keeps the current one. */
+  async set(o: { cron?: string; path?: string }): Promise<Status> {
+    const { old, cron, pages } = await this.#check(o);
     // a new cron starts now, so the job does not catch up a time of the old one
     const since = old?.cron === cron.text && old.since ? old.since : new Date().toISOString();
     // saved first: launchd starts the job as it loads it, and the job must see `since`
@@ -721,6 +739,14 @@ export async function refreshPages(
   return { lines, failed, partial };
 }
 
+/** The tool reply: the status as JSON. */
+function reply(r: object) {
+  return { content: [{ type: "text" as const, text: JSON.stringify(r) }] };
+}
+
+/** What `set` would save, and whether it differs from the saved schedule. */
+export type Plan = { cron: string; pages: string[]; next: string[]; changed: boolean };
+
 /** Registers scheduleDashboardRefresh. */
 export function registerSchedule(server: McpServer, auto: AutoRefresh): void {
   server.registerTool(
@@ -755,13 +781,22 @@ export function registerSchedule(server: McpServer, auto: AutoRefresh): void {
         off: z.boolean().describe("Stop the refresh").optional(),
       }),
     },
-    async ({ cron, path, off }) => {
-      const status = off
-        ? await auto.off(path)
-        : cron !== undefined || path !== undefined
-          ? await auto.set({ cron, path })
-          : await auto.status();
-      return { content: [{ type: "text" as const, text: JSON.stringify(status) }] };
+    async ({ cron, path, off }, ctx) => {
+      if (off) return reply(await auto.off(path));
+      if (cron === undefined && path === undefined) return reply(await auto.status());
+      // checked before the question: the SDK calls this handler again with the answer
+      const plan = await auto.plan({ cron, path });
+      const c = plan.changed
+        ? confirm(
+            server,
+            ctx,
+            "confirm",
+            `Automatic refresh "${plan.cron}" for ${plan.pages.join(", ")}. Next runs: ${plan.next.join(", ")}. Confirm?`,
+          )
+        : { answer: "unasked" as const };
+      if ("ask" in c) return c.ask;
+      if (c.answer === "no") return reply({ ...(await auto.status()), declined: true });
+      return reply(await auto.set({ cron, path }));
     },
   );
 }

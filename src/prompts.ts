@@ -1,12 +1,13 @@
 import { readFileSync } from "node:fs";
-import type { McpServer } from "@modelcontextprotocol/server";
+import { completable, type McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { addDays, localToday } from "./dates";
 import { hms, swimPaceText } from "./fit";
-import { mondayOf } from "./analytics/calc";
+import { type Activity, groupOf, mondayOf } from "./analytics/calc";
 import { BUILT_IN } from "./page/i18n/built-in";
 import { en } from "./page/i18n/en";
 import { THEMES } from "./page/theme";
+import { isObject, NAME_SEARCH } from "./tools";
 
 /**
  * MCP prompts: ready-made instructions the client shows in its prompt menu (e.g. Claude Desktop "+").
@@ -21,7 +22,13 @@ export const DASHBOARD_VERSION = 3;
 /** prompts/ sits next to dist/ in the package and next to src/ in the repo. */
 const load = (name: string) => readFileSync(new URL(`../prompts/${name}`, import.meta.url), "utf8");
 
-export function registerPrompts(server: McpServer): void {
+/** `cache` gives the dashboard cache: the review prompts suggest activity names from it, never from Garmin. */
+export function registerPrompts(server: McpServer, cache: () => Promise<unknown>): void {
+  /** An `activity` argument that suggests the names of one board. */
+  const activityArg = (description: string, board: string) =>
+    completable(z.string().describe(description), async (typed) =>
+      activityNames(await cache(), board, typed),
+    ).optional();
   const build = load("training-dashboard.md");
   const freeform = load("training-dashboard-freeform.md");
   const update = load("training-dashboard-update.md");
@@ -200,10 +207,10 @@ export function registerPrompts(server: McpServer): void {
     {
       description: reviewDescription,
       argsSchema: z.object({
-        activity: z
-          .string()
-          .describe("An activity id, or words of its name; empty = the latest run")
-          .optional(),
+        activity: activityArg(
+          "An activity id, or words of its name; empty = the latest run",
+          "running",
+        ),
       }),
     },
     (args) => {
@@ -219,10 +226,10 @@ export function registerPrompts(server: McpServer): void {
     {
       description: strengthDescription,
       argsSchema: z.object({
-        activity: z
-          .string()
-          .describe("An activity id, or words of its name; empty = the latest strength session")
-          .optional(),
+        activity: activityArg(
+          "An activity id, or words of its name; empty = the latest strength session",
+          "strengthTraining",
+        ),
       }),
     },
     (args) => {
@@ -244,7 +251,10 @@ export function registerPrompts(server: McpServer): void {
       description: readinessDescription,
       argsSchema: z.object({
         date: z.string().describe("The race date, yyyy-MM-dd").optional(),
-        distance: z.string().describe("5k, 10k, half, marathon, or a distance in km").optional(),
+        distance: completable(
+          z.string().describe("5k, 10k, half, marathon, or a distance in km"),
+          (typed) => DISTANCES.filter((d) => d.startsWith(arg(typed).toLowerCase())),
+        ).optional(),
         goal: z.string().describe("Your goal time, e.g. 1:45:00; empty = no goal").optional(),
       }),
     },
@@ -281,10 +291,10 @@ export function registerPrompts(server: McpServer): void {
     {
       description: swimReviewDescription,
       argsSchema: z.object({
-        activity: z
-          .string()
-          .describe("An activity id, or words of its name; empty = the latest swim")
-          .optional(),
+        activity: activityArg(
+          "An activity id, or words of its name; empty = the latest swim",
+          "swimming",
+        ),
       }),
     },
     (args) => {
@@ -305,10 +315,10 @@ export function registerPrompts(server: McpServer): void {
     {
       description: rideReviewDescription,
       argsSchema: z.object({
-        activity: z
-          .string()
-          .describe("An activity id, or words of its name; empty = the latest ride")
-          .optional(),
+        activity: activityArg(
+          "An activity id, or words of its name; empty = the latest ride",
+          "cycling",
+        ),
       }),
     },
     (args) => {
@@ -488,3 +498,36 @@ function weeks(v: string | undefined): number {
   }
   return Math.min(Math.max(Number(s), 1), MAX_WEEKS);
 }
+
+/**
+ * The suggestions of an `activity` argument: the distinct names of one board in the dashboard cache,
+ * newest first, that contain the typed text (case ignored), the match rule of `listActivities` `names`.
+ */
+export function activityNames(cache: unknown, board: string, typed: string): string[] {
+  const rows = isObject(cache) && isObject(cache.activities) ? Object.values(cache.activities) : [];
+  const wanted = arg(typed).toLowerCase();
+  const names = new Map<string, string>();
+  const recent = rows
+    .filter(isObject)
+    .toSorted((a, b) => startOf(b).localeCompare(startOf(a)))
+    // a name older than this window is not found by the review: listActivities searches no further.
+    // shortcut: activities after the last dashboard update move the window; a name near its end can drop out
+    .slice(0, NAME_SEARCH)
+    .filter(isRow);
+  for (const a of recent) {
+    const name = arg(a.name);
+    const key = name.toLowerCase();
+    if (name && groupOf(a) === board && key.includes(wanted) && !names.has(key))
+      names.set(key, name);
+  }
+  return [...names.values()];
+}
+
+/** The race distances that the race-readiness prompt text knows. */
+const DISTANCES = ["5k", "10k", "half", "marathon"];
+
+const startOf = (r: Record<string, unknown>) => (typeof r.start === "string" ? r.start : "");
+
+/** A cache row whose fields that the suggestions read are text or missing. */
+const isRow = (r: Record<string, unknown>): r is Activity =>
+  [r.name, r.type, r.sport, r.start].every((v) => v === undefined || typeof v === "string");
