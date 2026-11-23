@@ -402,6 +402,52 @@ describe("the page", () => {
     expect(errors).toEqual([]);
   });
 
+  it.each([
+    ["title", 5],
+    ["title", { a: 1 }],
+    ["language", 5],
+    ["language", { a: 1 }],
+    ["theme", 5],
+    ["theme", { a: 1 }],
+    ["sports", 5],
+    ["exclude", 5],
+    ["exclude", { a: 1 }],
+    ["themes", 5],
+    ["themes", true],
+    ["themes", { a: 1 }],
+    ["themes", "paper"],
+    ["themes", []],
+    ["themes", [5]],
+    ["themes", ["paper", 5]],
+    ["languages", 5],
+    ["languages", true],
+    ["languages", { a: 1 }],
+    ["languages", "it"],
+    ["languages", []],
+    ["languages", [5]],
+    ["languages", ["it", 5]],
+  ])("shows all themes and English with the hand-edited %s %j", async (key, value) => {
+    const file = pageFile({ settings: { headline: "H" } });
+    const own = `"headline":"H"`;
+    const before = readFileSync(file, "utf8");
+    const after = before.replace(own, `${own},"${key}":${JSON.stringify(value)}`);
+    expect(after).not.toBe(before);
+    writeFileSync(file, after);
+    // a theme that the reader chose before stays
+    const init = `localStorage.setItem("garmin-theme", "ocean");`;
+    for (const [script, theme] of [
+      [undefined, "midnight"],
+      [init, "ocean"],
+    ]) {
+      const { page, errors } = await open(browser, file, { locale: "en-US", init: script });
+      expect(errors).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
+      expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(theme);
+      expect(await page.locator("#theme option").count()).toBe(THEMES.length);
+      expect(await page.textContent("h1")).toBe("Training + Recovery");
+    }
+  });
+
   it("shows only Italian on a page that leaves English out, also for an English browser", async () => {
     const { page, errors } = await open(browser, pageFile({ settings: { languages: ["it"] } }), {
       locale: "en-US",

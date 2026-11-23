@@ -239,6 +239,15 @@ describe("guide", () => {
     );
   });
 
+  it("says what to do when `answers` need a page from the template", () => {
+    expect(flat("guide/troubleshooting.md")).toContain(
+      "| `answers` need a page from the template | The assistant designed this page (`freeform`), so it " +
+        "has no Year tab. To have the tab, ask for a new page from the template: `layout` = `preset`. The " +
+        "new page keeps its settings. A `freeform` page can use the recap: make a new one with " +
+        "`yearReview`. |",
+    );
+  });
+
   it("says which settings add the settings block to a freeform page", () => {
     expect(flat("guide/dashboard.md")).toContain(
       "The freeform prompt adds that block when the new page has settings: `workouts`, `recoveryHistory` or `yearReview`, or the settings that it keeps from the page that it replaces.",

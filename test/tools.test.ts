@@ -1447,6 +1447,29 @@ describe("MCP tools", () => {
       expect(textOf(result)).toBe('{"previewed":1}');
     });
 
+    it("writeDashboard passes the answers to the preview, which refuses them", async () => {
+      const client = await connectHandlers(writer, dashboard);
+      const answers = { yearReview: true };
+      const call = { name: "writeDashboard", arguments: { answers, preview: true } };
+      await client.callTool(call);
+      expect(writer.preview).toHaveBeenCalledWith({ answers });
+      expect(writer.write).not.toHaveBeenCalled();
+    });
+
+    it("writeDashboard says what a preview returns, and what goes not with answers", async () => {
+      const client = await connectHandlers(writer, dashboard);
+      const list = (await client.listTools()).tools;
+      const props = list.find((t) => t.name === "writeDashboard")?.inputSchema.properties;
+      expect(props?.preview).toHaveProperty(
+        "description",
+        "Write nothing: return the digest, the activities of each board, the page settings and `pageFrom` (template or assistant)",
+      );
+      expect(props?.answers).toHaveProperty(
+        "description",
+        "The answers to `offers`; the page keeps its other settings. Not with `settings` or `preview`",
+      );
+    });
+
     it("editDashboard edits with its arguments", async () => {
       const client = await connectHandlers(writer, dashboard);
       const args = { removeLanguages: ["de"], path: "a.html" };

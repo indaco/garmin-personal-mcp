@@ -93,6 +93,7 @@ beforeEach(() => {
 });
 
 const page = () => readFileSync(file, "utf8");
+const styles = () => page().match(/<style>.*<\/style>/)?.[0];
 /** A page with only a data block, holding this JSON text. */
 const dataPage = (json: string) =>
   `<script>/* garmin-data:start */${json}/* garmin-data:end */</script>`;
@@ -1373,13 +1374,16 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
       });
 
       it.each(['"yes"', "null", "0", "[]"])(
-        "offers nothing on a page whose yearReview was set to %s by hand",
+        "offers the Year tab on a page whose yearReview was set to %s by hand, and saves the answer",
         async (value) => {
           await writer.write({ settings: { title: "T", yearReview: true } });
           writeFileSync(file, page().replace('"yearReview":true', `"yearReview":${value}`));
           const r = await writer.write({});
-          expect(r).not.toHaveProperty("offers");
+          expect(r.offers).toEqual(["yearReview"]);
           expect(dataOf(page())).not.toHaveProperty("year");
+          const answered = await writer.write({ answers: { yearReview: false } });
+          expect(answered).not.toHaveProperty("offers");
+          expect(savedSettings()).toEqual({ title: "T", yearReview: false });
         },
       );
 
@@ -1467,6 +1471,74 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
           ).rejects.toThrow("Give either `settings` or `answers`");
           expect(page()).toBe(before);
         });
+
+        it.each([
+          ["title", 5],
+          ["title", true],
+          ["title", { a: 1 }],
+          ["title", ["A"]],
+          ["title", ""],
+          ["title", null],
+          ["themes", 5],
+          ["themes", true],
+          ["themes", { a: 1 }],
+          ["themes", "paper"],
+          ["themes", ""],
+          ["themes", null],
+          ["themes", []],
+          ["themes", [5]],
+          ["themes", ["paper", 5]],
+          ["languages", 5],
+          ["languages", true],
+          ["languages", { a: 1 }],
+          ["languages", "it"],
+          ["languages", ""],
+          ["languages", null],
+          ["languages", []],
+          ["languages", [5]],
+          ["languages", ["it", 5]],
+        ])("saves the answer on a page with the %s %j", async (key, value) => {
+          await writer.write({ settings: { headline: "H" } });
+          const own = `"headline":"H"`;
+          writeFileSync(file, page().replace(own, `${own},"${key}":${JSON.stringify(value)}`));
+          const r = await writer.write({ answers: { yearReview: true } });
+          expect(r.page).toBe("replaced");
+          expect(savedSettings()).toEqual({ headline: "H", [key]: value, yearReview: true });
+          // the value is not a title or a list of names: the page has the ones without it
+          expect(r.pageLanguages).toEqual(["en"]);
+          expect(readBlock(page(), "languages")).toEqual({});
+          expect(page()).toContain("<title>Training + Recovery</title>");
+          expect(styles()).toBe(styledTemplate.match(/<style>.*<\/style>/)?.[0]);
+        });
+
+        it("saves the answer on a page with a title and themes, which the page still has", async () => {
+          const own: Settings = { title: "A & B", themes: ["midnight", "paper"] };
+          await writer.write({ settings: own });
+          await writer.write({ answers: { yearReview: true } });
+          expect(savedSettings()).toEqual({ ...own, yearReview: true });
+          expect(page()).toContain("<title>A &amp; B</title>");
+          expect(styles()).toContain(':root[data-theme="paper"]{');
+          expect(styles()).not.toContain("ocean");
+        });
+
+        it.each([true, false, undefined])(
+          "refuses a preview with the answer %s, and asks Garmin nothing",
+          async (yearReview) => {
+            const load = vi.fn(async () => JSON.stringify(full));
+            writer = new DashboardWriter(load, dir, async () => templateText);
+            await writer.write({ settings: kept });
+            const before = page();
+            load.mockClear();
+            await expect(writer.preview({ weeks: 7, answers: { yearReview } })).rejects.toThrow(
+              "Give either `preview` or `answers`, not both: a preview saves no answer",
+            );
+            expect(load).not.toHaveBeenCalled();
+            expect(page()).toBe(before);
+            // the refused call does not stop the next one
+            expect((await writer.preview({ weeks: 7 })).settings).toEqual(kept);
+            expect(load).toHaveBeenCalledOnce();
+          },
+        );
 
         it("refuses answers on a page that the assistant designed, and writes nothing", async () => {
           await expect(
@@ -2196,6 +2268,85 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
     templateText = styledTemplate.replace(/^const I18N.*\n/m, "");
     const r = await profile(full, "ru").write({ path: "no-i18n.html" });
     expect(r.missingProfileLanguage).toBe("ru");
+  });
+
+  it.each([[5], [true], [{ a: 1 }], ["it"], [""], [null], [[]], [[5]], [["it", 5]]])(
+    "has English and the profile language on a page with the hand-edited languages %j",
+    async (value) => {
+      const mine = { id: "mine", title: "Mine", code: "x", texts: { en: { title: "Mine" } } };
+      writer = profile(full, "de");
+      await writer.write({ settings: { headline: "H" }, layout: "preset" });
+      const own = `"headline":"H"`;
+      writeFileSync(file, page().replace(own, `${own},"languages":${JSON.stringify(value)}`));
+      const r = await writer.write({});
+      expect(r.pageLanguages).toEqual(["en", "de"]);
+      expect(Object.keys(readBlock(page(), "languages") as object)).toEqual(["de"]);
+      // the setting stays as it is, and an edit reads it too
+      expect(savedSettings()).toEqual({ headline: "H", languages: value });
+      const edited = await writer.edit({ widgets: [mine] });
+      expect(edited.pageLanguages).toEqual(["en", "de"]);
+    },
+  );
+
+  it.each([
+    ["title", 5],
+    ["headline", { a: 1 }],
+    ["languages", "it"],
+    ["language", 5],
+    ["themes", [5]],
+    ["theme", true],
+    ["workouts", "yes"],
+    ["recoveryHistory", 1],
+    ["since", 5],
+    ["shared", "true"],
+    ["colour", "red"],
+  ])(
+    "keeps the hand-edited %s %j in the file, and gives the settings without it",
+    async (key, value) => {
+      await writer.write({ settings: { headline: "H", sports: ["running"] }, layout: "preset" });
+      const own = `"sports":["running"]`;
+      writeFileSync(
+        file,
+        page().replace(own, `${own},${JSON.stringify(key)}:${JSON.stringify(value)}`),
+      );
+      const block = { headline: "H", sports: ["running"], [key]: value };
+      const settings = { ...(key === "headline" ? {} : { headline: "H" }), sports: ["running"] };
+      const r = await writer.write({});
+      expect(r.settings).toEqual(settings);
+      expect(savedSettings()).toEqual(block);
+      expect((await writer.preview({})).settings).toEqual(settings);
+      expect((await writer.view({})).blocks.settings).toEqual(settings);
+      expect(await writer.settings()).toEqual(settings);
+      // the settings of a reply can be given back: a new write refuses the others
+      const again = JSON.parse(JSON.stringify(r.settings));
+      expect((await writer.write({ settings: again, layout: "preset" })).settings).toEqual(
+        settings,
+      );
+      expect(savedSettings()).toEqual(again);
+    },
+  );
+
+  describe("a block with no setting that is valid", () => {
+    beforeEach(async () => {
+      await writer.write({ settings: { headline: "H" } });
+      writeFileSync(file, page().replace('"headline":"H"', '"headline":5'));
+    });
+
+    it("stays on a page with new page code", async () => {
+      expect((await writer.write({ layout: "preset" })).settings).toEqual({});
+      expect(savedSettings()).toEqual({ headline: 5 });
+    });
+
+    it("stays on a designed page, which needs a place for it", async () => {
+      const bare = "<script>/* garmin-data:start */null/* garmin-data:end */</script>";
+      const before = page();
+      await expect(writer.write({ page: bare })).rejects.toThrow("has no garmin-settings block");
+      expect(page()).toBe(before);
+      await writer.write({
+        page: `${bare}<script>/* garmin-settings:start */null/* garmin-settings:end */</script>`,
+      });
+      expect(savedSettings()).toEqual({ headline: 5 });
+    });
   });
 
   it("matches the profile locale by full tag, then by language", () => {

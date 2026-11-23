@@ -863,7 +863,7 @@ describe("getYearReview", () => {
       expect(text).not.toMatch(/private|"title"|"shared"/);
     });
 
-    it.each([{ sports: null, exclude: null }, { sports: ["running"] }, { exclude: ["names"] }])(
+    it.each([{}, { sports: ["running"] }, { exclude: ["names"] }])(
       "gives the settings %j as they are",
       async (settings) => {
         saveAllKinds();
@@ -871,6 +871,14 @@ describe("getYearReview", () => {
         expect((await review()).reply.settings).toEqual(settings);
       },
     );
+
+    it("gives no setting for null by hand", async () => {
+      saveAllKinds();
+      savePage(JSON.stringify({ sports: null, exclude: null }));
+      const { reply } = await review();
+      expect(reply.settings).toEqual({});
+      expect(reply.year.sports.length).toBeGreaterThan(1);
+    });
 
     it("leaves out what the page at path leaves out", async () => {
       saveAllKinds();

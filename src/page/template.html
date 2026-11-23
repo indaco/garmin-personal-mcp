@@ -26,7 +26,7 @@
       } catch (e) {
         // a blocked storage gives the default
       }
-      {
+      try {
         let s = window.GARMIN_SETTINGS || {};
         let themes = s.themes;
         let fallback =
@@ -34,6 +34,8 @@
         // a theme that the page no longer has gives the default too
         document.documentElement.dataset.theme =
           garminTheme && (!themes || themes.indexOf(garminTheme) >= 0) ? garminTheme : fallback;
+      } catch (e) {
+        // hand-edited settings of another type: start() in app.ts chooses the theme
       }
     </script>
     <!--style-->
