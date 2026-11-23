@@ -4,6 +4,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
@@ -2684,9 +2685,9 @@ describe("readCached", () => {
   it.each([
     // the days that a fill which keeps them asks for, from the last 14 cached days on
     ["no session, 2000 days", "2021-05-19", 0, "2021-05-06", 20, null],
-    ["no session, 2001 days", "2021-05-18", 0, "2026-01-01", 1, "2021-05-18"],
+    ["no session, 2001 days", "2021-05-18", 0, "2026-01-01", 3, "2021-05-18"],
     ["a session every second day, 2000 days", "2021-05-19", 70, "2021-05-06", 20, null],
-    ["a session every second day, 2001 days", "2021-05-18", 69, "2026-01-01", 2, "2021-05-18"],
+    ["a session every second day, 2001 days", "2021-05-18", 69, "2026-01-01", 3, "2021-05-18"],
     ["2 sessions a day, 1000 days", "2024-02-13", 818, "2024-01-31", 20, null],
     ["2 sessions a day, 1001 days", "2024-02-12", 816, "2026-01-01", 6, "2024-02-12"],
   ])(
@@ -2700,6 +2701,19 @@ describe("readCached", () => {
       expect(out.fillDrops).toEqual(dropsTo === null ? null : { from, to: dropsTo });
     },
   );
+
+  it("counts the sessions of the cached days, not 1 a day, when there is no gap", async () => {
+    // an older summary: all 2491 days again, but 1 session in them is 1 request
+    save({
+      activitiesSummary: 2,
+      activitiesFrom: "2020-01-01",
+      activitiesTo: "2026-10-20",
+      activities: byId([row(1, "2026-10-01")]),
+    });
+    const out = await readRange();
+    expect([out.fillStart, out.fillRequests]).toEqual(["2020-01-01", 1]);
+    expect(out.fillDrops).toBeNull();
+  });
 
   it("drops one earlier day", async () => {
     // 3 sessions on the one cached day: the gap is far over the cap, the year alone is 9 requests
@@ -3287,6 +3301,122 @@ describe("fillActivities", () => {
       otherSaves({ ...filled, activitiesTo });
       await dashboard.fillActivities("2026-01-01", "2026-01-10");
       expect(heldRange()).toEqual([from, "2026-01-10"]);
+    });
+
+    // a fill gets only activities: the rest of the file is not its to write
+    const others = {
+      hrv: { "2026-10-25": { hrv: 61 } },
+      hrvFrom: "2026-08-01",
+      hrvTo: "2026-10-26",
+      recovery: { "2026-10-26": { date: "2026-10-26", rhr: 48 } },
+      recoveryTo: "2026-10-26",
+      zones: [{ sport: "RUNNING" }],
+      units: "statute_us",
+      locale: "en-US",
+      keyOfALaterServer: [1],
+    };
+    const old = {
+      hrv: { "2026-10-01": { hrv: 50 } },
+      hrvTo: "2026-10-01",
+      recovery: {},
+      recoveryTo: "2026-10-01",
+      zones: [],
+      units: "metric",
+      locale: "it-IT",
+    };
+
+    it.each([
+      ["when its own copy is older", () => save(old)],
+      ["when the cache was empty before", () => rmSync(cacheFile(), { force: true })],
+    ])("keeps what the other process saved beside the activities, %s", async (_when, before) => {
+      before();
+      otherSaves({ ...filled, ...others });
+      garminActivities = [activity(9, "2026-10-20")];
+      await fillFrom();
+      const { activities, activitiesFrom, activitiesTo, activitiesSummary, ...rest } = readCache();
+      expect(rest).toEqual(others);
+      expect(Object.keys(activities)).toEqual(["1", "2", "9"]);
+      expect([activitiesFrom, activitiesTo, activitiesSummary]).toEqual([
+        "2025-01-01",
+        "2026-10-26",
+        3,
+      ]);
+    });
+
+    it("does not bring back a value that the other process removed", async () => {
+      save(old);
+      otherSaves({ hrv: {} });
+      await fillFrom();
+      expect(readCache()).toEqual({
+        activitiesSummary: 3,
+        activitiesFrom: "2026-01-01",
+        activitiesTo: "2026-10-26",
+        activities: {},
+        hrv: {},
+      });
+    });
+
+    it("writes its own activities when the other process leaves an outdated list", async () => {
+      save(old);
+      otherSaves({ ...filled, ...others, activitiesSummary: 2 });
+      garminActivities = [activity(9, "2026-10-20")];
+      await fillFrom();
+      expect(readCache()).toMatchObject({ ...others, activitiesSummary: 3 });
+      expect(cachedIds()).toEqual(["9"]);
+    });
+
+    it.each([
+      ["is damaged", () => writeFileSync(cacheFile(), "{")],
+      ["is gone", () => rmSync(cacheFile(), { force: true })],
+      ["is no object", () => writeFileSync(cacheFile(), "[]")],
+      ["has a block of the wrong type", () => writeFileSync(cacheFile(), '{"hrv":[]}')],
+      ["is empty", () => writeFileSync(cacheFile(), "{}")],
+    ])("saves its activities and what it read before when the file %s", async (_what, end) => {
+      save(old);
+      answer({
+        [SEARCH]: (q) => {
+          end();
+          return fakeGarmin(SEARCH, q);
+        },
+      });
+      garminActivities = [activity(9, "2026-10-20")];
+      await fillFrom();
+      expect(readCache()).toMatchObject({ ...old, activitiesSummary: 3 });
+      expect(cachedIds()).toEqual(["9"]);
+      expect(heldRange()).toEqual(["2026-01-01", "2026-10-26"]);
+    });
+
+    it("takes the file of the other process also when it has one value only", async () => {
+      save(old);
+      const other = { hrv: { "2026-10-25": { hrv: 61 } } };
+      answer({
+        [SEARCH]: (q) => {
+          writeFileSync(cacheFile(), JSON.stringify(other));
+          return fakeGarmin(SEARCH, q);
+        },
+      });
+      await fillFrom();
+      const { activities, activitiesFrom, activitiesTo, activitiesSummary, ...rest } = readCache();
+      expect(rest).toEqual(other);
+      expect([activities, activitiesFrom, activitiesTo, activitiesSummary]).toEqual([
+        {},
+        "2026-01-01",
+        "2026-10-26",
+        3,
+      ]);
+    });
+
+    it("saves its activities when no file can be read before or at the end", async () => {
+      rmSync(cacheFile(), { force: true });
+      garminActivities = [activity(9, "2026-10-20")];
+      await fillFrom();
+      expect(Object.keys(readCache()).toSorted()).toEqual([
+        "activities",
+        "activitiesFrom",
+        "activitiesSummary",
+        "activitiesTo",
+      ]);
+      expect(cachedIds()).toEqual(["9"]);
     });
 
     it("does not need a date in a row of the other process", async () => {
