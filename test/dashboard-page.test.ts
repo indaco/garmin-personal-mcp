@@ -2385,6 +2385,26 @@ describe("a damaged page block", () => {
       },
     );
 
+    it.each(['["names"]', "[]", '"names"', '""', "0", "false", "true"])(
+      "refuses %s, which is no object: it cannot leave data out",
+      async (json) => {
+        const before = await damaged("settings", json);
+        const refused =
+          /garmin-settings block of the page is not an object in .*garmin-dashboard\.html: give new settings, or delete the file$/;
+        await expect(w.write({})).rejects.toThrow(refused);
+        await expect(w.view({})).rejects.toThrow(refused);
+        await expect(w.preview({})).rejects.toThrow(refused);
+        await expect(w.edit({})).rejects.toThrow(refused);
+        await expect(w.settings()).rejects.toThrow(refused);
+        expect(page()).toBe(before);
+      },
+    );
+
+    it("reads null as no settings", async () => {
+      await damaged("settings", "null");
+      expect(await w.settings()).toEqual({});
+    });
+
     it("names new settings as the way out for edit too", async () => {
       await damaged("settings", '{"exclude":"names"}');
       await expect(w.edit({})).rejects.toThrow(
