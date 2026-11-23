@@ -98,13 +98,15 @@ describe("prompts", () => {
     for (const layout of ["preset", "blank"]) {
       const text = await render("training-dashboard", { weeks: "8", layout });
       expect(text).toContain("1. Call `writeDashboard` with `preview` = true and `weeks` = 8.");
-      expect(text).toContain("only when `settings` has more than `title` and `headline`");
+      expect(text).toContain("only when `settings` has more than `title`, `headline` and");
       expect(text).toContain('"Keep these settings" (default)');
       expect(text).toContain(
         '"Use the defaults: all sports, all data, English and\n     the language of my Garmin profile, all themes, opens in midnight, no workout comparison, no\n     Recovery trend, no recap of the calendar year, the last 8 weeks"',
       );
       expect(text).toContain('"all sports, keep the rest"');
-      expect(text).toContain("name each item that it excludes. Say that the defaults add them to");
+      expect(text).toContain(
+        "name each item that it excludes. Say that the\n     defaults add them to",
+      );
       expect(text).toContain(
         "If I typed my own choice, give `settings` = `settings` changed as I said.",
       );
@@ -878,14 +880,89 @@ describe("recovery trend", () => {
   it("keeps the recap of the calendar year in the setup prompt, but not on a shared page without a yes", async () => {
     const setup = await pageText("dashboard-setup");
     expect(setup.replace(/\s+/g, " ")).toContain(
-      "`recoveryHistory` (true when I said yes to the Recovery trend), `yearReview` (true when the " +
-        "page is for me and the `settings` of the preview have it, or when I ask for it), `shared` (true when",
-    );
-    expect(setup.replace(/\s+/g, " ")).toContain(
-      "When the `settings` of the preview have `yearReview`, tell me whether the page keeps the recap of " +
+      "When the `settings` of the preview have `yearReview` = true, tell me whether the page keeps the recap of " +
         "the calendar year, which holds days before its period, and that I can change this. A page for a " +
         "person I share it with does not keep it without my yes.",
     );
+  });
+
+  it("offers the Year tab in the preset and blank prompts, off by default", async () => {
+    for (const layout of ["preset", "blank"]) {
+      const text = await pageText("training-dashboard", { layout });
+      expect(text).toContain(
+        "for the whole period, and that the page file then holds these values for each day: this " +
+          "matters for a page that I share. - **Year tab**: only when `settings` has no `yearReview` = true. " +
+          'Options "No" (default) and "Yes, add a Year tab with the recap of the calendar year". Say ' +
+          "that the page file then holds data of days before its period: this matters for a page that " +
+          "I share. - **Period**",
+      );
+      expect(text).toContain(
+        "Do the same with `recoveryHistory` = true if I said yes to the Recovery trend. Do the same " +
+          "with `yearReview` = true if I said yes to the Year tab, or false if I said no to it or chose " +
+          "the defaults without this question: the answer is saved, and no update asks again.",
+      );
+    }
+  });
+
+  it("offers the Year tab in the setup prompt, in a call of its own", async () => {
+    const setup = (await pageText("dashboard-setup")).replace(/\s+/g, " ");
+    // the call before has four questions, the most that a tool for questions takes
+    expect(setup).toContain(
+      "in a new year it keeps its start day. Then ask, in a call of its own, about the **Year tab**, " +
+        "only when the `settings` of the preview have no `yearReview` = true and its `pageFrom` is not " +
+        '"assistant" (a designed page has no Year tab). Options "No" (default) and ' +
+        '"Yes, add a Year tab with the recap of the calendar year". Say that the page file then holds ' +
+        "data of days before its period: this matters for a page that I share.",
+    );
+    expect(setup).toContain(
+      "`yearReview` (true when I said yes to the Year tab, when the page is for me and the " +
+        "`settings` of the preview have it as true, or when I ask for it; else false: the answer is " +
+        'saved, and no update asks again; with `pageFrom` = "assistant", do not give it as false), `shared`',
+    );
+  });
+
+  it("does not ask about the settings of a page that has only an answer about the Year tab", async () => {
+    for (const layout of ["preset", "blank"]) {
+      expect(await pageText("training-dashboard", { layout })).toContain(
+        "only when `settings` has more than `title`, `headline` and `yearReview` = false",
+      );
+    }
+  });
+
+  it("offers the Year tab one time in the update prompt, and saves the answer", async () => {
+    const argSets: Record<string, string>[] = [
+      {},
+      { weeks: "8" },
+      { path: "coach.html" },
+      { weeks: "8", path: "coach.html" },
+    ];
+    for (const args of argSets) {
+      const text = await pageText("training-dashboard-update", args);
+      const path = args.path === undefined ? "" : ' and `path` = "coach.html"';
+      const step1 = text.slice(text.indexOf("1. Call"), text.indexOf("2. Write at most"));
+      expect(step1).toContain(
+        "If the reply of this first call has `offers` with `yearReview`, ask me, before step 3, " +
+          "whether to add a Year tab. If your client has a tool for questions with choices, use it. " +
+          'Options "No" (default) and "Yes, add a Year tab with the recap of the calendar year". Say ' +
+          "that the page file then holds data of days before its period: this matters for a page that " +
+          "I share. Say that you ask this one time for this page. Without `offers`, do not ask. ",
+      );
+      const step3 = text.slice(text.indexOf("3. Call"), text.indexOf("4. If the reply lists"));
+      expect(step3).toContain(
+        `the same \`weeks\`${path} and the \`notes\`, without \`settings\`: the page keeps them. ` +
+          "If I answered about the Year tab, also give `answers` = " +
+          '{ "yearReview": true } if I said yes, or { "yearReview": false } if I said no: the answer is ' +
+          "saved, and no update asks again. If I gave no answer, or you did not ask, give no `answers`. " +
+          "After a yes, say in one line " +
+          "that the Year tab has the days of the year that the cache has, that the `year-review` " +
+          "prompt can add the others after a yes in its form, in a client with a form, and that the " +
+          "page shows them after the next update.",
+      );
+    }
+  });
+
+  it("does not offer the Year tab in the freeform prompt, which has no boards", async () => {
+    expect(await pageText("training-dashboard", { layout: "freeform" })).not.toContain("Year tab");
   });
 
   it("pins the other sentences of the Recovery trend in the three prompts", async () => {

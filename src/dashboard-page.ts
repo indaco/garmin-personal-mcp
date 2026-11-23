@@ -64,12 +64,16 @@ export interface WriteOptions {
   path?: string;
   /** Replaces the settings of the page; without it, the page keeps its own. */
   settings?: Settings;
+  /** The answers to the `offers` of a page: the other settings stay as they are. */
+  answers?: Pick<Settings, "yearReview">;
   /** Refuse to make a new page: for the scheduled `refresh` command, not a tool argument. */
   onlyExisting?: boolean;
 }
 
 export interface PreviewResult {
   path: string;
+  /** What wrote the code of the page; not there without a page. */
+  pageFrom?: "template" | "assistant";
   /** The activities of each board in the period, before the `sports` setting. */
   boards: Record<string, number>;
   digest: Digest;
@@ -102,6 +106,8 @@ interface WriteResultBase {
   pageLanguages: string[];
   /** The settings that the page keeps. */
   settings: Settings;
+  /** The settings to ask the user about, which the page has no answer for. */
+  offers?: "yearReview"[];
   /** The texts that each language of the page still misses (they show in English). */
   languages?: Record<string, { missing: string[] }>;
   /** The language of the Garmin profile when the page has no texts in it, e.g. ru: the page shows English. */
@@ -440,6 +446,10 @@ function countBy(items: Json[], key: (a: Activity) => string): Record<string, nu
   return out;
 }
 
+/** A designed page has no Year tab, and data of days before its period is not offered for a shared page. */
+const offersYear = (page: string, s: Settings): boolean =>
+  pageCode(page).from === "template" && s.yearReview === undefined && s.shared !== true;
+
 /** A page that leaves out the recovery data asks Garmin for no more of it. */
 const wantsHistory = (s: Settings): boolean =>
   s.recoveryHistory === true && !s.exclude?.includes("recovery");
@@ -700,6 +710,7 @@ export class DashboardWriter {
       ) as Json;
       return {
         path: target,
+        ...(old === undefined ? {} : { pageFrom: pageCode(old).from }),
         boards: countBy(listOf(data.activities), groupOf),
         digest: digest(filterData(data, settings)),
         settings,
@@ -784,10 +795,15 @@ export class DashboardWriter {
 
   async #write(options: WriteOptions, again = false): Promise<WriteResult> {
     this.#skipped = []; // not every write reads the library
-    const { weeks, notes = [], layout, page, path, settings, onlyExisting } = options;
+    const { weeks, notes = [], layout, page, path, settings, answers, onlyExisting } = options;
     if (layout && page) {
       throw new Error(
         "Give either `layout` (a page from the template) or `page` (your own page), not both",
+      );
+    }
+    if (settings && answers) {
+      throw new Error(
+        "Give either `settings` or `answers` (it keeps the other settings), not both",
       );
     }
     if (page !== undefined && !marker("data").test(page)) {
@@ -812,7 +828,10 @@ export class DashboardWriter {
       oldSettings = {};
       broken = true;
     }
-    const own = asked ?? oldSettings;
+    const answer = answers?.yearReview;
+    // not through checkSettings: an older or edited page can hold settings that it refuses
+    const own =
+      asked ?? (answer === undefined ? oldSettings : { ...oldSettings, yearReview: answer });
 
     // read before withData gives the page the version of this server
     const previousServer = old === undefined ? "n/a" : serverOf(old);
@@ -848,6 +867,9 @@ export class DashboardWriter {
     } else {
       next = old;
       kind = "updated";
+    }
+    if (answer !== undefined && pageCode(next).from !== "template") {
+      throw new Error("`answers` need a page from the template: a designed page has no Year tab");
     }
     if (Object.keys(own).length > 0 && !marker("settings").test(next)) {
       // the data filter must hold on the next update too, so the page must keep its settings
@@ -919,6 +941,7 @@ export class DashboardWriter {
       digest: digest(filterData(raw, own)),
       pageLanguages: pageLanguages(next, own),
       settings: own,
+      ...(offersYear(next, own) ? { offers: ["yearReview" as const] } : {}),
       ...(hasLanguages(next) ? { languages: missingTexts(next) } : {}),
       ...(page === undefined && missingLanguage(next, raw.locale)
         ? { missingProfileLanguage: raw.locale as string }
@@ -1484,12 +1507,14 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
         "`settings` replace the page's settings (title, headline, sports, data to leave out, languages,",
         "themes); without them the page keeps its own. The page holds only the data, languages and themes",
         "they keep. `pageLanguages` in the result lists the languages of the page's Language menu, and",
-        "`settings` the settings that the page keeps. `missingProfileLanguage` is the language of the Garmin",
+        "`settings` the settings that the page keeps. `offers` lists settings that the page has no answer for:",
+        "ask the user one time, and save true or false with `answers`, without `settings`. `missingProfileLanguage` is the language of the Garmin",
         "profile when the page has no texts in it (it shows English); editDashboard `languages` adds it.",
         "`missingWidgetTexts` lists the custom widgets that miss texts in a language of the page, with",
         "those languages; editDashboard `widgetTexts` adds them.",
         "`preview: true` writes no page file (it updates the data cache, as getDashboardData does): it",
-        "returns the digest, the activities of each board and the `settings` of the page.",
+        "returns the digest, the activities of each board, the `settings` of the page and `pageFrom`",
+        "(template, or assistant for a designed page, which has no Year tab; not there without a page).",
       ].join("\n"),
       inputSchema: z.object({
         weeks: z
@@ -1553,7 +1578,7 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
             yearReview: z
               .boolean()
               .describe(
-                "Add the recap of the calendar year to the page data, from the local cache; getYearReview fills its missing days after a yes; off when not set",
+                "Add the Year tab with the recap of the calendar year, from the local cache; getYearReview fills its missing days after a yes; false keeps it off and is not offered again; off when not set",
               )
               .optional(),
             since: z
@@ -1570,6 +1595,17 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
               .optional(),
           })
           .describe("The page settings; replaces the page's own")
+          .optional(),
+        answers: z
+          .object({
+            yearReview: z
+              .boolean()
+              .describe("true adds the Year tab, false keeps it off")
+              .optional(),
+          })
+          .describe(
+            "The answers to `offers`; the page keeps its other settings. Not with `settings`",
+          )
           .optional(),
         preview: z
           .boolean()
@@ -1620,7 +1656,7 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
               board: z
                 .string()
                 .describe(
-                  "all, recovery, running, strengthTraining, walking, hiking, cycling, swimming, racket, generic (Other), or another SDK sport name",
+                  "all, recovery, year, running, strengthTraining, walking, hiking, cycling, swimming, racket, generic (Other), or another SDK sport name",
                 ),
               widget: z.string().describe("A widget id of the catalogue or a custom widget"),
               type: z

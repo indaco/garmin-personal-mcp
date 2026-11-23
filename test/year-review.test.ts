@@ -1,4 +1,12 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,6 +15,7 @@ import type { YearSummary } from "../src/analytics/year";
 import { type CachedRows, GarminDashboard } from "../src/dashboard";
 import { DashboardWriter, readBlock } from "../src/dashboard-page";
 import { addDays, reviewYear } from "../src/dates";
+import { refreshPages } from "../src/schedule";
 import { type GarminTools, isObject } from "../src/tools";
 import type { Settings } from "../src/page/settings";
 import { pageYear, registerYearReview, yearOf } from "../src/year-review";
@@ -900,6 +909,48 @@ describe("pageYear", () => {
     };
     expect(await yearOn("2026-01-14")).toBe(2025);
     expect(await yearOn("2026-01-15")).toBe(2026);
+  });
+
+  it("an update replaces the year from 15 January with no backup, and leaves a copy as it is", async () => {
+    save({
+      activitiesFrom: "2025-01-01",
+      activitiesTo: "2026-01-20",
+      activities: byId(row(1, "2025-06-01"), row(2, "2026-01-03")),
+    });
+    const { writer } = parts();
+    setToday("2026-01-04");
+    const { path } = await writer.write({ settings: { yearReview: true } });
+    const yearAfterRefresh = async (today: string) => {
+      setToday(today);
+      const { failed } = await refreshPages(writer, [path]);
+      expect(failed).toEqual([]);
+      return (readBlock(readFileSync(path, "utf8"), "data") as { year: YearSummary }).year.year;
+    };
+    expect(await yearAfterRefresh("2026-01-14")).toBe(2025);
+    const copy = join(dir, "garmin-dashboard-2025.html");
+    copyFileSync(path, copy);
+    const copied = readFileSync(copy, "utf8");
+    expect(await yearAfterRefresh("2026-01-15")).toBe(2026);
+    expect(await yearAfterRefresh("2026-12-31")).toBe(2026);
+    expect(readFileSync(copy, "utf8")).toBe(copied);
+    expect(readBlock(copied, "data")).toMatchObject({ year: { year: 2025 } });
+    expect(readdirSync(dir).filter((f) => f.endsWith(".bak"))).toEqual([]);
+  });
+
+  it("an update of the copy itself gives it the new year too", async () => {
+    save({
+      activitiesFrom: "2025-01-01",
+      activitiesTo: "2026-01-20",
+      activities: byId(row(1, "2025-06-01"), row(2, "2026-01-03")),
+    });
+    const { writer } = parts();
+    setToday("2026-01-14");
+    const { path } = await writer.write({ settings: { yearReview: true } });
+    const copy = join(dir, "garmin-dashboard-2025.html");
+    copyFileSync(path, copy);
+    setToday("2026-01-15");
+    await writer.write({ path: copy, onlyExisting: true });
+    expect(readBlock(readFileSync(copy, "utf8"), "data")).toMatchObject({ year: { year: 2026 } });
   });
 
   it("has only the sports that the page keeps", async () => {

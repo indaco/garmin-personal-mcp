@@ -249,6 +249,10 @@ The assistant also asks whether to add the Recovery trend. The default is no. A 
 with the weekly average of sleep, sleep score and resting HR for the whole period, and the file then
 holds these values for each day. See [Page settings](guide/dashboard.md#page-settings).
 
+The assistant also asks whether to add a Year tab. The default is no. A yes adds a board with the
+recap of the calendar year, and the file then holds data of days before the period of the page. See
+[Page settings](guide/dashboard.md#page-settings).
+
 [The dashboard guide](guide/dashboard.md) tells about the title and the headline, the boards, the
 themes and languages, the units and the activity-name filter, and how to change the layout.
 [The widget catalogue](guide/widgets.md) lists every widget.
@@ -258,6 +262,9 @@ themes and languages, the units and the activity-name filter, and how to change 
 This prompt replaces the data and the coach notes of the page. Your layout, your custom widgets and
 your languages stay. Only a new preset widget of a release can join a board that you edited, one
 time. Reload the page to see the new data.
+
+When the page has no answer about the Year tab, the assistant asks one time whether to add it. The
+default is no. See [Page settings](guide/dashboard.md#page-settings).
 
 | Argument | Values                                                                  | Default                 |
 | -------- | ----------------------------------------------------------------------- | ----------------------- |
@@ -293,8 +300,8 @@ Then the assistant asks for the file (any name or path), the title, the headline
 languages and the themes, whether to compare the workouts that your runs repeat, and the period: the
 last `weeks` weeks, or from a day that you choose (`since`), with one more week at each update, up
 to 52. A page can also keep the sleep and resting HR of the whole period (`recoveryHistory`,
-off by default). The assistant does not ask about the recap of the calendar year (`yearReview`, off
-by default): ask for it in the chat. A page that has it keeps it, but a page that you share keeps it
+off by default). The assistant also asks whether to add a Year tab with the recap of the calendar
+year (`yearReview`, off by default). A page that has it keeps it, but a page that you share keeps it
 only when you ask for it. The server writes only the data that you select into the file. Other data
 is not in the file, so you can send the file safely. A personal page and a shared page can be two
 files side by side. Each page keeps its settings on each update. The argument `weeks` is optional
@@ -389,7 +396,8 @@ covers after the fetch.
 A dashboard update fetches only the days of the dashboard. It can drop the earlier days that a
 review fetched: after an update of the server that changes the cache, or when the dashboard starts
 more than one day after the last cached day. The next review shows the missing days and asks again.
-A page with the [`yearReview` setting](guide/dashboard.md#page-settings) holds the same recap.
+A page with the [`yearReview` setting](guide/dashboard.md#page-settings) shows the same recap in its
+Year tab.
 
 In the answer, `fill.asked` tells what it did:
 

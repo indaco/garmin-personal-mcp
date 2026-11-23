@@ -138,6 +138,7 @@ const mode = (f: string) => statSync(f).mode & 0o777;
 const code = (s: string) =>
   s.replace(/\/\* garmin-data:start \*\/[\s\S]*?\/\* garmin-data:end \*\//, "");
 
+const savedSettings = (): unknown => readBlock(page(), "settings");
 const dataOf = (p: string) => readBlock(p, "data") as Record<string, unknown>;
 /** The page without the random rev of its layout. */
 const noRev = (p: string) => p.replace(/"rev":"[^"]*"/, "");
@@ -1325,6 +1326,308 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
       const settings = { yearReview: "yes" } as unknown as Settings;
       await expect(writer.write({ settings })).rejects.toThrow("yearReview: true or false");
       expect(page()).toBe(before);
+    });
+
+    describe("the offer to an existing page", () => {
+      const designed = `<script>/* garmin-data:start */null/* garmin-data:end */;/* garmin-settings:start */null/* garmin-settings:end */</script>`;
+
+      it.each<Settings | undefined>([
+        undefined,
+        {},
+        { title: "T", exclude: ["recovery"] },
+        { shared: false },
+      ])("offers yearReview on a page with the settings %j", async (settings) => {
+        expect((await writer.write({ settings })).offers).toEqual(["yearReview"]);
+        expect((await writer.write({})).offers).toEqual(["yearReview"]);
+      });
+
+      it.each<Settings>([
+        { yearReview: true },
+        { yearReview: false },
+        { shared: true },
+        { shared: true, title: "T" },
+      ])("offers nothing on a page with the settings %j", async (settings) => {
+        expect(await writer.write({ settings })).not.toHaveProperty("offers");
+        expect(await writer.write({})).not.toHaveProperty("offers");
+      });
+
+      it("offers yearReview on an update that changes the page code", async () => {
+        await writer.write({});
+        writeFileSync(file, page().replace(/(name="garmin-template" content=")[^"]*/, "$1old"));
+        expect(await writer.write({})).toMatchObject({ page: "upgraded", offers: ["yearReview"] });
+      });
+
+      it("offers yearReview until the page has an answer, also after a refresh", async () => {
+        await writer.write({});
+        await refreshPages(writer, [file]);
+        expect((await writer.write({})).offers).toEqual(["yearReview"]);
+        await writer.write({ settings: { yearReview: false } });
+        await refreshPages(writer, [file]);
+        expect(await writer.write({})).not.toHaveProperty("offers");
+      });
+
+      it("offers nothing on a page that the assistant designed", async () => {
+        const settings = { title: "T" };
+        expect(await writer.write({ page: designed, settings })).not.toHaveProperty("offers");
+        expect(await writer.write({})).not.toHaveProperty("offers");
+      });
+
+      it.each(['"yes"', "null", "0", "[]"])(
+        "offers nothing on a page whose yearReview was set to %s by hand",
+        async (value) => {
+          await writer.write({ settings: { title: "T", yearReview: true } });
+          writeFileSync(file, page().replace('"yearReview":true', `"yearReview":${value}`));
+          const r = await writer.write({});
+          expect(r).not.toHaveProperty("offers");
+          expect(dataOf(page())).not.toHaveProperty("year");
+        },
+      );
+
+      it.each<[unknown, boolean]>([
+        ["yes", true],
+        [null, true],
+        [1, true],
+        [true, false],
+      ])("with the hand-edited shared %j, the offer is %s", async (shared, offered) => {
+        await writer.write({ settings: { title: "T", shared: true } });
+        const edited = page().replace('"shared":true', `"shared":${JSON.stringify(shared)}`);
+        writeFileSync(file, edited);
+        expect("offers" in (await writer.write({}))).toBe(offered);
+      });
+
+      describe("answers", () => {
+        const kept: Settings = { title: "T", sports: ["running"], exclude: ["recovery", "names"] };
+
+        it.each([true, false])(
+          "saves %s with the other settings as they are",
+          async (yearReview) => {
+            await writer.write({ settings: kept });
+            const before = dataOf(page());
+            const r = await writer.write({ answers: { yearReview }, notes: ["Easy week."] });
+            expect(r.settings).toEqual({ ...kept, yearReview });
+            expect(r).not.toHaveProperty("offers");
+            expect(savedSettings()).toEqual({ ...kept, yearReview });
+            const { recovery, activities } = dataOf(page());
+            expect({ recovery, activities }).toEqual({
+              recovery: before.recovery,
+              activities: before.activities,
+            });
+            await refreshPages(writer, [file]);
+            expect(savedSettings()).toEqual({ ...kept, yearReview });
+          },
+        );
+
+        it.each<[string, string, object]>([
+          ["a null list", '"sports":null', { sports: null }],
+          ["a setting of a newer server", '"later":[1]', { later: [1] }],
+          ["a theme that this server does not have", '"themes":["x"]', { themes: ["x"] }],
+        ])("saves the answer on a page with %s", async (_, text, value) => {
+          await writer.write({ settings: { title: "T" } });
+          writeFileSync(file, page().replace('"title":"T"', `"title":"T",${text}`));
+          expect((await writer.write({})).offers).toEqual(["yearReview"]);
+          const r = await writer.write({ answers: { yearReview: false }, notes: ["Easy week."] });
+          expect(r.notes).toBe(1);
+          expect(savedSettings()).toEqual({ title: "T", ...value, yearReview: false });
+          expect(await writer.write({})).not.toHaveProperty("offers");
+        });
+
+        it("changes an answer, and the same answer again changes nothing but the data", async () => {
+          await writer.write({ settings: { ...kept, yearReview: false } });
+          const yes = await writer.write({ answers: { yearReview: true } });
+          expect(yes).toMatchObject({ page: "replaced", settings: { ...kept, yearReview: true } });
+          expect(dataOf(page()).year).toEqual(YEAR);
+          expect((await writer.write({ answers: { yearReview: true } })).page).toBe("updated");
+        });
+
+        it.each([{}, { yearReview: undefined }])("with %j keeps the settings", async (answers) => {
+          await writer.write({ settings: kept });
+          expect((await writer.write({ answers })).offers).toEqual(["yearReview"]);
+          expect(savedSettings()).toEqual(kept);
+        });
+
+        it("saves the answer on a shared page, which has no offer", async () => {
+          await writer.write({ settings: { shared: true } });
+          await writer.write({ answers: { yearReview: true } });
+          expect(savedSettings()).toEqual({ shared: true, yearReview: true });
+        });
+
+        it("writes a first page with the answer, and a new layout keeps the settings", async () => {
+          await writer.write({ answers: { yearReview: true } });
+          expect(savedSettings()).toEqual({ yearReview: true });
+          await writer.write({ settings: kept });
+          await writer.write({ layout: "blank", answers: { yearReview: true } });
+          expect(savedSettings()).toEqual({ ...kept, yearReview: true });
+        });
+
+        it("refuses answers with settings, and writes nothing", async () => {
+          await writer.write({ settings: kept });
+          const before = page();
+          await expect(
+            writer.write({ settings: {}, answers: { yearReview: true } }),
+          ).rejects.toThrow("Give either `settings` or `answers`");
+          expect(page()).toBe(before);
+        });
+
+        it("refuses answers on a page that the assistant designed, and writes nothing", async () => {
+          await expect(
+            writer.write({ page: designed, answers: { yearReview: true } }),
+          ).rejects.toThrow("`answers` need a page from the template");
+          expect(existsSync(file)).toBe(false);
+          await writer.write({ page: designed, settings: kept });
+          const before = page();
+          await expect(writer.write({ answers: { yearReview: false } })).rejects.toThrow(
+            "`answers` need a page from the template",
+          );
+          expect(page()).toBe(before);
+        });
+
+        it.each(["{broken", '{"exclude":5}'])(
+          "refuses answers on a page with the settings block %s",
+          async (text) => {
+            await writer.write({ settings: { title: "T" } });
+            writeFileSync(file, page().replace('{"title":"T"}', text));
+            const before = page();
+            await expect(writer.write({ answers: { yearReview: true } })).rejects.toThrow(
+              "give new settings, or delete the file",
+            );
+            expect(page()).toBe(before);
+          },
+        );
+      });
+
+      it("a designed page without a settings block takes no setting, and no setting is no reason to refuse", async () => {
+        const plain = "<script>/* garmin-data:start */null/* garmin-data:end */</script>";
+        await writer.write({ page: plain });
+        expect((await writer.write({ settings: {} })).settings).toEqual({});
+        await expect(writer.write({ settings: { yearReview: false } })).rejects.toThrow(
+          "has no garmin-settings block",
+        );
+      });
+
+      it("a preview says where the page comes from, and nothing without a page", async () => {
+        expect(await writer.preview({})).not.toHaveProperty("pageFrom");
+        await writer.write({});
+        expect((await writer.preview({})).pageFrom).toBe("template");
+        await writer.write({ page: designed });
+        expect((await writer.preview({ settings: { title: "T" } })).pageFrom).toBe("assistant");
+      });
+
+      it("has the offer only in the reply of a write", async () => {
+        await writer.write({});
+        expect(await writer.preview({})).not.toHaveProperty("offers");
+        expect(await writer.view({})).not.toHaveProperty("offers");
+        expect(await writer.edit({})).not.toHaveProperty("offers");
+      });
+
+      it("offers yearReview on a page with since, and the answer needs no weeks", async () => {
+        const kept: Settings = { since: "2026-10-05", title: "T" };
+        const { settings, offers } = await writer.write({ settings: kept });
+        expect(offers).toEqual(["yearReview"]);
+        const r = await writer.write({ settings: { ...settings, yearReview: true } });
+        expect(r.settings).toEqual({ ...kept, yearReview: true });
+        expect(r).not.toHaveProperty("offers");
+      });
+
+      it.each<[Settings, boolean]>([
+        [{ title: "T" }, true],
+        [{ title: "T", yearReview: false }, false],
+        [{ title: "T", shared: true }, false],
+      ])(
+        "a page with an unreadable settings block that gets %j has the offer: %s",
+        async (settings, offered) => {
+          await writer.write({ settings: { title: "T" } });
+          writeFileSync(file, page().replace('{"title":"T"}', "{broken"));
+          await expect(writer.write({})).rejects.toThrow("settings");
+          expect("offers" in (await writer.write({ settings }))).toBe(offered);
+        },
+      );
+
+      it.each([
+        ["the page code of a template", '<meta name="garmin-template" content="0123456789abcdef">'],
+        ["an empty page code", '<meta name="garmin-template" content="">'],
+      ])("offers yearReview for a given page with %s", async (_, tag) => {
+        const r = await writer.write({ page: `${tag}${designed}`, settings: { title: "T" } });
+        expect(r.offers).toEqual(["yearReview"]);
+      });
+
+      it("offers yearReview again when a layout starts the page again with no answer", async () => {
+        await writer.write({ settings: { title: "T", yearReview: false } });
+        expect(await writer.write({ layout: "preset" })).not.toHaveProperty("offers");
+        const r = await writer.write({ layout: "blank", settings: { title: "T" } });
+        expect(r.offers).toEqual(["yearReview"]);
+      });
+
+      it.each<[string, number, boolean]>([
+        ["1 ms before 15 minutes", 15 * 60_000 - 1, false],
+        ["15 minutes", 15 * 60_000, true],
+      ])(
+        "an answer %s after an upgrade has a .bak of its own only when the build is over",
+        async (_, wait, own) => {
+          await writer.write({});
+          const old = page().replace(/(name="garmin-template" content=")[^"]*/, "$1old");
+          writeFileSync(file, old);
+          vi.useFakeTimers({ now: new Date("2026-11-18T12:00:00"), toFake: ["Date"] });
+          try {
+            const first = await writer.write({});
+            expect(first.page).toBe("upgraded");
+            const upgraded = page();
+            vi.setSystemTime(Date.now() + wait);
+            await writer.write({ settings: { ...first.settings, yearReview: true } });
+            expect(readFileSync(`${file}.bak`, "utf8")).toBe(own ? upgraded : old);
+          } finally {
+            vi.useRealTimers();
+          }
+        },
+      );
+
+      it("saves a yes when the year cannot be read, and the next update adds the year", async () => {
+        const year = vi.fn(async () => YEAR).mockRejectedValueOnce(new Error("no rows"));
+        writer = yearWriter(year);
+        await writer.write({});
+        const r = await writer.write({ settings: { yearReview: true } });
+        expect(r.settings).toEqual({ yearReview: true });
+        expect(r).not.toHaveProperty("offers");
+        expect(dataOf(page())).not.toHaveProperty("year");
+        expect(await writer.write({})).not.toHaveProperty("offers");
+        expect(dataOf(page()).year).toEqual(YEAR);
+      });
+
+      it("a refresh makes no change to the settings of a page with an offer", async () => {
+        await writer.write({ settings: { title: "T" } });
+        const { lines, failed } = await refreshPages(writer, [file]);
+        expect(failed).toEqual([]);
+        expect(lines).toHaveLength(1);
+        expect(lines[0]).not.toContain("yearReview");
+        expect(readBlock(page(), "settings")).toEqual({ title: "T" });
+      });
+
+      it.each<[boolean, unknown]>([
+        [true, YEAR],
+        [false, undefined],
+      ])(
+        "saves the answer %s, and keeps the page that the user edited",
+        async (yearReview, year) => {
+          const kept: Settings = { title: "T", sports: ["running"], exclude: ["names"] };
+          await writer.write({ settings: kept });
+          await writer.edit({
+            widgets: [{ id: "mine", title: "Mine", code: "(ctx) => 'x'", types: ["running"] }],
+            place: [{ board: "running", widget: "mine" }],
+            languages: { es: { "type.all": "Todo" } },
+          });
+          const before = page();
+          const { settings } = await writer.write({});
+          expect(settings).toEqual(kept);
+          const r = await writer.write({ settings: { ...settings, yearReview } });
+          expect(r.settings).toEqual({ ...kept, yearReview });
+          for (const block of ["layout", "widgets", "i18n"] as const) {
+            expect(readBlock(before, block)).not.toEqual({});
+            expect(readBlock(page(), block)).toEqual(readBlock(before, block));
+          }
+          expect(dataOf(page()).year).toEqual(year);
+          expect((await writer.write({})).settings).toEqual({ ...kept, yearReview });
+          expect(dataOf(page()).year).toEqual(year);
+        },
+      );
     });
 
     it.each([["yes"], [1], [null], [[]], [{}]])("refuses the setting %j", async (yearReview) => {

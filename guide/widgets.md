@@ -70,6 +70,8 @@ every board. _Width_ is the default width in columns.
 | Board | Widgets, in order |
 | ----- | ----------------- |
 | all | `kpis`, `readiness`, `calendar`, `periodComparison`, `weeklyVolume`, `intensityMinutes`, `records`, `loadSafety`, `fitnessFatigue`, `loadVsRecovery`, `activities`, `coachNotes` |
+| recovery | `readiness`, `fitnessAge`, `warningSigns`, `loadVsRecovery`, `hrv`, `restingHr`, `sleep`, `sleepNeed`, `bedtime`, `bodyBattery`, `stress`, `recoveryTrend` |
+| year | `yearTotals`, `yearMonths`, `yearSports`, `yearRhythm`, `yearHighlights`, `yearStreaks`, `yearRecords`, `yearRecovery` |
 | running | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `races`, `racePredictor`, `aerobicFitness`, `bestEfforts`, `trainingEffect`, `intensityShare`, `runningForm`, `longRuns`, `runWalk`, `workoutTrend`, `activities` |
 | strengthTraining | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `setsPerCategory`, `muscleBalance`, `planAdherence`, `exercises`, `strengthSessions` |
 | walking | `typeKpis`, `typeWeekly`, `hrZones`, `records`, `steps`, `walkDetails`, `activities` |

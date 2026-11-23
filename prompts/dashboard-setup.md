@@ -44,17 +44,24 @@ such a tool, ask the questions in chat as numbered lists, with the default first
    Say that I can type the day in my own words. Say that with a day, the page starts in the week of
    that day and gets one more week at each update, up to 52 weeks; after that it shows the last 52
    weeks. Say that the page does not start again on 1 January: in a new year it keeps its start day.
+   Then ask, in a call of its own, about the **Year tab**, only when the `settings` of the preview
+   have no `yearReview` = true and its `pageFrom` is not "assistant" (a designed page has no Year
+   tab). Options "No" (default) and "Yes, add a Year tab with the recap of the calendar year". Say
+   that the page file then holds data of days before its period: this matters for a page that I
+   share.
 4. Call `writeDashboard` with `weeks` = {{weeks}}, the `path` and `settings`. The settings are
    `title`, `headline`, `sports` (the boards to keep), `exclude` (from `recovery`, `fitnessAge`,
    `zones`, `names`, `notes`), `languages` (the codes to keep: {{languages}}), `language` (the one
    it opens in), `themes`, `theme`, `workouts` (true when I said yes to the workout comparison),
-   `recoveryHistory` (true when I said yes to the Recovery trend), `yearReview` (true when the
-   page is for me and the `settings` of the preview have it, or when I ask for it), `shared` (true
-   when the page is for a person I share it with), `since` (the start day, when I chose one; then no
-   `weeks`). Do not give a setting that keeps its default. If there is no page at the path, also give
-   `layout` = "preset". When the `settings` of the preview have `yearReview`, tell me whether the page
-   keeps the recap of the calendar year, which holds days before its period, and that I can change
-   this. A page for a person I share it with does not keep it without my yes.
+   `recoveryHistory` (true when I said yes to the Recovery trend), `yearReview` (true when I said
+   yes to the Year tab, when the page is for me and the `settings` of the preview have it as true,
+   or when I ask for it; else false: the answer is saved, and no update asks again; with `pageFrom`
+   = "assistant", do not give it as false), `shared` (true when the page is for a person I share it
+   with), `since` (the start day, when I chose one; then no `weeks`). Do not give another setting
+   that keeps its default. If there is no page at the path, also give `layout` = "preset". When the
+   `settings` of the preview have `yearReview` = true, tell me whether the page keeps the recap of
+   the calendar year, which holds days before its period, and that I can change this. A page for a
+   person I share it with does not keep it without my yes.
    If the reply has `addedWidgets` (board -> widget ids), tell me which widgets it added to which
    board, as the reply gives them; do not make up a title. Without it, say nothing about them.
 5. Unless I excluded the coach notes: write at most 5 coach notes from the digest. Each note names a

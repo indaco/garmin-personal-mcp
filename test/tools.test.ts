@@ -26,6 +26,7 @@ import { registerDashboardWriter, type DashboardWriter } from "../src/dashboard-
 import { createServer } from "../src/server";
 import { firstArray, GarminTools, registerTools, summarize, writeAtomically } from "../src/tools";
 import { log } from "../src/log";
+import { PRESET_BOARDS } from "../src/page/presets";
 import { fitFile } from "./fit-file";
 import toolList from "./fixtures/tool-list.json";
 
@@ -1170,6 +1171,15 @@ describe("MCP tools", () => {
     }
   });
 
+  it("names each built-in board in the place argument of editDashboard", async () => {
+    const { tools: listed } = await (await connect()).listTools();
+    const place = JSON.stringify(
+      listed.find((t) => t.name === "editDashboard")?.inputSchema.properties?.place,
+    );
+    const names = /"description":"(all,[^"]*)/.exec(place)?.[1].split(/, | \(Other\)/) ?? [];
+    expect(names).toEqual(expect.arrayContaining([...PRESET_BOARDS]));
+  });
+
   it("lets only the model call each tool, never the page in the chat", async () => {
     const { tools: listed } = await (await connect()).listTools();
     expect(listed).toHaveLength(toolList.length);
@@ -1398,27 +1408,33 @@ describe("MCP tools", () => {
       expect(textOf(result)).toBe('{"wrote":1}');
     });
 
-    it.each([true, false])(
-      "writeDashboard passes the setting yearReview %s",
-      async (yearReview) => {
-        const client = await connectHandlers(writer, dashboard);
-        const args = { settings: { yearReview } };
-        await client.callTool({ name: "writeDashboard", arguments: args });
-        expect(writer.write).toHaveBeenCalledWith(args);
-      },
-    );
+    it.each([
+      ["settings", true],
+      ["settings", false],
+      ["answers", true],
+      ["answers", false],
+    ])("writeDashboard passes %s with yearReview %s", async (key, yearReview) => {
+      const client = await connectHandlers(writer, dashboard);
+      const args = { [key]: { yearReview } };
+      await client.callTool({ name: "writeDashboard", arguments: args });
+      expect(writer.write).toHaveBeenCalledWith(args);
+    });
 
-    it.each([["yes"], [1], [null]])(
-      "writeDashboard refuses the setting yearReview %j",
-      async (yearReview) => {
-        const client = await connectHandlers(writer, dashboard);
-        const args = { settings: { yearReview } };
-        const result = await client.callTool({ name: "writeDashboard", arguments: args });
-        expect(result.isError).toBe(true);
-        expect(textOf(result)).toContain("yearReview");
-        expect(writer.write).not.toHaveBeenCalled();
-      },
-    );
+    it.each([
+      ["settings", "yes"],
+      ["settings", 1],
+      ["settings", null],
+      ["answers", "yes"],
+      ["answers", 1],
+      ["answers", null],
+    ])("writeDashboard refuses %s with yearReview %j", async (key, yearReview) => {
+      const client = await connectHandlers(writer, dashboard);
+      const args = { [key]: { yearReview } };
+      const result = await client.callTool({ name: "writeDashboard", arguments: args });
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toContain("yearReview");
+      expect(writer.write).not.toHaveBeenCalled();
+    });
 
     it("writeDashboard with preview only previews, without the preview key", async () => {
       const client = await connectHandlers(writer, dashboard);

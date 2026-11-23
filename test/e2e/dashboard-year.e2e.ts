@@ -211,6 +211,7 @@ const openYear = (
     locale?: string;
     timezoneId?: string;
     viewport?: { width: number; height: number };
+    init?: string;
   } = {},
 ) => {
   const { settings = ON, extra = {}, hash = "#year", layout, widgets, ...options } = blocks;
@@ -306,6 +307,16 @@ const FILL =
   "Some days of the year are missing. To add them, ask your assistant for a year review and say yes in the form, then ask it to update this page. An automatic refresh does not add them.";
 const NONE = "This page has no recap of the year yet. Ask your assistant to update the page.";
 
+/** What every Year tile and the tab show, in a page that runs `init` first, and the year of its clock. */
+const recap = async (init?: string) => {
+  const { page, errors } = await openYear(YEAR, { init });
+  expect(errors).toEqual([]);
+  expect(await tiles(page)).toEqual(IDS);
+  const values = await Promise.all(IDS.map((id) => text(page, id)));
+  const tab = await page.textContent("[data-tab=year]");
+  return { values, tab, year: await page.evaluate(() => new Date().getFullYear()) };
+};
+
 describe("the Year tab", () => {
   it("shows the eight tiles in order, right after Recovery, with no page error", async () => {
     const { page, errors } = await openYear();
@@ -324,6 +335,25 @@ describe("the Year tab", () => {
     expect(await chartsWithoutTooltip(page)).toEqual([]);
     expect(errors).toEqual([]);
   });
+
+  it.each(["2027-01-15", "2031-06-01"])(
+    "keeps the recap of its file when the file opens on %s",
+    async (today) => {
+      const now = await recap();
+      const later = await recap(`(() => {
+        const Native = Date;
+        const at = Native.parse("${today}T12:00:00Z");
+        window.Date = class extends Native {
+          constructor(...args) { super(...(args.length ? args : [at])); }
+          static now() { return at; }
+        };
+      })();`);
+      expect(later.year).toBe(Number(today.slice(0, 4)));
+      expect(later.values).toEqual(now.values);
+      expect(later.tab).toBe(now.tab);
+      expect(now.values.join(" ")).toContain("2026");
+    },
+  );
 
   it("has an icon of its own", async () => {
     const { page } = await openYear(YEAR, { settings: { ...ON, sports: ["running", "generic"] } });
@@ -348,6 +378,24 @@ describe("the Year tab", () => {
       expect(errors).toEqual([]);
     },
   );
+
+  it.each<["preset" | "blank", string[]]>([
+    ["preset", IDS],
+    ["blank", []],
+  ])("shows its widgets on an edited page that started as %s: %j", async (base, ids) => {
+    const layout = {
+      rev: "r1",
+      base,
+      boards: { all: [{ id: "coachNotes", widget: "coachNotes", span: 3 }] },
+    };
+    const { page, errors } = await openYear(YEAR, { layout });
+    expect((await tabs(page)).map(([tab]) => tab)).toContain("year");
+    expect(await tiles(page)).toEqual(ids);
+    expect(await page.locator("#board").getByRole("button", { name: "Edit layout" }).count()).toBe(
+      ids.length === 0 ? 1 : 0,
+    );
+    expect(errors).toEqual([]);
+  });
 
   it("shows on a page that keeps some sports only", async () => {
     const { page, errors } = await openYear(YEAR, {
