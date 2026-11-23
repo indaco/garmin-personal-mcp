@@ -470,4 +470,23 @@ describe("site demo", () => {
     for (const v of gct) expect(v).toMatch(/^\d+ ms$/);
     expect(errors).toEqual([]);
   });
+
+  it("shows the Year tab with a resting HR in each month and the Recovery trend, and its note names both", async () => {
+    const { page, errors } = await site();
+    await page.goto(`${base}demo/index.html#year`, { waitUntil: "load" });
+    const tile = "[data-id=yearRecovery]";
+    await page.waitForSelector(`${tile} table.data`);
+    const rows = await page.$$eval(`${tile} table.data tbody tr`, (r) =>
+      r.map((x) => x.textContent),
+    );
+    expect(rows.length).toBeGreaterThan(1);
+    expect(rows.join()).not.toContain("n/a");
+    expect(await page.textContent("[data-id=yearTotals]")).not.toContain("n/a");
+    expect(await page.textContent(".demo-note")).toContain(
+      "The Year tab and the Recovery trend are off on a new page",
+    );
+    await page.click("[data-tab=recovery]");
+    await page.waitForSelector("[data-id=recoveryTrend] canvas");
+    expect(errors).toEqual([]);
+  });
 });

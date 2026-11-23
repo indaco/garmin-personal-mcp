@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
 import { demoStamp, gifIsCurrent, STAMP_FILE } from "./demo-stamp.mjs";
-import { fillPage } from "./fill-dashboard-fixture.mjs";
+import { DEMO_SETTINGS, fillPage } from "./fill-dashboard-fixture.mjs";
 
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 
@@ -23,8 +23,8 @@ const json = join(dir, "demo-data.json");
 execFileSync("node", ["scripts/demo-dashboard.mjs", json], { stdio: "ignore" });
 const data = JSON.parse(readFileSync(json, "utf8"));
 
-function pageFile(name, layout, settings = null) {
-  const page = fillPage(readFileSync("dist/dashboard.html", "utf8"), data, layout, settings);
+function pageFile(name, layout) {
+  const page = fillPage(readFileSync("dist/dashboard.html", "utf8"), data, layout, DEMO_SETTINGS);
   const file = join(dir, `${name}.html`);
   writeFileSync(file, page);
   return file;
@@ -60,9 +60,9 @@ const scrollTo = (page, id) =>
     window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 16),
   );
 
-// The All board, load against recovery, the Run board with two workouts compared across weeks, and
-// an exercise of the Strength board
-let page = await open(pageFile("preset", null, { workouts: true }));
+// The All board, load against recovery, the Run board with two workouts compared across weeks, an
+// exercise of the Strength board, and the Year tab
+let page = await open(pageFile("preset", null));
 await shot(page);
 await scrollTo(page, "loadVsRecovery");
 await shot(page);
@@ -81,6 +81,9 @@ await shot(page);
 await page.click("[data-tab=strengthTraining]");
 await page.click("[data-exercise=barbell-back-squat]");
 await scrollTo(page, "exercises");
+await shot(page);
+await page.click("[data-tab=year]");
+await page.evaluate(() => window.scrollTo(0, 0));
 await shot(page);
 
 // Edit mode: drag Consistency before Readiness, widen Readiness, then hide it
@@ -141,7 +144,7 @@ const blocks = {
   widgets: [],
   languages: {},
   i18n: {},
-  settings: { workouts: true },
+  settings: DEMO_SETTINGS,
 };
 await chat.evaluate(
   ([html, b]) => {

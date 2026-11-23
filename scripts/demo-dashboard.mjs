@@ -8,7 +8,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { parseArgs } from "node:util";
-import { asServer, fillPage } from "./fill-dashboard-fixture.mjs";
+import { Rolldown } from "tsdown";
+import { asServer, DEMO_SETTINGS, fillPage } from "./fill-dashboard-fixture.mjs";
 
 const { values: opt, positionals } = parseArgs({
   allowPositionals: true,
@@ -624,7 +625,7 @@ hrv.forEach((h, n) => {
   h.high = HIGH;
 });
 
-const recovery = daily.slice(-14).map(({ day, load, steps }, n, rows) => {
+const recent = daily.slice(-14).map(({ day, load, steps }, n, rows) => {
   const hard = (rows[n - 1]?.load ?? 0) > 120;
   const sleepH = round(clamp(r(6.4, 8.4) - (weekday(day) === 0 ? 0 : r(0, 0.4)), 5.5, 9), 2);
   const awake = round(r(0.1, 0.4), 2);
@@ -651,6 +652,67 @@ const recovery = daily.slice(-14).map(({ day, load, steps }, n, rows) => {
   };
 });
 
+// the older days have only what the server keeps for a weekly trend (trendRow in src/dashboard.ts). They
+// come after the last 14 days, so the random numbers of the other data stay the same.
+const older = daily.flatMap(({ day, load }, i) => {
+  if (day < START || i >= daily.length - recent.length) return [];
+  const sick = inRange(day, ILLNESS);
+  const sleepH = round(clamp(r(6.4, 8.4) - (sick ? 0.6 : 0), 5.5, 9), 2);
+  return {
+    date: day,
+    sleepH,
+    sleepScore: Math.round(clamp(55 + (sleepH - 6) * 14 + r(-6, 6) - (sick ? 10 : 0), 40, 98)),
+    // it falls as the fitness rises
+    rhr: Math.round(
+      REST_HR - 2 + 8 * (1 - fitness(i)) + (sick ? 5 : load > 120 ? 2 : 0) + r(-1.5, 1.5),
+    ),
+  };
+});
+const recovery = [...older, ...recent];
+
+/** The exports of a TypeScript module of the server: plain node cannot import its extensionless imports. */
+async function bundled(input) {
+  const { output } = await Rolldown.build({ input, write: false });
+  return import(`data:text/javascript,${encodeURIComponent(output[0].code)}`);
+}
+
+const zones = [
+  {
+    trainingMethod: "HR_MAX_BASED",
+    restingHeartRateUsed: REST_HR,
+    lactateThresholdHeartRateUsed: null,
+    zone1Floor: FLOORS[0],
+    zone2Floor: FLOORS[1],
+    zone3Floor: FLOORS[2],
+    zone4Floor: FLOORS[3],
+    zone5Floor: FLOORS[4],
+    maxHeartRateUsed: MAX_HR,
+    restingHrAutoUpdateUsed: false,
+    sport: "DEFAULT",
+    changeState: "UNCHANGED",
+  },
+];
+
+// the recap that the server puts in the data of a page with the yearReview setting, from all the rows
+const { yearSummary } = await bundled("src/analytics/year.ts");
+const { reviewYear } = await bundled("src/dates.ts");
+const rangeOf = (from) => ({ from, to: END });
+const year = yearSummary(
+  {
+    activities: withId,
+    hrv,
+    recovery,
+    zones,
+    coverage: {
+      activities: rangeOf(PREV_START),
+      hrv: rangeOf(START),
+      rhr: rangeOf(recovery[0].date),
+    },
+  },
+  reviewYear(END),
+  END,
+);
+
 const data = {
   generated: END,
   weeks: WEEKS,
@@ -658,22 +720,7 @@ const data = {
   end: END,
   prevStart: PREV_START,
   prevEnd: addDays(START, -1),
-  zones: [
-    {
-      trainingMethod: "HR_MAX_BASED",
-      restingHeartRateUsed: REST_HR,
-      lactateThresholdHeartRateUsed: null,
-      zone1Floor: FLOORS[0],
-      zone2Floor: FLOORS[1],
-      zone3Floor: FLOORS[2],
-      zone4Floor: FLOORS[3],
-      zone5Floor: FLOORS[4],
-      maxHeartRateUsed: MAX_HR,
-      restingHrAutoUpdateUsed: false,
-      sport: "DEFAULT",
-      changeState: "UNCHANGED",
-    },
-  ],
+  zones,
   fitnessAge: {
     chronologicalAge: 41,
     fitnessAge: 34.2,
@@ -706,6 +753,7 @@ const data = {
   previousActivities: previous,
   hrv,
   recovery,
+  year,
   sync: {
     garminCalls: 5,
     newActivities: current.filter((a) => dayOf(a) >= addDays(END, -1)).length,
@@ -730,13 +778,11 @@ console.log(
 const LAYOUT_KEY = "garmin-layout:";
 const NOTE = `<style>.demo-note{max-width:1440px;margin:12px auto 0;padding:0 16px}.demo-note p{margin:0;padding:8px 12px;border:1px solid var(--warn);border-radius:8px;background:var(--panel);color:var(--text)}.demo-note strong{color:var(--warn)}</style>
     <script>try{localStorage.removeItem("${LAYOUT_KEY}"+location.pathname)}catch(e){}</script>
-    <div class="demo-note" role="note"><p><strong>Sample data.</strong> A demo of garmin-personal-mcp with made-up activities, not a real Garmin account. Not affiliated with or endorsed by Garmin. It shows a page that has updated for a year, so Workout trend has the laps of every session. Try Edit layout in the settings menu: your changes last until you reload the page.</p></div>
+    <div class="demo-note" role="note"><p><strong>Sample data.</strong> A demo of garmin-personal-mcp with made-up activities, not a real Garmin account. Not affiliated with or endorsed by Garmin. It shows a page that has updated for a year, so Workout trend has the laps of every session. The Year tab and the Recovery trend are off on a new page: your assistant adds them when you ask. Try Edit layout in the settings menu: your changes last until you reload the page.</p></div>
     <div id="app"></div>`;
 
 if (outHtml) {
-  const page = fillPage(readFileSync("dist/dashboard.html", "utf8"), data, null, {
-    workouts: true,
-  });
+  const page = fillPage(readFileSync("dist/dashboard.html", "utf8"), data, null, DEMO_SETTINGS);
   if (!page.includes('<div id="app"></div>')) throw new Error("dist/dashboard.html has no #app");
   if (!page.includes(LAYOUT_KEY)) throw new Error(`dist/dashboard.html has no ${LAYOUT_KEY} key`);
   mkdirSync(dirname(outHtml), { recursive: true });

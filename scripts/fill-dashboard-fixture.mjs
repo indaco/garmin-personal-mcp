@@ -20,6 +20,9 @@ export const fill = (page, block, value) =>
       `/* garmin-${block}:start */${JSON.stringify(value).replaceAll("<", "\\u003c").replaceAll("*", "\\u002a")}/* garmin-${block}:end */`,
   );
 
+/** The settings of the demo page and the demo images: the data of the demo is what they keep. */
+export const DEMO_SETTINGS = { workouts: true, recoveryHistory: true, yearReview: true };
+
 const isRun = (a) => typeof a.type === "string" && a.type.endsWith("running");
 // workoutOf of src/analytics/running.ts: the run name without the place that Garmin puts before " - "
 const workoutOf = (name) => {
