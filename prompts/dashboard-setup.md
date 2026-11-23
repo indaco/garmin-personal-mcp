@@ -19,7 +19,10 @@ such a tool, ask the questions in chat as numbered lists, with the default first
 2. Second round:
    - **Data** (multiple choice): recovery (sleep, HRV, stress, body battery, resting HR), fitness
      age, HR zones, activity names. For me, the default is all of them. For a shared page, ask about
-     each one. The server removes from the file the data that I do not select.
+     each one. A shared page has no default here: a reply such as "defaults", or no reply, does not
+     answer this question. Ask it again at once, and go to step 3 only with my answer. A selection
+     answers for all four, also "none". The server removes from the file the data that I do not
+     select.
    - **Coach notes**: include (default) or exclude.
    - **Languages**: options "English and the language of my Garmin profile, opens in the profile
      language" (default), "All: {{languageNames}}", "English only" and "Italian only". Say that I can
@@ -53,24 +56,34 @@ such a tool, ask the questions in chat as numbered lists, with the default first
    `title`, `headline`, `sports` (the boards to keep), `exclude` (from `recovery`, `fitnessAge`,
    `zones`, `names`, `notes`), `languages` (the codes to keep: {{languages}}), `language` (the one
    it opens in), `themes`, `theme`, `workouts` (true when I said yes to the workout comparison),
-   `recoveryHistory` (true when I said yes to the Recovery trend), `yearReview` (true when I said
-   yes to the Year tab, when the page is for me and the `settings` of the preview have it as true,
-   or when I ask for it; false when I said no, also with a reply such as "defaults", or when the
-   page is for a person I share it with and those settings have it as true: the answer is saved,
-   and no update asks again; when you asked and I gave no answer, give it as those settings have
-   it, or leave it out when they do not have it; with `pageFrom` = "assistant", do not give it as
-   false), `shared` (true when the page is for a person I share it with), `since` (the start day,
-   when I chose one; then no `weeks`). Do not give another setting that keeps its default. If there
-   is no page at the path, also give `layout` = "preset". When the `settings` of the preview have
-   `yearReview` = true, tell me whether the page keeps the recap of the calendar year, which holds
-   days before its period, and that I can change this. A page for a person I share it with does not
-   keep it without my yes.
+   `recoveryHistory` (true when I said yes to the Recovery trend), `yearReview` (see below),
+   `shared` (true when the page is for a person I share it with), `since` (the start day, when I
+   chose one; then no `weeks`). These settings replace those of the page: a setting that you leave
+   out goes back to its default. Give `settings` also when they are {}. Leave out each setting that
+   keeps its default, also `title` or `headline` when I chose the text that the question offers: the
+   page then shows its own text in each language. The exception is `yearReview` = false, which is
+   saved. If there is no page at the path, also give `layout` = "preset".
+   `yearReview` is the first of these that applies:
+   - true: I said yes to the Year tab or asked for it, or the page is for me, the `settings` of the
+     preview have it as true and I did not say no.
+   - left out: `pageFrom` is "assistant".
+   - false: I said no, you asked and I replied "defaults", or the page is for a person I share it
+     with and the `settings` of the preview have it as true. The answer is saved: no update asks
+     again.
+   - no answer, in all other cases: as the `settings` of the preview have it, or left out when they
+     do not have it.
+   After this call, when the `settings` of the preview have `yearReview` = true, tell me, without a
+   question, whether the page keeps the recap of the calendar year, which holds days before its
+   period, and that I can change this. A page for a person I share it with does not keep it without
+   my yes. With `pageFrom` = "assistant", speak of the recap in the file of the page, not of a Year
+   tab: a designed page has none. Tell me also when those settings have a `title` or `headline` that
+   the page does not keep.
    If the reply has `addedWidgets` (board -> widget ids), tell me which widgets it added to which
    board, as the reply gives them; do not make up a title. Without it, say nothing about them.
-   If the reply of this call has `offers`, I gave no answer about the Year tab: do not ask again,
-   the `training-dashboard-update` prompt asks later. If I answer after this call, save the answer
-   with `answers`: in the call of step 5, or in one more `writeDashboard` call with the same
-   `weeks` and `path`, and the same `notes` if there are any.
+   If the reply of this call has `offers`, I gave no answer about the Year tab: do not ask again and
+   say nothing about the tab, the `training-dashboard-update` prompt asks later. If I answer after
+   this call, save the answer with `answers`: in the call of step 5, or in one more `writeDashboard`
+   call with the same `weeks` and `path`, and the same `notes` if there are any.
 5. Unless I excluded the coach notes: write at most 5 coach notes from the digest. Each note names a
    specific number of the digest. Training suggestions only, no medical advice. Plain text, in my
    language. Then call `writeDashboard` again with the same `weeks`, `path` and the `notes`, without
