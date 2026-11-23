@@ -435,6 +435,25 @@ function settingsBlock(page: string | undefined): Json {
 /** The settings of a page. */
 const settingsOf = (page: string | undefined): Settings => readSettings(settingsBlock(page));
 
+/**
+ * New settings cannot name the data that only another version of the server knows, so these names of
+ * `exclude` in the old page stay, also when another part of its settings is damaged. Settings without
+ * `exclude` leave no data out: they remove them.
+ */
+function keepUnknown(asked: Settings, old: string | undefined): Settings | Json {
+  if (!asked.exclude || old === undefined) return asked;
+  let saved: unknown;
+  try {
+    saved = readBlock(old, "settings");
+  } catch {
+    return asked; // not JSON: there are no names to read
+  }
+  if (!isObject(saved) || !Array.isArray(saved.exclude)) return asked;
+  const names: readonly unknown[] = DATA_ITEMS;
+  const others = saved.exclude.filter((x) => typeof x === "string" && !names.includes(x));
+  return { ...asked, exclude: [...asked.exclude, ...others] };
+}
+
 /** The settings block of the page cannot be read: only new settings, or a new file, help. */
 function unreadable(e: unknown, target: string): Error {
   return new Error(`${(e as Error).message} in ${target}: give new settings, or delete the file`, {
@@ -839,7 +858,8 @@ export class DashboardWriter {
     }
     const answer = answers?.yearReview;
     // not through checkSettings: an older or edited page can hold settings that it refuses
-    const block = asked ?? (answer === undefined ? saved : { ...saved, yearReview: answer });
+    const kept = answer === undefined ? saved : { ...saved, yearReview: answer };
+    const block = asked ? keepUnknown(asked, old) : kept;
     const own = readSettings(block);
 
     // read before withData gives the page the version of this server
@@ -1558,7 +1578,7 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
               .optional(),
             exclude: z
               .array(z.enum(DATA_ITEMS))
-              .describe("The data to leave out of the page")
+              .describe("The data to leave out of the page; for all the data, do not give it")
               .optional(),
             languages: z
               .array(z.string())

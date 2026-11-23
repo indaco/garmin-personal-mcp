@@ -570,7 +570,7 @@
                 "type": "string",
                 "enum": ["recovery", "fitnessAge", "zones", "names", "notes"]
               },
-              "description": "The data to leave out of the page"
+              "description": "The data to leave out of the page; for all the data, do not give it"
             },
             "languages": {
               "type": "array",

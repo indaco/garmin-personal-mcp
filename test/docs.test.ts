@@ -294,6 +294,17 @@ describe("guide", () => {
     expect(table).toMatch(new RegExp(`^\\| [^|]+ \\| \`${board}\` +\\|`, "m"));
   });
 
+  it("says what happens to an excluded name that the server does not know", () => {
+    expect(flat("guide/dashboard.md")).toContain(
+      "A page can have a name in `exclude` that your version of the server does not know, for example " +
+        "from a newer version. Your version cannot leave out the data of that name: the data is in the " +
+        "file until a version that knows the name writes the page. New settings that have `exclude`, " +
+        "also as an empty list, keep the name when the settings block is valid JSON. Settings without " +
+        "`exclude` remove it, and they also put all the excluded data back in the page. To remove only " +
+        "that name, edit `exclude` in the `garmin-settings` block of the file. The file holds only",
+    );
+  });
+
   it("tells when the Year tab is there", () => {
     expect(flat("guide/dashboard.md")).toContain(
       "The All and Recovery tabs are always there. The Year tab shows with the `yearReview` setting. It " +

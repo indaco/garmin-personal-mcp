@@ -139,6 +139,11 @@ const mode = (f: string) => statSync(f).mode & 0o777;
 const code = (s: string) =>
   s.replace(/\/\* garmin-data:start \*\/[\s\S]*?\/\* garmin-data:end \*\//, "");
 
+/** A page with these excluded names, as a newer server or a hand edit leaves them. */
+const pageWith = async (exclude: string) => {
+  await writer.write({ settings: { title: "T", exclude: ["zones"] }, layout: "preset" });
+  writeFileSync(file, page().replace('"exclude":["zones"]', `"exclude":${exclude}`));
+};
 const savedSettings = (): unknown => readBlock(page(), "settings");
 const dataOf = (p: string) => readBlock(p, "data") as Record<string, unknown>;
 /** The page without the random rev of its layout. */
@@ -2361,6 +2366,109 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
       expect(savedSettings()).toEqual(again);
     },
   );
+
+  describe("a name in exclude that this server does not know", () => {
+    it.each<[string, NonNullable<Settings["exclude"]>]>([
+      ['["sleep","zones"]', ["zones"]],
+      ['["zones","sleep","power"]', ["zones"]],
+      // only such names: the reply has an empty list
+      ['["sleep"]', []],
+    ])("stays when the settings of a reply are given back (%s)", async (saved, known) => {
+      await pageWith(saved);
+      const { settings } = await writer.preview({});
+      expect(settings).toEqual({ title: "T", exclude: known });
+      const r = await writer.write({ settings: { ...settings, title: "New" } });
+      expect(r.settings).toEqual({ title: "New", exclude: known });
+      const names = JSON.parse(saved) as string[];
+      const others = names.filter((n) => n !== "zones");
+      expect(savedSettings()).toEqual({ title: "New", exclude: [...known, ...others] });
+      // and again, once each
+      await writer.write({ settings: r.settings, layout: "preset" });
+      expect(savedSettings()).toEqual({ title: "New", exclude: [...known, ...others] });
+    });
+
+    it("stays next to another list", async () => {
+      await pageWith('["sleep","zones"]');
+      await writer.write({ settings: { exclude: ["names"] } });
+      expect(savedSettings()).toEqual({ exclude: ["names", "sleep"] });
+    });
+
+    it.each<[string, Settings]>([
+      ["a reset", {}],
+      ["a reset that keeps the title", { title: "T" }],
+    ])("goes with %s, which has no exclude", async (_, settings) => {
+      await pageWith('["sleep","zones"]');
+      await writer.write({ settings, layout: "preset" });
+      expect(savedSettings()).toEqual(Object.keys(settings).length > 0 ? settings : null);
+    });
+
+    it("stays on a designed page too", async () => {
+      await pageWith('["sleep"]');
+      const own =
+        "<script>/* garmin-data:start */null/* garmin-data:end */</script><script>/* garmin-settings:start */null/* garmin-settings:end */</script>";
+      await writer.write({ page: own, settings: { exclude: ["names"] } });
+      expect(savedSettings()).toEqual({ exclude: ["names", "sleep"] });
+    });
+
+    it("is still refused in a new setting, and changes no file", async () => {
+      await pageWith('["sleep","zones"]');
+      const before = page();
+      const exclude = JSON.parse('["sleep"]') as NonNullable<Settings["exclude"]>;
+      await expect(writer.write({ settings: { exclude } })).rejects.toThrow(
+        /exclude: unknown sleep/,
+      );
+      expect(page()).toBe(before);
+    });
+
+    it.each<[string, string[]]>([
+      // a value that is not a name goes
+      ['["sleep",5]', ["sleep"]],
+      ['["zones","sleep"],"sports":"running"', ["sleep"]],
+      ['["sleep","power"],"sports":[5]', ["sleep", "power"]],
+      ['["zones"],"sports":"running"', []],
+    ])("stays when another part of the block is damaged (%s)", async (saved, others) => {
+      await pageWith(saved);
+      await expect(writer.write({ layout: "preset" })).rejects.toThrow("give new settings");
+      await writer.write({ settings: { exclude: ["names"] } });
+      expect(savedSettings()).toEqual({ exclude: ["names", ...others] });
+    });
+
+    it.each(["{oops", "null", "[]", '["sleep"]', '"sleep"', "5"])(
+      "adds nothing from the settings block %s",
+      async (block) => {
+        await pageWith('["zones"]');
+        writeFileSync(
+          file,
+          page().replace('{"title":"T","exclude":["zones"]}', () => block),
+        );
+        expect(page()).toContain(`garmin-settings:start */${block}/* garmin-settings:end`);
+        await writer.write({ settings: { exclude: ["names"] } });
+        expect(savedSettings()).toEqual({ exclude: ["names"] });
+      },
+    );
+
+    it("adds nothing to a new page", async () => {
+      await writer.write({ settings: { exclude: ["names"] } });
+      expect(savedSettings()).toEqual({ exclude: ["names"] });
+    });
+
+    it.each(['"sleep"', "null", "5", '{"sleep":true}'])(
+      "adds nothing from an exclude that is %s",
+      async (saved) => {
+        await pageWith(saved);
+        await writer.write({ settings: { exclude: ["names"] } });
+        expect(savedSettings()).toEqual({ exclude: ["names"] });
+      },
+    );
+
+    it("does not come from another page", async () => {
+      await pageWith('["sleep"]');
+      await writer.write({ settings: { exclude: ["names"] }, path: "new.html" });
+      expect(readBlock(readFileSync(join(dir, "new.html"), "utf8"), "settings")).toEqual({
+        exclude: ["names"],
+      });
+    });
+  });
 
   describe("a block with no setting that is valid", () => {
     beforeEach(async () => {
