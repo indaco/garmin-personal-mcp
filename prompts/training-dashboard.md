@@ -46,7 +46,10 @@ Answer in my language.
    when I pick it in the Settings question, by its name or its number, or ask in my own words for a
    reset of all the settings, for example "reset" or "reset, but only running". To reset a part, for
    example "reset the theme", is my own choice: take out only that part, and keep the other
-   settings. If you cannot tell which of the two I mean, ask me.
+   settings. To reset the Year tab is a no to it. If you cannot tell whether I mean all the settings
+   or a part, or which setting the part is, ask me: for example for "reset recovery" when `exclude`
+   has `recovery` and `recoveryHistory` is true. Each time that a change takes an item out of
+   `exclude`, say that the page has that data again.
 3. Call `writeDashboard` with `weeks` = {{weeks}} and `layout` = "{{layout}}". If I chose "Reset
    these settings", also give `settings` = only the `title` and `headline` of `settings`, the ones
    that it has, or {} when it has none: the reset then removes the other settings. If I asked for a
@@ -73,6 +76,11 @@ Answer in my language.
 5. Call `writeDashboard` again with the same `weeks` and the `notes`, without `layout`. The page keeps
    its layout. If I typed my own title or headline, also give `settings` = the `settings` of the
    last result with `title` and `headline` set to my texts: the other settings of the page stay.
+   If the reply of step 3 has `offers`, I gave no answer about the Year tab: do not ask again, the
+   `training-dashboard-update` prompt asks later. If I answer after step 3, save the answer in the
+   next `writeDashboard` call: `yearReview` in its `settings` if it gives them, else `answers`. If
+   no such call is left, make one more with `answers` and the same `weeks` and `notes`, without
+   `layout`.
 6. If the result has `missingProfileLanguage`, say first that my Garmin profile uses that language,
    that the page has no texts in it yet, so the page shows English, and that you can add it.
    Make that language the default of the question below instead of "No".

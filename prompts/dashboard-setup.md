@@ -55,15 +55,22 @@ such a tool, ask the questions in chat as numbered lists, with the default first
    it opens in), `themes`, `theme`, `workouts` (true when I said yes to the workout comparison),
    `recoveryHistory` (true when I said yes to the Recovery trend), `yearReview` (true when I said
    yes to the Year tab, when the page is for me and the `settings` of the preview have it as true,
-   or when I ask for it; else false: the answer is saved, and no update asks again; with `pageFrom`
-   = "assistant", do not give it as false), `shared` (true when the page is for a person I share it
-   with), `since` (the start day, when I chose one; then no `weeks`). Do not give another setting
-   that keeps its default. If there is no page at the path, also give `layout` = "preset". When the
-   `settings` of the preview have `yearReview` = true, tell me whether the page keeps the recap of
-   the calendar year, which holds days before its period, and that I can change this. A page for a
-   person I share it with does not keep it without my yes.
+   or when I ask for it; false when I said no, also with a reply such as "defaults", or when the
+   page is for a person I share it with and those settings have it as true: the answer is saved,
+   and no update asks again; when you asked and I gave no answer, give it as those settings have
+   it, or leave it out when they do not have it; with `pageFrom` = "assistant", do not give it as
+   false), `shared` (true when the page is for a person I share it with), `since` (the start day,
+   when I chose one; then no `weeks`). Do not give another setting that keeps its default. If there
+   is no page at the path, also give `layout` = "preset". When the `settings` of the preview have
+   `yearReview` = true, tell me whether the page keeps the recap of the calendar year, which holds
+   days before its period, and that I can change this. A page for a person I share it with does not
+   keep it without my yes.
    If the reply has `addedWidgets` (board -> widget ids), tell me which widgets it added to which
    board, as the reply gives them; do not make up a title. Without it, say nothing about them.
+   If the reply of this call has `offers`, I gave no answer about the Year tab: do not ask again,
+   the `training-dashboard-update` prompt asks later. If I answer after this call, save the answer
+   with `answers`: in the call of step 5, or in one more `writeDashboard` call with the same
+   `weeks` and `path`, and the same `notes` if there are any.
 5. Unless I excluded the coach notes: write at most 5 coach notes from the digest. Each note names a
    specific number of the digest. Training suggestions only, no medical advice. Plain text, in my
    language. Then call `writeDashboard` again with the same `weeks`, `path` and the `notes`, without

@@ -127,8 +127,11 @@ describe("prompts", () => {
           '"Reset these settings" only when I pick it in the Settings question, by its name or its ' +
           'number, or ask in my own words for a reset of all the settings, for example "reset" or ' +
           '"reset, but only running". To reset a part, for example "reset the theme", is my own ' +
-          "choice: take out only that part, and keep the other settings. If you cannot tell which of " +
-          "the two I mean, ask me. 3. Call `writeDashboard`",
+          "choice: take out only that part, and keep the other settings. To reset the Year tab is a no " +
+          "to it. If you cannot tell whether I mean all the settings or a part, or which setting the " +
+          'part is, ask me: for example for "reset recovery" when `exclude` has `recovery` and ' +
+          "`recoveryHistory` is true. Each time that a change takes an item out of `exclude`, say that " +
+          "the page has that data again. 3. Call `writeDashboard`",
       );
       // no text calls the reset "the defaults": a reply with that word keeps the settings
       expect(text).not.toMatch(/"Use\s+the\s+defaults|cho(se|ose)\s+the\s+defaults/);
@@ -945,9 +948,39 @@ describe("recovery trend", () => {
     );
     expect(setup).toContain(
       "`yearReview` (true when I said yes to the Year tab, when the page is for me and the " +
-        "`settings` of the preview have it as true, or when I ask for it; else false: the answer is " +
-        'saved, and no update asks again; with `pageFrom` = "assistant", do not give it as false), `shared`',
+        "`settings` of the preview have it as true, or when I ask for it; false when I said no, also " +
+        'with a reply such as "defaults", or when the page is for a person I share it with and those ' +
+        "settings have it as true: the answer is saved, and no update asks again; when you asked and I " +
+        "gave no answer, give it as those settings have it, or leave it out when they do not have it; " +
+        'with `pageFrom` = "assistant", do not give it as false), `shared`',
     );
+  });
+
+  it("does not ask again after the questions, and saves a late answer, in the preset and blank prompts", async () => {
+    for (const layout of ["preset", "blank"]) {
+      const text = await pageText("training-dashboard", { layout });
+      const step5 = text.slice(text.indexOf("5. Call"), text.indexOf("6. If the result has"));
+      expect(step5).toContain(
+        "the other settings of the page stay. If the reply of step 3 has `offers`, I gave no answer about " +
+          "the Year tab: do not ask again, the `training-dashboard-update` prompt asks later. If I " +
+          "answer after step 3, save the answer in the next `writeDashboard` call: `yearReview` in its " +
+          "`settings` if it gives them, else `answers`. If no such call is left, make one more with " +
+          "`answers` and the same `weeks` and `notes`, without `layout`.",
+      );
+    }
+  });
+
+  it("saves no answer in the setup prompt when I gave none, and does not ask again", async () => {
+    const setup = await pageText("dashboard-setup");
+    // step 5 is not for each page: without coach notes it has no call
+    const step4 = setup.slice(setup.indexOf("4. Call"), setup.indexOf("5. Unless"));
+    expect(step4).toContain(
+      "If the reply of this call has `offers`, I gave no answer about the Year tab: do not ask again, " +
+        "the `training-dashboard-update` prompt asks later. If I answer after this call, save the " +
+        "answer with `answers`: in the call of step 5, or in one more `writeDashboard` call with the " +
+        "same `weeks` and `path`, and the same `notes` if there are any.",
+    );
+    expect(setup).not.toContain("else false");
   });
 
   it("does not ask about the settings of a page that has only an answer about the Year tab", async () => {
