@@ -377,7 +377,16 @@ the answer lists it in `coverage.missing`.
 A `path` to a page that does not exist is an error.
 
 When a day of the year before today is missing, the server asks you in a form before it fetches the
-activity list. It makes at most 20 requests for the list, and it does not fetch HRV and resting HR.
+activity list. It asks for at most 20 pages of the list, and it does not fetch HRV and resting HR. A
+page that Garmin refuses can be asked for again. The cache keeps one range of days, so the first day
+in the form can be in an earlier year. When the earlier days would need more than about 20 requests,
+the fetch starts in the year itself. The form then names the earlier days that the cache no longer
+covers after the fetch.
+
+A dashboard update fetches only the days of the dashboard. It can drop the earlier days that a
+review fetched: after an update of the server that changes the cache, or when the dashboard starts
+more than one day after the last cached day. The next review shows the missing days and asks again.
+
 In the answer, `fill.asked` tells what it did:
 
 | `fill.asked` | What the server did                                                                             |
@@ -389,8 +398,10 @@ In the answer, `fill.asked` tells what it did:
 | `tooLarge`   | the days need more than about 20 requests: no question and no request                           |
 
 When only today is missing, the server does not ask. A workout that came to Garmin after the last
-update of the cache is then not in the recap, and its day can look like a rest day. For a recap with
-all workouts, update the dashboard first.
+update of the cache is then not in the recap, and its day can look like a rest day. `lastDayOpen` is
+true in the answer when the last cached day is in the year: a later workout of that day can be
+missing. For a recap of the current year with all workouts, update the dashboard first, but only
+when no day before today is missing.
 
 Claude Code (tested with 2.1.329) and the MCP Inspector (tested with 2.16.0) show the forms of other
 tools. Claude Desktop shows no form (tested with 6.6395.1). The form of this tool: not tested.

@@ -78,6 +78,14 @@ const runAndRide = () => [
   row(1, "2026-03-02"),
   row(2, "2026-03-03", { name: "Ride 2", type: "cycling", sport: "cycling" }),
 ];
+/** An older cache with 2125 days from 2021 to today, 1 session a day: 22 requests; the year alone is 3. */
+const saveOldYears = () => {
+  const days: string[] = [];
+  for (let d = "2021-01-01"; d <= "2026-10-20"; d = addDays(d, 1)) days.push(d);
+  const activities = byId(...days.map((d, i) => row(i, d)));
+  save({ activitiesSummary: 2, activitiesFrom: days[0], activitiesTo: days.at(-1), activities });
+};
+
 /** Two sports, HRV and resting HR, all days covered. */
 const saveAllKinds = () =>
   save({
@@ -162,6 +170,8 @@ describe("yearOf", () => {
       rhr: { from: "2026-03-02", to: "2026-03-02" },
     },
     fillRequests: 1,
+    fillStart: "2026-01-01",
+    fillDrops: null,
   };
 
   it("gives the recap of all the rows without settings", () => {
@@ -225,7 +235,8 @@ describe.each<Era>(ERAS)("getYearReview on the %s era", (era) => {
     expect(api.getJson).not.toHaveBeenCalled();
     expect(reply).toEqual({
       year: expect.objectContaining({ v: 1, year: 2026 }),
-      fill: { asked: "notNeeded", estimate: 0, garminCalls: 0, newActivities: 0 },
+      fill: { asked: "notNeeded", estimate: 0, garminCalls: 0 },
+      lastDayOpen: true,
       settings: {},
     });
     expect(reply.year.totals.activities).toBe(1);
@@ -240,7 +251,7 @@ describe.each<Era>(ERAS)("getYearReview on the %s era", (era) => {
         "HRV and resting HR are not fetched. Confirm?",
     ]);
     expect(api.getJson).toHaveBeenCalledTimes(2);
-    expect(reply.fill).toEqual({ asked: "yes", estimate: 2, garminCalls: 2, newActivities: 2 });
+    expect(reply.fill).toEqual({ asked: "yes", estimate: 2, garminCalls: 2 });
     // row 1 is in the days that the fill fetches again, and Garmin does not have it any more
     expect(reply.year.totals.activities).toBe(2);
     expect(reply.year.coverage).toMatchObject({ missing: [], complete: true });
@@ -260,7 +271,7 @@ describe.each<Era>(ERAS)("getYearReview on the %s era", (era) => {
     expect(asked).toHaveLength(forms);
     expect(api.getJson).not.toHaveBeenCalled();
     expect(readFileSync(cacheFile(), "utf8")).toBe(before);
-    expect(reply.fill).toEqual({ asked: word, estimate: 2, garminCalls: 0, newActivities: 0 });
+    expect(reply.fill).toEqual({ asked: word, estimate: 2, garminCalls: 0 });
     expect(reply.year.totals.activities).toBe(1);
     expect(reply.year.coverage.missing).toEqual([{ from: "2026-01-01", to: "2026-02-28" }]);
   });
@@ -282,7 +293,6 @@ describe.each<Era>(ERAS)("getYearReview on the %s era", (era) => {
       asked: "notNeeded",
       estimate: 0,
       garminCalls: 0,
-      newActivities: 0,
     });
     expect(reply.year.totals.activities).toBe(1);
   });
@@ -297,7 +307,6 @@ describe.each<Era>(ERAS)("getYearReview on the %s era", (era) => {
       asked: "tooLarge",
       estimate: 21,
       garminCalls: 0,
-      newActivities: 0,
     });
     expect(reply.year).toMatchObject({ year: 2021, totals: { activities: null } });
   });
@@ -318,8 +327,73 @@ describe("getYearReview", () => {
     save({ activitiesTo: "2026-10-24" });
     const { messages } = await review({}, NO);
     expect(messages).toEqual([
-      "Fetch the activity list from Garmin for 2026-01-01 to 2026-10-26, about 1 request? " +
+      // from the last cached days that can still change
+      "Fetch the activity list from Garmin for 2026-10-11 to 2026-10-26, about 1 request? " +
         "HRV and resting HR are not fetched. Confirm?",
+    ]);
+  });
+
+  it("names the earlier years that it fetches again from an older cache", async () => {
+    save({ activitiesSummary: 2, activitiesFrom: "2024-01-01" });
+    const { messages } = await review({}, NO);
+    expect(messages).toEqual([
+      "Fetch the activity list from Garmin for 2024-01-01 to 2026-10-26, about 1 request? " +
+        "HRV and resting HR are not fetched. Confirm?",
+    ]);
+  });
+
+  it("names the earlier days that the cache no longer covers after the fetch", async () => {
+    saveOldYears();
+    garmin = [activity(1, "2026-03-01")];
+    const { reply, messages } = await review({}, YES);
+    expect(messages).toEqual([
+      "Fetch the activity list from Garmin for 2026-01-01 to 2026-10-26, about 3 requests? " +
+        "The cache then no longer covers 2021-01-01 to 2025-12-31: a review of those days must fetch " +
+        "them again. HRV and resting HR are not fetched. Confirm?",
+    ]);
+    expect(reply.fill).toEqual({ asked: "yes", estimate: 3, garminCalls: 1 });
+    expect(reply.year.coverage.complete).toBe(true);
+  });
+
+  it.each<[string, Answer | undefined, number]>([
+    ["no", NO, 1],
+    ["unasked", undefined, 0],
+  ])("drops no earlier day on %s", async (word, answer, forms) => {
+    saveOldYears();
+    const before = readFileSync(cacheFile(), "utf8");
+    const { reply, asked } = await review({}, answer);
+    expect(asked).toHaveLength(forms);
+    expect(reply.fill).toEqual({ asked: word, estimate: 3, garminCalls: 0 });
+    expect(readFileSync(cacheFile(), "utf8")).toBe(before);
+  });
+
+  it("drops no earlier day when the fetch fails", async () => {
+    saveOldYears();
+    const before = readFileSync(cacheFile(), "utf8");
+    api.getJson.mockRejectedValue(new GarminApiError("GET /x -> HTTP 500: body-SECRET", 500));
+    const { reply } = await review({}, YES);
+    expect(reply.fill).toEqual({
+      asked: "yes",
+      estimate: 3,
+      garminCalls: 1,
+      error: "Garmin answered HTTP 500. Nothing was saved: try again later.",
+    });
+    expect(readFileSync(cacheFile(), "utf8")).toBe(before);
+  });
+
+  it("names the earlier days in a form of one request", async () => {
+    setToday("2026-03-01");
+    save({
+      activitiesFrom: "2020-01-01",
+      activitiesTo: "2020-01-10",
+      activities: byId(...Array.from({ length: 10 }, (_, i) => row(i, "2020-01-05"))),
+    });
+    const { messages } = await review({}, NO);
+    expect(messages).toEqual([
+      // 60 days, 1 session a day; from 2020 on it is over the cap
+      "Fetch the activity list from Garmin for 2026-01-01 to 2026-03-01, about 1 request? " +
+        "The cache then no longer covers 2020-01-01 to 2020-01-10: a review of those days must fetch " +
+        "them again. HRV and resting HR are not fetched. Confirm?",
     ]);
   });
 
@@ -332,7 +406,6 @@ describe("getYearReview", () => {
       asked: "notNeeded",
       estimate: 0,
       garminCalls: 0,
-      newActivities: 0,
     });
     expect(reply.year.totals.activities).toBe(1);
     expect(reply.year.coverage).toMatchObject({
@@ -341,12 +414,61 @@ describe("getYearReview", () => {
     });
   });
 
+  it.each([
+    ["ends on the last day of the year", 2025, {}, true],
+    ["ends in the year", 2025, { activitiesTo: "2025-07-01" }, true],
+    ["goes on after the year", 2025, { activitiesTo: "2026-01-01" }, false],
+    ["ends before the year", 2025, { activitiesTo: "2024-12-31" }, false],
+    [
+      "starts after the year",
+      2025,
+      { activitiesFrom: "2026-01-01", activitiesTo: "2026-02-01" },
+      false,
+    ],
+    ["is not there", 2025, { activitiesTo: undefined }, false],
+    ["has an older summary", 2025, { activitiesSummary: 2 }, false],
+    ["ends yesterday", 2026, { activitiesTo: "2026-10-25" }, true],
+    ["ends today", 2026, { activitiesTo: "2026-10-26" }, true],
+    ["ends after today", 2026, { activitiesTo: "2026-10-27" }, true],
+  ])(
+    "tells if the last day is open when the cache %s (%i)",
+    async (_what, year, extra, expected) => {
+      save({ activitiesFrom: "2024-01-01", activitiesTo: "2025-12-31", ...extra });
+      expect((await review({ year })).reply.lastDayOpen).toBe(expected);
+    },
+  );
+
+  it("gives the last day as not open after a fill of the days after it", async () => {
+    save({ activitiesFrom: "2024-01-01", activitiesTo: "2025-12-30" });
+    const { reply } = await review({ year: 2025 }, YES);
+    expect(reply.fill.asked).toBe("yes");
+    expect(reply.lastDayOpen).toBe(false);
+  });
+
+  it("gives the last day as open after a fill up to today", async () => {
+    save({ activitiesTo: "2026-10-20" });
+    const { reply } = await review({}, YES);
+    expect(reply.fill.asked).toBe("yes");
+    expect(reply.year.coverage.activities?.to).toBe("2026-10-26");
+    expect(reply.lastDayOpen).toBe(true);
+  });
+
   it("tells the assistant that the last cached day can lack a late session", async () => {
     const { client } = await open("2026-07-28", undefined);
     const tool = (await client.listTools()).tools.find((t) => t.name === "getYearReview");
     expect(tool?.description?.replace(/\s+/g, " ")).toContain(
-      "The last cached day, `year.coverage.activities.to`, can lack sessions that came after that " +
-        "day's update: say so, and that a dashboard update adds them.",
+      "With `lastDayOpen` true, the last cached day, `year.coverage.activities.to`, can lack sessions that came after that " +
+        "day's update: say so. When `fill.asked` is notNeeded and the year is the year of today, say also that " +
+        "a dashboard update adds them.",
+    );
+  });
+
+  it("tells the assistant that a yes can fetch earlier days too", async () => {
+    const { client } = await open("2026-07-28", undefined);
+    const tool = (await client.listTools()).tools.find((t) => t.name === "getYearReview");
+    expect(tool?.description?.replace(/\s+/g, " ")).toContain(
+      "only after a yes it fetches the activity list of these days, and of other days that the cache " +
+        "needs (no HRV, no resting HR).",
     );
   });
 
@@ -373,7 +495,7 @@ describe("getYearReview", () => {
     save();
     garmin = [activity(7, "2025-05-05")];
     const { reply } = await review({ year: 2025 }, YES);
-    expect(reply.fill).toEqual({ asked: "yes", estimate: 2, garminCalls: 2, newActivities: 1 });
+    expect(reply.fill).toEqual({ asked: "yes", estimate: 2, garminCalls: 2 });
     const ranges = api.getJson.mock.calls.map(([, q]) => [q.startDate, q.endDate]);
     expect(ranges).toEqual([
       ["2025-01-01", "2025-12-31"],
@@ -434,6 +556,23 @@ describe("getYearReview", () => {
   describe("with the settings of a page", () => {
     const coach = { sports: ["running"], exclude: ["recovery", "names"] };
 
+    it("gives only the settings that leave data out", async () => {
+      saveAllKinds();
+      savePage(JSON.stringify({ ...coach, title: "Coach", shared: true, note: "private" }));
+      const { reply, text } = await review();
+      expect(reply.settings).toEqual(coach);
+      expect(text).not.toMatch(/private|"title"|"shared"/);
+    });
+
+    it.each([{ sports: null, exclude: null }, { sports: ["running"] }, { exclude: ["names"] }])(
+      "gives the settings %j as they are",
+      async (settings) => {
+        saveAllKinds();
+        savePage(JSON.stringify(settings));
+        expect((await review()).reply.settings).toEqual(settings);
+      },
+    );
+
     it("leaves out what the page at path leaves out", async () => {
       saveAllKinds();
       savePage(JSON.stringify(coach), "coach.html");
@@ -459,7 +598,7 @@ describe("getYearReview", () => {
         { ...activity(8, "2026-02-05"), activityType: { typeKey: "cycling" }, sportTypeId: 2 },
       ];
       const { reply, text } = await review({}, YES);
-      expect(reply.fill).toMatchObject({ asked: "yes", newActivities: 2 });
+      expect(reply.fill).toMatchObject({ asked: "yes", garminCalls: 2 });
       expect(reply.year.totals.activities).toBe(1);
       expect(text).not.toMatch(/cycling|"name"/);
     });
@@ -509,6 +648,7 @@ describe("getYearReview", () => {
         '{"exclude":"names"}',
         "The garmin-settings block of the page has a bad exclude",
       ],
+      ["a list", '["names"]', "The garmin-settings block of the page is not an object"],
     ])("refuses settings with %s, and asks and gives nothing", async (_what, settings, start) => {
       saveFromMarch();
       savePage(settings, "coach.html");
@@ -562,7 +702,6 @@ describe("getYearReview", () => {
       asked: "yes",
       estimate: 2,
       garminCalls: 1,
-      newActivities: 0,
       error,
     });
     expect(reply.year.totals.activities).toBe(1);
@@ -583,7 +722,6 @@ describe("getYearReview", () => {
       asked: "yes",
       estimate: 2,
       garminCalls: 20,
-      newActivities: 0,
       error:
         "The fetch stopped at 20 requests and saved nothing: the days need more. Another try stops too.",
     });

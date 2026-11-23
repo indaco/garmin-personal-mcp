@@ -69,11 +69,14 @@ export function registerYearReview(
         "best efforts, weekdays, time of day, and HRV and resting HR by month. Use it for a year in review;",
         "for the last weeks, use `getDashboardData`. `year.coverage.missing` lists the days that the cache",
         "does not have. With a day before today in it, the tool asks the user first, in a form, and only",
-        "after a yes it fetches the activity list of these days (no HRV, no resting HR). `fill.asked` says",
-        "what came of it: notNeeded (no day before today is missing), yes, no, unasked (this client has no",
-        `form), or tooLarge (about \`estimate\` requests, over ${FILL_CAP}). Only yes fetches; \`fill.error\` says why`,
-        "a fetch failed. The last cached day, `year.coverage.activities.to`, can lack sessions that came",
-        "after that day's update: say so, and that a dashboard update adds them. null is n/a, never 0.",
+        "after a yes it fetches the activity list of these days, and of other days that the cache needs",
+        "(no HRV, no resting HR). `fill.asked` says what came of it: notNeeded (no day before today is",
+        "missing), yes, no, unasked (this client has no form), or tooLarge (about `estimate` requests, over",
+        `${FILL_CAP}). Only yes fetches; \`fill.error\` says why a fetch failed. With`,
+        "`lastDayOpen` true, the last cached day, `year.coverage.activities.to`, can lack",
+        "sessions that came after that day's update: say so. When `fill.asked` is notNeeded and the year",
+        "is the year of today, say also that a dashboard update adds them.",
+        "null is n/a, never 0.",
       ].join("\n"),
       inputSchema: z.object({
         year: z
@@ -101,8 +104,13 @@ export function registerYearReview(
       const settings = await writer.settings(a.path);
       const cached = await dashboard.readCached(from, today);
       const reply = (asked: Fill["asked"], estimate: number, rows = cached, done?: FillResult) => {
-        const fill: Fill = { asked, estimate, garminCalls: 0, newActivities: 0, ...done };
-        const out = { year: yearOf(rows, settings, year, today), fill, settings };
+        const fill: Fill = { asked, estimate, garminCalls: 0, ...done };
+        const recap = yearOf(rows, settings, year, today);
+        // the rows go to today: the same end means that the cache has no day after the year
+        const last = recap.coverage.activities?.to;
+        const lastDayOpen = last !== undefined && last === rows.coverage.activities?.to;
+        const { sports, exclude } = settings;
+        const out = { year: recap, fill, lastDayOpen, settings: { sports, exclude } };
         return { content: [{ type: "text" as const, text: JSON.stringify(out) }] };
       };
       const { missing } = yearOf(cached, settings, year, today).coverage;
@@ -110,11 +118,14 @@ export function registerYearReview(
       if (missing.every((r) => r.from === today)) return reply("notNeeded", 0);
       const estimate = cached.fillRequests;
       if (estimate > FILL_CAP) return reply("tooLarge", estimate);
+      const drops = cached.fillDrops
+        ? ` The cache then no longer covers ${cached.fillDrops.from} to ${cached.fillDrops.to}: a review of those days must fetch them again.`
+        : "";
       const c = confirm(
         server,
         ctx,
         "confirm",
-        `Fetch the activity list from Garmin for ${from} to ${today}, about ${estimate} request${estimate === 1 ? "" : "s"}? HRV and resting HR are not fetched. Confirm?`,
+        `Fetch the activity list from Garmin for ${cached.fillStart} to ${today}, about ${estimate} request${estimate === 1 ? "" : "s"}?${drops} HRV and resting HR are not fetched. Confirm?`,
       );
       if ("ask" in c) return c.ask;
       // the other tools do on "unasked" what the user told them to do: here the user asked for a

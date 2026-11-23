@@ -129,8 +129,15 @@ describe("guide", () => {
         "| `path` | a dashboard page: its sports and excluded data apply | `garmin-dashboard.html` in the data folder | " +
         "A `path` to a page that does not exist is an error. " +
         "When a day of the year before today is missing, the server asks you in a form before it fetches " +
-        "the activity list. It makes at most 20 requests for the list, and it does not fetch HRV and " +
-        "resting HR. In the answer, `fill.asked` tells what it did: " +
+        "the activity list. It asks for at most 20 pages of the list, and it does not fetch HRV and " +
+        "resting HR. A page that Garmin refuses can be asked for again. The cache keeps one range of " +
+        "days, so the first day in the form can be in an earlier year. When the earlier days would need " +
+        "more than about 20 requests, the fetch starts in the year itself. The form then names the earlier " +
+        "days that the cache no longer covers after the fetch. " +
+        "A dashboard update fetches only the days of the dashboard. It can drop the earlier days that a " +
+        "review fetched: after an update of the server that changes the cache, or when the dashboard starts " +
+        "more than one day after the last cached day. The next review shows the missing days and asks again. " +
+        "In the answer, `fill.asked` tells what it did: " +
         "| `fill.asked` | What the server did | | --- | --- | " +
         "| `notNeeded` | no day before today is missing: no question and no request | " +
         "| `yes` | you said yes: it fetched the list. When this fails, it saves nothing and `fill.error` tells why | " +
@@ -138,8 +145,10 @@ describe("guide", () => {
         "| `unasked` | your client has no form: no request | " +
         "| `tooLarge` | the days need more than about 20 requests: no question and no request | " +
         "When only today is missing, the server does not ask. A workout that came to Garmin after the last " +
-        "update of the cache is then not in the recap, and its day can look like a rest day. For a recap " +
-        "with all workouts, update the dashboard first. " +
+        "update of the cache is then not in the recap, and its day can look like a rest day. `lastDayOpen` " +
+        "is true in the answer when the last cached day is in the year: a later workout of that day can be " +
+        "missing. For a recap of the current year with all workouts, update the dashboard first, but only " +
+        "when no day before today is missing. " +
         "Claude Code (tested with 2.1.329) and the MCP Inspector (tested with 2.16.0) show the forms of other " +
         "tools. Claude Desktop shows no form (tested with 6.6395.1). The form of this tool: not tested. ",
     );
@@ -147,9 +156,29 @@ describe("guide", () => {
       "| `getYearReview` | `/activitylist-service/activities/search/activities`, only after a yes | " +
         "the recap of a calendar year (`year`, default this year; until 14 January, the year before) from " +
         "the cache. When days before today are missing, it asks in a form and fetches the activity list after a yes, " +
-        "with at most 20 requests; it never fetches HRV and resting HR. `path` is the dashboard page whose " +
+        "at most 20 pages; it never fetches HRV and resting HR. `path` is the dashboard page whose " +
         "sports and excluded data apply; it must exist. `fill.asked` in the answer: see " +
         "[Year review](../README.md#year-review) |",
+    );
+    expect(flat("guide/tools.md")).toContain(
+      "| `dashboard-cache.json` | the dashboard data of the last calls, and the days that `getYearReview` fetched: an update or a later fetch can drop them |",
+    );
+    expect(flat("guide/dashboard.md")).toContain(
+      "The server leaves the excluded data and sports out of the file, and out of the digest for the " +
+        "coach notes. `getYearReview` leaves them out of its answer too. The server cannot remove data " +
+        "from the chat.",
+    );
+    expect(flat("guide/dashboard.md")).toContain(
+      "Later updates use the local cache and send about 7. An update fetches only the days of the " +
+        "dashboard: it can drop the earlier days of a [year review](../README.md#year-review).",
+    );
+    expect(flat("guide/troubleshooting.md")).toContain(
+      "Wait a few minutes and update again: it does not fetch again what it saved. A failed fetch of " +
+        "`getYearReview` saves nothing: the next one starts again. |",
+    );
+    expect(flat("guide/how-it-works.md")).toContain(
+      "The next call asks Garmin only for the days after the last call. It also asks again for the last " +
+        "14 days, because Garmin can still add data to them.",
     );
     expect(flat("guide/how-it-works.md")).toContain(
       "`getYearReview` reads the same file, and adds activities to it only after a yes.",

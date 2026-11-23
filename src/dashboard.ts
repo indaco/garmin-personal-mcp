@@ -47,10 +47,13 @@ export const weeksSince = (since: string, today: string): number =>
 /**
  * The last days of a cached range are fetched again: a watch can sync days late, and Garmin can still
  * change a session or finish a night's data. 14 days fit one search page, one HRV chunk and one recovery
- * range pair, so the window costs no extra requests.
+ * range pair, so the window seldom costs a request more: many new days can need one more chunk.
  */
 const REFRESH_DAYS = 14;
-/** Bump when summarize keeps a new field, or to mend cached rows that an older rule got wrong: cached rows from before it are fetched again, once. */
+/**
+ * Bump when summarize keeps a new field, or to mend cached rows that an older rule got wrong: the next
+ * sync drops the cached rows from before it and fetches the days that it needs again, once.
+ */
 const SUMMARY = 3;
 /** The most search requests of one fillActivities call. */
 export const FILL_CAP = 20;
@@ -69,7 +72,9 @@ interface Sync {
 }
 
 /** The activity list needs more requests than its limit. */
-class SearchLimitError extends Error {}
+class SearchLimitError extends Error {
+  override name = "SearchLimitError";
+}
 
 /** The cached rows of a range of days. They are read from a file, so each value needs a check. */
 export interface CachedRows {
@@ -84,12 +89,15 @@ export interface CachedRows {
   };
   /** About how many requests fillActivities needs for the same range. */
   readonly fillRequests: number;
+  /** The first day that fillActivities asks for. */
+  readonly fillStart: string;
+  /** The earlier cached days that the cache does not cover after fillActivities. */
+  readonly fillDrops: DayRange | null;
 }
 
 /** What fillActivities did. `error` is a text without a key, a token or an answer of Garmin. */
 export interface FillResult {
   readonly garminCalls: number;
-  readonly newActivities: number;
   readonly error?: string;
 }
 
@@ -141,11 +149,16 @@ export class GarminDashboard {
 
     const cache = await this.load();
     const before = new Set(Object.keys(objectAt(cache, "activities")));
+    // only the days of the dashboard: the earlier years of a year review need a yes
     await this.#syncActivities(cache, prevStart, today, sync);
     await this.#syncHrv(cache, start, today, sync);
     await this.#syncRecovery(cache, recoveryFrom, today, sync);
     cache.syncedAt = new Date().toISOString();
-    await writeAtomically(this.#file(), JSON.stringify(cache));
+    // before a save adds the rows of another process
+    const newActivities = Object.keys(objectAt(cache, "activities")).filter(
+      (id) => !before.has(id),
+    );
+    await this.#save(cache);
 
     const [newZones, fitnessAge, settings] = await Promise.all([
       optional(sync, "zones", () => this.tools.getHeartRateZones().then(parsed)),
@@ -160,7 +173,7 @@ export class GarminDashboard {
       // Garmin writes a locale as pt_BR; the page keeps the built-in language that matches it
       cache.locale = String(settings.preferredLocale).replace("_", "-");
     }
-    await writeAtomically(this.#file(), JSON.stringify(cache));
+    await this.#save(cache);
     const { units, locale } = cache;
     const out: Json = {
       generated: today,
@@ -174,18 +187,17 @@ export class GarminDashboard {
       ...(typeof units === "string" && UNITS.includes(units) ? { units } : {}),
       ...(typeof locale === "string" && /^[a-z]{2,3}(-[A-Z]{2})?$/.test(locale) ? { locale } : {}),
     };
-    const cached = Object.keys(objectAt(cache, "activities"));
     // the small parts first: a reader that stops early still sees them
     const synced: Json = {
       garminCalls: sync.calls, // the .FIT downloads are in fitDownloads
       fitDownloads: 0,
-      newActivities: cached.filter((id) => !before.has(id)).length,
+      newActivities: newActivities.length,
       failedDays: sync.failedDates.length,
       failedDates: sync.failedDates,
       failedSections: sync.failedSections,
       failedDetails: 0,
       stoppedEarly: false,
-      cachedActivities: cached.length,
+      cachedActivities: Object.keys(objectAt(cache, "activities")).length,
     };
     out.sync = synced;
     out.hrv = between(objectAt(cache, "hrv"), start, today);
@@ -207,7 +219,8 @@ export class GarminDashboard {
   readCached(from: string, to: string): Promise<CachedRows> {
     return this.#inTurn(async () => {
       const cache = await this.load();
-      const held = rangeOf(cache.activitiesFrom, cache.activitiesTo);
+      const held = outdated(cache) ? null : rangeOf(cache.activitiesFrom, cache.activitiesTo);
+      const plan = fillPlan(cache, from, to);
       const recovery = objectAt(cache, "recovery");
       let rhr: DayRange | null = null;
       for (let day = from, first = ""; day <= to; day = addDays(day, 1)) {
@@ -215,18 +228,19 @@ export class GarminDashboard {
         first ||= day;
         rhr = { from: first, to: day };
       }
-      const sessions = held ? activitiesBetween(cache, held.from, held.to).length : 0;
       return {
         activities: activitiesBetween(cache, from, to),
         hrv: between(objectAt(cache, "hrv"), from, to).filter(isObject),
         recovery: between(recovery, from, to).filter(isObject),
         zones: cache.zones,
         coverage: {
-          activities: cache.activitiesSummary === SUMMARY ? clip(held, from, to) : null,
+          activities: clip(held, from, to),
           hrv: clip(rangeOf(cache.hrvFrom, cache.hrvTo), from, to),
           rhr,
         },
-        fillRequests: searchRequests(outdated(cache) ? null : held, sessions, from, to),
+        fillRequests: plan.requests,
+        fillStart: toFetch(held?.from, held?.to, plan.start, to)[0]?.[0] ?? from,
+        fillDrops: plan.drops,
       };
     });
   }
@@ -240,16 +254,12 @@ export class GarminDashboard {
       const sync: Sync = { ...newSync(), searchLimit: FILL_CAP };
       try {
         const cache = await this.load();
-        const before = new Set(Object.keys(objectAt(cache, "activities")));
-        await this.#syncActivities(cache, from, to, sync);
-        await writeAtomically(this.#file(), JSON.stringify(cache));
-        const newActivities = Object.keys(objectAt(cache, "activities")).filter(
-          (id) => !before.has(id),
-        ).length;
-        return { garminCalls: sync.calls, newActivities };
+        await this.#syncActivities(cache, fillPlan(cache, from, to).start, to, sync);
+        await this.#save(cache);
+        return { garminCalls: sync.calls };
       } catch (e) {
         log("WARN", `Activity list not fetched: ${reasonOf(e)}`);
-        return { garminCalls: sync.calls, newActivities: 0, error: fillError(e) };
+        return { garminCalls: sync.calls, error: fillError(e) };
       }
     });
   }
@@ -285,13 +295,14 @@ export class GarminDashboard {
         const list = Array.isArray(json) ? json : firstArray(json);
         if (!list) {
           // abort before the cache is saved: the days of this range are already removed from it
-          throw new GarminApiError(
-            `Unexpected activity list response: ${JSON.stringify(json).slice(0, 200)}`,
-          );
+          throw new GarminApiError("Unexpected activity list response");
         }
         for (const a of list) {
           const activity = isObject(a) ? a : {};
-          byId[asString(activity.activityId)] = summarize(activity);
+          const row = summarize(activity);
+          // a row without this key is from another server or an older one: see outdated
+          row.sport ??= "";
+          byId[asString(activity.activityId)] = row;
         }
         if (list.length < SEARCH_PAGE) {
           break;
@@ -507,6 +518,34 @@ export class GarminDashboard {
     return join(this.dataDir, "dashboard-cache.json");
   }
 
+  /**
+   * Writes the cache. A fill of another process can have saved earlier days since this one read the
+   * file. They stay when no later sync has to ask for them: their last REFRESH_DAYS days are in this
+   * cache, or are the last days of this cache too. They then take the place of the rows that this cache
+   * still has from before its first day.
+   * shortcut: a write of another process between this read and this write is lost; a lock file if it matters
+   */
+  async #save(cache: Json): Promise<void> {
+    const now = await this.load();
+    const theirs = outdated(now) ? null : rangeOf(now.activitiesFrom, now.activitiesTo);
+    const mine = rangeOf(cache.activitiesFrom, cache.activitiesTo);
+    if (
+      theirs &&
+      mine &&
+      theirs.from < mine.from &&
+      (theirs.to >= mine.to || refreshFrom(theirs.to) >= mine.from)
+    ) {
+      const rows = objectAt(cache, "activities");
+      const earlier = (a: unknown) => (dayOf(a) ?? mine.from) < mine.from;
+      for (const [id, a] of Object.entries(rows)) if (earlier(a)) delete rows[id];
+      for (const [id, a] of Object.entries(objectAt(now, "activities"))) {
+        if (earlier(a)) rows[id] = a;
+      }
+      cache.activitiesFrom = theirs.from;
+    }
+    await writeAtomically(this.#file(), JSON.stringify(cache));
+  }
+
   /** The cache, or an empty one when the file is missing, unreadable or has the wrong shape. */
   async load(): Promise<Json> {
     try {
@@ -527,6 +566,9 @@ export class GarminDashboard {
 }
 
 // ------------------------------------------------------------------ date ranges
+
+/** The first of the REFRESH_DAYS days that end on `to`. */
+const refreshFrom = (to: string): string => addDays(to, -(REFRESH_DAYS - 1));
 
 /**
  * Date ranges to fetch so the cache covers [from, to]: the part before the cached range, and from
@@ -552,7 +594,7 @@ export function toFetch(
   if (from < cachedFrom) {
     out.push([from, addDays(cachedFrom, -1)]);
   }
-  let tail = addDays(cachedTo, -(REFRESH_DAYS - 1));
+  let tail = refreshFrom(cachedTo);
   // the part before the cached range is its own range: the two never overlap
   if (tail < cachedFrom) {
     tail = cachedFrom;
@@ -585,19 +627,52 @@ export function covered(
 }
 
 /**
- * About how many search requests a fill of [from, to] needs, for a cache that holds `sessions` in
- * `held`: the sessions per held day, or 1 a day without held days.
+ * About how many search requests a sync of [from, to] needs with the days of `held` in the cache, at
+ * `rate` sessions a day.
  */
 export function searchRequests(
   held: DayRange | null,
-  sessions: number,
+  rate: number,
   from: string,
   to: string,
 ): number {
-  const rate = held ? sessions / daysIn(held.from, held.to) : 1;
   return toFetch(held?.from, held?.to, from, to)
     .map(([a, b]) => Math.max(1, Math.ceil((daysIn(a, b) * rate) / SEARCH_PAGE)))
     .reduce((sum, n) => sum + n, 0);
+}
+
+/** What a fill of [from, to] covers. */
+interface FillPlan {
+  /** The first day that it must cover. */
+  readonly start: string;
+  /** About how many search requests it makes. */
+  readonly requests: number;
+  /** The earlier cached days that the cache does not cover after it. */
+  readonly drops: DayRange | null;
+}
+
+/**
+ * A fill of [from, to] that keeps the earlier cached days when that needs at most FILL_CAP requests: it
+ * starts at the first of them. A sync drops all rows of an outdated cache, and the cache covers one range,
+ * so a start at `from` can lose them. The estimate takes the sessions of each cached day, or 1 a day
+ * without cached days. The days of a gap count at least 1 a day: the cached days before it can be few.
+ */
+function fillPlan(cache: Json, from: string, to: string): FillPlan {
+  const held = rangeOf(cache.activitiesFrom, cache.activitiesTo);
+  const rate = held
+    ? activitiesBetween(cache, held.from, held.to).length / daysIn(held.from, held.to)
+    : 1;
+  const old = outdated(cache);
+  const plan = (start: string, drops: DayRange | null, perDay = rate): FillPlan => ({
+    start,
+    requests: searchRequests(old ? null : held, perDay, start, to),
+    drops,
+  });
+  if (!held || held.from >= from) return plan(from, null);
+  const gap = addDays(held.to, 1) < from;
+  const keep = plan(held.from, null, gap ? Math.max(1, rate) : rate);
+  if (keep.requests <= FILL_CAP || (!old && !gap)) return keep;
+  return plan(from, { from: held.from, to: gap ? held.to : addDays(from, -1) });
 }
 
 /** The days from `from` to `to`, both included. */
@@ -620,7 +695,7 @@ function clip(range: DayRange | null, from: string, to: string): DayRange | null
 /** Recovery rows from the last REFRESH_DAYS days before the last sync on are fetched again. */
 export function recoveryRefreshFrom(lastSync: string | undefined, today: string): string {
   const last = lastSync === undefined || lastSync > today ? today : lastSync;
-  return addDays(last, -(REFRESH_DAYS - 1));
+  return refreshFrom(last);
 }
 
 /** Spans of at most RECOVERY_CHUNK_DAYS days over the given days, which are in date order. */
@@ -701,8 +776,7 @@ const newSync = (): Sync => ({
 
 /**
  * Rows written before a summary field (SUMMARY) or the sport field, or by another server: the next
- * sync drops them all and fetches again.
- * shortcut: a row that Garmin sends without sportTypeId repeats this on every call; mark rows if that happens
+ * sync drops them all and fetches again. A row whose sport Garmin does not tell has the sport "".
  */
 const outdated = (cache: Json): boolean =>
   cache.activitiesSummary !== SUMMARY ||
@@ -710,9 +784,20 @@ const outdated = (cache: Json): boolean =>
     (a) => isObject(a) && a.type !== undefined && a.sport === undefined,
   );
 
-/** The reason for the log: the text of an error that is not from the API client can hold a secret. */
-const reasonOf = (e: unknown): string =>
-  e instanceof GarminApiError ? e.message : e instanceof Error ? e.name : typeof e;
+/**
+ * The reason for the log. The text of an error can hold a secret or a part of Garmin's answer. The
+ * status, the code of a file error (EACCES) and the start of a text of the API client do not: the
+ * answer comes after the status, or after the Content-Type in brackets.
+ */
+function reasonOf(e: unknown): string {
+  if (e instanceof GarminApiError)
+    return e.status === undefined
+      ? e.message.split(" (Content-Type")[0]
+      : `${e.name} HTTP ${e.status}`;
+  if (!(e instanceof Error)) return typeof e;
+  const code = field(e, "code");
+  return typeof code === "string" && /^E[A-Z0-9]+$/.test(code) ? `${e.name} ${code}` : e.name;
+}
 
 /** The text of a failed fill for the tool reply: never an answer of Garmin, and no local path. */
 function fillError(e: unknown): string {
@@ -755,12 +840,16 @@ async function optional(sync: Sync, section: string, f: () => Promise<unknown>):
   }
 }
 
-/** Most recent first, as listActivities returns them. */
+/** Most recent first, as listActivities returns them, without the "" of a row that has no sport. */
 function activitiesBetween(cache: Json, from: string, to: string): Json[] {
   return Object.values(objectAt(cache, "activities"))
     .filter((a): a is Json => {
       const d = dayOf(a);
       return d !== undefined && d >= from && d <= to;
+    })
+    .map((a) => {
+      const { sport, ...rest } = a;
+      return sport === "" ? rest : a;
     })
     .toSorted((a, b) => {
       const x = typeof a.start === "string" ? a.start : "";
