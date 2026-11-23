@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/server";
+import type { CallToolResult, InputRequiredResult, McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import type { Activity } from "./analytics/calc";
 import { type YearSummary, yearSummary } from "./analytics/year";
@@ -100,7 +100,7 @@ export function registerYearReview(
           .optional(),
       }),
     },
-    async (a, ctx) => {
+    async function review(a, ctx): Promise<CallToolResult | InputRequiredResult> {
       const today = localToday();
       const year = a.year ?? reviewYear(today);
       // to today, also for an earlier year: the cache keeps one range, with no hole in it
@@ -133,9 +133,9 @@ export function registerYearReview(
       // the other tools do on "unasked" what the user told them to do: here the user asked for a
       // recap, not for a fetch that can use a fifth of Garmin's request limit
       if (c.answer !== "yes") return reply(c.answer, estimate);
-      // shortcut: fillActivities reads the cache again, so a write of another process in the few
-      // milliseconds since readCached can still change the plan; pass the plan if that ever matters
-      const done = await dashboard.fillActivities(from, today);
+      const done = await dashboard.fillActivities(from, today, cached);
+      // the cache changed since the yes: the days can be there now, or the form must show the new fetch
+      if (!done) return review(a, ctx);
       return reply("yes", estimate, await dashboard.readCached(from, today), done);
     },
   );

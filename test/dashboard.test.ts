@@ -38,6 +38,10 @@ import { pageYear } from "../src/year-review";
 import { fitFile } from "./fit-file";
 
 vi.mock("../src/log", () => ({ log: vi.fn() }));
+vi.mock("../src/tools", async (original) => {
+  const tools = await original<typeof import("../src/tools")>();
+  return { ...tools, writeAtomically: vi.fn(tools.writeAtomically) };
+});
 
 const FROM = "2026-08-03";
 const TO = "2026-10-26";
@@ -2457,18 +2461,24 @@ const pages = (n: number, from: string, to: string) =>
   Array.from({ length: n }, (_, i) => [from, to, String(i * 100), "100"]);
 
 const readRange = () => dashboard.readCached("2026-01-01", "2026-10-26");
-const fillFrom = (from = "2026-01-01") => dashboard.fillActivities(from, "2026-10-26");
-/** Writes the file of the other process during the first answer of the search. */
-const otherSaves = (extra: Record<string, unknown>) => {
+const fillFrom = async (from = "2026-01-01", to = "2026-10-26") =>
+  dashboard.fillActivities(from, to, await dashboard.readCached(from, to));
+const fillShown = (shown: Parameters<GarminDashboard["fillActivities"]>[2]) =>
+  dashboard.fillActivities("2026-01-01", "2026-10-26", shown);
+/** Runs `change` during the first answer of the search. */
+const duringFill = (change: () => void) => {
   let done = false;
   answer({
     [SEARCH]: (q) => {
-      if (!done) save(extra);
+      if (!done) change();
       done = true;
       return fakeGarmin(SEARCH, q);
     },
   });
 };
+/** Writes the file of the other process during the first answer of the search. */
+const otherSaves = (extra: Record<string, unknown>) => duringFill(() => save(extra));
+const cacheText = () => (existsSync(cacheFile()) ? readFileSync(cacheFile(), "utf8") : undefined);
 const heldRange = () => [readCache().activitiesFrom, readCache().activitiesTo];
 const cachedIds = () => Object.keys(readCache().activities);
 const recoveryOn = (d: string, rhr?: unknown) => [d, { date: d, rhr }];
@@ -2847,7 +2857,7 @@ describe("readCached", () => {
 });
 
 describe("fillActivities", () => {
-  const stopped = "The fetch stopped at 20 requests and saved nothing: the days need more.";
+  const stopped = "The fetch stopped at 20 requests and saved no activities: the days need more.";
   const stopsToo = `${stopped} Another try stops too.`;
   const lessDays = (from: string) =>
     `${stopped} Another try asks for the days from ${from} only: its form names the cached days that it drops.`;
@@ -3051,13 +3061,62 @@ describe("fillActivities", () => {
     expect(readFileSync(cacheFile(), "utf8")).toBe(before);
   });
 
-  it("stops a fill of a gap with more sessions than its estimate, and saves nothing", async () => {
+  it("stops a fill of a gap with more sessions than its estimate, and saves none of them", async () => {
     save({ activitiesFrom: "2024-01-01", activitiesTo: "2024-12-31", activities: {} });
-    const before = readFileSync(cacheFile(), "utf8");
+    const before = readCache();
     garminActivities = many(2000, "2025-03-01", 1000);
     expect(await fillFrom()).toEqual({ garminCalls: 20, error: lessDays("2026-01-01") });
     expect(searches()).toEqual(pages(20, "2024-12-18", "2026-10-26"));
-    expect(readFileSync(cacheFile(), "utf8")).toBe(before);
+    expect(readCache()).toEqual({ ...before, fillStopped: expect.any(String) });
+  });
+
+  describe("with a plan that the cache no longer gives", () => {
+    const shown = { fillStart: "2026-01-01", fillRequests: 4, fillDrops: null };
+    const drops = { from: "2025-01-01", to: "2025-12-31" };
+
+    it.each([
+      ["first day", { ...shown, fillRequests: 2, fillStart: "2026-01-02" }],
+      ["requests", shown],
+      ["days to drop", { ...shown, fillRequests: 2, fillDrops: drops }],
+    ])("makes no request and saves nothing: other %s", async (_what, plan) => {
+      save();
+      const before = readFileSync(cacheFile(), "utf8");
+      expect(await fillShown(plan)).toBeUndefined();
+      expect(api.getJson).not.toHaveBeenCalled();
+      expect(readFileSync(cacheFile(), "utf8")).toBe(before);
+    });
+
+    it("fetches with the plan of the cache", async () => {
+      save();
+      expect(await fillShown({ ...shown, fillRequests: 2 })).toEqual({ garminCalls: 2 });
+    });
+
+    it.each([
+      ["another first day", "2025-01-02", "2025-12-31", undefined],
+      ["another last day", "2025-01-01", "2025-12-30", undefined],
+      ["the same days", "2025-01-01", "2025-12-31", { garminCalls: 1 }],
+    ])("compares the days that it drops: %s", async (_what, first, last, done) => {
+      // 3 a day in an old cache: too many to keep the days before this year
+      const days = daysOf("2025-01-01", "2026-10-20");
+      const rows = days.flatMap((d, i) => [0, 1, 2, 3].map((n) => row(4 * i + n, d)));
+      save({ activitiesSummary: 2, activitiesFrom: days[0], activities: byId(rows) });
+      const plan = await readRange();
+      expect(plan.fillDrops).toEqual(drops);
+      const { fillStart, fillRequests } = plan;
+      const fillDrops = { from: first, to: last };
+      expect(await fillShown({ fillStart, fillRequests, fillDrops })).toEqual(done);
+    });
+
+    it("compares after an update that came before it in the queue", async () => {
+      save();
+      const plan = await readRange();
+      const update = dashboard.getDashboardData(52);
+      const done = fillShown(plan);
+      await update;
+      const count = callsTo(SEARCH).length;
+      expect(await done).toBeUndefined();
+      expect(callsTo(SEARCH)).toHaveLength(count);
+    });
   });
 
   describe("after a fill that keeps the cached days and stops at the cap", () => {
@@ -3131,6 +3190,134 @@ describe("fillActivities", () => {
         expect((await readRange()).fillDrops).toBeNull();
       },
     );
+
+    describe("in the file", () => {
+      const key = JSON.stringify([year.from, year.to, 3]);
+      const others = { zones: [{ sport: "RUNNING" }], keyOfALaterServer: [1], syncedAt: "x" };
+
+      it("is a mark, and all other values stay as they are", async () => {
+        saveYear(others);
+        const before = readCache();
+        await fillFrom();
+        expect(readCache()).toEqual({ ...before, fillStopped: key });
+      });
+
+      it("holds in another process", async () => {
+        saveYear();
+        await fillFrom();
+        const client = api as unknown as GarminApiClient;
+        dashboard = new GarminDashboard(new GarminTools(client, dataDir), client, dataDir);
+        expect((await readRange()).fillDrops).toEqual(year);
+        expect(await fillFrom()).toEqual({ garminCalls: 6 });
+      });
+
+      it("marks the summary of an older cache, so a newer one can keep its days", async () => {
+        const days = daysOf("2022-10-01", "2026-10-26");
+        const activities = byId(days.map((d, i) => row(i, d)));
+        const extra = { activitiesFrom: days[0], activitiesTo: days.at(-1), activities };
+        save({ ...extra, activitiesSummary: 2 });
+        garminActivities = days.flatMap((d, i) => [0, 1, 2].map((n) => activity(3 * i + n, d)));
+        await fillFrom();
+        const mark = readCache().fillStopped;
+        expect(mark).toBe(JSON.stringify([days[0], days.at(-1), 2]));
+        // a server of a later version wrote all the rows again: 1 a day is known to be right
+        save({ ...extra, activitiesSummary: 1, fillStopped: mark });
+        expect((await readRange()).fillDrops).toBeNull();
+      });
+
+      it.each<[string, unknown]>([
+        ["no value", undefined],
+        ["null", null],
+        ["true", true],
+        ["the list", [year.from, year.to, 3]],
+        ["an object", { from: year.from, to: year.to }],
+        ["another first day", JSON.stringify(["2022-10-02", year.to, 3])],
+        ["another last day", JSON.stringify([year.from, "2023-10-01", 3])],
+        ["another summary", JSON.stringify([year.from, year.to, 2])],
+        ["the days alone", JSON.stringify([year.from, year.to])],
+        ["an empty text", ""],
+      ])("with %s counts as no mark", async (_what, fillStopped) => {
+        saveYear({ fillStopped });
+        expect((await readRange()).fillDrops).toBeNull();
+      });
+
+      it("drops the days with the mark of them", async () => {
+        saveYear({ fillStopped: key });
+        expect((await readRange()).fillDrops).toEqual(year);
+      });
+
+      it("is not there after a fill that another try cannot make shorter", async () => {
+        save();
+        const before = readFileSync(cacheFile(), "utf8");
+        garminActivities = many(2000, "2026-03-01", 1000);
+        expect(await fillFrom()).toEqual({ garminCalls: 20, error: stopsToo });
+        expect(readFileSync(cacheFile(), "utf8")).toBe(before);
+      });
+
+      it("is not there after another failure", async () => {
+        saveYear();
+        const before = readFileSync(cacheFile(), "utf8");
+        api.getJson.mockRejectedValueOnce(rateLimit());
+        await fillFrom();
+        expect(readFileSync(cacheFile(), "utf8")).toBe(before);
+      });
+
+      it("keeps the rows that another process wrote for the same days", async () => {
+        saveYear();
+        const zones = [{ sport: "CYCLING" }];
+        duringFill(() => saveYear({ zones, activities: byId([row(7, "2022-12-01")]) }));
+        expect(await fillFrom()).toEqual({ garminCalls: 20, error: lessDays("2026-01-01") });
+        expect(readCache()).toMatchObject({ zones, fillStopped: key });
+        expect(cachedIds()).toEqual(["7"]);
+      });
+
+      it.each<[string, () => void]>([
+        ["has other days now", () => save({ activitiesFrom: "2023-01-01" })],
+        ["is damaged now", () => writeFileSync(cacheFile(), "{")],
+        ["is not there any more", () => rmSync(cacheFile())],
+      ])(
+        "is not written when the file %s, and the error promises no next try",
+        async (_w, change) => {
+          saveYear();
+          let after: string | undefined;
+          duringFill(() => {
+            change();
+            after = cacheText();
+          });
+          expect(await fillFrom()).toEqual({ garminCalls: 20, error: stopped });
+          expect(cacheText()).toBe(after);
+        },
+      );
+
+      it("is not there when it cannot be written: the reply stays, and the log says why", async () => {
+        saveYear();
+        const before = readFileSync(cacheFile(), "utf8");
+        vi.mocked(logMock).mockClear();
+        vi.mocked(writeAtomically).mockRejectedValueOnce(
+          Object.assign(new Error("ENOSPC: /home/me"), { code: "ENOSPC" }),
+        );
+        expect(await fillFrom()).toEqual({ garminCalls: 20, error: stopped });
+        expect(vi.mocked(logMock).mock.calls).toEqual([
+          ["WARN", "Activity list not fetched: SearchLimitError"],
+          ["WARN", "Stopped fetch not marked: Error ENOSPC"],
+        ]);
+        expect(readFileSync(cacheFile(), "utf8")).toBe(before);
+        // no mark: the next one tries to keep the days again
+        expect((await readRange()).fillDrops).toBeNull();
+      });
+
+      it("does not count after a fill, and the update keeps the cache", async () => {
+        saveYear();
+        await fillFrom();
+        await fillFrom();
+        const { activitiesFrom, activitiesTo, fillStopped } = readCache();
+        expect([activitiesFrom, activitiesTo]).toEqual(["2026-01-01", "2026-10-26"]);
+        // the mark can stay: it names days that the cache does not hold any more
+        expect(fillStopped).toBe(key);
+        await get();
+        expect(heldRange()).toEqual(["2026-01-01", "2026-10-26"]);
+      });
+    });
 
     it("says that another try stops too when the asked days alone need too many", async () => {
       saveYear();
@@ -3223,7 +3410,7 @@ describe("fillActivities", () => {
 
   it("gives an answer that is no list as an error without the answer", async () => {
     api.getJson.mockResolvedValue({ secret: "SECRET" });
-    expect((await fillFrom()).error).toBe(
+    expect((await fillFrom())?.error).toBe(
       "The activity list was not fetched or saved. The log of the server tells more.",
     );
   });
@@ -3327,7 +3514,7 @@ describe("fillActivities", () => {
 
   it("logs no part of an answer that is not a list", async () => {
     answer({ [SEARCH]: () => ({ headers: { authorization: "Bearer SECRET" } }) });
-    expect((await fillFrom()).error).toBe(
+    expect((await fillFrom())?.error).toBe(
       "The activity list was not fetched or saved. The log of the server tells more.",
     );
     expect(vi.mocked(logMock).mock.calls).toEqual([
@@ -3421,7 +3608,7 @@ describe("fillActivities", () => {
       ["on the day before", "2026-01-09", "2026-01-01"],
     ])("reads a range that ends %s as a short fill", async (_at, activitiesTo, from) => {
       otherSaves({ ...filled, activitiesTo });
-      await dashboard.fillActivities("2026-01-01", "2026-01-10");
+      await fillFrom("2026-01-01", "2026-01-10");
       expect(heldRange()).toEqual([from, "2026-01-10"]);
     });
 
@@ -3550,8 +3737,8 @@ describe("fillActivities", () => {
 
   it("lets the next call run after a failure", async () => {
     api.getJson.mockRejectedValueOnce(rateLimit());
-    expect((await fillFrom()).error).toBeDefined();
-    expect((await fillFrom()).error).toBeUndefined();
+    expect((await fillFrom())?.error).toBeDefined();
+    expect(await fillFrom()).toEqual({ garminCalls: expect.any(Number) });
   });
 
   it("does not read the cache while an update writes it", async () => {

@@ -401,16 +401,16 @@ Year tab.
 
 In the answer, `fill.asked` tells what it did:
 
-| `fill.asked` | What the server did                                                                             |
-| ------------ | ----------------------------------------------------------------------------------------------- |
-| `notNeeded`  | no day before today is missing: no question and no request                                      |
-| `yes`        | you said yes: it fetched the list. When this fails, it saves nothing and `fill.error` tells why |
-| `no`         | you said no: no request                                                                         |
-| `unasked`    | your client has no form: no request                                                             |
-| `tooLarge`   | the days need more than about 20 requests: no question and no request                           |
+| `fill.asked` | What the server did                                                                            |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| `notNeeded`  | no day before today is missing: no question and no request                                     |
+| `yes`        | you said yes: it fetched the list. If this fails, it saves no activity: `fill.error` tells why |
+| `no`         | you said no: no request                                                                        |
+| `unasked`    | your client has no form: no request                                                            |
+| `tooLarge`   | the days need more than about 20 requests: no question and no request                          |
 
-A fetch stops at 20 requests and saves nothing when the days need more. `fill.error` then tells if
-another try asks for fewer days, and the form of that try names the days that it drops.
+A fetch stops at 20 requests and saves no activities when the days need more. `fill.error` then
+tells if another try asks for fewer days, and the form of that try names the days that it drops.
 
 After `tooLarge` for a year before this year, review a newer year first, then this one. Each yes
 adds earlier days to the cache, so the next review needs fewer requests. This works only in a client
