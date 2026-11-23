@@ -118,7 +118,7 @@ describe("guide", () => {
     );
     const section = readme.slice(
       readme.indexOf("## Year review "),
-      readme.indexOf("## Coach prompts "),
+      readme.indexOf("### year-review prompt "),
     );
     expect(section.replace(/-{3,}/g, "---")).toBe(
       "## Year review `getYearReview` gives the recap of a calendar year in the chat. Ask, for example, " +
@@ -223,6 +223,41 @@ describe("guide", () => {
     );
     expect(readme).toContain(
       '### block-review The assistant reads the server\'s summary of the block (a `writeDashboard` preview, which writes no page file). The block is your last 4 to 12 whole weeks, Monday to Sunday, 8 by default. The week in progress is not in it. The assistant gives a table of the weeks with their sessions, hours, km, load, load ramp against the week before, monotony, strain, and the easy and hard share of the runs and of the rides. It names the weeks that the page flags (a ramp above 10%, a monotony above 2) and the strain of the first and the last week. It compares the easy and hard share of the first and the last week. Then it compares the aerobic efficiency at the start and at the end of the block: the metres per heartbeat of the runs and the normalized power per heartbeat of the rides, both below zone 4. Each end is 4 weeks, or half of a shorter block. The change needs 3 sessions at each end, so in a short block it is often "n/a", with the session count of each end. Both values need your HR zones, and the ride value needs a power meter. It ends with a short coach note. The argument `weeks` is optional (default 8): the number of whole weeks in the block. A value under 4 gives 4, a value over 12 gives 12, and a value that is not a whole number gives 8. ## Configuration',
+    );
+  });
+
+  it("documents the year-review prompt and its arguments in the README", () => {
+    const readme = flat("README.md");
+    expect(readme).toContain(
+      "| [year-review](#year-review-prompt) | gives the recap of a calendar year | `/mcp__garmin-personal__year-review 2025` |",
+    );
+    expect(readme).toContain(
+      "a review of the week or of the calendar year, a readiness check before a race or a swim event,",
+    );
+    expect(
+      readme.slice(
+        readme.indexOf("### year-review prompt "),
+        readme.indexOf("## Coach prompts These"),
+      ),
+    ).toBe(
+      "### year-review prompt " +
+        "The assistant calls `getYearReview` and gives the year in a fixed order: the totals, the sports, the " +
+        "months, the biggest month and week, the best 4 weeks, the most consistent month, the streaks, the " +
+        "longest and the biggest session, the new bests of each running distance, the weekdays and the time " +
+        "of day, and the HRV and the resting HR of each month. When days are missing, the answer names the " +
+        'days that the recap covers, and the other days are "n/a". It says why nothing was fetched, and it ' +
+        "offers no other fetch. When `unlikelyTimes` is above 0, it says how many sessions have a time that " +
+        "is not likely (over 12 h at under 1 km/h). This time and a load estimate from it do not count. " +
+        "The argument `year` is optional: the calendar year, 2000 to this year. The default is this year, and " +
+        "until 14 January the year before. A value under 2000 gives 2000, a value over this year gives this " +
+        "year. " +
+        "The argument `path` is optional: the dashboard page whose sports and excluded data apply, for " +
+        "example `/mcp__garmin-personal__year-review 2025 garmin-dashboard-coach.html`. The default page " +
+        "applies without it. The name of a page alone, or before the year, works too. Text that is not a year " +
+        "is read as the page. When this page does not exist or is not a `.html` file, the answer names it, " +
+        "says what the prompt takes, and asks you to correct it. It gives no review before that, so a " +
+        "mistyped name does not show the data that the page excludes. After a year, Claude Code cuts a page " +
+        "name at its first space: name such a page in the chat. ",
     );
   });
 

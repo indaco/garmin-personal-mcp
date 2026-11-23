@@ -6,9 +6,9 @@ import { type GarminApiClient, GarminApiError } from "../src/api-client";
 import type { YearSummary } from "../src/analytics/year";
 import { type CachedRows, GarminDashboard } from "../src/dashboard";
 import { DashboardWriter } from "../src/dashboard-page";
-import { addDays } from "../src/dates";
-import type { GarminTools } from "../src/tools";
-import { registerYearReview, reviewYear, yearOf } from "../src/year-review";
+import { addDays, reviewYear } from "../src/dates";
+import { type GarminTools, isObject } from "../src/tools";
+import { registerYearReview, yearOf } from "../src/year-review";
 import { type Answer, closeAll, connect, type Era } from "./elicitation-client";
 
 vi.mock("../src/log", () => ({ log: vi.fn() }));
@@ -145,6 +145,17 @@ async function review(
     messages: asked.map((p) => (p as { message: string }).message),
   };
 }
+
+/** The keys of a value, at any depth. */
+const keysOf = (v: unknown): string[] =>
+  Array.isArray(v)
+    ? v.flatMap(keysOf)
+    : isObject(v)
+      ? Object.entries(v).flatMap(([k, x]) => [k, ...keysOf(x)])
+      : [];
+/** The value at a dotted path. */
+const at = (root: unknown, name: string) =>
+  name.split(".").reduce<unknown>((o, k) => (isObject(o) ? o[k] : undefined), root);
 
 describe("reviewYear", () => {
   it.each([
@@ -603,7 +614,7 @@ describe("getYearReview", () => {
       expect(text).not.toMatch(/cycling|"name"/);
     });
 
-    it.each(["none.html", "garmin-dashboard.html"])(
+    it.each(["none.html", "garmin-dashboard.html", "my coach.html", "2025 coach.html"])(
       "refuses the page %s that does not exist, and asks and gives nothing",
       async (path) => {
         saveFromMarch();
@@ -661,11 +672,19 @@ describe("getYearReview", () => {
       );
     });
 
-    it("refuses a path that is no .html file", async () => {
-      const { text, isError } = await review({ path: "coach.txt" });
-      expect(isError).toBe(true);
-      expect(text).toBe(`The dashboard must be an .html file: ${join(dir, "coach.txt")}`);
-    });
+    // the names that a mistyped year or page gives: the saved page must not apply, nor no page
+    it.each(["coach.txt", "coach", "2025", "20025x", "coach.html 2025", "2025.5"])(
+      "refuses the path %j that is no .html file, and asks and gives nothing",
+      async (path) => {
+        saveFromMarch();
+        savePage(JSON.stringify(coach), "coach.html");
+        const { text, isError, asked } = await review({ path }, YES);
+        expect(isError).toBe(true);
+        expect(text).toBe(`The dashboard must be an .html file: ${join(dir, path)}`);
+        expect(asked).toEqual([]);
+        expect(api.getJson).not.toHaveBeenCalled();
+      },
+    );
 
     it("refuses a file that is no dashboard", async () => {
       writeFileSync(join(dir, "other.html"), "<p>x</p>");
@@ -708,6 +727,37 @@ describe("getYearReview", () => {
     expect(reply.year.coverage.complete).toBe(false);
     expect(text).not.toContain("SECRET");
     expect(readFileSync(cacheFile(), "utf8")).toBe(before);
+  });
+
+  it("gives every field that the year-review prompt quotes", async () => {
+    // weekly runs from March, so each part has a value and January and February are missing
+    const runs = Array.from({ length: 12 }, (_, i) =>
+      row(i, addDays("2026-03-02", 7 * i), { trainingLoad: 50, best: { "5k": `${30 - i}:00` } }),
+    );
+    const night = { date: "2026-03-02", hrv: 50, rhr: 45 };
+    save({
+      activitiesFrom: "2026-03-01",
+      activities: byId(...runs),
+      hrvFrom: "2026-03-01",
+      hrvTo: "2026-10-26",
+      hrv: { [night.date]: night },
+      recovery: { [night.date]: night },
+    });
+    savePage('{"sports":["running"],"exclude":["fitnessAge"]}');
+    api.getJson.mockRejectedValue(new Error("down"));
+    const { reply } = await review({}, YES);
+    const keys = new Set([...Object.keys(reply), ...keysOf(reply.year)]);
+    const has = (name: string) =>
+      name.includes(".") ? (at(reply, name) ?? at(reply.year, name)) !== undefined : keys.has(name);
+    // the tool, its other argument, the server and the values of fill.asked
+    const noField = new Set(["garmin-personal", "getYearReview", "path", ".html"]);
+    const asked = ["notNeeded", "yes", "no", "unasked", "tooLarge"];
+    const template = readFileSync(new URL("../prompts/year-review.md", import.meta.url), "utf8");
+    const quoted = [...template.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+    expect(quoted).toEqual(expect.arrayContaining(asked));
+    const fields = quoted.filter((name) => !noField.has(name) && !asked.includes(name));
+    expect(fields.length).toBeGreaterThan(60);
+    expect(fields.filter((name) => !has(name))).toEqual([]);
   });
 
   it("stops a fill that needs more requests than its estimate said", async () => {
