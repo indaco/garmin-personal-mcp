@@ -680,6 +680,21 @@ export class DashboardWriter {
     return run;
   }
 
+  /** The settings of the page at `path`, which must exist; without a path, of the default page if there is one. */
+  async settings(path?: string): Promise<Settings> {
+    const target = this.#target(path);
+    const page = await readExisting(target);
+    // a mistyped path must not give the data that the page leaves out
+    if (path && page === undefined) {
+      throw new Error(`${target} does not exist: give the path of a dashboard page, or no path`);
+    }
+    try {
+      return settingsOf(page);
+    } catch (e) {
+      throw unreadable(e, target);
+    }
+  }
+
   /** The template; a build without a page code id would refresh each page on each write, so it stops here. */
   async #template(): Promise<string> {
     const html = await this.template();

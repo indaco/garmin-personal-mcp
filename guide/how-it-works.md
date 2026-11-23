@@ -37,4 +37,5 @@ flowchart LR
 - **Dashboard cache**: each `getDashboardData` call keeps its data in `dashboard-cache.json`. The
   next call asks Garmin only for the days after the last call. It also asks again for the last two
   days, because Garmin can still add data to them. The sets and laps come from the .FIT files in
-  the `fit` folder, so they need no new download.
+  the `fit` folder, so they need no new download. `getYearReview` reads the same file, and adds
+  activities to it only after a yes.

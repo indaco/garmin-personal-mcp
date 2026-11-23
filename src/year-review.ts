@@ -1,0 +1,127 @@
+import type { McpServer } from "@modelcontextprotocol/server";
+import * as z from "zod/v4";
+import type { Activity } from "./analytics/calc";
+import { type YearSummary, yearSummary } from "./analytics/year";
+import { confirm } from "./confirm";
+import { type CachedRows, FILL_CAP, type FillResult, type GarminDashboard } from "./dashboard";
+import { type DashboardWriter, filterData } from "./dashboard-page";
+import { localToday } from "./dates";
+import type { Settings } from "./page/settings";
+import { isObject, MODEL_ONLY } from "./tools";
+
+const FIRST_YEAR = 2000;
+const thisYear = () => Number(localToday().slice(0, 4));
+const yearError = () => `Give a whole year from ${FIRST_YEAR} to ${thisYear()}`;
+
+/** What the tool did for the missing days. */
+interface Fill extends FillResult {
+  readonly asked: "notNeeded" | "tooLarge" | "yes" | "no" | "unasked";
+  /** About how many requests the missing days need. */
+  readonly estimate: number;
+}
+
+/** The year to review by default: the year before until 14 January. */
+export function reviewYear(today: string): number {
+  const year = Number(today.slice(0, 4));
+  return today.slice(5) <= "01-14" ? year - 1 : year;
+}
+
+// no field of a row is sure in a cache file: yearSummary checks each one that it reads
+const isRow = (v: unknown): v is Activity & Record<string, unknown> => isObject(v);
+const rowsOf = (v: unknown) => (Array.isArray(v) ? v.filter(isRow) : []);
+
+/** The recap of a year from the cached rows, without what the page settings leave out. */
+export function yearOf(
+  cached: CachedRows,
+  settings: Settings,
+  year: number,
+  today: string,
+): YearSummary {
+  const { activities, hrv, recovery, zones, coverage } = cached;
+  const kept = filterData({ activities, hrv, recovery, zones }, settings);
+  return yearSummary(
+    {
+      activities: rowsOf(kept.activities),
+      hrv: rowsOf(kept.hrv),
+      recovery: rowsOf(kept.recovery),
+      zones: kept.zones,
+      coverage,
+    },
+    year,
+    today,
+  );
+}
+
+/** Registers getYearReview. */
+export function registerYearReview(
+  server: McpServer,
+  dashboard: GarminDashboard,
+  writer: DashboardWriter,
+): void {
+  server.registerTool(
+    "getYearReview",
+    {
+      _meta: MODEL_ONLY,
+      description: [
+        "The recap of a calendar year from the local cache: totals (sessions, active days, km, hours,",
+        "ascent in metres, calories, load), sports, months, the biggest month and week, the best 4 weeks,",
+        "the most consistent month, streaks, the longest and the biggest session, the progression of the",
+        "best efforts, weekdays, time of day, and HRV and resting HR by month. Use it for a year in review;",
+        "for the last weeks, use `getDashboardData`. `year.coverage.missing` lists the days that the cache",
+        "does not have. With a day before today in it, the tool asks the user first, in a form, and only",
+        "after a yes it fetches the activity list of these days (no HRV, no resting HR). `fill.asked` says",
+        "what came of it: notNeeded (no day before today is missing), yes, no, unasked (this client has no",
+        `form), or tooLarge (about \`estimate\` requests, over ${FILL_CAP}). Only yes fetches; \`fill.error\` says why`,
+        "a fetch failed. The last cached day, `year.coverage.activities.to`, can lack sessions that came",
+        "after that day's update: say so, and that a dashboard update adds them. null is n/a, never 0.",
+      ].join("\n"),
+      inputSchema: z.object({
+        year: z
+          .number({ error: yearError })
+          .int()
+          .min(FIRST_YEAR)
+          .refine((y) => y <= thisYear())
+          .describe(
+            `Calendar year, ${FIRST_YEAR} to this year; default this year (the year before until 14 January)`,
+          )
+          .optional(),
+        path: z
+          .string()
+          .describe(
+            "The dashboard page whose sports and excluded data apply; it must exist; relative paths are inside the data dir",
+          )
+          .optional(),
+      }),
+    },
+    async (a, ctx) => {
+      const today = localToday();
+      const year = a.year ?? reviewYear(today);
+      // to today, also for an earlier year: the cache keeps one range, with no hole in it
+      const from = `${year}-01-01`;
+      const settings = await writer.settings(a.path);
+      const cached = await dashboard.readCached(from, today);
+      const reply = (asked: Fill["asked"], estimate: number, rows = cached, done?: FillResult) => {
+        const fill: Fill = { asked, estimate, garminCalls: 0, newActivities: 0, ...done };
+        const out = { year: yearOf(rows, settings, year, today), fill, settings };
+        return { content: [{ type: "text" as const, text: JSON.stringify(out) }] };
+      };
+      const { missing } = yearOf(cached, settings, year, today).coverage;
+      // today alone is missing on most days of the year in progress: no reason to ask each time
+      if (missing.every((r) => r.from === today)) return reply("notNeeded", 0);
+      const estimate = cached.fillRequests;
+      if (estimate > FILL_CAP) return reply("tooLarge", estimate);
+      const c = confirm(
+        server,
+        ctx,
+        "confirm",
+        `Fetch the activity list from Garmin for ${from} to ${today}, about ${estimate} request${estimate === 1 ? "" : "s"}? HRV and resting HR are not fetched. Confirm?`,
+      );
+      if ("ask" in c) return c.ask;
+      // the other tools do on "unasked" what the user told them to do: here the user asked for a
+      // recap, not for a fetch that can use a fifth of Garmin's request limit
+      if (c.answer !== "yes") return reply(c.answer, estimate);
+      const done = await dashboard.fillActivities(from, today);
+      return reply("yes", estimate, await dashboard.readCached(from, today), done);
+    },
+  );
+}

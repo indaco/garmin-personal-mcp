@@ -194,6 +194,7 @@ Desktop. In Claude Code, use `/permissions` and add `mcp__garmin-personal`.
 | `editDashboard`            | changes the layout, the custom widgets and the languages of the page                                                                                                                                                                                  |
 | `showDashboard`            | shows the dashboard inside the chat, in Claude Desktop                                                                                                                                                                                                |
 | `scheduleDashboardRefresh` | updates a dashboard page automatically, at the times you say in your own words                                                                                                                                                                        |
+| `getYearReview`            | the recap of a calendar year from the cache; it asks before it fetches the missing days                                                                                                                                                               |
 | `garminGet`                | all other GET endpoints of the Personal API                                                                                                                                                                                                           |
 
 [Tools](guide/tools.md) gives the endpoints, the details of each tool and the data that the
@@ -361,6 +362,38 @@ coach notes.
 The page in the chat is an MCP App. Other clients that show MCP Apps can also work, but they are not
 tested. [Show the dashboard in the chat](guide/dashboard.md#show-the-dashboard-in-the-chat) gives
 the limits.
+
+## Year review
+
+`getYearReview` gives the recap of a calendar year in the chat. Ask, for example, "give me my year
+in review". The server reads its local cache. A day that the cache does not have is not a rest day:
+the answer lists it in `coverage.missing`.
+
+| Argument | Values                                               | Default                                      |
+| -------- | ---------------------------------------------------- | -------------------------------------------- |
+| `year`   | a year from 2000 to this year                        | this year; until 14 January, the year before |
+| `path`   | a dashboard page: its sports and excluded data apply | `garmin-dashboard.html` in the data folder   |
+
+A `path` to a page that does not exist is an error.
+
+When a day of the year before today is missing, the server asks you in a form before it fetches the
+activity list. It makes at most 20 requests for the list, and it does not fetch HRV and resting HR.
+In the answer, `fill.asked` tells what it did:
+
+| `fill.asked` | What the server did                                                                             |
+| ------------ | ----------------------------------------------------------------------------------------------- |
+| `notNeeded`  | no day before today is missing: no question and no request                                      |
+| `yes`        | you said yes: it fetched the list. When this fails, it saves nothing and `fill.error` tells why |
+| `no`         | you said no: no request                                                                         |
+| `unasked`    | your client has no form: no request                                                             |
+| `tooLarge`   | the days need more than about 20 requests: no question and no request                           |
+
+When only today is missing, the server does not ask. A workout that came to Garmin after the last
+update of the cache is then not in the recap, and its day can look like a rest day. For a recap with
+all workouts, update the dashboard first.
+
+Claude Code (tested with 2.1.329) and the MCP Inspector (tested with 2.16.0) show the forms of other
+tools. Claude Desktop shows no form (tested with 6.6395.1). The form of this tool: not tested.
 
 ## Coach prompts
 

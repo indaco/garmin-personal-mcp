@@ -420,6 +420,25 @@
     }
   },
   {
+    "name": "getYearReview",
+    "description": "The recap of a calendar year from the local cache: totals (sessions, active days, km, hours,\nascent in metres, calories, load), sports, months, the biggest month and week, the best 4 weeks,\nthe most consistent month, streaks, the longest and the biggest session, the progression of the\nbest efforts, weekdays, time of day, and HRV and resting HR by month. Use it for a year in review;\nfor the last weeks, use `getDashboardData`. `year.coverage.missing` lists the days that the cache\ndoes not have. With a day before today in it, the tool asks the user first, in a form, and only\nafter a yes it fetches the activity list of these days (no HRV, no resting HR). `fill.asked` says\nwhat came of it: notNeeded (no day before today is missing), yes, no, unasked (this client has no\nform), or tooLarge (about `estimate` requests, over 20). Only yes fetches; `fill.error` says why\na fetch failed. The last cached day, `year.coverage.activities.to`, can lack sessions that came\nafter that day's update: say so, and that a dashboard update adds them. null is n/a, never 0.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "year": {
+          "type": "integer",
+          "minimum": 2000,
+          "description": "Calendar year, 2000 to this year; default this year (the year before until 14 January)"
+        },
+        "path": {
+          "type": "string",
+          "description": "The dashboard page whose sports and excluded data apply; it must exist; relative paths are inside the data dir"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
     "name": "listActivities",
     "description": "List the user's Garmin activities (most recent first) as a compact summary: id, name, type,\nlocal start time, distance (km), moving duration, average pace, average/max heart rate,\ncadence, ascent; when Garmin has them: elapsed time (if longer than moving time), race flag,\nGarmin training load, aerobic/anaerobic training effect and label, seconds in HR zones 1-5,\ncalories, moderate/vigorous intensity minutes, body battery change, steps, swim SWOLF, pool\nlength, lengths and strokes, power, mountain-bike grit and flow, a ride's km/h, ascent per hour\nand easy (zones 1-2) and hard (zones 4-5) share of the zone time, running form (stride,\nground contact, vertical oscillation and ratio), grade-adjusted pace, best efforts (1k,\nmile, 5k, 10k, half, marathon) and run/walk segments. Dates are yyyy-MM-dd. Set raw=true for Garmin's\nfull JSON. limit is at most 200; names filters the last 200 activities of the date window.\nUse it to find activity ids and to compare many activities. For the laps, sets or plan of one\nactivity, give its id to getActivityLaps, getActivitySets or getActivityWorkouts.",
     "inputSchema": {

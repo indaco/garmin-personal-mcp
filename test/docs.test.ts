@@ -78,6 +78,8 @@ function check(file: string, text: string): void {
   expect(readFileSync(file, "utf8"), `${file} is not current: run pnpm guide`).toBe(text);
 }
 
+const flat = (file: string) => readFileSync(file, "utf8").replace(/\s+/g, " ");
+
 describe("guide", () => {
   it("says in the tool guide that a ride or a swim has no plan", () => {
     expect(readFileSync("guide/tools.md", "utf8")).toContain(
@@ -106,6 +108,54 @@ describe("guide", () => {
     );
     expect(readFileSync("README.md", "utf8")).toContain(
       "The tool reads new data from Garmin and shows your saved page,\nwith its layout, custom widgets, languages and settings. It writes no page file, and the page has no\ncoach notes.",
+    );
+  });
+
+  it("says what getYearReview asks, fetches and answers", () => {
+    const readme = flat("README.md");
+    expect(readme).toContain(
+      "| `getYearReview` | the recap of a calendar year from the cache; it asks before it fetches the missing days |",
+    );
+    const section = readme.slice(
+      readme.indexOf("## Year review "),
+      readme.indexOf("## Coach prompts "),
+    );
+    expect(section.replace(/-{3,}/g, "---")).toBe(
+      "## Year review `getYearReview` gives the recap of a calendar year in the chat. Ask, for example, " +
+        '"give me my year in review". The server reads its local cache. A day that the cache does not have ' +
+        "is not a rest day: the answer lists it in `coverage.missing`. " +
+        "| Argument | Values | Default | | --- | --- | --- | " +
+        "| `year` | a year from 2000 to this year | this year; until 14 January, the year before | " +
+        "| `path` | a dashboard page: its sports and excluded data apply | `garmin-dashboard.html` in the data folder | " +
+        "A `path` to a page that does not exist is an error. " +
+        "When a day of the year before today is missing, the server asks you in a form before it fetches " +
+        "the activity list. It makes at most 20 requests for the list, and it does not fetch HRV and " +
+        "resting HR. In the answer, `fill.asked` tells what it did: " +
+        "| `fill.asked` | What the server did | | --- | --- | " +
+        "| `notNeeded` | no day before today is missing: no question and no request | " +
+        "| `yes` | you said yes: it fetched the list. When this fails, it saves nothing and `fill.error` tells why | " +
+        "| `no` | you said no: no request | " +
+        "| `unasked` | your client has no form: no request | " +
+        "| `tooLarge` | the days need more than about 20 requests: no question and no request | " +
+        "When only today is missing, the server does not ask. A workout that came to Garmin after the last " +
+        "update of the cache is then not in the recap, and its day can look like a rest day. For a recap " +
+        "with all workouts, update the dashboard first. " +
+        "Claude Code (tested with 2.1.329) and the MCP Inspector (tested with 2.16.0) show the forms of other " +
+        "tools. Claude Desktop shows no form (tested with 6.6395.1). The form of this tool: not tested. ",
+    );
+    expect(flat("guide/tools.md")).toContain(
+      "| `getYearReview` | `/activitylist-service/activities/search/activities`, only after a yes | " +
+        "the recap of a calendar year (`year`, default this year; until 14 January, the year before) from " +
+        "the cache. When days before today are missing, it asks in a form and fetches the activity list after a yes, " +
+        "with at most 20 requests; it never fetches HRV and resting HR. `path` is the dashboard page whose " +
+        "sports and excluded data apply; it must exist. `fill.asked` in the answer: see " +
+        "[Year review](../README.md#year-review) |",
+    );
+    expect(flat("guide/how-it-works.md")).toContain(
+      "`getYearReview` reads the same file, and adds activities to it only after a yes.",
+    );
+    expect(flat("CONTRIBUTING.md")).toContain(
+      "| `src/year-review.ts` | `getYearReview`: the recap of a year from the cache, and its fill |",
     );
   });
 

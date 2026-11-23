@@ -8,6 +8,7 @@ import { DashboardWriter, registerDashboardWriter } from "./dashboard-page";
 import { registerPrompts } from "./prompts";
 import { AutoRefresh, registerSchedule } from "./schedule";
 import { GarminTools, registerTools } from "./tools";
+import { registerYearReview } from "./year-review";
 
 /** The page template; the build writes it next to dist/index.js. */
 const template = () => readFile(new URL("./dashboard.html", import.meta.url), "utf8");
@@ -35,6 +36,7 @@ export function createServer(config: Config): McpServer {
   registerTools(server, tools);
   registerDashboard(server, dashboard);
   registerDashboardWriter(server, writer);
+  registerYearReview(server, dashboard, writer);
   registerSchedule(server, auto);
   registerPrompts(server, () => dashboard.load());
   return server;
