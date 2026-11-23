@@ -242,6 +242,26 @@ describe("boards in tab order", () => {
     ]);
     expect(tabsFor([], {})).toEqual(["all", "recovery"]);
   });
+
+  it.each([
+    [{ yearReview: true }, ["all", "recovery", "year", "running"]],
+    [{ yearReview: true, exclude: ["recovery"] }, ["all", "year", "running"]],
+    [{ yearReview: true, sports: ["cycling"] }, ["all", "recovery", "year", "cycling"]],
+    [{ yearReview: false }, ["all", "recovery", "running"]],
+    [{}, ["all", "recovery", "running"]],
+  ])("has the Year tab right after Recovery only with the setting on: %j", (settings, tabs) => {
+    expect(tabsFor([{ type: "running", sport: "running" }], settings)).toEqual(tabs);
+  });
+
+  it.each([["yes"], [1], [null]])("has no Year tab for a setting edited to %j", (value) => {
+    // the settings block of a page file, edited by hand
+    const settings = JSON.parse(JSON.stringify({ yearReview: value }));
+    expect(tabsFor([], settings)).toEqual(["all", "recovery"]);
+  });
+
+  it("has the Year tab without any activity", () => {
+    expect(tabsFor([], { yearReview: true })).toEqual(["all", "recovery", "year"]);
+  });
 });
 
 describe("distance and time for pace", () => {

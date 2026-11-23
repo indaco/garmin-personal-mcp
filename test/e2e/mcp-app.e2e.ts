@@ -97,6 +97,15 @@ it("shows the dashboard in a host frame from the showDashboard blocks", async ()
   expect(errors).toEqual([]);
 });
 
+it("shows the Year tab in a host frame, with the note of a page that has no recap", async () => {
+  const blocks = { ...(await viewBlocks()), settings: { yearReview: true } };
+  const { frame, errors } = await showInHost(template(), blocks);
+  await frame.click("[role=tab][data-tab=year]");
+  expect(await frame.getAttribute("[data-tab=year]", "aria-selected")).toBe("true");
+  expect(await frame.innerText(".board-note")).toContain("This page has no recap of the year yet.");
+  expect(errors).toEqual([]);
+});
+
 it("shows the error in a custom widget when the host blocks eval, and the rest of the page", async () => {
   // a host whose rules leave out 'unsafe-eval'
   const strict = template().replace(" 'unsafe-eval'", "");

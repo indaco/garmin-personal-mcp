@@ -31,6 +31,16 @@ const PRESETS: Record<string, Row> & { generic: Row } = {
     ["stress", 3],
     ["recoveryTrend", 3],
   ],
+  year: [
+    ["yearTotals", 3],
+    ["yearMonths", 3],
+    ["yearSports", 2],
+    ["yearRhythm", 1],
+    ["yearHighlights", 2],
+    ["yearStreaks", 1],
+    ["yearRecords", 3],
+    ["yearRecovery", 3],
+  ],
   running: [
     ["typeKpis", 3],
     ["typeWeekly", 2],
@@ -142,6 +152,16 @@ const BASELINE: Record<string, string[]> & { generic: string[] } = {
     "sleepNeed",
     "bedtime",
     "bodyBattery",
+  ],
+  year: [
+    "yearTotals",
+    "yearMonths",
+    "yearSports",
+    "yearRhythm",
+    "yearHighlights",
+    "yearStreaks",
+    "yearRecords",
+    "yearRecovery",
   ],
   running: [
     "typeKpis",

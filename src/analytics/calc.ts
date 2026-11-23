@@ -80,13 +80,17 @@ export function boardOrder(present: ReadonlySet<string>): string[] {
 
 /**
  * The tabs of a page, in order: the page script and the server both use this rule. A sport has a tab
- * when the data has its activities, or when the `sports` setting names it.
+ * when the data has its activities, or when the `sports` setting names it; the Year tab has its own setting.
  */
-export function tabsFor(acts: Activity[], s: { sports?: string[]; exclude?: string[] }): string[] {
+export function tabsFor(
+  acts: Activity[],
+  s: { sports?: string[]; exclude?: string[]; yearReview?: boolean },
+): string[] {
   const present = new Set(acts.map(groupOf));
   return [
     "all",
     ...(s.exclude?.includes("recovery") ? [] : ["recovery"]),
+    ...(s.yearReview === true ? ["year"] : []),
     ...boardOrder(present).filter((g) => (s.sports ? s.sports.includes(g) : present.has(g))),
   ];
 }

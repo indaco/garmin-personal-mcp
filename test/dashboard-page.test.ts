@@ -1913,6 +1913,10 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
     await expect(writer.write({ settings: { sports: ["chess"] } })).rejects.toThrow(
       /sports: unknown chess/,
     );
+    // the Year tab has its own setting
+    await expect(writer.write({ settings: { sports: ["year"] } })).rejects.toThrow(
+      /sports: unknown year/,
+    );
     // a bad argument is not a broken page: no "delete the file"
     await expect(writer.preview({ settings: { sports: ["chess"] } })).rejects.toThrow(
       /^Settings: sports: unknown chess$/,

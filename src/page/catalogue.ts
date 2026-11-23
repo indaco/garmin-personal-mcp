@@ -18,7 +18,7 @@ export interface CatalogueEntry {
   /** The data the widget shows: a page without it has no such widget. */
   needs?: DataItem;
   /** The page setting that turns the widget on: a page without it has no such widget. */
-  optIn?: "workouts" | "recoveryHistory";
+  optIn?: "workouts" | "recoveryHistory" | "yearReview";
 }
 
 /** Whether a page with these settings has the widget. */
@@ -306,6 +306,55 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
     id: "racketDetails",
     title: "w.racketDetails",
     types: ["racket", "generic"],
+    span: 3,
+  },
+  {
+    id: "yearTotals",
+    title: "w.yearTotals",
+    optIn: "yearReview",
+    span: 3,
+  },
+  {
+    id: "yearMonths",
+    title: "w.yearMonths",
+    optIn: "yearReview",
+    span: 3,
+  },
+  {
+    id: "yearSports",
+    title: "w.yearSports",
+    optIn: "yearReview",
+    span: 2,
+  },
+  {
+    id: "yearRhythm",
+    title: "w.yearRhythm",
+    optIn: "yearReview",
+    span: 1,
+  },
+  {
+    id: "yearHighlights",
+    title: "w.yearHighlights",
+    optIn: "yearReview",
+    span: 2,
+  },
+  {
+    id: "yearStreaks",
+    title: "w.yearStreaks",
+    optIn: "yearReview",
+    span: 1,
+  },
+  {
+    id: "yearRecords",
+    title: "w.yearRecords",
+    optIn: "yearReview",
+    span: 3,
+  },
+  {
+    id: "yearRecovery",
+    title: "w.yearRecovery",
+    needs: "recovery",
+    optIn: "yearReview",
     span: 3,
   },
 ];

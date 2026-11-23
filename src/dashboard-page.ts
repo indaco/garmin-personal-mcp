@@ -589,7 +589,7 @@ export function checkSettings(s: Settings): Settings {
   text("headline", 120);
   names(
     "sports",
-    [...TYPES].filter((t) => t !== "all" && t !== "recovery"),
+    [...TYPES].filter((t) => t !== "all" && t !== "recovery" && t !== "year"),
   );
   names("exclude", DATA_ITEMS, true);
   names("languages", ["en", ...Object.keys(BUILT_IN)]);
@@ -1104,7 +1104,7 @@ export class DashboardWriter {
     for (const p of o.place ?? []) {
       if (!TYPES.has(p.board))
         throw new Error(
-          `Unknown board ${p.board}: use all, recovery, ${GROUPS.join(", ")} or another SDK sport name`,
+          `Unknown board ${p.board}: use all, recovery, year, ${GROUPS.join(", ")} or another SDK sport name`,
         );
       if (!known.has(p.widget)) throw new Error(`Unknown widget ${p.widget}`);
       if (p.type !== undefined && !TYPES.has(p.type)) throw new Error(`Unknown type ${p.type}`);
@@ -1260,10 +1260,11 @@ export function pageTarget(dataDir: string, path: string | undefined): string {
   return target;
 }
 
-/** The boards: All, Recovery, the type boards, and a board for any other SDK sport. */
+/** The boards: All, Recovery, Year, the type boards, and a board for any other SDK sport. */
 const TYPES = new Set<string>([
   "all",
   "recovery",
+  "year",
   ...GROUPS,
   ...Object.values(Profile.types.sport),
 ]);
