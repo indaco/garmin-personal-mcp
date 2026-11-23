@@ -578,6 +578,7 @@
   "yr.estimate": "estimación",
   "yr.unlikely": "{n} sesión tiene un tiempo de más de 12 horas a menos de 1 km/h: su tiempo no cuenta.|{n} sesiones tienen un tiempo de más de 12 horas a menos de 1 km/h: su tiempo no cuenta.",
   "yr.month": "Mes",
+  "yr.numbers": "Mostrar los números",
   "yr.partDays": "{n} día con datos|{n} días con datos",
   "yr.topSport": "Deporte principal: {sport}",
   "yr.weekday": "Día de la semana",

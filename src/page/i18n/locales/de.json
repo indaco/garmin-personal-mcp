@@ -578,6 +578,7 @@
   "yr.estimate": "Schätzung",
   "yr.unlikely": "{n} Einheit hat eine Zeit von über 12 Stunden bei unter 1 km/h: Ihre Zeit zählt nicht.|{n} Einheiten haben eine Zeit von über 12 Stunden bei unter 1 km/h: Ihre Zeit zählt nicht.",
   "yr.month": "Monat",
+  "yr.numbers": "Zahlen anzeigen",
   "yr.partDays": "{n} Tag mit Daten|{n} Tage mit Daten",
   "yr.topSport": "Wichtigste Sportart: {sport}",
   "yr.weekday": "Wochentag",

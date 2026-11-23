@@ -1114,6 +1114,12 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 12px;
+    &.fit {
+      grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+    }
+    & + .kpis {
+      margin-top: 12px;
+    }
   }
   .multiple h3 {
     font-size: 12px;

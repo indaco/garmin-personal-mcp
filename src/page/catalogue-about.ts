@@ -82,17 +82,17 @@ export const ABOUT: Record<string, string> = {
   yearTotals:
     "The calendar year in numbers: sessions, active days, distance, time, ascent, calories and load, with the days that the recap has when some are missing. Needs the setting yearReview.",
   yearMonths:
-    "Each month of the year: its load as a bar (its time when no session has a load), sessions, active days, distance and time. A month without data shows n/a. Needs the setting yearReview.",
+    "Each month of the year: its load as a bar (its time when no session has a load), with sessions, active days, distance and time in the folded numbers. A month without data has no bar. Needs the setting yearReview.",
   yearSports:
-    "Each sport of the year: sessions, distance, time and load, and the top sport. Needs the setting yearReview.",
+    "Each sport of the year: its time as a bar, with sessions, distance, time and load in the folded numbers, and the top sport. Needs the setting yearReview.",
   yearRhythm:
-    "The sessions of the year by weekday and by time of day: night 22:00-4:59, morning 5:00-11:59, afternoon 12:00-17:59, evening 18:00-21:59. Needs the setting yearReview.",
+    "The sessions of the year by weekday and by time of day, as bars with the top one marked: night 22:00-4:59, morning 5:00-11:59, afternoon 12:00-17:59, evening 18:00-21:59. Needs the setting yearReview.",
   yearHighlights:
     "The biggest month and week, the best 4 weeks, the most consistent month, the longest session and the one with the highest load. Needs the setting yearReview.",
   yearStreaks:
     "The most days in a row and the most weeks in a row with a session, with their dates. Needs the setting yearReview.",
   yearRecords:
-    "The best efforts of the runs of the year, distance by distance: each time that was faster than all before it. Needs the setting yearReview.",
+    "The best efforts of the runs of the year, distance by distance: each time that was faster than all before it, as a step of a line. A distance with one such time shows it as a number. Needs the setting yearReview.",
   yearRecovery:
-    "The mean nightly HRV and resting HR of each month of the year, from the days that the cache has. Needs the setting yearReview.",
+    "The mean nightly HRV and resting HR of each month of the year, each in its own chart, from the days that the cache has. Needs the setting yearReview.",
 };

@@ -34,8 +34,8 @@ const PRESETS: Record<string, Row> & { generic: Row } = {
   year: [
     ["yearTotals", 3],
     ["yearMonths", 3],
-    ["yearSports", 2],
-    ["yearRhythm", 1],
+    ["yearSports", 1],
+    ["yearRhythm", 2],
     ["yearHighlights", 2],
     ["yearStreaks", 1],
     ["yearRecords", 3],

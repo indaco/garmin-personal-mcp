@@ -2236,6 +2236,14 @@ describe("chart table", () => {
     expect(got).toEqual([["1", "1: 2"]]);
   });
 
+  it("reads the x of a point by the callback of its axis", async () => {
+    const got = await customTable(`{ type: "line", data: { datasets: [
+      { label: "x", data: [{ x: 1, y: 2 }] },
+      { label: "y", data: [{ x: 3, y: 4 }], xAxisID: "x1" }] },
+      options: { scales: { x: { ticks: { callback: (v) => "day " + v } } } } }`);
+    expect(got).toEqual([["1", "day 1: 2", "3: 4"]]);
+  });
+
   it("shows nothing for a scatter value without an x", async () => {
     const got = await customTable(
       `{ type: "scatter", data: { datasets: [{ label: "x", data: [{ y: 2 }] }] } }`,

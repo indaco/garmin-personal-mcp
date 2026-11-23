@@ -109,15 +109,14 @@ export const CHART_TYPES = ["bar", "line", "scatter", "doughnut", "pie"];
 
 type Tick = (value: number) => unknown;
 
-/** The tick text of the axis that holds a dataset's values: the table reads as the chart does. */
+/** The tick text of an axis of a dataset: the table reads as the chart does. */
 function axisText(
   config: ChartConfig,
   set: ChartConfig["data"]["datasets"][number],
+  dir: "x" | "y",
 ): Tick | undefined {
-  const horizontal = config.options?.indexAxis === "y";
-  const axis = horizontal
-    ? ((set as { xAxisID?: string }).xAxisID ?? "x")
-    : ((set as { yAxisID?: string }).yAxisID ?? "y");
+  const ids = set as { xAxisID?: string; yAxisID?: string };
+  const axis = (dir === "x" ? ids.xAxisID : ids.yAxisID) ?? dir;
   const scales = config.options?.scales as
     | Record<string, { ticks?: { callback?: unknown } }>
     | undefined;
@@ -136,9 +135,9 @@ function valueText(v: number, tick: Tick | undefined): string {
 }
 
 /** A value of a dataset as text: a number, an {x, y} point, or nothing. */
-function text(v: unknown, tick?: Tick): string {
+function text(v: unknown, tick?: Tick, xTick?: Tick): string {
   if (typeof v === "number") return valueText(v, tick);
-  if (isPoint(v)) return `${text(v.x)}: ${text(v.y, tick)}`;
+  if (isPoint(v)) return `${text(v.x, xTick)}: ${text(v.y, tick)}`;
   // an object that is not a point has no text; an array is a floating bar
   const empty = v === null || v === undefined || (typeof v === "object" && !Array.isArray(v));
   return empty ? "" : String(v);
@@ -155,6 +154,7 @@ function cell(
   i: number,
   labelled: boolean,
   tick: Tick | undefined,
+  xTick: Tick | undefined,
 ): string {
   if (labelled && data.some(isPoint)) {
     return data
@@ -163,7 +163,7 @@ function cell(
       .map((p) => text(p.y, tick))
       .join(", ");
   }
-  return text(data[i], tick);
+  return text(data[i], tick, xTick);
 }
 
 /** The data of a chart as a table that only screen readers get: one row per label, one column per series. */
@@ -200,7 +200,14 @@ function dataTable(config: ChartConfig, title: string): HTMLElement {
               h(
                 "td",
                 {},
-                cell(d.data, label, i, config.data.labels !== undefined, axisText(config, d)),
+                cell(
+                  d.data,
+                  label,
+                  i,
+                  config.data.labels !== undefined,
+                  axisText(config, d, config.options?.indexAxis === "y" ? "x" : "y"),
+                  axisText(config, d, "x"),
+                ),
               ),
             ),
           ),
