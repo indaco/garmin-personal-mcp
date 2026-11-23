@@ -4,8 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { GROUPS } from "../src/analytics/calc";
 import { LONG_RUN_SHARE_WARN } from "../src/analytics/running";
 import { en } from "../src/page/i18n/en";
+import { WIDGET_API, YEAR_FIELDS } from "../src/page/widget-api";
 import { addDays } from "../src/dates";
 import { activityNames } from "../src/prompts";
 import { createServer } from "../src/server";
@@ -99,7 +101,7 @@ describe("prompts", () => {
       expect(text).toContain("only when `settings` has more than `title` and `headline`");
       expect(text).toContain('"Keep these settings" (default)');
       expect(text).toContain(
-        '"Use the defaults: all sports, all data, English and\n     the language of my Garmin profile, all themes, opens in midnight, no workout comparison, no\n     Recovery trend, the last 8 weeks"',
+        '"Use the defaults: all sports, all data, English and\n     the language of my Garmin profile, all themes, opens in midnight, no workout comparison, no\n     Recovery trend, no recap of the calendar year, the last 8 weeks"',
       );
       expect(text).toContain('"all sports, keep the rest"');
       expect(text).toContain("name each item that it excludes. Say that the defaults add them to");
@@ -150,7 +152,7 @@ describe("prompts", () => {
     expect(text).not.toContain("unsafe-eval");
     expect(text).not.toContain("self-contained");
     expect(text).toContain("`const DATA = /* garmin-data:start */null/* garmin-data:end */;`");
-    expect(text).toContain("first in the first inline script of the page");
+    expect(text).toMatch(/first in\s+the\s+first\s+inline\s+script\s+of\s+the\s+page/);
     expect(text.includes("{{")).toBe(false);
     const flat = text.replace(/\s+/g, " ");
     for (const line of [
@@ -352,7 +354,8 @@ describe("prompts", () => {
         "training-dashboard",
         { weeks: "12", layout: "freeform" },
         [
-          'First call `writeDashboard` with `preview` = true and `weeks` = 12. It writes no page file. If `repeatedRuns` of its `digest` is not empty, ask me one question before you design the page: whether to compare those workouts across weeks. Name them with their number of runs. If your client has a tool for questions with choices, use it: "No" (default) and "Yes, compare them across weeks". Say that a yes adds a Workout trend section, and that the page then downloads the laps of the last 8 runs of each workout, once: this build takes longer.',
+          "First call `writeDashboard` with `preview` = true and `weeks` = 12. It writes no page file. Its `settings` are the settings of the page at the path now: the **old settings**.",
+          'If `repeatedRuns` of the `digest` of the last preview is not empty, ask me one question before you design the page: whether to compare those workouts across weeks. Name them with their number of runs. If your client has a tool for questions with choices, use it: "No" (default) and "Yes, compare them across weeks". Say that a yes adds a Workout trend section, and that the page then downloads the laps of the last 8 runs of each workout, once: this build takes longer.',
         ],
       ],
       [
@@ -403,7 +406,8 @@ describe("prompts", () => {
         .replaceAll("{{today}}", "2026-10-28")
         .replaceAll("{{startDate}}", "2026-09-28")
         .replaceAll("{{prevStartDate}}", "2026-08-24")
-        .replaceAll("{{prevEndDate}}", "2026-09-27"),
+        .replaceAll("{{prevEndDate}}", "2026-09-27")
+        .replaceAll("{{yearFields}}", YEAR_FIELDS),
     );
   });
 
@@ -424,7 +428,8 @@ describe("prompts", () => {
           .replaceAll("{{today}}", today)
           .replaceAll("{{startDate}}", start)
           .replaceAll("{{prevStartDate}}", prevStart)
-          .replaceAll("{{prevEndDate}}", prevEnd),
+          .replaceAll("{{prevEndDate}}", prevEnd)
+          .replaceAll("{{yearFields}}", YEAR_FIELDS),
       );
     },
   );
@@ -562,11 +567,12 @@ describe("workout comparison", () => {
       expect(text).toContain("give `settings` with `workouts` = true");
     }
     const freeform = await render("training-dashboard", { layout: "freeform" });
-    expect(freeform).toContain("If `repeatedRuns` of its `digest` is not empty");
     expect(freeform).toContain(
-      "`window.GARMIN_SETTINGS = /* garmin-settings:start */null/* garmin-settings:end */;`",
+      "If `repeatedRuns` of the `digest` of the last preview is not empty",
     );
-    expect(freeform).toContain('give `settings` = { "workouts": true }');
+    expect(freeform.replace(/\s+/g, " ")).toContain(
+      'On a yes: - Give `"workouts": true` in the `settings` (Page settings). The page keeps it, so its updates load the laps too.',
+    );
     expect(freeform).toContain("10. **Workout trend**, only when I said yes");
     const setup = await render("dashboard-setup");
     expect(setup).toContain("ask about the **Workout comparison**, only when `repeatedRuns`");
@@ -579,6 +585,255 @@ describe("workout comparison", () => {
 /** The prompt on one line per paragraph, so that a reflow does not change a pin. */
 const pageText = async (name: string, args: Record<string, string> = {}) =>
   (await render(name, args)).replace(/\s+/g, " ");
+
+const freeText = () => pageText("training-dashboard", { layout: "freeform" });
+
+describe("page settings in the freeform prompt", () => {
+  it("copies the settings of the page into the first write, before the questions", async () => {
+    const text = await pageText("training-dashboard", { layout: "freeform" });
+    const section = text.slice(
+      text.indexOf("## Page settings"),
+      text.indexOf("## Sports and data left out"),
+    );
+    expect(section).toBe(
+      "## Page settings First call `writeDashboard` with `preview` = true and `weeks` = 12. It writes no " +
+        "page file. Its `settings` are the settings of the page at the path now: the **old settings**. The " +
+        "`settings` that you give replace all of them, so in the first `writeDashboard` call that writes the " +
+        "page, give `settings` = a copy of the old settings, with what I say yes to below added. Keep `sports` and `exclude` as " +
+        "they are, unless I choose otherwise below: else the new page can hold data that I left out. Leave " +
+        "out `since` (this page covers weeks). Leave out `workouts`, `recoveryHistory` and `yearReview` too, " +
+        "unless their section below says to give them: a question that you do not ask is not a yes. The " +
+        "page keeps these settings. When the `settings` that you give are not empty, put this line first in " +
+        "the first inline script of the page, once: " +
+        "`window.GARMIN_SETTINGS = /* garmin-settings:start */null/* garmin-settings:end */;` ",
+    );
+  });
+
+  it("says which sports and data stay left out, and asks whether they do", async () => {
+    const text = await freeText();
+    const section = text.slice(
+      text.indexOf("## Sports and data left out"),
+      text.indexOf("## Workout comparison"),
+    );
+    expect(section).toBe(
+      "## Sports and data left out When the old settings have `sports` or `exclude`, ask me " +
+        "this first. Tell me in words which sports the page keeps, and name each item that it excludes. Say " +
+        "that all sports and all data also come back on each update: this matters for a page that I share. " +
+        'Options "Keep them left out" (default) and "Use all sports and all data". Say that I can type my ' +
+        'own choice, for example "all sports, keep the rest". When I do not answer, keep them left out. ' +
+        "When my choice changes `sports` or `exclude`, call the preview again with `weeks` = 12 and the " +
+        "`settings` that you give, only for `repeatedRuns` of its `digest`. Its reply does not change the " +
+        "old settings, and you do not ask this again. ",
+    );
+  });
+
+  it.each(["workouts", "recoveryHistory", "yearReview"])(
+    "gives %s in one place, which needs a yes",
+    async (name) => {
+      const text = await freeText();
+      expect(text.split(`Give \`"${name}": true\``)).toHaveLength(2);
+    },
+  );
+
+  it("does not offer the Recovery trend of a page that excludes recovery", async () => {
+    const text = await freeText();
+    const section = text.slice(
+      text.indexOf("## Recovery trend"),
+      text.indexOf("## Recap of the calendar year"),
+    );
+    expect(section).toBe(
+      "## Recovery trend After that question, ask whether to add a Recovery trend, only when the " +
+        "`exclude` of the `settings` that you give has no `recovery`. Else the page has no Recovery trend. " +
+        'Options "No" (default) and "Yes, add the Recovery trend". Say that a yes adds a section with the ' +
+        "weekly average of sleep, sleep score and resting HR for the whole period, and that the page file " +
+        "then holds these values for each day: this matters for a page that I share. On a yes: - Give " +
+        '`"recoveryHistory": true` in the `settings` (Page settings). - Add the Recovery trend to the ' +
+        "Recovery board (below). ",
+    );
+  });
+
+  it("shows the tabs and chips of the kept sports only", async () => {
+    const text = await freeText();
+    expect(text).toContain(
+      "The sports of the page can change later with no new page code, so the page reads " +
+        "`window.GARMIN_SETTINGS?.sports` when it opens, and fixes nothing from it at build time. When it has " +
+        "sports, the data has only these: show only **All** and the tabs and chips of these sports, and say " +
+        "under the header which sports the page shows. When it has none, show the tabs above. Its values are: " +
+        "`running`, `strengthTraining`, `walking`, `hiking`, `cycling`, `swimming`, `racket`, `generic` " +
+        "(Other), and for another sport its name in `sport`.",
+    );
+    for (const group of GROUPS) expect(text).toContain(`\`${group}\``);
+  });
+
+  it("says which activities the load ratio counts", async () => {
+    const text = await freeText();
+    expect(text).toContain(
+      "The **load ratio always uses all activities of the data**: say this next to the tile when a filter " +
+        "is active. When `window.GARMIN_SETTINGS?.sports` has sports, say always that it counts only these " +
+        "sports: next to the tile, at the load ratio of Readiness today, and at the Load safety numbers.",
+    );
+    expect(text).not.toContain("always uses all activities**");
+  });
+
+  it("says in the setup prompt which freeform pages keep settings", async () => {
+    const text = await pageText("dashboard-setup");
+    expect(text).toContain(
+      "Settings need a page from the template, or a page designed with layout freeform that has a `garmin-settings` block.",
+    );
+    expect(text).not.toContain("cannot keep them");
+  });
+
+  it("calls only the first preview the old settings", async () => {
+    const text = await freeText();
+    expect(text).not.toContain("`settings` of the preview");
+    expect(text.match(/the \*\*old settings\*\*/g)).toHaveLength(1);
+  });
+
+  it("gives no readiness verdict without HRV and sleep", async () => {
+    const text = await freeText();
+    expect(text).toContain(
+      'When the HRV status and the sleep score are both missing, the verdict is "n/a". Else it is "go easy" if HRV is low',
+    );
+    expect(text.indexOf("are both missing")).toBeLessThan(text.indexOf('Otherwise it is "normal"'));
+  });
+
+  it("has no coach notes on a page that excludes them", async () => {
+    expect(await freeText()).toContain(
+      "When `exclude` of the `settings` that you give has `notes`, write no notes: do not make the call with the notes, and leave this section out.",
+    );
+  });
+
+  it("gives no settings object that drops the others", async () => {
+    const text = await pageText("training-dashboard", { layout: "freeform" });
+    expect(text).toContain(
+      "1. Call `writeDashboard` with `weeks` = 12, `page` = the page code and the `settings` (Page settings). The server puts",
+    );
+    expect(text).not.toContain("`settings` = {");
+    expect(text.split("window.GARMIN_SETTINGS =").length).toBe(2);
+  });
+});
+
+describe("recap of the calendar year in the freeform prompt", () => {
+  it("says the whole rule of the recap in its own section", async () => {
+    const text = await freeText();
+    const section = text.slice(
+      text.indexOf("## Recap of the calendar year"),
+      text.indexOf("## 1. The data"),
+    );
+    expect(section).toBe(
+      "## Recap of the calendar year Do not offer the recap of the calendar year: it is for a page whose " +
+        "user asks for it. When I ask for it, tell me that the page file then holds data of days before " +
+        "its period, also data that the week window does not show. When I share the page, wait for my " +
+        "yes. When the old settings have `yearReview` = true and I did not ask for it, ask " +
+        'me once whether the new page keeps the recap, with the same remark. Options "No" (default) and ' +
+        '"Yes, keep the recap". When I do not say yes, the new `settings` have no `yearReview`. When the ' +
+        'page gets the recap: - Give `"yearReview": true` in the `settings` (Page settings). - Add the ' +
+        "Recap section to the All tab (below). ",
+    );
+  });
+
+  it("asks for the settings before the questions, and the questions before the data", async () => {
+    const headings = [
+      ...(await render("training-dashboard", { layout: "freeform" })).matchAll(/^## (.+)$/gm),
+    ];
+    expect(headings.map((h) => h[1])).toEqual([
+      "Page settings",
+      "Sports and data left out",
+      "Workout comparison",
+      "Recovery trend",
+      "Recap of the calendar year",
+      "1. The data",
+      "2. Compute",
+      "3. Build the dashboard",
+    ]);
+  });
+
+  it("numbers the widgets of the All tab in order", async () => {
+    const text = await render("training-dashboard", { layout: "freeform" });
+    const tab = text.slice(text.indexOf("### All tab"), text.indexOf("### Type tabs"));
+    const items = [...tab.matchAll(/^(\d+)\. \*\*([^*]+)\*\*/gm)].map((m) => [m[1], m[2]]);
+    expect(items.map(([n]) => Number(n))).toEqual(Array.from({ length: 13 }, (_, i) => i + 1));
+    expect(items.slice(10)).toEqual([
+      ["11", "Recap"],
+      ["12", "Recent activities"],
+      ["13", "Coach notes"],
+    ]);
+  });
+
+  it.each([
+    ["the layout alone", { weeks: "freeform" }],
+    ["1 week", { weeks: "1", layout: "freeform" }],
+    ["52 weeks", { weeks: "52", layout: "freeform" }],
+    ["weeks that are no number", { weeks: "x", layout: "freeform" }],
+  ])("fills the fields with %s", async (_, args) => {
+    const text = await render("training-dashboard", args);
+    expect(text).toContain(`Fields: ${YEAR_FIELDS}\n`);
+    expect(text).not.toContain("{{");
+  });
+
+  it.each([
+    ["training-dashboard", { layout: "preset" }],
+    ["training-dashboard", { layout: "blank" }],
+    ["dashboard-setup", {}],
+    ["dashboard-widget", { idea: "x" }],
+    ["training-dashboard-update", {}],
+  ])("does not give the fields in %s %j", async (name, args) => {
+    const text = await render(name, args);
+    expect(text).not.toContain(YEAR_FIELDS);
+    expect(text).not.toContain("yearFields");
+  });
+
+  it("does not offer it, and adds it when the user asks", async () => {
+    const text = await freeText();
+    expect(text).toContain(
+      "Do not offer the recap of the calendar year: it is for a page whose user asks for it.",
+    );
+    expect(text).toContain(
+      "When I ask for it, tell me that the page file then holds data of days before its period, " +
+        "also data that the week window does not show. When I share the page, wait for my yes.",
+    );
+  });
+
+  it("asks when the page at the path has it, and drops it without a yes", async () => {
+    expect(await freeText()).toContain(
+      "When the old settings have `yearReview` = true and I did not ask for it, ask me " +
+        'once whether the new page keeps the recap, with the same remark. Options "No" (default) and ' +
+        '"Yes, keep the recap". When I do not say yes, the new `settings` have no `yearReview`.',
+    );
+  });
+
+  it("gives the setting in the page settings", async () => {
+    expect(await freeText()).toContain(
+      'When the page gets the recap: - Give `"yearReview": true` in the `settings` (Page settings). ' +
+        "- Add the Recap section to the All tab (below).",
+    );
+  });
+
+  it("names the fields of DATA.year, as the widget reference does", async () => {
+    const text = await freeText();
+    expect(text).toContain(
+      "- `year`: only with `yearReview`: the recap of the calendar year. Fields:",
+    );
+    expect(text).toContain(YEAR_FIELDS.replace(/\s+/g, " "));
+    expect(text).not.toContain("{{");
+    expect(WIDGET_API).toContain(`Fields: ${YEAR_FIELDS}`);
+  });
+
+  it("shows n/a without the recap, and the missing days", async () => {
+    expect(await freeText()).toContain(
+      "**Recap**, only when the page gets the recap of the calendar year: the totals, the months, the " +
+        "sports, the records and the streaks of `DATA.year`. Only show its values, and calculate nothing " +
+        'from them. When `DATA.year` is missing or a value is null, show "n/a", never 0. When ' +
+        "`coverage.complete` is false, name the days of `coverage.missing`: they are not rest days. The " +
+        "section does not follow the week window or the type chips, and says so.",
+    );
+  });
+
+  it("is not in the preset and blank prompts", async () => {
+    for (const layout of ["preset", "blank"])
+      expect(await pageText("training-dashboard", { layout })).not.toContain("DATA.year");
+  });
+});
 
 describe("recovery trend", () => {
   const ask =
@@ -598,11 +853,9 @@ describe("recovery trend", () => {
     const text = await pageText("training-dashboard", { layout: "freeform" });
     expect(text).toContain("## Recovery trend");
     expect(text).toContain(
-      'After that question, ask whether to add a Recovery trend. Options "No" (default) and "Yes, add the Recovery trend".',
+      'ask whether to add a Recovery trend, only when the `exclude` of the `settings` that you give has no `recovery`. Else the page has no Recovery trend. Options "No" (default) and "Yes, add the Recovery trend".',
     );
-    expect(text).toContain(
-      'give `settings` with `"recoveryHistory": true`, next to `"workouts": true` when I also said yes to that.',
-    );
+    expect(text).toContain('Give `"recoveryHistory": true` in the `settings` (Page settings).');
     expect(text).toContain(
       "With `recoveryHistory`, the rows cover the whole period: a row older than the last 14 days has only `date`, `sleepH`, `sleepScore` and `rhr`, so a panel of the last 14 days uses the last 14 rows.",
     );
@@ -622,10 +875,23 @@ describe("recovery trend", () => {
     );
   });
 
+  it("keeps the recap of the calendar year in the setup prompt, but not on a shared page without a yes", async () => {
+    const setup = await pageText("dashboard-setup");
+    expect(setup.replace(/\s+/g, " ")).toContain(
+      "`recoveryHistory` (true when I said yes to the Recovery trend), `yearReview` (true when the " +
+        "page is for me and the `settings` of the preview have it, or when I ask for it), `shared` (true when",
+    );
+    expect(setup.replace(/\s+/g, " ")).toContain(
+      "When the `settings` of the preview have `yearReview`, tell me whether the page keeps the recap of " +
+        "the calendar year, which holds days before its period, and that I can change this. A page for a " +
+        "person I share it with does not keep it without my yes.",
+    );
+  });
+
   it("pins the other sentences of the Recovery trend in the three prompts", async () => {
     for (const layout of ["preset", "blank"]) {
       expect(await pageText("training-dashboard", { layout })).toContain(
-        'opens in midnight, no workout comparison, no Recovery trend, the last 12 weeks". Say that I can type my own choice',
+        'opens in midnight, no workout comparison, no Recovery trend, no recap of the calendar year, the last 12 weeks". Say that I can type my own choice',
       );
     }
     expect(await pageText("dashboard-setup")).toContain(
@@ -634,9 +900,6 @@ describe("recovery trend", () => {
     const free = await pageText("training-dashboard", { layout: "freeform" });
     expect(free).toContain(
       "Say that a yes adds a section with the weekly average of sleep, sleep score and resting HR for the whole period, and that the page file then holds these values for each day: this matters for a page that I share. On a yes:",
-    );
-    expect(free).toContain(
-      "Put the settings line of the Workout comparison first in the first inline script of the page, once.",
     );
     expect(free).toContain("Add the Recovery trend to the Recovery board (below).");
     expect(free).toContain("a week with no value is a gap, never 0.");

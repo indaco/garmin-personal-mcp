@@ -14,8 +14,8 @@ Answer in my language.
      the page again, also on each automatic update: this matters for a page that I share.
      Options "Keep these settings" (default) and "Use the defaults: all sports, all data, English and
      the language of my Garmin profile, all themes, opens in midnight, no workout comparison, no
-     Recovery trend, the last {{weeks}} weeks". Say that I can type my own choice, for example
-     "all sports, keep the rest".
+     Recovery trend, no recap of the calendar year, the last {{weeks}} weeks". Say that I can type
+     my own choice, for example "all sports, keep the rest".
    - **Title**: options "Keep the title" (default: the `title` of `settings`, else "{{title}}") and
      "Type my own".
    - **Headline** (the line under the title): options "Keep the headline" (default: the `headline`

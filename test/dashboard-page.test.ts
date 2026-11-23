@@ -26,10 +26,13 @@ import {
   writeBlock,
 } from "../src/dashboard-page";
 import { weeksSince } from "../src/dashboard";
+import type { YearSummary } from "../src/analytics/year";
 import { digest } from "../src/digest";
 import { log } from "../src/log";
 import { preset } from "../src/page/presets";
 import { DASHBOARD_VERSION } from "../src/prompts";
+import type { Settings } from "../src/page/settings";
+import { refreshPages } from "../src/schedule";
 import { version as serverVersion } from "../package.json";
 
 vi.mock("../src/log", () => ({ LOG_DIR: ".cache/garmin-personal-mcp", log: vi.fn() }));
@@ -134,6 +137,10 @@ const mode = (f: string) => statSync(f).mode & 0o777;
 /** The page without its data block: what an update must keep. */
 const code = (s: string) =>
   s.replace(/\/\* garmin-data:start \*\/[\s\S]*?\/\* garmin-data:end \*\//, "");
+
+const dataOf = (p: string) => readBlock(p, "data") as Record<string, unknown>;
+/** The page without the random rev of its layout. */
+const noRev = (p: string) => p.replace(/"rev":"[^"]*"/, "");
 
 describe("writeDashboard", () => {
   it("withData keeps only the sports, data and notes that the settings keep", () => {
@@ -1037,6 +1044,298 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
     });
   });
 
+  describe("yearReview", () => {
+    const YEAR = { v: 1, year: 2026, totals: { activities: 7 } };
+    const reads: unknown[] = [];
+    /** A writer whose year review is `YEAR`, or what `year` gives. */
+    const yearWriter = (year: () => Promise<unknown> = async () => YEAR) =>
+      new DashboardWriter(
+        async () => JSON.stringify(full),
+        dir,
+        async () => templateText,
+        undefined,
+        async (s) => {
+          reads.push(s);
+          return (await year()) as YearSummary;
+        },
+      );
+
+    beforeEach(() => {
+      reads.length = 0;
+      vi.mocked(log).mockClear();
+      writer = yearWriter();
+    });
+
+    it.each<[string, () => Promise<unknown>]>([
+      ["a write", async () => dataOf(page())],
+      ["a data update", () => writer.write({}).then(() => dataOf(page()))],
+      ["a refresh", () => refreshPages(writer, [file]).then(() => dataOf(page()))],
+      ["a view", () => writer.view({}).then((v) => v.blocks.data)],
+    ])("puts the year review into the data of %s", async (_, act) => {
+      await writer.write({ settings: { yearReview: true, sports: ["running"] } });
+      reads.length = 0;
+      const last = page();
+      const out = await act();
+      expect(out).toMatchObject({ year: YEAR });
+      expect(last).toContain('"yearReview":true');
+    });
+
+    it("reads the year with the settings of the page, one time for each write and view", async () => {
+      const settings = { yearReview: true, sports: ["running"] };
+      await writer.write({ settings });
+      await writer.write({});
+      await writer.view({});
+      expect(reads).toEqual([settings, settings, settings]);
+    });
+
+    it("puts the year review into a page that the assistant designed", async () => {
+      await writer.write({
+        page: `<script>/* garmin-data:start */null/* garmin-data:end */;/* garmin-settings:start */null/* garmin-settings:end */</script>`,
+        settings: { yearReview: true },
+      });
+      expect(dataOf(page()).year).toEqual(YEAR);
+      await writer.write({});
+      expect(dataOf(page()).year).toEqual(YEAR);
+    });
+
+    it.each<[string, Settings]>([
+      ["{}", {}],
+      ["other settings", { exclude: ["names"] }],
+    ])("drops the year review when a designed page is given %s", async (_, settings) => {
+      await writer.write({ settings: { yearReview: true, exclude: ["names"] } });
+      await writer.write({
+        page: `<script>/* garmin-data:start */null/* garmin-data:end */;/* garmin-settings:start */null/* garmin-settings:end */</script>`,
+        settings,
+      });
+      expect(dataOf(page())).not.toHaveProperty("year");
+      expect(page()).not.toContain("yearReview");
+    });
+
+    it.each([undefined, {}, { yearReview: false }])(
+      "reads no year, and the data is the same, with the settings %j",
+      async (settings) => {
+        vi.useFakeTimers({ now: new Date("2026-10-26T12:00:00Z"), toFake: ["Date"] });
+        try {
+          await writer.write({ settings });
+          const view = await writer.view({});
+          const withReader = page();
+          rmSync(file);
+          await new DashboardWriter(
+            async () => JSON.stringify(full),
+            dir,
+            async () => templateText,
+          ).write({ settings });
+          expect(noRev(withReader)).toBe(noRev(page()));
+          expect(dataOf(withReader)).not.toHaveProperty("year");
+          expect(view.blocks.data).not.toHaveProperty("year");
+          expect(reads).toEqual([]);
+        } finally {
+          vi.useRealTimers();
+        }
+      },
+    );
+
+    it("removes the year review when new settings turn it off", async () => {
+      await writer.write({ settings: { yearReview: true } });
+      await writer.write({ settings: { yearReview: false } });
+      expect(dataOf(page())).not.toHaveProperty("year");
+    });
+
+    it.each(['"yes"', "1", '"true"', "null", "{}"])(
+      "reads no year on an update of a page whose yearReview was edited to %s",
+      async (value) => {
+        await writer.write({ settings: { yearReview: true } });
+        writeFileSync(file, page().replace('"yearReview":true', `"yearReview":${value}`));
+        reads.length = 0;
+        await writer.write({});
+        expect(dataOf(page())).not.toHaveProperty("year");
+        expect((await writer.view({})).blocks.data).not.toHaveProperty("year");
+        expect(reads).toEqual([]);
+      },
+    );
+
+    it("keeps the year review out of the digest, and reads none for a preview", async () => {
+      const r = await writer.write({ settings: { yearReview: true } });
+      const view = await writer.view({});
+      reads.length = 0;
+      const preview = await writer.preview({});
+      expect(reads).toEqual([]);
+      expect(r.digest).toEqual(preview.digest);
+      expect(view.digest).toEqual(preview.digest);
+      expect(preview.digest).not.toHaveProperty("year");
+    });
+
+    it.each([
+      [new Error("no rows"), "no rows"],
+      ["no file", "no file"],
+    ])("writes the page, and logs one line, when the year read fails with %s", async (e, why) => {
+      writer = yearWriter(() => Promise.reject(e));
+      await writer.write({ settings: { yearReview: true } });
+      expect(dataOf(page())).not.toHaveProperty("year");
+      expect(dataOf(page()).activities).toHaveLength(2);
+      expect(vi.mocked(log).mock.calls).toEqual([
+        ["WARN", `Cannot add the year review to the dashboard: ${why}`],
+      ]);
+      vi.mocked(log).mockClear();
+      const view = await writer.view({});
+      expect(view.blocks.data).not.toHaveProperty("year");
+      expect(vi.mocked(log)).toHaveBeenCalledTimes(1);
+    });
+
+    it("writes the page without the year review when no reader is given", async () => {
+      writer = new DashboardWriter(
+        async () => JSON.stringify(full),
+        dir,
+        async () => templateText,
+      );
+      await writer.write({ settings: { yearReview: true } });
+      expect(dataOf(page())).not.toHaveProperty("year");
+      expect(vi.mocked(log)).not.toHaveBeenCalled();
+    });
+
+    it.each<[string, () => Promise<{ page: string }>, string]>([
+      ["a new layout", () => writer.write({ layout: "preset" }), "replaced"],
+      [
+        "new settings",
+        () => writer.write({ settings: { yearReview: true, title: "T" } }),
+        "replaced",
+      ],
+      ["notes", () => writer.write({ notes: ["n"] }), "updated"],
+      ["other weeks", () => writer.write({ weeks: 4 }), "updated"],
+      [
+        "new page code",
+        () => {
+          templateText = styledTemplate.replace(ID_A, ID_B);
+          return writer.write({});
+        },
+        "upgraded",
+      ],
+    ])("has the year of this write, not of the one before, after %s", async (_, act, kind) => {
+      await writer.write({ settings: { yearReview: true } });
+      writer = yearWriter(async () => ({ ...YEAR, year: 2027 }));
+      expect((await act()).page).toBe(kind);
+      expect(dataOf(page()).year).toEqual({ ...YEAR, year: 2027 });
+    });
+
+    it.each<[string, Settings]>([
+      ["no settings key", {}],
+      ["another setting", { title: "T" }],
+    ])("removes the year review when new settings have %s", async (_, settings) => {
+      await writer.write({ settings: { yearReview: true } });
+      await writer.write({ settings });
+      expect(dataOf(page())).not.toHaveProperty("year");
+    });
+
+    it.each<[string, () => Promise<unknown>]>([
+      ["fails", () => Promise.reject(new Error("no rows"))],
+      ["gives nothing", async () => undefined],
+    ])("drops the year of the write before when the read %s", async (_, year) => {
+      await writer.write({ settings: { yearReview: true } });
+      writer = yearWriter(year);
+      await writer.write({});
+      expect(dataOf(page())).not.toHaveProperty("year");
+      expect(page()).toContain('"yearReview":true');
+    });
+
+    it("logs each failed read of a write that another writer makes start again", async () => {
+      await writer.write({ settings: { yearReview: true } });
+      let changes = 1;
+      writer = yearWriter(async () => {
+        if (changes-- > 0) writeFileSync(file, page().replace("<title>", "<!--x--><title>"));
+        throw new Error("no rows");
+      });
+      vi.mocked(log).mockClear();
+      await writer.write({});
+      expect(page()).toContain("<!--x-->");
+      expect(reads).toHaveLength(3);
+      expect(vi.mocked(log)).toHaveBeenCalledTimes(2);
+    });
+
+    it("reads the year with the settings that another writer saved during the read", async () => {
+      await writer.write({ settings: { yearReview: true } });
+      reads.length = 0;
+      let changes = 1;
+      writer = yearWriter(async () => {
+        if (changes-- > 0)
+          writeFileSync(
+            file,
+            page().replace('"yearReview":true', '"yearReview":true,"exclude":["names"]'),
+          );
+        return { ...YEAR, year: 2000 + reads.length };
+      });
+      await writer.write({});
+      expect(reads).toEqual([{ yearReview: true }, { yearReview: true, exclude: ["names"] }]);
+      // the year of the first read can hold the names that the page now leaves out
+      expect(dataOf(page()).year).toEqual({ ...YEAR, year: 2002 });
+    });
+
+    it("reads no year for a page whose excluded data cannot be read", async () => {
+      await writer.write({ settings: { yearReview: true } });
+      writeFileSync(
+        file,
+        page().replace('"yearReview":true', '"yearReview":true,"exclude":"names"'),
+      );
+      const before = page();
+      reads.length = 0;
+      const bad = /garmin-settings block of the page has a bad exclude/;
+      await expect(writer.write({})).rejects.toThrow(bad);
+      await expect(writer.view({})).rejects.toThrow(bad);
+      expect(reads).toEqual([]);
+      expect(page()).toBe(before);
+    });
+
+    it("keeps the year review, with no read, when a schedule or an edit changes the page", async () => {
+      await writer.write({ settings: { yearReview: true } });
+      reads.length = 0;
+      await patchDue(file, "2026-10-27T06:00:00.000Z");
+      expect(dataOf(page())).toMatchObject({ due: "2026-10-27T06:00:00.000Z", year: YEAR });
+      await writer.edit({ layout: { base: "preset", boards: {} } });
+      expect(dataOf(page()).year).toEqual(YEAR);
+      expect(reads).toEqual([]);
+    });
+
+    it("has no year in the view of a page that does not exist", async () => {
+      expect((await writer.view({})).blocks.data).not.toHaveProperty("year");
+      expect(reads).toEqual([]);
+    });
+
+    it("keeps the next refresh time beside the year review", async () => {
+      writer = new DashboardWriter(
+        async () => JSON.stringify(full),
+        dir,
+        async () => templateText,
+        { due: async () => "2026-10-27T06:00:00.000Z" },
+        async () => YEAR as unknown as YearSummary,
+      );
+      await writer.write({ settings: { yearReview: true } });
+      expect(dataOf(page())).toMatchObject({ due: "2026-10-27T06:00:00.000Z", year: YEAR });
+    });
+
+    it("writes a name of the year that closes the script or the block as text", async () => {
+      const name = "</script><img src=x> /* garmin-data:end */";
+      writer = yearWriter(async () => ({ ...YEAR, longest: { name } }));
+      await writer.write({ settings: { yearReview: true } });
+      expect(page()).not.toContain("<img src=x>");
+      expect(dataOf(page()).year).toMatchObject({ longest: { name } });
+    });
+
+    it("leaves a page as it was when the setting is refused", async () => {
+      await writer.write({ settings: { yearReview: true } });
+      const before = page();
+      const settings = { yearReview: "yes" } as unknown as Settings;
+      await expect(writer.write({ settings })).rejects.toThrow("yearReview: true or false");
+      expect(page()).toBe(before);
+    });
+
+    it.each([["yes"], [1], [null], [[]], [{}]])("refuses the setting %j", async (yearReview) => {
+      const settings = { yearReview } as unknown as { yearReview: boolean };
+      const message = "Settings: yearReview: true or false";
+      await expect(writer.write({ settings })).rejects.toMatchObject({ message });
+      await expect(writer.preview({ settings })).rejects.toMatchObject({ message });
+      expect(existsSync(file)).toBe(false);
+    });
+  });
+
   describe("since", () => {
     const asks: (number | undefined)[] = [];
 
@@ -1257,6 +1556,129 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
         "this page has no garmin-settings block",
       );
       expect(page()).toBe(before);
+    });
+
+    describe("in place of a page from the template", () => {
+      const old: Settings = { exclude: ["names"], sports: ["running"] };
+
+      it.each<[string, Settings]>([
+        ["workouts", { workouts: true }],
+        ["recoveryHistory", { recoveryHistory: true }],
+        ["yearReview", { yearReview: true }],
+      ])(
+        "keeps the sports and the excluded data with a copy of its settings and %s",
+        async (_, yes) => {
+          await writer.write({ settings: old });
+          const { settings } = await writer.preview({ weeks: 12 });
+          await later(() =>
+            writer.write({ weeks: 12, page: own, settings: { ...settings, ...yes } }),
+          );
+          expect(readBlock(page(), "settings")).toEqual({ ...old, ...yes });
+          expect((readBlock(page(), "data") as Full).activities.map((a) => a.sport)).toEqual([
+            "running",
+          ]);
+          expect(page()).not.toContain("Anna");
+          // the write of the coach notes gives no settings
+          await later(() => writer.write({ weeks: 12, notes: ["n"] }));
+          expect(readBlock(page(), "settings")).toEqual({ ...old, ...yes });
+          expect(page()).not.toContain("Anna");
+        },
+      );
+
+      it("gives no recovery data, and asks for none, with a Recovery trend on a page that excludes it", async () => {
+        const histories: (boolean | undefined)[] = [];
+        writer = new DashboardWriter(
+          async (_, _laps, history) => {
+            histories.push(history);
+            return JSON.stringify(full);
+          },
+          dir,
+          async () => templateText,
+        );
+        await writer.write({ settings: { exclude: ["recovery"] } });
+        const { settings } = await writer.preview({ weeks: 12 });
+        await later(() =>
+          writer.write({ weeks: 12, page: own, settings: { ...settings, recoveryHistory: true } }),
+        );
+        expect(readBlock(page(), "data")).toMatchObject({ hrv: [], recovery: [] });
+        expect(histories).not.toContain(true);
+      });
+
+      it.each<NonNullable<Settings["exclude"]>[number]>([
+        "names",
+        "recovery",
+        "fitnessAge",
+        "zones",
+      ])("keeps %s out of the page with a copy of its settings", async (item) => {
+        await writer.write({ settings: { exclude: [item] } });
+        const before = { ...dataOf(page()), updated: "n/a" };
+        const { settings } = await writer.preview({ weeks: 12 });
+        await later(() => writer.write({ weeks: 12, page: own, settings }));
+        expect({ ...dataOf(page()), updated: "n/a" }).toEqual(before);
+        expect(readBlock(page(), "settings")).toEqual({ exclude: [item] });
+        // without the copy the item comes back, so the check above is not empty
+        await later(() => writer.write({ weeks: 12, page: own, settings: {} }));
+        expect({ ...dataOf(page()), updated: "n/a" }).not.toEqual(before);
+      });
+
+      it("gives the repeated runs of the new sports when the preview gets new settings", async () => {
+        writer = new DashboardWriter(
+          async () =>
+            JSON.stringify({ ...full, activities: [...full.activities, ...full.activities] }),
+          dir,
+          async () => templateText,
+        );
+        const settings: Settings = { sports: ["cycling"] };
+        await writer.write({ settings });
+        expect((await writer.preview({ weeks: 12 })).digest.repeatedRuns).toEqual({});
+        const all = await writer.preview({ weeks: 12, settings: {} });
+        expect(Object.values(all.digest.repeatedRuns)).toEqual([2]);
+        expect(readBlock(page(), "settings")).toEqual(settings);
+      });
+
+      it("brings the excluded data back without the copy, so the prompt asks for it", async () => {
+        await writer.write({ settings: old });
+        await later(() => writer.write({ page: own, settings: { workouts: true } }));
+        expect((readBlock(page(), "data") as Full).activities.map((a) => a.sport)).toEqual([
+          "running",
+          "cycling",
+        ]);
+        expect(page()).toContain("Anna");
+      });
+
+      it("refuses the copy without a settings line, and keeps the old page", async () => {
+        await writer.write({ settings: old });
+        const before = page();
+        const bare = own.replace(/window\.GARMIN_SETTINGS.*;\n/, "");
+        expect(bare).not.toContain("garmin-settings");
+        await expect(
+          later(() => writer.write({ weeks: 12, page: bare, settings: old })),
+        ).rejects.toThrow("this page has no garmin-settings block");
+        expect(page()).toBe(before);
+      });
+
+      it("writes an empty copy on a page without a settings line", async () => {
+        await writer.write({});
+        const { settings } = await writer.preview({ weeks: 12 });
+        expect(settings).toEqual({});
+        const bare = own.replace(/window\.GARMIN_SETTINGS.*;\n/, "");
+        await later(() => writer.write({ weeks: 12, page: bare, settings }));
+        expect((readBlock(page(), "data") as Full).activities).toHaveLength(2);
+      });
+
+      it("refuses a copy with since next to weeks, and takes it without since", async () => {
+        await on("2026-11-18", async () => {
+          await writer.write({ settings: { ...old, since: "2026-11-02" } });
+          const { settings } = await writer.preview({ weeks: 12 });
+          expect(settings.since).toBe("2026-11-02");
+          await expect(writer.write({ weeks: 12, page: own, settings })).rejects.toThrow(
+            /the page starts on 2026-11-02/,
+          );
+          const { since: _, ...rest } = settings;
+          await writer.write({ weeks: 12, page: own, settings: rest });
+        });
+        expect(readBlock(page(), "settings")).toEqual(old);
+      });
     });
 
     it("does not change the block of a write without settings", async () => {

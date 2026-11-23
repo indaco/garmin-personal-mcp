@@ -48,9 +48,13 @@ such a tool, ask the questions in chat as numbered lists, with the default first
    `title`, `headline`, `sports` (the boards to keep), `exclude` (from `recovery`, `fitnessAge`,
    `zones`, `names`, `notes`), `languages` (the codes to keep: {{languages}}), `language` (the one
    it opens in), `themes`, `theme`, `workouts` (true when I said yes to the workout comparison),
-   `recoveryHistory` (true when I said yes to the Recovery trend), `shared` (true when the page is
-   for a person I share it with), `since` (the start day, when I chose one; then no `weeks`). Do not give a setting that keeps its default. If there is no page
-   at the path, also give `layout` = "preset".
+   `recoveryHistory` (true when I said yes to the Recovery trend), `yearReview` (true when the
+   page is for me and the `settings` of the preview have it, or when I ask for it), `shared` (true
+   when the page is for a person I share it with), `since` (the start day, when I chose one; then no
+   `weeks`). Do not give a setting that keeps its default. If there is no page at the path, also give
+   `layout` = "preset". When the `settings` of the preview have `yearReview`, tell me whether the page
+   keeps the recap of the calendar year, which holds days before its period, and that I can change
+   this. A page for a person I share it with does not keep it without my yes.
    If the reply has `addedWidgets` (board -> widget ids), tell me which widgets it added to which
    board, as the reply gives them; do not make up a title. Without it, say nothing about them.
 5. Unless I excluded the coach notes: write at most 5 coach notes from the digest. Each note names a
@@ -79,8 +83,8 @@ is missing, write "n/a". If a call fails, say which one and why in one line.
 If `estimatedLoads` is more than 0, say that a part of the load is an estimate from heart rate. Do
 not compare a week with `partial: true` with whole weeks.
 
-Do not write or change the page yourself. Settings need a page from the template: a page designed with
-layout freeform cannot keep them.
+Do not write or change the page yourself. Settings need a page from the template,
+or a page designed with layout freeform that has a `garmin-settings` block.
 
 Automatic refresh: call `scheduleDashboardRefresh` without arguments. If its `pages` do not have
 the `path` of the page, ask me once whether to update the page automatically. If your client has a

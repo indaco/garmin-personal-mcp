@@ -5,10 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type GarminApiClient, GarminApiError } from "../src/api-client";
 import type { YearSummary } from "../src/analytics/year";
 import { type CachedRows, GarminDashboard } from "../src/dashboard";
-import { DashboardWriter } from "../src/dashboard-page";
+import { DashboardWriter, readBlock } from "../src/dashboard-page";
 import { addDays, reviewYear } from "../src/dates";
 import { type GarminTools, isObject } from "../src/tools";
-import { registerYearReview, yearOf } from "../src/year-review";
+import type { Settings } from "../src/page/settings";
+import { pageYear, registerYearReview, yearOf } from "../src/year-review";
 import { type Answer, closeAll, connect, type Era } from "./elicitation-client";
 
 vi.mock("../src/log", () => ({ log: vi.fn() }));
@@ -775,5 +776,162 @@ describe("getYearReview", () => {
       error:
         "The fetch stopped at 20 requests and saved nothing: the days need more. Another try stops too.",
     });
+  });
+});
+
+describe("pageYear", () => {
+  const template =
+    '<html><head><meta name="garmin-template" content="0123456789abcdef"></head><script>' +
+    ["data", "layout", "widgets", "languages", "i18n", "refresh", "settings"]
+      .map((b) => `/* garmin-${b}:start */null/* garmin-${b}:end */`)
+      .join(";") +
+    "</script></html>";
+  /** The server's dashboard and its page writer. */
+  const parts = () => {
+    const dashboard = new GarminDashboard(
+      {} as GarminTools,
+      api as unknown as GarminApiClient,
+      dir,
+    );
+    const data = { start: "2026-10-19", end: "2026-10-26", activities: [], previousActivities: [] };
+    const writer = new DashboardWriter(
+      async () => JSON.stringify(data),
+      dir,
+      async () => template,
+      undefined,
+      (s) => pageYear(dashboard, s),
+    );
+    return { dashboard, writer };
+  };
+  /** The year in a page that a write with these settings made. */
+  const writtenYear = async (settings: Settings) => {
+    const { path } = await parts().writer.write({ settings });
+    const data = readBlock(readFileSync(path, "utf8"), "data");
+    return (data as { year?: YearSummary }).year;
+  };
+
+  it.each<[string, Settings]>([
+    ["no other setting", {}],
+    ["sports and excluded data", { sports: ["running"], exclude: ["recovery", "names"] }],
+    ["excluded zones", { exclude: ["zones"] }],
+  ])("a page has the same year as getYearReview with %s", async (_, settings) => {
+    saveAllKinds();
+    const year = await writtenYear({ yearReview: true, ...settings });
+    const { reply } = await review();
+    expect(year).toEqual(reply.year);
+    expect(year?.totals.activities).toBe(settings.sports ? 1 : 2);
+  });
+
+  it.each([
+    ["2026-01-01", 2025, 1],
+    ["2026-01-14", 2025, 1],
+    ["2026-01-15", 2026, 2],
+  ])("on %s is the year %i, as for getYearReview", async (today, year, activities) => {
+    setToday(today);
+    save({
+      activitiesFrom: "2025-01-01",
+      activitiesTo: today,
+      activities: byId(
+        row(1, "2025-01-01"),
+        row(2, "2026-01-01"),
+        row(3, "2026-01-02"),
+        row(4, "2024-12-31"),
+      ),
+    });
+    const recap = await writtenYear({ yearReview: true });
+    expect(recap).toEqual((await review()).reply.year);
+    expect(recap).toMatchObject({ year, totals: { activities } });
+  });
+
+  it("has the missing days that a review fetched, at the next update", async () => {
+    saveFromMarch();
+    garmin = [activity(7, "2026-01-10")];
+    const before = await writtenYear({ yearReview: true });
+    expect(before?.coverage.missing).toEqual([{ from: "2026-01-01", to: "2026-02-28" }]);
+    await review({}, YES);
+    const after = await writtenYear({ yearReview: true });
+    expect(after?.coverage.missing).toEqual([]);
+    expect(after?.months[0]).toMatchObject({ covered: "all", sessions: 1 });
+  });
+
+  it.each([
+    ["recovery", /"(hrv|rhr)"/],
+    ["names", /"name"|Run 1|Ride 2/],
+  ] as const)("has no %s that the page leaves out", async (item, left) => {
+    saveAllKinds();
+    const all = JSON.stringify(await writtenYear({ yearReview: true }));
+    expect(all).toMatch(left);
+    const cut = JSON.stringify(await writtenYear({ yearReview: true, exclude: [item] }));
+    expect(cut).toContain('"totals"');
+    expect(cut).not.toMatch(left);
+  });
+
+  it.each(["sports", "exclude"])("has all the data of a page whose %s is null", async (key) => {
+    saveAllKinds();
+    const all = await writtenYear({ yearReview: true });
+    const { writer } = parts();
+    const file = join(dir, "garmin-dashboard.html");
+    writeFileSync(
+      file,
+      readFileSync(file, "utf8").replace('"yearReview":true', `"yearReview":true,"${key}":null`),
+    );
+    await writer.write({});
+    expect(readBlock(readFileSync(file, "utf8"), "data")).toMatchObject({ year: all });
+  });
+
+  it("has no activity when the page keeps a sport that the year does not have", async () => {
+    saveAllKinds();
+    const year = await writtenYear({ yearReview: true, sports: ["swimming"] });
+    expect(year).toMatchObject({ totals: { activities: 0 }, sports: [], longest: null });
+    expect(year).toEqual((await review()).reply.year);
+  });
+
+  it("has the new year from the first write on 15 January", async () => {
+    save({
+      activitiesFrom: "2025-01-01",
+      activitiesTo: "2026-01-20",
+      activities: byId(row(1, "2025-06-01"), row(2, "2026-01-03")),
+    });
+    const { writer } = parts();
+    const yearOn = async (today: string) => {
+      setToday(today);
+      const { path } = await writer.write({ settings: { yearReview: true } });
+      return (readBlock(readFileSync(path, "utf8"), "data") as { year: YearSummary }).year.year;
+    };
+    expect(await yearOn("2026-01-14")).toBe(2025);
+    expect(await yearOn("2026-01-15")).toBe(2026);
+  });
+
+  it("has only the sports that the page keeps", async () => {
+    saveAllKinds();
+    const year = await writtenYear({ yearReview: true, sports: ["running"] });
+    expect(year?.sports.map((s) => s.sport)).toEqual(["running"]);
+    expect(JSON.stringify(year)).not.toMatch(/cycling|Ride 2/);
+  });
+
+  it.each([
+    ["none", undefined],
+    ["damaged", "{"],
+  ])(
+    "has every day as missing, and no invented value, with a cache that is %s",
+    async (_, text) => {
+      if (text !== undefined) writeFileSync(cacheFile(), text);
+      const year = await writtenYear({ yearReview: true });
+      expect(year).toEqual((await review()).reply.year);
+      expect(year?.coverage.missing).toEqual([{ from: "2026-01-01", to: "2026-10-26" }]);
+      expect(year?.totals.activities).toBeNull();
+    },
+  );
+
+  it("asks Garmin for nothing, also when days are missing", async () => {
+    saveFromMarch();
+    const year = await writtenYear({ yearReview: true });
+    expect(year?.coverage.missing).toHaveLength(1);
+    expect(api.getJson).not.toHaveBeenCalled();
+  });
+
+  it("leaves the year out of a page when the cache cannot be read", async () => {
+    vi.spyOn(GarminDashboard.prototype, "readCached").mockRejectedValueOnce(new Error("no rows"));
+    expect(await writtenYear({ yearReview: true })).toBeUndefined();
   });
 });

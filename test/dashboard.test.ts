@@ -26,13 +26,14 @@ import {
   searchRequests,
   toFetch,
 } from "../src/dashboard";
-import { filterData } from "../src/dashboard-page";
+import { DashboardWriter, filterData, readBlock } from "../src/dashboard-page";
 import { addDays } from "../src/dates";
 import { digest } from "../src/digest";
 import { log as logMock } from "../src/log";
 import { groupOf } from "../src/analytics/calc";
 import { periodWindow } from "../src/analytics/metrics";
 import { GarminTools, writeAtomically } from "../src/tools";
+import { pageYear } from "../src/year-review";
 import { fitFile } from "./fit-file";
 
 vi.mock("../src/log", () => ({ log: vi.fn() }));
@@ -3438,5 +3439,37 @@ describe("fillActivities", () => {
     // the update covers the last days: the fill asks for the gap and for the last 14 days
     expect(filled).toEqual({ garminCalls: 2 });
     expect(readCache().hrvFrom).toBe("2026-10-19");
+  });
+});
+
+describe("a page with the year review", () => {
+  it("asks Garmin for the same data as a page without it, and holds the days of the update", async () => {
+    garminActivities = [activity(1, "2026-10-20"), activity(2, "2026-10-26")];
+    const page =
+      "<script>/* garmin-data:start */null/* garmin-data:end */;/* garmin-settings:start */null/* garmin-settings:end */</script>";
+    /** The requests and the year of a first update, in a new data folder. */
+    const firstUpdate = async (yearReview: boolean) => {
+      const dir = mkdtempSync(join(tmpdir(), "garmin-dash-"));
+      const client = api as unknown as GarminApiClient;
+      const own = new GarminDashboard(new GarminTools(client, dir), client, dir);
+      const writer = new DashboardWriter(
+        (weeks, workouts, history) => own.getDashboardData(weeks, workouts, history),
+        dir,
+        async () => '<head><meta name="garmin-template" content="0123456789abcdef"></head>',
+        undefined,
+        (s) => pageYear(own, s),
+      );
+      api.getJson.mockClear();
+      const { path } = await writer.write({ page, settings: { yearReview } });
+      const data = readBlock(readFileSync(path, "utf8"), "data") as { year?: unknown };
+      return { requests: api.getJson.mock.calls, year: data.year };
+    };
+    const without = await firstUpdate(false);
+    const on = await firstUpdate(true);
+    expect(without.requests.length).toBeGreaterThan(0);
+    expect(on.requests).toEqual(without.requests);
+    expect(without.year).toBeUndefined();
+    // the year is read after the update: it has the session that this update fetched
+    expect(on.year).toMatchObject({ year: 2026, totals: { activities: 2 } });
   });
 });

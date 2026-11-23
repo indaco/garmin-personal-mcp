@@ -1398,6 +1398,28 @@ describe("MCP tools", () => {
       expect(textOf(result)).toBe('{"wrote":1}');
     });
 
+    it.each([true, false])(
+      "writeDashboard passes the setting yearReview %s",
+      async (yearReview) => {
+        const client = await connectHandlers(writer, dashboard);
+        const args = { settings: { yearReview } };
+        await client.callTool({ name: "writeDashboard", arguments: args });
+        expect(writer.write).toHaveBeenCalledWith(args);
+      },
+    );
+
+    it.each([["yes"], [1], [null]])(
+      "writeDashboard refuses the setting yearReview %j",
+      async (yearReview) => {
+        const client = await connectHandlers(writer, dashboard);
+        const args = { settings: { yearReview } };
+        const result = await client.callTool({ name: "writeDashboard", arguments: args });
+        expect(result.isError).toBe(true);
+        expect(textOf(result)).toContain("yearReview");
+        expect(writer.write).not.toHaveBeenCalled();
+      },
+    );
+
     it("writeDashboard with preview only previews, without the preview key", async () => {
       const client = await connectHandlers(writer, dashboard);
       const result = await client.callTool({
@@ -1420,7 +1442,8 @@ describe("MCP tools", () => {
     });
 
     it("showDashboard gives the model the digest and the page the blocks", async () => {
-      const blocks = { data: { weeks: 4 }, layout: null, widgets: [], languages: {}, i18n: {} };
+      const data = { weeks: 4, year: { v: 1, totals: { activities: 7 } } };
+      const blocks = { data, layout: null, widgets: [], languages: {}, i18n: {} };
       const view = vi.fn().mockResolvedValue({
         path: "/d/a.html",
         digest: { totals: {} },

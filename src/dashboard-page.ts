@@ -9,6 +9,7 @@ import { localToday } from "./dates";
 import { type Digest, digest, syncGaps } from "./digest";
 import { Profile } from "@garmin/fitsdk";
 import { type Activity, GROUPS, groupOf, tabsFor } from "./analytics/calc";
+import type { YearSummary } from "./analytics/year";
 import { CATALOGUE, inPage } from "./page/catalogue";
 import { ABOUT } from "./page/catalogue-about";
 import { BUILT_IN } from "./page/i18n/built-in";
@@ -497,7 +498,8 @@ export function styled(page: string, s: Settings): string {
 
 /**
  * The page with the built-in languages and the data that the settings keep, and the escaped notes.
- * `due`: the next automatic refresh, so the page can tell when it missed one.
+ * `due`: the next automatic refresh, so the page can tell when it missed one. `year`: the recap of
+ * the year, already without what the settings leave out.
  */
 export function withData(
   page: string,
@@ -505,6 +507,7 @@ export function withData(
   s: Settings,
   notes: readonly string[],
   due?: string,
+  year?: YearSummary,
 ): string {
   const next = writeBlock(page, "languages", languagesOf(s, data.locale));
   const kept = s.exclude?.includes("notes") ? [] : notes;
@@ -514,6 +517,7 @@ export function withData(
     server: version,
     updated: new Date().toISOString(),
     ...(due ? { due } : {}),
+    ...(year ? { year } : {}),
     notes: kept.map(escapeHtml),
   });
 }
@@ -575,6 +579,7 @@ export function checkSettings(s: Settings): Settings {
         "theme",
         "workouts",
         "recoveryHistory",
+        "yearReview",
         "shared",
         "since",
       ].includes(k),
@@ -598,6 +603,8 @@ export function checkSettings(s: Settings): Settings {
     problems.push("workouts: true or false");
   if (s.recoveryHistory !== undefined && typeof s.recoveryHistory !== "boolean")
     problems.push("recoveryHistory: true or false");
+  if (s.yearReview !== undefined && typeof s.yearReview !== "boolean")
+    problems.push("yearReview: true or false");
   if (s.shared !== undefined && typeof s.shared !== "boolean")
     problems.push("shared: true or false");
   if (s.since !== undefined && !isDay(s.since))
@@ -643,7 +650,25 @@ export class DashboardWriter {
     private readonly schedule: { due(path: string): Promise<string | undefined> } = {
       due: async () => undefined,
     },
+    /** The recap of the year for a page with these settings, from the cache. */
+    private readonly year: (settings: Settings) => Promise<YearSummary | undefined> = async () =>
+      undefined,
   ) {}
+
+  /** The recap of the year, when the page asks for it. Without it the page is still worth a write. */
+  async #year(settings: Settings): Promise<YearSummary | undefined> {
+    // a page that was edited by hand can hold any value here
+    if (settings.yearReview !== true) return undefined;
+    try {
+      return await this.year(settings);
+    } catch (e) {
+      log(
+        "WARN",
+        `Cannot add the year review to the dashboard: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      return undefined;
+    }
+  }
 
   write(options: WriteOptions): Promise<WriteResult> {
     const run = this.#queue.then(() => this.#write(options));
@@ -739,7 +764,7 @@ export class DashboardWriter {
           wantsHistory(settings),
         ),
       ) as Json;
-      page = withData(page, raw, settings, []);
+      page = withData(page, raw, settings, [], undefined, await this.#year(settings));
       return {
         path: target,
         digest: digest(filterData(raw, settings)),
@@ -886,7 +911,8 @@ export class DashboardWriter {
         next = await this.#withLibrary(next, undefined);
       }
     }
-    next = withData(next, raw, own, notes, await this.schedule.due(target));
+    const due = await this.schedule.due(target);
+    next = withData(next, raw, own, notes, due, await this.#year(own));
     // first, so that a damaged block stops the call before the page changes
     const report = {
       notes: own.exclude?.includes("notes") ? 0 : notes.length,
@@ -1521,6 +1547,12 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
               .boolean()
               .describe(
                 "Keep the sleep and resting HR rows of the whole period in the page, not only the last 14 days; off when not set",
+              )
+              .optional(),
+            yearReview: z
+              .boolean()
+              .describe(
+                "Add the recap of the calendar year to the page data, from the local cache; getYearReview fills its missing days after a yes; off when not set",
               )
               .optional(),
             since: z

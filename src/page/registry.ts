@@ -5,6 +5,7 @@ import type * as running from "../analytics/running";
 import type * as strength from "../analytics/strength";
 import type * as sports from "../analytics/sports";
 import type { Activity } from "../analytics/calc";
+import type { YearSummary } from "../analytics/year";
 import type { Fmt, T, Units } from "./i18n";
 import { CATALOGUE, inPage } from "./catalogue";
 import type { Settings } from "./settings";
@@ -36,6 +37,8 @@ export interface Data {
   updated?: string;
   /** The next automatic refresh, as an ISO time; only on a page with a schedule. */
   due?: string;
+  /** The recap of the calendar year; only on a page with the setting `yearReview`. */
+  year?: YearSummary;
 }
 
 /** What a widget gets to draw itself. Built-in and custom widgets get the same. */
