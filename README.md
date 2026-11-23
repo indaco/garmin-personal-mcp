@@ -409,6 +409,13 @@ In the answer, `fill.asked` tells what it did:
 | `unasked`    | your client has no form: no request                                                             |
 | `tooLarge`   | the days need more than about 20 requests: no question and no request                           |
 
+A fetch stops at 20 requests and saves nothing when the days need more. `fill.error` then tells if
+another try asks for fewer days, and the form of that try names the days that it drops.
+
+After `tooLarge` for a year before this year, review a newer year first, then this one. Each yes
+adds earlier days to the cache, so the next review needs fewer requests. This works only in a client
+with a form.
+
 When only today is missing, the server does not ask. A workout that came to Garmin after the last
 update of the cache is then not in the recap, and its day can look like a rest day. `lastDayOpen` is
 true in the answer when the last cached day is in the year: a later workout of that day can be

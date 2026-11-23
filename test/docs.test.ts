@@ -158,6 +158,10 @@ describe("guide", () => {
         "| `no` | you said no: no request | " +
         "| `unasked` | your client has no form: no request | " +
         "| `tooLarge` | the days need more than about 20 requests: no question and no request | " +
+        "A fetch stops at 20 requests and saves nothing when the days need more. `fill.error` then tells " +
+        "if another try asks for fewer days, and the form of that try names the days that it drops. " +
+        "After `tooLarge` for a year before this year, review a newer year first, then this one. Each yes " +
+        "adds earlier days to the cache, so the next review needs fewer requests. This works only in a client with a form. " +
         "When only today is missing, the server does not ask. A workout that came to Garmin after the last " +
         "update of the cache is then not in the recap, and its day can look like a rest day. `lastDayOpen` " +
         "is true in the answer when the last cached day is in the year: a later workout of that day can be " +
@@ -170,7 +174,7 @@ describe("guide", () => {
       "| `getYearReview` | `/activitylist-service/activities/search/activities`, only after a yes | " +
         "the recap of a calendar year (`year`, default this year; until 14 January, the year before) from " +
         "the cache. When days before today are missing, it asks in a form and fetches the activity list after a yes, " +
-        "at most 20 pages; it never fetches HRV and resting HR. `path` is the dashboard page whose " +
+        "at most 20 pages. For more pages, review a newer year first, then this one, in a client with a form. It never fetches HRV and resting HR. `path` is the dashboard page whose " +
         "sports and excluded data apply; it must exist. `fill.asked` in the answer: see " +
         "[Year review](../README.md#year-review) |",
     );

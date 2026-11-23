@@ -75,8 +75,9 @@ export function registerYearReview(
         "after a yes it fetches the activity list of these days, and of other days that the cache needs",
         "(no HRV, no resting HR). `fill.asked` says what came of it: notNeeded (no day before today is",
         "missing), yes, no, unasked (this client has no form), or tooLarge (about `estimate` requests, over",
-        `${FILL_CAP}). Only yes fetches; \`fill.error\` says why a fetch failed. With`,
-        "`lastDayOpen` true, the last cached day, `year.coverage.activities.to`, can lack",
+        `${FILL_CAP}: for a year before this year, say to review a newer year first, then this one,`,
+        "which works only in a client with a form). Only yes fetches; `fill.error` says why a fetch failed.",
+        "With `lastDayOpen` true, the last cached day, `year.coverage.activities.to`, can lack",
         "sessions that came after that day's update: say so. When `fill.asked` is notNeeded and the year",
         "is the year of today, say also that a dashboard update adds them.",
         "null is n/a, never 0.",
@@ -94,7 +95,7 @@ export function registerYearReview(
         path: z
           .string()
           .describe(
-            "The dashboard page whose sports and excluded data apply; it must exist; relative paths are inside the data dir",
+            "The dashboard page whose sports and excluded data apply; it must exist; relative paths are inside the data dir; default: the page garmin-dashboard.html, when there is one",
           )
           .optional(),
       }),
@@ -124,16 +125,16 @@ export function registerYearReview(
       const drops = cached.fillDrops
         ? ` The cache then no longer covers ${cached.fillDrops.from} to ${cached.fillDrops.to}: a review of those days must fetch them again.`
         : "";
-      const c = confirm(
-        server,
-        ctx,
-        "confirm",
-        `Fetch the activity list from Garmin for ${cached.fillStart} to ${today}, about ${estimate} request${estimate === 1 ? "" : "s"}?${drops} HRV and resting HR are not fetched. Confirm?`,
-      );
+      const question = `Fetch the activity list from Garmin for ${cached.fillStart} to ${today}, about ${estimate} request${estimate === 1 ? "" : "s"}?${drops} HRV and resting HR are not fetched. Confirm?`;
+      // the question is the key: a yes to another question is no answer to this one, so a cache that
+      // changed while the form was open makes a new form
+      const c = confirm(server, ctx, question, question);
       if ("ask" in c) return c.ask;
       // the other tools do on "unasked" what the user told them to do: here the user asked for a
       // recap, not for a fetch that can use a fifth of Garmin's request limit
       if (c.answer !== "yes") return reply(c.answer, estimate);
+      // shortcut: fillActivities reads the cache again, so a write of another process in the few
+      // milliseconds since readCached can still change the plan; pass the plan if that ever matters
       const done = await dashboard.fillActivities(from, today);
       return reply("yes", estimate, await dashboard.readCached(from, today), done);
     },

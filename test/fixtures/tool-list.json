@@ -421,7 +421,7 @@
   },
   {
     "name": "getYearReview",
-    "description": "The recap of a calendar year from the local cache: totals (sessions, active days, km, hours,\nascent in metres, calories, load), sports, months, the biggest month and week, the best 4 weeks,\nthe most consistent month, streaks, the longest and the biggest session, the progression of the\nbest efforts, weekdays, time of day, and HRV and resting HR by month. Use it for a year in review;\nfor the last weeks, use `getDashboardData`. `year.coverage.missing` lists the days that the cache\ndoes not have. With a day before today in it, the tool asks the user first, in a form, and only\nafter a yes it fetches the activity list of these days, and of other days that the cache needs\n(no HRV, no resting HR). `fill.asked` says what came of it: notNeeded (no day before today is\nmissing), yes, no, unasked (this client has no form), or tooLarge (about `estimate` requests, over\n20). Only yes fetches; `fill.error` says why a fetch failed. With\n`lastDayOpen` true, the last cached day, `year.coverage.activities.to`, can lack\nsessions that came after that day's update: say so. When `fill.asked` is notNeeded and the year\nis the year of today, say also that a dashboard update adds them.\nnull is n/a, never 0.",
+    "description": "The recap of a calendar year from the local cache: totals (sessions, active days, km, hours,\nascent in metres, calories, load), sports, months, the biggest month and week, the best 4 weeks,\nthe most consistent month, streaks, the longest and the biggest session, the progression of the\nbest efforts, weekdays, time of day, and HRV and resting HR by month. Use it for a year in review;\nfor the last weeks, use `getDashboardData`. `year.coverage.missing` lists the days that the cache\ndoes not have. With a day before today in it, the tool asks the user first, in a form, and only\nafter a yes it fetches the activity list of these days, and of other days that the cache needs\n(no HRV, no resting HR). `fill.asked` says what came of it: notNeeded (no day before today is\nmissing), yes, no, unasked (this client has no form), or tooLarge (about `estimate` requests, over\n20: for a year before this year, say to review a newer year first, then this one,\nwhich works only in a client with a form). Only yes fetches; `fill.error` says why a fetch failed.\nWith `lastDayOpen` true, the last cached day, `year.coverage.activities.to`, can lack\nsessions that came after that day's update: say so. When `fill.asked` is notNeeded and the year\nis the year of today, say also that a dashboard update adds them.\nnull is n/a, never 0.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -432,7 +432,7 @@
         },
         "path": {
           "type": "string",
-          "description": "The dashboard page whose sports and excluded data apply; it must exist; relative paths are inside the data dir"
+          "description": "The dashboard page whose sports and excluded data apply; it must exist; relative paths are inside the data dir; default: the page garmin-dashboard.html, when there is one"
         }
       },
       "$schema": "https://json-schema.org/draft/2020-12/schema"

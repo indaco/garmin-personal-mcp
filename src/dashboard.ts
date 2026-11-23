@@ -112,6 +112,8 @@ const stopsAll = (e: GarminApiError) => e.status === undefined || e.status === 4
 export class GarminDashboard {
   /** Calls run one at a time, so the cache file has one writer. */
   #queue: Promise<unknown> = Promise.resolve();
+  /** The cached days whose fill stopped at FILL_CAP: the next one does not keep them. */
+  #tooFar: string | undefined;
 
   constructor(
     private readonly tools: GarminTools,
@@ -149,7 +151,7 @@ export class GarminDashboard {
 
     const cache = await this.load();
     const before = new Set(Object.keys(objectAt(cache, "activities")));
-    // only the days of the dashboard: the earlier years of a year review need a yes
+    // only the days of the dashboard: the earlier days of a year review need a yes
     await this.#syncActivities(cache, prevStart, today, sync);
     await this.#syncHrv(cache, start, today, sync);
     await this.#syncRecovery(cache, recoveryFrom, today, sync);
@@ -220,7 +222,7 @@ export class GarminDashboard {
     return this.#inTurn(async () => {
       const cache = await this.load();
       const held = outdated(cache) ? null : rangeOf(cache.activitiesFrom, cache.activitiesTo);
-      const plan = fillPlan(cache, from, to);
+      const plan = this.#fillPlan(cache, from, to);
       const recovery = objectAt(cache, "recovery");
       let rhr: DayRange | null = null;
       for (let day = from, first = ""; day <= to; day = addDays(day, 1)) {
@@ -252,16 +254,26 @@ export class GarminDashboard {
   fillActivities(from: string, to: string): Promise<FillResult> {
     return this.#inTurn(async () => {
       const sync: Sync = { ...newSync(), searchLimit: FILL_CAP };
+      const cache = await this.load();
+      const plan = this.#fillPlan(cache, from, to);
+      const held = heldDays(cache); // the sync changes the cache
+      const canDrop = plan.drops === null && fillPlan(cache, from, to, false).drops !== null;
       try {
-        const cache = await this.load();
-        await this.#syncActivities(cache, fillPlan(cache, from, to).start, to, sync);
+        await this.#syncActivities(cache, plan.start, to, sync);
         await this.#save(cache, true);
         return { garminCalls: sync.calls };
       } catch (e) {
         log("WARN", `Activity list not fetched: ${reasonOf(e)}`);
-        return { garminCalls: sync.calls, error: fillError(e) };
+        const fewer = canDrop && e instanceof SearchLimitError;
+        // no silent retry: the user said yes to a form that names no days to drop
+        if (fewer) this.#tooFar = held;
+        return { garminCalls: sync.calls, error: fillError(e, fewer ? from : undefined) };
       }
     });
+  }
+
+  #fillPlan(cache: Json, from: string, to: string): FillPlan {
+    return fillPlan(cache, from, to, heldDays(cache) !== this.#tooFar);
   }
 
   // ------------------------------------------------------------------ sync
@@ -564,7 +576,7 @@ export class GarminDashboard {
         }
       }
     } catch (e) {
-      log("WARN", `Dashboard cache unreadable, starting again: ${(e as Error).message}`);
+      log("WARN", `Dashboard cache unreadable, starting again: ${reasonOf(e)}`);
     }
     return {};
   }
@@ -661,8 +673,9 @@ interface FillPlan {
  * starts at the first of them. A sync drops all rows of an outdated cache, and the cache covers one range,
  * so a start at `from` can lose them. The estimate takes the sessions of each cached day, or 1 a day
  * without cached days. The days of a gap count at least 1 a day: the cached days before it can be few.
+ * The estimate can be too low: without `tryKeep`, it does not keep them when a start at `from` can drop them.
  */
-function fillPlan(cache: Json, from: string, to: string): FillPlan {
+function fillPlan(cache: Json, from: string, to: string, tryKeep: boolean): FillPlan {
   const held = rangeOf(cache.activitiesFrom, cache.activitiesTo);
   const rate = held
     ? activitiesBetween(cache, held.from, held.to).length / daysIn(held.from, held.to)
@@ -677,9 +690,13 @@ function fillPlan(cache: Json, from: string, to: string): FillPlan {
   const gap = addDays(held.to, 1) < from;
   const perDay = gap ? Math.max(1, rate) : rate;
   const keep = plan(held.from, null, perDay);
-  if (keep.requests <= FILL_CAP || (!old && !gap)) return keep;
+  if ((tryKeep && keep.requests <= FILL_CAP) || (!old && !gap)) return keep;
   return plan(from, { from: held.from, to: gap ? held.to : addDays(from, -1) }, perDay);
 }
+
+/** The cached range of days, as one key. */
+const heldDays = (cache: Json): string =>
+  JSON.stringify([cache.activitiesFrom, cache.activitiesTo]);
 
 /** The days from `from` to `to`, both included. */
 const daysIn = (from: string, to: string): number =>
@@ -805,10 +822,13 @@ function reasonOf(e: unknown): string {
   return typeof code === "string" && /^E[A-Z0-9]+$/.test(code) ? `${e.name} ${code}` : e.name;
 }
 
-/** The text of a failed fill for the tool reply: never an answer of Garmin, and no local path. */
-function fillError(e: unknown): string {
+/**
+ * The text of a failed fill for the tool reply: never an answer of Garmin, and no local path. `fewer`
+ * is the first day of the next fill, when that one has fewer days.
+ */
+function fillError(e: unknown, fewer?: string): string {
   if (e instanceof SearchLimitError)
-    return `The fetch stopped at ${FILL_CAP} requests and saved nothing: the days need more. Another try stops too.`;
+    return `The fetch stopped at ${FILL_CAP} requests and saved nothing: the days need more. Another try ${fewer ? `asks for the days from ${fewer} only: its form names the cached days that it drops` : "stops too"}.`;
   if (e instanceof KeyRefusedError)
     return `Garmin refuses the personal API key: it is incorrect, expired or revoked. Nothing was saved. Create a new key at ${KEY_PAGE_URL} and put it where the server reads it: the key file, or GARMIN_PERSONAL_API_KEY in the MCP client configuration (then restart the client).`;
   if (e instanceof GarminApiError && e.status !== undefined && e.status !== 200)

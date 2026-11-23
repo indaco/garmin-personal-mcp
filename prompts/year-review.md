@@ -26,7 +26,9 @@ Then answer in chat, in this order, short:
   `unasked`, for each range of `coverage.missing`: "n/a from A to B: the assistant cannot show the
   confirm form, so nothing was fetched". `tooLarge`, for each range: "n/a from A to B: the fetch
   needs about N requests, which is too many, so nothing was fetched", where N is `fill.estimate`.
-  Offer no other way to fetch these days.
+  With `tooLarge`, when `year.year` is before the year of today, also tell me to review a newer year
+  first, then this one, and that this works only when the assistant can show the confirm form. Offer
+  no other way to fetch these days.
 - **Last day**: only when `lastDayOpen` is true, and `fill.asked` is not `yes` or there is a
   `fill.error`. Say that `coverage.activities.to`, the last day in the cache, can lack a session
   that came to Garmin after the last update of the cache. When `fill.asked` is `notNeeded` and the
