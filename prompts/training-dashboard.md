@@ -10,13 +10,13 @@ Answer in my language.
    without one, ask in chat as numbered lists, with the default first:
    - **Settings**: only when `settings` has more than `title`, `headline` and `yearReview` = false.
      Tell me those settings in words, for example "only strength training", "without sleep data" or
-     "Italian only". If `settings` has `exclude`, name each item that it excludes. Say that the
-     defaults add them to the page again, also on each automatic update: this matters for a page
-     that I share.
-     Options "Keep these settings" (default) and "Use the defaults: all sports, all data, English and
-     the language of my Garmin profile, all themes, opens in midnight, no workout comparison, no
-     Recovery trend, no recap of the calendar year, the last {{weeks}} weeks". Say that I can type
-     my own choice, for example "all sports, keep the rest".
+     "Italian only". If `settings` has `exclude`, name each item that it excludes. Say that a
+     reset adds them to the page again, also on each automatic update: this matters for a page that
+     I share.
+     Options "Keep these settings" (default) and "Reset these settings: all sports, all data,
+     English and the language of my Garmin profile, all themes, opens in midnight, no workout
+     comparison, no Recovery trend, no recap of the calendar year, the last {{weeks}} weeks". Say
+     that I can type my own choice, for example "all sports, keep the rest".
    - **Title**: options "Keep the title" (default: the `title` of `settings`, else "{{title}}") and
      "Type my own".
    - **Headline** (the line under the title): options "Keep the headline" (default: the `headline`
@@ -40,17 +40,33 @@ Answer in my language.
      the last 52 weeks. Say that the page does not start again on 1 January: in a new year it keeps
      its start day.
    When I choose "Type my own" and give no text, ask for the text in chat.
-3. Call `writeDashboard` with `weeks` = {{weeks}} and `layout` = "{{layout}}". If I chose the
-   defaults, also give `settings` = only the `title` and `headline` of `settings`, the ones that it
-   has. If I typed my own choice, give `settings` = `settings` changed as I said. If I said yes to
-   the workout comparison, give `settings` with `workouts` = true: added to the settings of this
-   step, or to `settings` when this step gives none. Do the same with `recoveryHistory` = true if I
-   said yes to the Recovery trend. Do the same with `yearReview` = true if I said yes to the Year
-   tab, or false if I said no to it or chose the defaults without this question: the answer is
-   saved, and no update asks again. Do the same with `since` if I chose a start day. Give no `weeks`
-   when I chose a start day or keep the `since` of `settings`. The server gets the data, writes the
-   page from its template, and returns the path of the page and a digest of the data. An existing
-   page stays as a `.bak` file.
+   A reply such as "defaults", "use the defaults" or "all defaults" means the option marked
+   (default) of each question: I keep these settings. With a change, for example "the defaults, but
+   only running", I keep these settings, changed as I said. I choose "Reset these settings" only
+   when I pick it in the Settings question, by its name or its number, or ask in my own words for a
+   reset of all the settings, for example "reset" or "reset, but only running". To reset a part, for
+   example "reset the theme", is my own choice: take out only that part, and keep the other
+   settings. If you cannot tell which of the two I mean, ask me.
+3. Call `writeDashboard` with `weeks` = {{weeks}} and `layout` = "{{layout}}". If I chose "Reset
+   these settings", also give `settings` = only the `title` and `headline` of `settings`, the ones
+   that it has, or {} when it has none: the reset then removes the other settings. If I asked for a
+   reset with a change, for example "reset, but only running", add the change to the settings of the
+   reset.
+   If I typed my own choice, give `settings` = `settings` changed as I said. If I said yes to the
+   workout comparison, give `settings` with `workouts` = true: added to the settings of this step,
+   or to `settings` when this step gives none. Do the same with `recoveryHistory` = true if I said
+   yes to the Recovery trend. Do the same with `since` if I chose a start day. Give no `weeks` when
+   I chose a start day or keep the `since` of `settings`. Also save the answer about the Year tab:
+   `yearReview` = true if I said yes to it, also as a change to a reset, or false if I said no to it
+   or chose "Reset these settings" without an answer to this question and did not keep the tab. No
+   update asks again. If I got no question about it or gave no answer to it, did not choose "Reset
+   these settings" and said nothing about the tab, there is no answer to save: give no `answers`,
+   and leave `yearReview` as it is in `settings`. If there is an answer and this step gives
+   `settings`, put `yearReview` in them, also when they are {}. If there is an answer and it gives
+   none, give `answers` = { "yearReview": true } or { "yearReview": false }: the page keeps its
+   other settings. Never give `settings` and `answers` together. The server gets the data, writes
+   the page from its template, and returns the path of the page and a digest of the data. An
+   existing page stays as a `.bak` file.
 4. Write at most 5 coach notes from the digest. Each note names a specific number of the digest, for
    example "load ratio 1.18 while HRV was under its weekly average on 3 of the last 7 nights".
    Training suggestions only, no medical advice. Plain text, in my language.

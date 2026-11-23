@@ -308,10 +308,13 @@ describe("guide", () => {
     );
   });
 
-  it("names what the defaults leave out in the dashboard guide", () => {
+  it("names what a reset leaves out in the dashboard guide", () => {
     expect(readFileSync("guide/dashboard.md", "utf8").replace(/\s+/g, " ")).toContain(
-      "With the defaults, the page opens in midnight. It has no workout comparison, no Recovery trend and " +
-        "no recap of the calendar year.",
+      "It also tells you that a reset adds that data to the page again. Keep the settings (the default), " +
+        "or reset them. After a reset, the page has all sports, all data, all themes, and English and the " +
+        "language of your Garmin profile. It opens in midnight. It has no workout comparison, no Recovery " +
+        'trend and no recap of the calendar year. A reply such as "use the defaults" does not reset: it ' +
+        "keeps the settings. You can also type your own choice",
     );
   });
 

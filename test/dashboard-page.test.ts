@@ -1463,6 +1463,42 @@ const I18N = /* garmin-i18n:start */{}/* garmin-i18n:end */;
           expect(savedSettings()).toEqual({ ...kept, yearReview: true });
         });
 
+        it.each([true, false])(
+          "with a new preset layout saves %s and keeps the settings",
+          async (yearReview) => {
+            await writer.write({ settings: kept });
+            await writer.write({ layout: "preset", answers: { yearReview } });
+            expect(savedSettings()).toEqual({ ...kept, yearReview });
+          },
+        );
+
+        it("with a new layout keeps the settings of a page that the assistant designed", async () => {
+          await writer.write({ page: designed, settings: kept });
+          await writer.write({ layout: "preset", answers: { yearReview: false } });
+          expect(savedSettings()).toEqual({ ...kept, yearReview: false });
+        });
+
+        it.each(["preset", "blank"] as const)(
+          "a new %s layout keeps the Year tab and the settings when there is no answer",
+          async (layout) => {
+            await writer.write({ settings: { ...kept, yearReview: true } });
+            await writer.write({ layout });
+            expect(savedSettings()).toEqual({ ...kept, yearReview: true });
+          },
+        );
+
+        it.each([
+          [{}, null],
+          [{ yearReview: false }, { yearReview: false }],
+        ])(
+          "a new layout with the settings %j replaces the other settings",
+          async (settings, out) => {
+            await writer.write({ settings: { ...kept, yearReview: true } });
+            await writer.write({ layout: "preset", settings });
+            expect(savedSettings()).toEqual(out);
+          },
+        );
+
         it("refuses answers with settings, and writes nothing", async () => {
           await writer.write({ settings: kept });
           const before = page();
@@ -2425,7 +2461,7 @@ const DATA = /* garmin-data:start */null/* garmin-data:end */;</script></html>`;
   });
 
   it("goes back to the default settings on a new layout, with only the title and headline kept", async () => {
-    // the training-dashboard prompt: "Use the defaults" on a page with one sport
+    // the training-dashboard prompt: "Reset these settings" on a page with one sport
     await writer.write({ settings: { sports: ["cycling"], exclude: ["zones"], title: "Rides" } });
     const { title } = (await writer.preview({})).settings;
     const r = await writer.write({ layout: "preset", settings: { title } });
