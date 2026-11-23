@@ -15,12 +15,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GarminApiError, KeyRefusedError, type GarminApiClient } from "../src/api-client";
 import {
   covered,
+  FILL_CAP,
   GarminDashboard,
   jsonByLines,
   rangeSummary,
   recoveryChunks,
   recoveryRefreshFrom,
   recoveryRow,
+  searchRequests,
   toFetch,
 } from "../src/dashboard";
 import { filterData } from "../src/dashboard-page";
@@ -2320,5 +2322,475 @@ describe("getDashboardData", () => {
     expect(Object.keys(readCache().recovery)).toContain(edge);
     expect(Object.keys(readCache().recovery)).not.toContain("2025-10-19");
     expect(Object.keys(readCache().recovery)).not.toContain("not a date");
+  });
+});
+
+// ------------------------------------------------------------------ the cached range and its fill
+
+const SEARCH = "/activitylist-service/activities/search/activities";
+/** A cached activity row, as summarize keeps it. */
+const row = (id: number, day: string, extra: Record<string, unknown> = {}) => ({
+  id,
+  start: `${day} 07:00:00`,
+  type: "running",
+  sport: "running",
+  ...extra,
+});
+const byId = (rows: { id: number }[]) => Object.fromEntries(rows.map((r) => [r.id, r]));
+/** Saves a cache whose activity list is current and covers 1 September to 20 October. */
+const save = (extra: Record<string, unknown> = {}) =>
+  writeFileSync(
+    cacheFile(),
+    JSON.stringify({
+      activitiesSummary: 3,
+      activitiesFrom: "2026-09-01",
+      activitiesTo: "2026-10-20",
+      ...extra,
+    }),
+  );
+/** The [startDate, endDate, start] of each search request. */
+const searches = () =>
+  callsTo(SEARCH).map(([, q]): string[] => [q.startDate, q.endDate, q.start, q.limit]);
+/** n activities on one day. */
+const many = (n: number, day: string, firstId = 1) =>
+  Array.from({ length: n }, (_, i) => activity(firstId + i, day));
+/** The first `from` of the n search pages: 0, 100, 200. */
+const pages = (n: number, from: string, to: string) =>
+  Array.from({ length: n }, (_, i) => [from, to, String(i * 100), "100"]);
+
+const readRange = () => dashboard.readCached("2026-01-01", "2026-10-26");
+const fillFrom = (from = "2026-01-01") => dashboard.fillActivities(from, "2026-10-26");
+const recoveryOn = (d: string, rhr?: unknown) => [d, { date: d, rhr }];
+
+describe("searchRequests", () => {
+  const held = { from: "2026-10-27", to: "2026-11-05" };
+
+  it("counts 1 session a day without a held range, 100 for each request", () => {
+    expect(searchRequests(null, 0, "2026-01-01", "2026-01-01")).toBe(1);
+    expect(searchRequests(null, 0, "2026-01-01", "2026-04-10")).toBe(1); // 100 days
+    expect(searchRequests(null, 0, "2026-01-01", "2026-04-11")).toBe(2); // 101 days
+  });
+
+  it("uses the sessions per held day for the missing days, and adds the last held days", () => {
+    // 10 held days, 5 sessions: 0.5 a day. 299 days before them: 149.5 sessions, 2 requests; the tail 1
+    expect(searchRequests(held, 5, "2026-01-01", "2026-11-05")).toBe(3);
+  });
+
+  it("counts 1 request for a range at 0 sessions a day", () => {
+    expect(searchRequests(held, 0, "2026-01-01", "2026-11-05")).toBe(2);
+  });
+
+  it("counts only the last days when nothing before them is missing", () => {
+    expect(searchRequests(held, 5, "2026-10-27", "2026-11-05")).toBe(1);
+  });
+});
+
+describe("readCached", () => {
+  it("gives the rows of the range, newest activity first, and makes no request", async () => {
+    save({
+      activities: byId([
+        row(1, "2025-12-31"),
+        row(2, "2026-01-01"),
+        row(3, "2026-10-26"),
+        row(4, "2026-10-27"),
+      ]),
+      hrv: {
+        "2025-12-31": { date: "2025-12-31", hrv: 1 },
+        "2026-01-01": { date: "2026-01-01", hrv: 2 },
+        "2026-10-26": { date: "2026-10-26", hrv: 3 },
+        "2026-10-27": { date: "2026-10-27", hrv: 4 },
+      },
+      recovery: {
+        "2025-12-31": { date: "2025-12-31", rhr: 51 },
+        "2026-01-01": { date: "2026-01-01", rhr: 52 },
+        "2026-10-26": { date: "2026-10-26", rhr: 53 },
+        "2026-10-27": { date: "2026-10-27", rhr: 54 },
+      },
+      zones: [{ zone: 1 }],
+    });
+    const out = await readRange();
+    expect(out.activities.map((a) => a.id)).toEqual([3, 2]);
+    expect(out.hrv.map((r) => r.hrv)).toEqual([2, 3]);
+    expect(out.recovery.map((r) => r.rhr)).toEqual([52, 53]);
+    expect(out.zones).toEqual([{ zone: 1 }]);
+    expect(api.getJson).not.toHaveBeenCalled();
+  });
+
+  it("gives only rows that are objects", async () => {
+    save({
+      activities: { 1: null, 2: 7, 3: row(3, "2026-10-01") },
+      hrv: { "2026-10-01": null, "2026-10-02": "x", "2026-10-03": { hrv: 3 } },
+      recovery: { "2026-10-01": null, "2026-10-02": [1], "2026-10-03": { rhr: 50 } },
+    });
+    const out = await readRange();
+    expect(out.activities.map((a) => a.id)).toEqual([3]);
+    expect(out.hrv).toEqual([{ hrv: 3 }]);
+    expect(out.recovery).toEqual([{ rhr: 50 }]);
+  });
+
+  it("gives the cached ranges inside the asked range", async () => {
+    save({
+      activitiesFrom: "2025-11-01",
+      activitiesTo: "2026-10-30",
+      hrvFrom: "2025-12-01",
+      hrvTo: "2026-10-20",
+    });
+    expect((await readRange()).coverage).toEqual({
+      activities: { from: "2026-01-01", to: "2026-10-26" },
+      hrv: { from: "2026-01-01", to: "2026-10-20" },
+      rhr: null,
+    });
+  });
+
+  it.each([
+    ["before", "2025-01-01", "2025-12-31", null],
+    ["on the first day of", "2025-01-01", "2026-01-01", { from: "2026-01-01", to: "2026-01-01" }],
+    ["on the last day of", "2026-10-26", "2026-11-30", { from: "2026-10-26", to: "2026-10-26" }],
+    ["after", "2026-10-27", "2026-11-30", null],
+  ])("gives a cached range %s the asked range as %s..%s -> %j", async (_at, from, to, held) => {
+    save({ activitiesFrom: from, activitiesTo: to, hrvFrom: from, hrvTo: to });
+    const { coverage } = await readRange();
+    expect(coverage.activities).toEqual(held);
+    expect(coverage.hrv).toEqual(held);
+  });
+
+  it.each([
+    ["no end", { activitiesTo: undefined, hrvTo: undefined }],
+    ["no start", { activitiesFrom: undefined, hrvFrom: undefined }],
+    ["a start that is no date", { activitiesFrom: "2026-02-30", hrvFrom: 7 }],
+    ["an end before its start", { activitiesTo: "2026-08-31", hrvTo: "2026-08-31" }],
+  ])("gives no coverage for a cached range with %s", async (_what, extra) => {
+    save({ hrvFrom: "2026-09-01", hrvTo: "2026-10-20", ...extra });
+    const out = await readRange();
+    expect(out.coverage).toEqual({ activities: null, hrv: null, rhr: null });
+    // 299 days at 1 session a day
+    expect(out.fillRequests).toBe(3);
+  });
+
+  it("gives the first and the last day with a resting HR", async () => {
+    save({
+      recovery: Object.fromEntries([
+        recoveryOn("2026-03-01"),
+        recoveryOn("2026-03-02", 50),
+        recoveryOn("2026-03-03"),
+        recoveryOn("2026-03-04", 51),
+        recoveryOn("2026-03-05", null),
+        recoveryOn("2026-03-06", "50"),
+        recoveryOn("not a date", 50),
+      ]),
+    });
+    expect((await readRange()).coverage.rhr).toEqual({ from: "2026-03-02", to: "2026-03-04" });
+  });
+
+  it("counts a resting HR on the first and the last day of the range", async () => {
+    save({
+      recovery: Object.fromEntries([recoveryOn("2026-01-01", 50), recoveryOn("2026-10-26", 51)]),
+    });
+    expect((await readRange()).coverage.rhr).toEqual({ from: "2026-01-01", to: "2026-10-26" });
+  });
+
+  it("gives the coverage of one cached day", async () => {
+    save({ activitiesFrom: "2026-10-20", hrvFrom: "2026-10-20", hrvTo: "2026-10-20" });
+    expect((await readRange()).coverage).toEqual({
+      activities: { from: "2026-10-20", to: "2026-10-20" },
+      hrv: { from: "2026-10-20", to: "2026-10-20" },
+      rhr: null,
+    });
+  });
+
+  it("gives no activity coverage when the rows are from an older summary", async () => {
+    save({
+      activitiesSummary: 2,
+      hrvFrom: "2026-09-01",
+      hrvTo: "2026-10-20",
+      activities: byId([row(1, "2026-10-01")]),
+    });
+    const out = await readRange();
+    expect(out.coverage).toEqual({
+      activities: null,
+      hrv: { from: "2026-09-01", to: "2026-10-20" },
+      rhr: null,
+    });
+    expect(out.fillRequests).toBe(3);
+  });
+
+  it("keeps the coverage when a row has no sport, but counts the fill as a whole fetch", async () => {
+    save({ activities: byId([row(1, "2026-10-01", { sport: undefined })]) });
+    const out = await readRange();
+    expect(out.coverage.activities).toEqual({ from: "2026-09-01", to: "2026-10-20" });
+    // the next sync drops all rows: 299 days at 1 a day, not 1 for the gap and 1 for the tail
+    expect(out.fillRequests).toBe(3);
+  });
+
+  it("does not count a row without a type as a row from before the sport field", async () => {
+    save({ activities: byId([row(1, "2026-10-01", { type: undefined, sport: undefined })]) });
+    // 1 session in 50 days: 1 for the gap and 1 for the tail
+    expect((await readRange()).fillRequests).toBe(2);
+  });
+
+  it("counts the fill from the cached sessions of the covered days only", async () => {
+    // 50 covered days, 150 sessions: 3 a day. 243 days before them: 729, so 8 requests; the tail
+    // is 7 to 26 October, 20 days: 60, so 1. The 100 rows outside the covered days do not count.
+    const held = Array.from({ length: 150 }, (_, i) => row(i, addDays("2026-09-01", i % 50)));
+    const outside = Array.from({ length: 100 }, (_, i) => row(500 + i, "2026-08-31"));
+    save({ activities: byId([...held, ...outside]) });
+    expect((await readRange()).fillRequests).toBe(9);
+  });
+
+  it("gives empty rows and no coverage without a cache file, and makes none", async () => {
+    expect(await readRange()).toEqual({
+      activities: [],
+      hrv: [],
+      recovery: [],
+      zones: undefined,
+      coverage: { activities: null, hrv: null, rhr: null },
+      fillRequests: 3,
+    });
+    expect(existsSync(cacheFile())).toBe(false);
+  });
+
+  it.each(["{", '{"activities":7}', '{"activities":{},"hrv":[]}'])(
+    "reads the cache file %s, which is not valid, as no cache",
+    async (file) => {
+      writeFileSync(cacheFile(), file);
+      const out = await readRange();
+      expect(out.activities).toEqual([]);
+      expect(out.coverage).toEqual({ activities: null, hrv: null, rhr: null });
+      expect(out.fillRequests).toBe(3);
+      expect(readFileSync(cacheFile(), "utf8")).toBe(file);
+    },
+  );
+
+  it("reads a range of one day", async () => {
+    save({
+      activities: byId([row(1, "2026-09-30"), row(2, "2026-10-01"), row(3, "2026-10-02")]),
+      recovery: Object.fromEntries([recoveryOn("2026-10-01", 50)]),
+    });
+    const out = await dashboard.readCached("2026-10-01", "2026-10-01");
+    const day = { from: "2026-10-01", to: "2026-10-01" };
+    expect(out.activities.map((a) => a.id)).toEqual([2]);
+    expect(out.coverage).toEqual({ activities: day, hrv: null, rhr: day });
+    expect(out.fillRequests).toBe(0);
+  });
+
+  it("waits for the update that runs", async () => {
+    garminActivities = [activity(1, "2026-10-20")];
+    const update = dashboard.getDashboardData(1);
+    const out = await readRange();
+    expect(out.activities.map((a) => a.id)).toEqual([1]);
+    await update;
+  });
+});
+
+describe("fillActivities", () => {
+  it("asks only the activity list: the gap by pages of 100, then the days that can change", async () => {
+    save({ activities: byId([row(900, "2026-10-01"), row(901, "2026-10-10")]) });
+    garminActivities = [...many(150, "2026-03-01"), activity(901, "2026-10-10")];
+    expect(await fillFrom()).toEqual({ garminCalls: 3, newActivities: 150 });
+    expect(searches()).toEqual([
+      ...pages(2, "2026-01-01", "2026-08-31"),
+      ...pages(1, "2026-10-07", "2026-10-26"),
+    ]);
+    expect(api.getJson).toHaveBeenCalledTimes(3);
+    const cache = readCache();
+    expect(Object.keys(cache.activities)).toHaveLength(152);
+    expect([cache.activitiesFrom, cache.activitiesTo]).toEqual(["2026-01-01", "2026-10-26"]);
+    // only a whole update sets the time of the last sync
+    expect(cache.syncedAt).toBeUndefined();
+    expect(cache.hrv).toBeUndefined();
+    expect(cache.recovery).toBeUndefined();
+  });
+
+  it("keeps one covered range after the fill of an earlier year", async () => {
+    save();
+    expect(await fillFrom("2025-01-01")).toEqual({ garminCalls: 2, newActivities: 0 });
+    expect([readCache().activitiesFrom, readCache().activitiesTo]).toEqual([
+      "2025-01-01",
+      "2026-10-26",
+    ]);
+  });
+
+  it("counts a row that Garmin gives again as not new", async () => {
+    save({ activities: byId([row(1, "2026-10-19")]) });
+    garminActivities = [activity(1, "2026-10-19"), activity(2, "2026-10-21")];
+    expect(await fillFrom("2026-09-01")).toEqual({ garminCalls: 1, newActivities: 1 });
+  });
+
+  it("replaces the rows of an older summary, and counts only the ids that are new", async () => {
+    save({ activitiesSummary: 2, activities: byId([row(1, "2026-10-19"), row(2, "2026-10-18")]) });
+    garminActivities = [activity(1, "2026-10-19"), activity(3, "2026-03-01")];
+    expect(await fillFrom()).toEqual({ garminCalls: 1, newActivities: 1 });
+    expect(searches()).toEqual(pages(1, "2026-01-01", "2026-10-26"));
+    const cache = readCache();
+    expect(Object.keys(cache.activities)).toEqual(["1", "3"]);
+    expect([cache.activitiesSummary, cache.activitiesFrom, cache.activitiesTo]).toEqual([
+      3,
+      "2026-01-01",
+      "2026-10-26",
+    ]);
+  });
+
+  it("keeps the other data of the cache", async () => {
+    const hrv = { "2026-10-01": { date: "2026-10-01", hrv: 50 } };
+    const recovery = { "2026-10-01": { date: "2026-10-01", rhr: 45 } };
+    const other = { hrvFrom: "2026-09-01", hrvTo: "2026-10-20", syncedAt: "x", zones: [{}] };
+    save({ hrv, recovery, ...other });
+    await fillFrom();
+    expect(readCache()).toMatchObject({ hrv, recovery, ...other });
+  });
+
+  it("covers only the new range when the cached days end before it", async () => {
+    save({ activitiesFrom: "2025-01-01", activitiesTo: "2025-06-30" });
+    garminActivities = [activity(1, "2026-03-01")];
+    expect(await fillFrom()).toEqual({ garminCalls: 1, newActivities: 1 });
+    expect(searches()).toEqual(pages(1, "2026-01-01", "2026-10-26"));
+    expect([readCache().activitiesFrom, readCache().activitiesTo]).toEqual([
+      "2026-01-01",
+      "2026-10-26",
+    ]);
+  });
+
+  it("starts again from a cache file that is not valid", async () => {
+    writeFileSync(cacheFile(), "{");
+    garminActivities = [activity(1, "2026-03-01")];
+    expect(await fillFrom()).toEqual({ garminCalls: 1, newActivities: 1 });
+    expect(Object.keys(readCache().activities)).toEqual(["1"]);
+  });
+
+  it("leaves the cache file as it was after a failed second page", async () => {
+    save({ activities: byId([row(900, "2026-10-19")]) });
+    const before = readFileSync(cacheFile(), "utf8");
+    garminActivities = many(150, "2026-03-01");
+    answer({
+      [SEARCH]: (q) => {
+        if (q.start === "100") throw rateLimit();
+        return fakeGarmin(SEARCH, q);
+      },
+    });
+    expect(await fillFrom()).toEqual({
+      garminCalls: 2,
+      newActivities: 0,
+      error: "Garmin answered HTTP 429. Nothing was saved: try again later.",
+    });
+    expect(readFileSync(cacheFile(), "utf8")).toBe(before);
+  });
+
+  it("stops at the cap, whatever the estimate said, and saves nothing", async () => {
+    save({ activities: byId([row(900, "2026-10-19")]) });
+    const before = readFileSync(cacheFile(), "utf8");
+    // 20 whole pages of the gap: the next one would be request 21
+    garminActivities = many(2000, "2026-03-01", 1000);
+    expect(await fillFrom()).toEqual({
+      garminCalls: 20,
+      newActivities: 0,
+      error:
+        "The fetch stopped at 20 requests and saved nothing: the days need more. Another try stops too.",
+    });
+    expect(searches()).toEqual(pages(20, "2026-01-01", "2026-08-31"));
+    expect(readFileSync(cacheFile(), "utf8")).toBe(before);
+  });
+
+  it("saves a fill of exactly the cap", async () => {
+    // 18 whole pages and a short one for the gap; the tail is request 20
+    save();
+    garminActivities = many(1850, "2026-03-01", 1000);
+    expect(await fillFrom()).toEqual({ garminCalls: FILL_CAP, newActivities: 1850 });
+    expect(FILL_CAP).toBe(20);
+  });
+
+  it("does not stop a dashboard update at the cap", async () => {
+    garminActivities = many(2000, "2026-10-20", 1000);
+    const out = await get();
+    expect(callsTo(SEARCH)).toHaveLength(21);
+    expect(out.sync.newActivities).toBe(2000);
+  });
+
+  it.each<[string, unknown, string]>([
+    [
+      "a status",
+      new GarminApiError("GET /x -> HTTP 500: body-SECRET", 500),
+      "Garmin answered HTTP 500. Nothing was saved: try again later.",
+    ],
+    [
+      "a refused key",
+      // as the API client writes it: with a part of Garmin's answer and the key file
+      new KeyRefusedError(
+        "Token request failed: HTTP 401 (Content-Type: text/plain, body: SECRET) - the personal " +
+          "API key is incorrect, expired or revoked. Put a new key in /home/me/.config/api-key",
+      ),
+      "Garmin refuses the personal API key: it is incorrect, expired or revoked. Nothing was saved. " +
+        "Create a new key at https://connect.garmin.com/app/settings/personalApiToken and put it " +
+        "where the server reads it: the key file, or GARMIN_PERSONAL_API_KEY in the MCP client " +
+        "configuration (then restart the client).",
+    ],
+    [
+      "an answer that is not JSON",
+      new GarminApiError("Response is not JSON: SECRET", 200),
+      "The activity list was not fetched or saved. The log of the server tells more.",
+    ],
+    [
+      "a network error",
+      new GarminApiError("Network error calling /x: SECRET"),
+      "The activity list was not fetched or saved. The log of the server tells more.",
+    ],
+    [
+      "another error",
+      new Error("Bearer SECRET"),
+      "The activity list was not fetched or saved. The log of the server tells more.",
+    ],
+    [
+      "a value that is no error",
+      "SECRET",
+      "The activity list was not fetched or saved. The log of the server tells more.",
+    ],
+  ])("gives %s as a text without Garmin's answer", async (_what, thrown, error) => {
+    api.getJson.mockRejectedValue(thrown);
+    expect(await fillFrom()).toEqual({ garminCalls: 1, newActivities: 0, error });
+    expect(existsSync(cacheFile())).toBe(false);
+  });
+
+  it("gives an answer that is no list as an error without the answer", async () => {
+    api.getJson.mockResolvedValue({ secret: "SECRET" });
+    expect((await fillFrom()).error).toBe(
+      "The activity list was not fetched or saved. The log of the server tells more.",
+    );
+  });
+
+  it("gives a cache file that cannot be written as an error without its path", async () => {
+    // a folder with a file in it cannot be replaced by a file
+    mkdirSync(cacheFile());
+    writeFileSync(join(cacheFile(), "x"), "");
+    expect(await fillFrom()).toEqual({
+      garminCalls: 1,
+      newActivities: 0,
+      error: "The activity list was not fetched or saved. The log of the server tells more.",
+    });
+  });
+
+  it("logs the reason of a Garmin error, and only the kind of another one", async () => {
+    api.getJson.mockRejectedValueOnce(rateLimit());
+    await fillFrom();
+    api.getJson.mockRejectedValueOnce(new TypeError("Bearer SECRET"));
+    await fillFrom();
+    api.getJson.mockRejectedValueOnce("SECRET");
+    await fillFrom();
+    expect(vi.mocked(logMock).mock.calls).toEqual([
+      ["WARN", "Activity list not fetched: GET /x -> HTTP 429: slow down"],
+      ["WARN", "Activity list not fetched: TypeError"],
+      ["WARN", "Activity list not fetched: string"],
+    ]);
+  });
+
+  it("lets the next call run after a failure", async () => {
+    api.getJson.mockRejectedValueOnce(rateLimit());
+    expect((await fillFrom()).error).toBeDefined();
+    expect((await fillFrom()).error).toBeUndefined();
+  });
+
+  it("does not read the cache while an update writes it", async () => {
+    garminActivities = [activity(1, "2026-10-20")];
+    const [, filled] = await Promise.all([dashboard.getDashboardData(1), fillFrom()]);
+    expect(filled).toMatchObject({ newActivities: 0 });
+    expect(readCache().hrvFrom).toBe("2026-10-19");
   });
 });

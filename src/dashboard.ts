@@ -2,13 +2,14 @@ import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
-import { type GarminApiClient, GarminApiError } from "./api-client";
+import { type GarminApiClient, GarminApiError, KEY_PAGE_URL, KeyRefusedError } from "./api-client";
 import { addDays, localToday } from "./dates";
 import { digest } from "./digest";
 import { log } from "./log";
 import { type Activity, isRunning, mondayOf } from "./analytics/calc";
 import { isLongRun, type LapPlanRow, workoutOf } from "./analytics/running";
 import type { PlanRow } from "./analytics/strength";
+import type { DayRange } from "./analytics/year";
 import {
   type GarminTools,
   MODEL_ONLY,
@@ -51,6 +52,8 @@ export const weeksSince = (since: string, today: string): number =>
 const REFRESH_DAYS = 14;
 /** Bump when summarize keeps a new field, or to mend cached rows that an older rule got wrong: cached rows from before it are fetched again, once. */
 const SUMMARY = 3;
+/** The most search requests of one fillActivities call. */
+export const FILL_CAP = 20;
 
 /** What one getDashboardData call counts. */
 interface Sync {
@@ -61,6 +64,33 @@ interface Sync {
   failedDetails: number;
   /** Garmin stopped answering: no more requests in this update. */
   stopped: boolean;
+  /** The most search requests; a whole update has no limit. */
+  searchLimit?: number;
+}
+
+/** The activity list needs more requests than its limit. */
+class SearchLimitError extends Error {}
+
+/** The cached rows of a range of days. They are read from a file, so each value needs a check. */
+export interface CachedRows {
+  readonly activities: Json[];
+  readonly hrv: Json[];
+  readonly recovery: Json[];
+  readonly zones: unknown;
+  readonly coverage: {
+    readonly activities: DayRange | null;
+    readonly hrv: DayRange | null;
+    readonly rhr: DayRange | null;
+  };
+  /** About how many requests fillActivities needs for the same range. */
+  readonly fillRequests: number;
+}
+
+/** What fillActivities did. `error` is a text without a key, a token or an answer of Garmin. */
+export interface FillResult {
+  readonly garminCalls: number;
+  readonly newActivities: number;
+  readonly error?: string;
 }
 
 /** Errors that more requests cannot mend, and a denied request counts against the limit. */
@@ -86,7 +116,11 @@ export class GarminDashboard {
    * `recoveryHistory` keeps the recovery rows of the whole period; the days before the last 14 are short.
    */
   getDashboardData(weeks?: number, workouts = false, recoveryHistory = false): Promise<string> {
-    const run = this.#queue.then(() => this.#build(weeks, workouts, recoveryHistory));
+    return this.#inTurn(() => this.#build(weeks, workouts, recoveryHistory));
+  }
+
+  #inTurn<T>(f: () => Promise<T>): Promise<T> {
+    const run = this.#queue.then(f);
     this.#queue = run.catch(() => {});
     return run;
   }
@@ -103,13 +137,7 @@ export class GarminDashboard {
     const prevStart = addDays(start, -7 * (w + 1));
     const recentFrom = addDays(today, -(RECOVERY_DAYS - 1));
     const recoveryFrom = recoveryHistory && start < recentFrom ? start : recentFrom;
-    const sync: Sync = {
-      calls: 0,
-      failedDates: [],
-      failedSections: [],
-      failedDetails: 0,
-      stopped: false,
-    };
+    const sync = newSync();
 
     const cache = await this.load();
     const before = new Set(Object.keys(objectAt(cache, "activities")));
@@ -175,16 +203,62 @@ export class GarminDashboard {
     return jsonByLines(out);
   }
 
+  /** The cached rows of [from, to] and the days that the cache holds. It makes no request. */
+  readCached(from: string, to: string): Promise<CachedRows> {
+    return this.#inTurn(async () => {
+      const cache = await this.load();
+      const held = rangeOf(cache.activitiesFrom, cache.activitiesTo);
+      const recovery = objectAt(cache, "recovery");
+      let rhr: DayRange | null = null;
+      for (let day = from, first = ""; day <= to; day = addDays(day, 1)) {
+        if (!Number.isFinite(field(recovery[day], "rhr"))) continue;
+        first ||= day;
+        rhr = { from: first, to: day };
+      }
+      const sessions = held ? activitiesBetween(cache, held.from, held.to).length : 0;
+      return {
+        activities: activitiesBetween(cache, from, to),
+        hrv: between(objectAt(cache, "hrv"), from, to).filter(isObject),
+        recovery: between(recovery, from, to).filter(isObject),
+        zones: cache.zones,
+        coverage: {
+          activities: cache.activitiesSummary === SUMMARY ? clip(held, from, to) : null,
+          hrv: clip(rangeOf(cache.hrvFrom, cache.hrvTo), from, to),
+          rhr,
+        },
+        fillRequests: searchRequests(outdated(cache) ? null : held, sessions, from, to),
+      };
+    });
+  }
+
+  /**
+   * Fetches the activity list of [from, to] into the cache: no HRV and no recovery. It saves all of
+   * it or nothing, and stops at FILL_CAP requests: the estimate of a fill can be too low.
+   */
+  fillActivities(from: string, to: string): Promise<FillResult> {
+    return this.#inTurn(async () => {
+      const sync: Sync = { ...newSync(), searchLimit: FILL_CAP };
+      try {
+        const cache = await this.load();
+        const before = new Set(Object.keys(objectAt(cache, "activities")));
+        await this.#syncActivities(cache, from, to, sync);
+        await writeAtomically(this.#file(), JSON.stringify(cache));
+        const newActivities = Object.keys(objectAt(cache, "activities")).filter(
+          (id) => !before.has(id),
+        ).length;
+        return { garminCalls: sync.calls, newActivities };
+      } catch (e) {
+        log("WARN", `Activity list not fetched: ${reasonOf(e)}`);
+        return { garminCalls: sync.calls, newActivities: 0, error: fillError(e) };
+      }
+    });
+  }
+
   // ------------------------------------------------------------------ sync
 
   async #syncActivities(cache: Json, from: string, to: string, sync: Sync): Promise<void> {
     const byId = objectAt(cache, "activities");
-    // rows written before a summary field (SUMMARY) or the sport field, or by another server: fetch them again.
-    // shortcut: a row that Garmin sends without sportTypeId repeats this on every call; mark rows if that happens
-    if (
-      cache.activitiesSummary !== SUMMARY ||
-      Object.values(byId).some((a) => isObject(a) && a.type !== undefined && a.sport === undefined)
-    ) {
+    if (outdated(cache)) {
       for (const id of Object.keys(byId)) delete byId[id];
       delete cache.activitiesFrom;
       delete cache.activitiesTo;
@@ -200,6 +274,7 @@ export class GarminDashboard {
         }
       }
       for (let page = 0; ; page += SEARCH_PAGE) {
+        if (sync.calls === sync.searchLimit) throw new SearchLimitError();
         sync.calls++;
         const json = await this.api.getJson("/activitylist-service/activities/search/activities", {
           start: String(page),
@@ -505,6 +580,39 @@ export function covered(
   return [cachedFrom < from ? cachedFrom : from, cachedTo > to ? cachedTo : to];
 }
 
+/**
+ * About how many search requests a fill of [from, to] needs, for a cache that holds `sessions` in
+ * `held`: the sessions per held day, or 1 a day without held days.
+ */
+export function searchRequests(
+  held: DayRange | null,
+  sessions: number,
+  from: string,
+  to: string,
+): number {
+  const rate = held ? sessions / daysIn(held.from, held.to) : 1;
+  return toFetch(held?.from, held?.to, from, to)
+    .map(([a, b]) => Math.max(1, Math.ceil((daysIn(a, b) * rate) / SEARCH_PAGE)))
+    .reduce((sum, n) => sum + n, 0);
+}
+
+/** The days from `from` to `to`, both included. */
+const daysIn = (from: string, to: string): number =>
+  (Date.parse(to) - Date.parse(from)) / 86_400_000 + 1;
+
+/** The range between two cached days; null when one is missing or no date, or the end is before the start. */
+function rangeOf(from: unknown, to: unknown): DayRange | null {
+  const a = date(from);
+  const b = date(to);
+  return a !== undefined && b !== undefined && a <= b ? { from: a, to: b } : null;
+}
+
+/** The part of a range inside [from, to]. */
+function clip(range: DayRange | null, from: string, to: string): DayRange | null {
+  if (!range || range.to < from || range.from > to) return null;
+  return { from: range.from < from ? from : range.from, to: range.to > to ? to : range.to };
+}
+
 /** Recovery rows from the last REFRESH_DAYS days before the last sync on are fetched again. */
 export function recoveryRefreshFrom(lastSync: string | undefined, today: string): string {
   const last = lastSync === undefined || lastSync > today ? today : lastSync;
@@ -578,6 +686,40 @@ export function recoveryRow(day: string, sleep: unknown, summary: unknown): Json
 }
 
 // ------------------------------------------------------------------ helpers
+
+const newSync = (): Sync => ({
+  calls: 0,
+  failedDates: [],
+  failedSections: [],
+  failedDetails: 0,
+  stopped: false,
+});
+
+/**
+ * Rows written before a summary field (SUMMARY) or the sport field, or by another server: the next
+ * sync drops them all and fetches again.
+ * shortcut: a row that Garmin sends without sportTypeId repeats this on every call; mark rows if that happens
+ */
+const outdated = (cache: Json): boolean =>
+  cache.activitiesSummary !== SUMMARY ||
+  Object.values(objectAt(cache, "activities")).some(
+    (a) => isObject(a) && a.type !== undefined && a.sport === undefined,
+  );
+
+/** The reason for the log: the text of an error that is not from the API client can hold a secret. */
+const reasonOf = (e: unknown): string =>
+  e instanceof GarminApiError ? e.message : e instanceof Error ? e.name : typeof e;
+
+/** The text of a failed fill for the tool reply: never an answer of Garmin, and no local path. */
+function fillError(e: unknown): string {
+  if (e instanceof SearchLimitError)
+    return `The fetch stopped at ${FILL_CAP} requests and saved nothing: the days need more. Another try stops too.`;
+  if (e instanceof KeyRefusedError)
+    return `Garmin refuses the personal API key: it is incorrect, expired or revoked. Nothing was saved. Create a new key at ${KEY_PAGE_URL} and put it where the server reads it: the key file, or GARMIN_PERSONAL_API_KEY in the MCP client configuration (then restart the client).`;
+  if (e instanceof GarminApiError && e.status !== undefined && e.status !== 200)
+    return `Garmin answered HTTP ${e.status}. Nothing was saved: try again later.`;
+  return "The activity list was not fetched or saved. The log of the server tells more.";
+}
 
 /** Counts the Garmin call and parses a tool's JSON string. */
 async function call(sync: Sync, f: () => Promise<string>): Promise<unknown> {
