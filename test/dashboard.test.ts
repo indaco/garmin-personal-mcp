@@ -51,8 +51,17 @@ describe("toFetch and covered", () => {
     expect(ranges(toFetch(FROM, TO, FROM, TO))).toEqual(["2026-10-13..2026-10-26"]);
   });
 
-  it("starts the refresh at the window when the cache ends on its first day", () => {
-    expect(ranges(toFetch("2026-07-01", FROM, FROM, TO))).toEqual(["2026-08-03..2026-10-26"]);
+  it.each([
+    // [the last cached day, the first day fetched]; the window starts on 3 August
+    ["on its first day", "2026-07-01", "2026-08-03", "2026-07-21"],
+    ["on its 5th day", "2026-07-01", "2026-08-07", "2026-07-25"],
+    ["on its 13th day", "2026-07-01", "2026-08-15", "2026-08-02"],
+    ["on its 14th day", "2026-07-01", "2026-08-16", "2026-08-03"],
+    ["on the day before it", "2026-07-01", "2026-08-02", "2026-07-20"],
+    ["two days before it: a gap, so the old days go", "2026-07-01", "2026-08-01", "2026-08-03"],
+    ["before it, and starts inside the last 14 days", "2026-07-30", "2026-08-02", "2026-07-30"],
+  ])("refreshes the last 14 cached days also when the cache ends %s", (_at, from, to, first) => {
+    expect(ranges(toFetch(from, to, FROM, TO))).toEqual([`${first}..2026-10-26`]);
   });
 
   it("also fetches the missing start of a longer window", () => {
@@ -2380,6 +2389,12 @@ describe("searchRequests", () => {
     expect(searchRequests(held, 0, "2026-01-01", "2026-11-05")).toBe(2);
   });
 
+  it("counts the last cached days with a window that starts after them", () => {
+    // 5 a day: 23 December to 14 January is 23 days, 115 sessions; the 14 days of January are 70
+    const old = { from: "2025-12-01", to: "2026-01-05" };
+    expect(searchRequests(old, 36 * 5, "2026-01-01", "2026-01-14")).toBe(2);
+  });
+
   it("counts only the last days when nothing before them is missing", () => {
     expect(searchRequests(held, 5, "2026-10-27", "2026-11-05")).toBe(1);
   });
@@ -2609,6 +2624,27 @@ describe("fillActivities", () => {
       "2026-10-26",
     ]);
   });
+
+  it.each([
+    // the days from 1 January (or the gap) and the 14 days that can change are one range
+    ["on the day before the year", "2025-12-31", "2025-12-18"],
+    ["on 5 January", "2026-01-05", "2025-12-23"],
+  ])(
+    "fetches a late session of the old year when the cache ends %s",
+    async (_at, activitiesTo, first) => {
+      save({
+        activitiesFrom: "2024-12-30",
+        activitiesTo,
+        activities: byId([row(1, "2025-12-20")]),
+      });
+      garminActivities = [activity(1, "2025-12-20"), activity(2, "2025-12-31")];
+      await fillFrom();
+      expect(searches()).toEqual(pages(1, first, "2026-10-26"));
+      const cache = readCache();
+      expect(Object.keys(cache.activities)).toEqual(["1", "2"]);
+      expect([cache.activitiesFrom, cache.activitiesTo]).toEqual(["2024-12-30", "2026-10-26"]);
+    },
+  );
 
   it("counts a row that Garmin gives again as not new", async () => {
     save({ activities: byId([row(1, "2026-10-19")]) });

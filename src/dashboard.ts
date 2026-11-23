@@ -530,7 +530,9 @@ export class GarminDashboard {
 
 /**
  * Date ranges to fetch so the cache covers [from, to]: the part before the cached range, and from
- * the last REFRESH_DAYS cached days to `to`. An empty cache fetches all of [from, to].
+ * the last REFRESH_DAYS cached days to `to`. These days can start before `from`: after the sync they
+ * count as covered, so no later sync would fetch them again. An empty cache, or one with a gap
+ * before or after [from, to], fetches all of [from, to].
  */
 export function toFetch(
   cachedFrom: string | undefined,
@@ -538,7 +540,12 @@ export function toFetch(
   from: string,
   to: string,
 ): Range[] {
-  if (cachedFrom === undefined || cachedTo === undefined || cachedTo < from || cachedFrom > to) {
+  if (
+    cachedFrom === undefined ||
+    cachedTo === undefined ||
+    addDays(cachedTo, 1) < from ||
+    cachedFrom > to
+  ) {
     return [[from, to]];
   }
   const out: Range[] = [];
@@ -546,9 +553,6 @@ export function toFetch(
     out.push([from, addDays(cachedFrom, -1)]);
   }
   let tail = addDays(cachedTo, -(REFRESH_DAYS - 1));
-  if (tail < from) {
-    tail = from;
-  }
   // the part before the cached range is its own range: the two never overlap
   if (tail < cachedFrom) {
     tail = cachedFrom;
