@@ -5,6 +5,9 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { facts, releases, render, renderWhatsNew, themeGroups } from "../scripts/build-site.mjs";
 import { gifIsCurrent, STAMP_FILE } from "../scripts/demo-stamp.mjs";
+import type { Activity } from "../src/analytics/calc";
+import { type YearSummary, yearSummary } from "../src/analytics/year";
+import { addDays } from "../src/dates";
 import { THEMES } from "../src/page/theme";
 import { AUTHORED, QUESTIONS } from "../site/questions";
 
@@ -319,6 +322,26 @@ describe("site page", () => {
   });
 });
 
+/** The data that the demo script writes with these options. */
+function demo(...options: string[]) {
+  const dir = mkdtempSync(join(tmpdir(), "demo-data-"));
+  try {
+    const file = join(dir, "d.json");
+    execFileSync("node", ["scripts/demo-dashboard.mjs", file, ...options], { stdio: "ignore" });
+    return JSON.parse(readFileSync(file, "utf8")) as {
+      start: string;
+      end: string;
+      zones: unknown;
+      activities: Activity[];
+      hrv: Record<string, unknown>[];
+      recovery: Record<string, unknown>[];
+      year: YearSummary;
+    };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 describe("demo data", () => {
   it("gives the runs the plan verdicts of the server: cadence laps on intervals, [] on tempo runs, else null", () => {
     const dir = mkdtempSync(join(tmpdir(), "demo-data-"));
@@ -356,5 +379,49 @@ describe("demo data", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it("has the recap that the server computes from the same rows, with no missing day", () => {
+    const { year, activities, hrv, recovery, zones, start, end } = demo();
+    const period = { from: start, to: end };
+    expect(start < `${year.year}-01-01`).toBe(true);
+    expect(year).toEqual(
+      yearSummary(
+        {
+          activities,
+          hrv,
+          recovery,
+          zones,
+          coverage: { activities: period, hrv: period, rhr: period },
+        },
+        Number(end.slice(0, 4)),
+        end,
+      ),
+    );
+    expect(year.coverage.complete).toBe(true);
+    expect(year.months.length).toBeGreaterThan(1);
+    // a mean for each month: the HRV and resting HR tile has no n/a
+    for (const rows of [year.hrv, year.rhr]) {
+      expect(rows?.map((m) => m.month)).toEqual(year.months.map((m) => m.month));
+      for (const m of rows ?? []) expect(m.mean).not.toBeNull();
+    }
+  });
+
+  it.each([
+    ["2027-01-14", 2026],
+    ["2027-01-15", 2027],
+  ])("with the end %s, has the recap of %i, as the server does", (end, year) => {
+    expect(demo("--weeks", "4", "--end", end).year.year).toBe(year);
+  });
+
+  it("has the recovery rows of the recoveryHistory setting: one a day, short before the last 14", () => {
+    const { recovery, start, end } = demo();
+    const days: string[] = [];
+    for (let day = start; day <= end; day = addDays(day, 1)) days.push(day);
+    expect(recovery.map((r) => r.date)).toEqual(days);
+    for (const r of recovery.slice(0, -14)) {
+      expect(Object.keys(r)).toEqual(["date", "sleepH", "sleepScore", "rhr"]);
+    }
+    for (const r of recovery.slice(-14)) expect(Object.keys(r).length).toBeGreaterThan(4);
   });
 });
