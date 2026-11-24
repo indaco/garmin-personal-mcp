@@ -83,8 +83,8 @@ describe("widget catalogue", () => {
     expect(CATALOGUE.slice(-8)).toEqual([
       { id: "yearTotals", title: "w.yearTotals", optIn: "yearReview", span: 3 },
       { id: "yearMonths", title: "w.yearMonths", optIn: "yearReview", span: 3 },
-      { id: "yearSports", title: "w.yearSports", optIn: "yearReview", span: 2 },
-      { id: "yearRhythm", title: "w.yearRhythm", optIn: "yearReview", span: 1 },
+      { id: "yearSports", title: "w.yearSports", optIn: "yearReview", span: 1 },
+      { id: "yearRhythm", title: "w.yearRhythm", optIn: "yearReview", span: 2 },
       { id: "yearHighlights", title: "w.yearHighlights", optIn: "yearReview", span: 2 },
       { id: "yearStreaks", title: "w.yearStreaks", optIn: "yearReview", span: 1 },
       { id: "yearRecords", title: "w.yearRecords", optIn: "yearReview", span: 3 },

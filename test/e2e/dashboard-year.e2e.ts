@@ -4,6 +4,7 @@ import type { Page } from "playwright-core";
 import { describe, expect, it } from "vitest";
 import type { YearSummary } from "../../src/analytics/year";
 import type { Settings } from "../../src/page/settings";
+import { THEMES } from "../../src/page/theme";
 import { DASHBOARD_VERSION } from "../../src/prompts";
 import {
   browser,
@@ -289,6 +290,66 @@ const axes = (page: Page, id: string) =>
     id,
   );
 
+/** The labels of the folded parts of a widget: the numbers of its charts. */
+const folds = (page: Page, id: string) =>
+  page.$$eval(`[data-id=${id}] details.more-details:not([open]) > summary`, (els) =>
+    els.map((e) => e.textContent),
+  );
+
+/** The charts of a widget, in page order: the title over it, its datasets and the options of its axes. */
+const charts = (page: Page, id: string) =>
+  page.evaluate((w) => {
+    const all = Object.values(window.Chart!.instances);
+    return [...document.querySelectorAll(`[data-widget=${w}] canvas`)].map((canvas) => {
+      const c = all.find((x) => x.canvas === canvas)!;
+      const scale = (x: string) => {
+        const s = c.scales[x];
+        return { min: s.min, max: s.max, ticks: s.ticks.map((k) => k.label) };
+      };
+      const { plugins, indexAxis, scales } = c.options;
+      const o = scales as Record<string, { reverse?: boolean; title?: { text?: string } }>;
+      return {
+        title: canvas.closest(".multiple")?.querySelector("h3")?.textContent ?? null,
+        labels: c.data.labels,
+        sets: c.data.datasets.map((d) => ({
+          label: d.label,
+          data: d.data,
+          fill: (d.backgroundColor ?? null) as string | string[] | null,
+          line: String(d.borderColor ?? ""),
+          stepped: (d as { stepped?: unknown }).stepped ?? null,
+          spanGaps: (d as { spanGaps?: unknown }).spanGaps ?? null,
+        })),
+        legend: plugins?.legend?.display,
+        horizontal: indexAxis === "y",
+        x: scale("x"),
+        y: scale("y"),
+        reverse: o.y?.reverse === true,
+        xTitle: o.x?.title?.text,
+      };
+    });
+  }, id);
+
+/** The tooltip of a point of the first chart of a widget, or of another one: its title lines, then its text lines. */
+const tooltip = (page: Page, id: string, index: number, nth = 0) =>
+  page.evaluate(
+    ([w, i, n]) => {
+      const canvas = document.querySelectorAll(`[data-widget=${w}] canvas`)[Number(n)];
+      const c = Object.values(window.Chart!.instances).find((x) => x.canvas === canvas)!;
+      const active = [{ datasetIndex: 0, index: Number(i) }];
+      c.tooltip!.setActiveElements(active, { x: 0, y: 0 });
+      c.update();
+      return [...c.tooltip!.title, ...c.tooltip!.body.flatMap((b) => b.lines)];
+    },
+    [id, index, nth] as const,
+  );
+
+/** The colour of a token of the theme. */
+const colour = (page: Page, name: string) =>
+  page.evaluate(
+    (t) => getComputedStyle(document.documentElement).getPropertyValue(`--${t}`).trim(),
+    name,
+  );
+
 const notes = (page: Page, id: string) =>
   page.$$eval(`[data-id=${id}] .note`, (els) => els.map((e) => e.textContent));
 
@@ -330,7 +391,7 @@ describe("the Year tab", () => {
     const spans = await page.$$eval(".tile", (els) =>
       els.map((e) => /span-(\d)/.exec(e.className)?.[1]),
     );
-    expect(spans).toEqual(["3", "3", "2", "1", "2", "1", "3", "3"]);
+    expect(spans).toEqual(["3", "3", "1", "2", "2", "1", "3", "3"]);
     expect(await page.$$(".tile .error")).toEqual([]);
     expect(await chartsWithoutTooltip(page)).toEqual([]);
     expect(errors).toEqual([]);
@@ -568,8 +629,16 @@ describe("the Year tab", () => {
     expect(errors).toEqual([]);
   });
 
-  it("does not scroll sideways on a phone", async () => {
+  it.each([
+    ["folded", false],
+    ["open", true],
+  ])("does not scroll sideways on a phone, with the numbers %s", async (_, opened) => {
     const { page, errors } = await openYear(YEAR, { viewport: { width: 375, height: 800 } });
+    await page.$$eval(
+      "details.more-details",
+      (els, o) => els.forEach((e) => e.toggleAttribute("open", o)),
+      opened,
+    );
     const wide = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
@@ -619,7 +688,7 @@ describe("the texts of the Year tab", () => {
       const many = (key: string, n: number) => texts[key].split("|")[1].replace("{n}", String(n));
 
       expect((await of("[data-tab=year]"))[0]).toBe(texts["type.year"]);
-      expect(await of(".tile h2, .tile h3")).toEqual(keyed(IDS.map((id) => `w.${id}`)));
+      expect(await of(".tile h2")).toEqual(keyed(IDS.map((id) => `w.${id}`)));
       expect(await of(".board-note")).toEqual([
         `${texts["yr.board"].replace("{year}", "2026")} ${texts["yr.fill"]}`,
       ]);
@@ -642,6 +711,7 @@ describe("the texts of the Year tab", () => {
           "yr.biggest",
           "yr.dayStreak",
           "yr.weekStreak",
+          "d.half",
         ]),
       );
       expect((await kpis(page, "yearTotals")).at(-1)?.at(-1)).toBe(many("yr.estimates", 2));
@@ -651,7 +721,8 @@ describe("the texts of the Year tab", () => {
       expect(covered).toContain(between);
       expect(covered?.endsWith(after)).toBe(true);
       expect(unlikely).toBe(many("yr.unlikely", 2));
-      expect((await rows(page, "yearMonths"))[0][0]).toContain(` · ${many("yr.partDays", 31)}`);
+      const rowsOf = await rows(page, "yearMonths");
+      expect(rowsOf[0][0]).toContain(` · ${many("yr.partDays", 31)}`);
       expect(await of("[data-id=yearSports] .totals")).toEqual([
         texts["yr.topSport"].replace("{sport}", texts["type.running"]),
       ]);
@@ -679,6 +750,14 @@ describe("the texts of the Year tab", () => {
         page.$$eval(`[data-id=${id}] table.data:not(.sr-only *) th`, (els) =>
           els.map((e) => e.textContent),
         );
+      const multiples = async (id: string) => (await charts(page, id)).map((c) => c.title);
+      expect(await multiples("yearRhythm")).toEqual(keyed(["yr.weekday", "yr.timeOfDay"]));
+      expect(await multiples("yearRecords")).toEqual([`${texts["d.5k"]} · 24:10`]);
+      expect(await multiples("yearRecovery")).toEqual([`${texts["hrv.nightly"]} (ms)`]);
+      for (const id of ["yearMonths", "yearSports", "yearRhythm", "yearRecords"]) {
+        expect(await folds(page, id), id).toEqual([texts["yr.numbers"]]);
+      }
+      expect(await notes(page, "yearMonths")).toEqual([rowsOf.map((r) => r[0]).join("; ")]);
       expect(await heads("yearMonths")).toEqual(
         keyed(["yr.month", "pc.sessions", "yr.activeDays", "pc.distance", "pc.time", "pc.load"]),
       );
@@ -803,6 +882,26 @@ describe("Month by month", () => {
     expect((await rows(page, "yearMonths"))[0].at(-1)).toBe("n/a");
   });
 
+  it("folds the rows under the chart", async () => {
+    const { page } = await openYear();
+    expect(await folds(page, "yearMonths")).toEqual(["Show the numbers"]);
+    expect(await page.locator("[data-id=yearMonths] table.data:visible").count()).toBe(0);
+    await page.click("[data-id=yearMonths] summary");
+    expect(await page.locator("[data-id=yearMonths] table.data:visible").count()).toBe(1);
+    expect(await notes(page, "yearMonths")).toEqual([]);
+  });
+
+  it("names each month that is not whole, next to the folded rows", async () => {
+    const part = { ...YEAR.months[1], covered: "part" as const, days: 1 };
+    const { page } = await openYear({
+      ...YEAR,
+      months: [EMPTY.months[0], part, YEAR.months[2], { ...YEAR.months[0], month: "2026-04" }],
+    });
+    expect(await notes(page, "yearMonths")).toEqual([
+      "Jan 2026 · 0 days of data; Feb 2026 · 1 day of data",
+    ]);
+  });
+
   it("draws no bar for a month without data, and shows n/a in its row", async () => {
     const { page, errors } = await openYear({
       ...YEAR,
@@ -855,6 +954,8 @@ describe("Month by month", () => {
     const { page, errors } = await openYear({ ...YEAR, months });
     expect(await page.$("[data-id=yearMonths] canvas")).toBeNull();
     expect(await rows(page, "yearMonths")).toHaveLength(months.length);
+    expect(await page.$("[data-id=yearMonths] details")).toBeNull();
+    expect(await notes(page, "yearMonths")).toEqual([]);
     expect(errors).toEqual([]);
   });
 
@@ -893,6 +994,15 @@ it("names the months and the weekdays as they are, west of Greenwich", async () 
   expect((await rows(page, "yearRhythm"))[0][0]).toBe("Monday");
 });
 
+/** The height of the chart of a year with so many sports. */
+const sportsHeight = async (n: number) => {
+  const sports = Array.from({ length: n }, (_, i) => ({ ...YEAR.sports[0], sport: `s${i}` }));
+  const { page } = await openYear({ ...YEAR, sports });
+  // no name is left out
+  expect((await charts(page, "yearSports"))[0].y.ticks).toHaveLength(n);
+  return page.$eval("[data-id=yearSports] .chart", (e) => e.getBoundingClientRect().height);
+};
+
 describe("Sports of the year", () => {
   it("lists each sport, and names the top one", async () => {
     const { page } = await openYear();
@@ -901,6 +1011,51 @@ describe("Sports of the year", () => {
       ["Alpine skiing", "1", "n/a", "2.0 h", "n/a"],
     ]);
     expect(await page.textContent("[data-id=yearSports] .totals")).toBe("Top sport: Run");
+  });
+
+  it("draws the hours of each sport as a bar in the colour of the sport, in the order of the data", async () => {
+    const { page } = await openYear();
+    const [chart, ...others] = await charts(page, "yearSports");
+    expect(others).toEqual([]);
+    expect(chart.labels).toEqual(["Run", "Alpine skiing"]);
+    expect(chart.sets.map((d) => [d.label, d.data, d.fill])).toEqual([
+      ["Time", [40.2, 2], [await colour(page, "running"), await colour(page, "generic")]],
+    ]);
+    expect(chart).toMatchObject({ horizontal: true, legend: false, xTitle: "h" });
+    expect(chart.x.min).toBe(0);
+    expect(await chartRows(page, "yearSports")).toEqual([
+      ["Run", "40.2"],
+      ["Alpine skiing", "2"],
+    ]);
+    expect(await tooltip(page, "yearSports", 0)).toEqual(["Run", "40.2 h · 40 sessions"]);
+    expect(await tooltip(page, "yearSports", 1)).toEqual(["Alpine skiing", "2.0 h · 1 session"]);
+    expect(await folds(page, "yearSports")).toEqual(["Show the numbers"]);
+  });
+
+  it("draws a chart that grows with the number of sports", async () => {
+    expect(await sportsHeight(2)).toBe(160);
+    expect(await sportsHeight(20)).toBe(600);
+  });
+
+  it("draws no bar for a sport without a time", async () => {
+    const { page, errors } = await openYear({
+      ...YEAR,
+      sports: [...YEAR.sports, { ...YEAR.sports[1], sport: "yoga", hours: null }],
+    });
+    expect((await charts(page, "yearSports"))[0].sets[0].data).toEqual([40.2, 2, null]);
+    expect((await chartRows(page, "yearSports"))[2][1]).toBe("");
+    expect(errors).toEqual([]);
+  });
+
+  it.each([
+    ["one sport", [YEAR.sports[0]]],
+    ["one sport with a time", [YEAR.sports[0], { ...YEAR.sports[1], hours: null }]],
+  ])("shows the rows and no chart for %s", async (_, sports) => {
+    const { page, errors } = await openYear({ ...YEAR, sports });
+    expect(await page.$("[data-id=yearSports] canvas")).toBeNull();
+    expect(await page.$("[data-id=yearSports] details")).toBeNull();
+    expect(await rows(page, "yearSports")).toHaveLength(sports.length);
+    expect(errors).toEqual([]);
   });
 
   it("names no top sport when there is none", async () => {
@@ -941,6 +1096,63 @@ describe("Weekdays and times", () => {
     ]);
   });
 
+  it("draws the sessions of each weekday and of each time of day, the top one in the accent", async () => {
+    const { page } = await openYear();
+    const [accent, muted] = [await colour(page, "accent"), `${await colour(page, "muted")}99`];
+    const [week, day, ...others] = await charts(page, "yearRhythm");
+    expect(others).toEqual([]);
+    expect([week.title, day.title]).toEqual(["Weekday", "Time of day"]);
+    expect(week.labels).toEqual(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
+    expect(day.labels).toEqual(["Night", "Morning", "Afternoon", "Evening"]);
+    expect(week.sets.map((d) => [d.label, d.data])).toEqual([["Sessions", [3, 0, 5, 1, 2, 9, 7]]]);
+    expect(day.sets.map((d) => [d.label, d.data])).toEqual([["Sessions", [1, 14, 2, 10]]]);
+    expect(week.sets[0].fill).toEqual([muted, muted, muted, muted, muted, accent, muted]);
+    expect(day.sets[0].fill).toEqual([muted, accent, muted, muted]);
+    expect([week.legend, day.legend, week.horizontal, day.horizontal]).toEqual(
+      Array.from({ length: 4 }, () => false),
+    );
+    expect(await tooltip(page, "yearRhythm", 5)).toEqual(["Saturday", "Sessions: 9"]);
+    expect(await tooltip(page, "yearRhythm", 1, 1)).toEqual([
+      "Morning (5:00-11:59)",
+      "Sessions: 14",
+    ]);
+    expect(await folds(page, "yearRhythm")).toEqual(["Show the numbers"]);
+  });
+
+  it.each(THEMES.filter((x) => x.group !== "auto").map((x) => x.id))(
+    "marks the top bar in the theme %s",
+    async (theme) => {
+      const { page } = await openYear(YEAR, { settings: { ...ON, theme } });
+      const [week] = await charts(page, "yearRhythm");
+      const fill = week.sets[0].fill as string[];
+      expect(fill[5]).toBe(await colour(page, "accent"));
+      // every other bar is pale, also when the theme has a colour in its short form
+      for (const i of [0, 1, 2, 3, 4, 6]) expect(fill[i]).toMatch(/^#[0-9a-f]{6}99$/);
+    },
+  );
+
+  it("counts whole sessions on the axis", async () => {
+    const { page } = await openYear({
+      ...YEAR,
+      rhythm: {
+        weekdays: [1, 0, 0, 0, 0, 0, 0],
+        topWeekday: 0,
+        timeOfDay: { night: 0, morning: 0, afternoon: 1, evening: 0 },
+        topTimeOfDay: "afternoon",
+      },
+    });
+    for (const c of await charts(page, "yearRhythm")) expect(c.y.ticks).toEqual(["0", "1"]);
+  });
+
+  it("names the weekdays of the axis in the page language", async () => {
+    const { page } = await openYear(YEAR, {
+      settings: { yearReview: true, language: "de", languages: ["en", "de"] },
+    });
+    const [week] = await charts(page, "yearRhythm");
+    expect(week.labels).toEqual(["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]);
+    expect((await tooltip(page, "yearRhythm", 0))[0]).toBe("Montag");
+  });
+
   it.each([
     ["night", "Night", "22:00-4:59"],
     ["afternoon", "Afternoon", "12:00-17:59"],
@@ -970,6 +1182,10 @@ describe("Weekdays and times", () => {
       ["Weekday", "n/a"],
       ["Time of day", "n/a"],
     ]);
+    // no time of day: no chart of zeros, and no top weekday: no bar in the accent
+    const drawn = await charts(page, "yearRhythm");
+    expect(drawn.map((c) => c.title)).toEqual(["Weekday"]);
+    expect(new Set(drawn[0].sets[0].fill)).toEqual(new Set([`${await colour(page, "muted")}99`]));
   });
 });
 
@@ -1060,6 +1276,12 @@ describe("Longest streaks", () => {
   });
 });
 
+/** A date as the x of a record. */
+const at = (d: string) => Date.parse(`${d}T00:00:00Z`) / 86_400_000;
+
+/** Two records of a distance. */
+const two = (a: string, b: string) => [...one(a), { date: "2026-02-10", time: b, previous: a }];
+
 describe("Records of the year", () => {
   it("lists the records of each distance, the shorter distance first, the older time first", async () => {
     const { page } = await openYear();
@@ -1070,6 +1292,82 @@ describe("Records of the year", () => {
     ]);
     expect(await notes(page, "yearRecords")).toEqual([
       "Each row is faster than all the runs before it in the days of the recap. The first row of a distance has no time before it.",
+    ]);
+  });
+
+  it("draws the times of a distance as steps on their true dates, faster is higher", async () => {
+    const { page } = await openYear();
+    const [chart, ...others] = await charts(page, "yearRecords");
+    expect(others).toEqual([]);
+    expect(chart.title).toBe("5 km · 24:10");
+    expect(chart.sets.map((d) => [d.label, d.data, d.stepped])).toEqual([
+      [
+        "Time",
+        [
+          { x: at("2026-01-10"), y: 1500 },
+          { x: at("2026-02-10"), y: 1450 },
+        ],
+        true,
+      ],
+    ]);
+    expect(chart.sets[0].line).toBe(await colour(page, "running"));
+    expect(chart).toMatchObject({ legend: false, reverse: true });
+    // the days of the recap, with a tick at each month
+    expect([chart.x.min, chart.x.max]).toEqual([at("2026-01-01"), at("2026-03-20")]);
+    expect(chart.x.ticks).toEqual(["Jan 1", "Feb 1", "Mar 1"]);
+    for (const tick of chart.y.ticks) expect(tick).toMatch(/^2\d:\d\d$/);
+    expect(await chartRows(page, "yearRecords")).toEqual([
+      ["1", "Jan 10: 25:00"],
+      ["2", "Feb 10: 24:10"],
+    ]);
+    expect(await tooltip(page, "yearRecords", 0)).toEqual(["Jan 10, 2026 · First", "25:00"]);
+    expect(await tooltip(page, "yearRecords", 1)).toEqual(["Feb 10, 2026", "24:10"]);
+  });
+
+  it("shows the time of a distance with one record as a number, next to the charts", async () => {
+    const { page } = await openYear();
+    expect(await kpis(page, "yearRecords")).toEqual([
+      ["half marathon", "1:55:00", "Mar 1, 2026 · Race"],
+    ]);
+    const gap = await page.$eval(
+      "[data-id=yearRecords] .kpis",
+      (e) =>
+        e.getBoundingClientRect().top - e.previousElementSibling!.getBoundingClientRect().bottom,
+    );
+    expect(gap).toBe(12);
+    expect(await folds(page, "yearRecords")).toEqual(["Show the numbers"]);
+  });
+
+  it("shows no number when each distance has a chart", async () => {
+    const { page } = await openYear({ ...YEAR, records: { "5k": YEAR.records["5k"] } });
+    expect(await kpis(page, "yearRecords")).toEqual([]);
+    expect(await page.$("[data-id=yearRecords] .kpis")).toBeNull();
+  });
+
+  it("shows the rows alone when no distance has a second record", async () => {
+    const { page, errors } = await openYear({
+      ...YEAR,
+      records: { "5k": one("25:00"), half: one("1:55:00") },
+    });
+    expect(await page.$("[data-id=yearRecords] canvas")).toBeNull();
+    expect(await page.$("[data-id=yearRecords] .multiples")).toBeNull();
+    expect(await page.$("[data-id=yearRecords] details")).toBeNull();
+    expect(await kpis(page, "yearRecords")).toEqual([]);
+    expect(await rows(page, "yearRecords")).toHaveLength(2);
+    expect(errors).toEqual([]);
+  });
+
+  it("draws the shorter distance first, and times over an hour as a clock", async () => {
+    const { page } = await openYear({
+      ...YEAR,
+      records: { half: two("2:00:00", "1:55:30"), "1k": two("4:30", "4:20") },
+    });
+    const drawn = await charts(page, "yearRecords");
+    expect(drawn.map((c) => c.title)).toEqual(["1 km · 4:20", "half marathon · 1:55:30"]);
+    expect((await tooltip(page, "yearRecords", 1, 1))[1]).toBe("1:55:30");
+    expect(drawn.map((c) => [c.x.min, c.x.max])).toEqual([
+      [drawn[0].x.min, drawn[0].x.max],
+      [drawn[0].x.min, drawn[0].x.max],
     ]);
   });
 
@@ -1102,7 +1400,9 @@ describe("Records of the year", () => {
       previous: null,
     }));
     const { page } = await openYear({ ...YEAR, records: { "5k": list } });
-    const visible = () => page.locator("[data-id=yearRecords] tbody tr:visible").count();
+    const visible = () => page.locator("[data-id=yearRecords] .data tbody tr:visible").count();
+    expect(await visible()).toBe(0);
+    await page.click("[data-id=yearRecords] summary");
     expect(await visible()).toBe(10);
     await page.click("[data-id=yearRecords] .more");
     expect(await visible()).toBe(14);
@@ -1131,14 +1431,13 @@ describe("HRV and resting HR by month", () => {
       ["Mar 2026", ""],
     ]);
     expect((await chartDataset(page, "yearRecovery", "Nightly HRV")).data).toEqual([61, 58, null]);
-    expect(await axes(page, "yearRecovery")).toEqual([
-      ["y", true, "ms", true],
-      ["y1", false, "bpm", false],
-    ]);
+    expect((await charts(page, "yearRecovery")).map((c) => c.title)).toEqual(["Nightly HRV (ms)"]);
+    // the one mean of the resting HR is in no chart: its row stays in view
+    expect(await page.$("[data-id=yearRecovery] details")).toBeNull();
     expect(await notes(page, "yearRecovery")).toEqual(["A mean needs 7 values in its month."]);
   });
 
-  it("draws both on their own axis, in the colours of their own widgets", async () => {
+  it("draws each in its own chart, in the colours of their own widgets", async () => {
     const { page, errors } = await openYear({
       ...YEAR,
       rhr: [
@@ -1146,25 +1445,27 @@ describe("HRV and resting HR by month", () => {
         { month: "2026-03", mean: 48, days: 14 },
       ],
     });
-    const sets = await page.evaluate(() =>
-      Object.values(window.Chart!.instances)
-        .filter((c) => c.canvas.closest("[data-widget=yearRecovery]"))
-        .flatMap((c) =>
-          c.data.datasets.map((d) => [
-            d.label,
-            d.data,
-            (d as { yAxisID?: string }).yAxisID,
-            (d as { spanGaps?: boolean }).spanGaps,
-            String(d.borderColor),
-          ]),
-        ),
-    );
-    expect(sets.map((s) => s.slice(0, 4))).toEqual([
-      ["Nightly HRV", [61, 58, null], "y", true],
-      ["Resting HR", [50, null, 48], "y1", true],
+    const drawn = await charts(page, "yearRecovery");
+    expect(drawn.map((c) => c.title)).toEqual(["Nightly HRV (ms)", "Resting HR (bpm)"]);
+    expect(drawn.map((c) => c.sets.map((d) => [d.label, d.data, d.spanGaps]))).toEqual([
+      [["Nightly HRV", [61, 58, null], true]],
+      [["Resting HR", [50, null, 48], true]],
     ]);
+    for (const c of drawn) {
+      expect(c.labels).toEqual(["Jan 2026", "Feb 2026", "Mar 2026"]);
+      expect(c.legend).toBe(false);
+    }
+    expect(await folds(page, "yearRecovery")).toEqual(["Show the numbers"]);
+    // the two fill the row of the tile
+    const [tile, ...boxes] = await page.$$eval(
+      "[data-id=yearRecovery] .multiples, [data-id=yearRecovery] .multiple",
+      (els) => els.map((e) => e.getBoundingClientRect()).map(({ width, top }) => ({ width, top })),
+    );
+    expect(boxes).toHaveLength(2);
+    expect(boxes[0].top).toBe(boxes[1].top);
+    expect(boxes[0].width + boxes[1].width + 12).toBeCloseTo(tile.width, 0);
     await page.click("[data-tab=recovery]");
-    const colour = (widget: string, label: string) =>
+    const lineOf = (widget: string, label: string) =>
       page.evaluate(
         ([w, l]) =>
           String(
@@ -1175,9 +1476,9 @@ describe("HRV and resting HR by month", () => {
           ),
         [widget, label],
       );
-    expect(sets.map((s) => s[4])).toEqual([
-      await colour("hrv", "Nightly HRV"),
-      await colour("restingHr", "Resting HR"),
+    expect(drawn.map((c) => c.sets[0].line)).toEqual([
+      await lineOf("hrv", "Nightly HRV"),
+      await lineOf("restingHr", "Resting HR"),
     ]);
     expect(errors).toEqual([]);
   });
@@ -1196,11 +1497,31 @@ describe("HRV and resting HR by month", () => {
       ["Feb 2026", "n/a", "n/a", "49", "28"],
     ]);
     expect((await chartDataset(page, "yearRecovery", "Resting HR")).data).toEqual([50, 49]);
-    expect(await axes(page, "yearRecovery")).toEqual([
-      ["y", false, "ms", true],
-      ["y1", true, "bpm", false],
-    ]);
+    expect((await charts(page, "yearRecovery")).map((c) => c.title)).toEqual(["Resting HR (bpm)"]);
+    expect(await folds(page, "yearRecovery")).toEqual(["Show the numbers"]);
     expect(errors).toEqual([]);
+  });
+
+  it.each([
+    ["HRV", { hrv: [{ month: "2026-01", mean: 61, nights: 31 }] }],
+    ["resting HR", { rhr: [{ month: "2026-01", mean: 50, days: 31 }] }],
+  ])("keeps the rows in view when the %s has one mean and no chart", async (_, lone) => {
+    const rest = {
+      hrv: YEAR.hrv,
+      rhr: [
+        { month: "2026-01", mean: 50, days: 31 },
+        { month: "2026-02", mean: 49, days: 28 },
+      ],
+    };
+    const { page } = await openYear({ ...YEAR, ...rest, ...lone });
+    expect(await charts(page, "yearRecovery")).toHaveLength(1);
+    expect(await page.$("[data-id=yearRecovery] details")).toBeNull();
+  });
+
+  it("folds the rows when the other measure has months and no mean", async () => {
+    const { page } = await openYear({ ...YEAR, rhr: [{ month: "2026-03", mean: null, days: 2 }] });
+    expect(await charts(page, "yearRecovery")).toHaveLength(1);
+    expect(await folds(page, "yearRecovery")).toEqual(["Show the numbers"]);
   });
 
   it("shows the rows and no chart when no measure has more than one mean", async () => {
@@ -1213,7 +1534,21 @@ describe("HRV and resting HR by month", () => {
       rhr: undefined,
     });
     expect(await page.$("[data-id=yearRecovery] canvas")).toBeNull();
+    expect(await page.$("[data-id=yearRecovery] .multiples")).toBeNull();
+    expect(await page.$("[data-id=yearRecovery] details")).toBeNull();
     expect(await rows(page, "yearRecovery")).toHaveLength(2);
+  });
+
+  it("keeps the rows in view when each month is without a mean", async () => {
+    const { page, errors } = await openYear({
+      ...YEAR,
+      hrv: [{ month: "2026-01", mean: null, nights: 4 }],
+      rhr: undefined,
+    });
+    expect(await page.$("[data-id=yearRecovery] canvas")).toBeNull();
+    expect(await page.$("[data-id=yearRecovery] details")).toBeNull();
+    expect(await rows(page, "yearRecovery")).toHaveLength(1);
+    expect(errors).toEqual([]);
   });
 
   it("says that the recap has no HRV and no resting HR", async () => {

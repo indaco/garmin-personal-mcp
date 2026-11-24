@@ -324,13 +324,13 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
     id: "yearSports",
     title: "w.yearSports",
     optIn: "yearReview",
-    span: 2,
+    span: 1,
   },
   {
     id: "yearRhythm",
     title: "w.yearRhythm",
     optIn: "yearReview",
-    span: 1,
+    span: 2,
   },
   {
     id: "yearHighlights",

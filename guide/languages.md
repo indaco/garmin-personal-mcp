@@ -638,6 +638,7 @@ out. To add one:
 | `yr.estimate` | estimate |
 | `yr.unlikely` | {n} session has a time of over 12 hours at under 1 km/h: its time does not count.\|{n} sessions have a time of over 12 hours at under 1 km/h: their time does not count. |
 | `yr.month` | Month |
+| `yr.numbers` | Show the numbers |
 | `yr.partDays` | {n} day of data\|{n} days of data |
 | `yr.topSport` | Top sport: {sport} |
 | `yr.weekday` | Weekday |

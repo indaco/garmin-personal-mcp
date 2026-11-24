@@ -475,7 +475,10 @@ describe("site demo", () => {
     const { page, errors } = await site();
     await page.goto(`${base}demo/index.html#year`, { waitUntil: "load" });
     const tile = "[data-id=yearRecovery]";
-    await page.waitForSelector(`${tile} table.data`);
+    await page.waitForSelector(`${tile} canvas`);
+    // the HRV and the resting HR each have a chart
+    expect(await page.$$(`${tile} canvas`)).toHaveLength(2);
+    expect((await page.$$("[data-id=yearRecords] canvas")).length).toBeGreaterThan(0);
     const rows = await page.$$eval(`${tile} table.data tbody tr`, (r) =>
       r.map((x) => x.textContent),
     );

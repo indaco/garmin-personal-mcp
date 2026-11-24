@@ -203,8 +203,10 @@ export const loadText = (ctx: Ctx, t: Totals) =>
 
 /** A colour with alpha, from a theme token in #rrggbb. */
 export function alpha(color: string, a: number): string {
-  return /^#[0-9a-f]{6}$/i.test(color)
-    ? `${color}${Math.round(a * 255)
+  // a token can be in the short form
+  const hex = color.replace(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i, "#$1$1$2$2$3$3");
+  return /^#[0-9a-f]{6}$/i.test(hex)
+    ? `${hex}${Math.round(a * 255)
         .toString(16)
         .padStart(2, "0")}`
     : color;
