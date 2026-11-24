@@ -86,8 +86,8 @@ assistant chooses the tools and can combine their data. Some examples:
 - **The dashboard in the chat**: in Claude Desktop, ask "show my training dashboard" and the page
   opens in the reply, with new data. See [Dashboard in the chat](#dashboard-in-the-chat).
 - **Coach prompts**: a review of one run, strength session, swim or ride against its planned
-  workout, a review of the week, a readiness check before a race or a swim event, and a check of
-  today. See [Coach prompts](#coach-prompts).
+  workout, a review of the week or of the calendar year, a readiness check before a race or a swim
+  event, and a check of today. See [Coach prompts](#coach-prompts).
 
 ## Quick start
 
@@ -406,6 +406,28 @@ when no day before today is missing.
 Claude Code (tested with 2.1.329) and the MCP Inspector (tested with 2.16.0) show the forms of other
 tools. Claude Desktop shows no form (tested with 6.6395.1). The form of this tool: not tested.
 
+### year-review prompt
+
+The assistant calls `getYearReview` and gives the year in a fixed order: the totals, the sports, the
+months, the biggest month and week, the best 4 weeks, the most consistent month, the streaks, the
+longest and the biggest session, the new bests of each running distance, the weekdays and the time
+of day, and the HRV and the resting HR of each month. When days are missing, the answer names the
+days that the recap covers, and the other days are "n/a". It says why nothing was fetched, and it
+offers no other fetch. When `unlikelyTimes` is above 0, it says how many sessions have a time that
+is not likely (over 12 h at under 1 km/h). This time and a load estimate from it do not count.
+
+The argument `year` is optional: the calendar year, 2000 to this year. The default is this year, and
+until 14 January the year before. A value under 2000 gives 2000, a value over this year gives this
+year.
+
+The argument `path` is optional: the dashboard page whose sports and excluded data apply, for
+example `/mcp__garmin-personal__year-review 2025 garmin-dashboard-coach.html`. The default page
+applies without it. The name of a page alone, or before the year, works too. Text that is not a
+year is read as the page. When this page does not exist or is not a `.html` file, the answer names
+it, says what the prompt takes, and asks you to correct it. It gives no review before that, so a
+mistyped name does not show the data that the page excludes. After a year, Claude Code cuts a page
+name at its first space: name such a page in the chat.
+
 ## Coach prompts
 
 These prompts answer in the chat. They do not change a dashboard.
@@ -421,6 +443,7 @@ These prompts answer in the chat. They do not change a dashboard.
 | [train-today](#train-today)         | tells if you should train hard today, with fitness and form | `/mcp__garmin-personal__train-today`                            |
 | [week-review](#week-review)         | reviews your last whole week against the weeks before       | `/mcp__garmin-personal__week-review`                            |
 | [block-review](#block-review)       | reviews your last 4 to 12 whole weeks as one training block | `/mcp__garmin-personal__block-review 8`                         |
+| [year-review](#year-review-prompt)  | gives the recap of a calendar year                          | `/mcp__garmin-personal__year-review 2025`                       |
 
 A missing value shows as "n/a": the assistant does not estimate it.
 

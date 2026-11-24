@@ -178,5 +178,21 @@
   {
     "name": "week-review",
     "description": "Review the last whole training week against the weeks before: sessions, hours, km, load and form"
+  },
+  {
+    "name": "year-review",
+    "description": "Review a calendar year: totals, sports, months, best block, streaks, records, HRV and resting HR",
+    "arguments": [
+      {
+        "name": "year",
+        "description": "Calendar year, 2000 to this year; default this year (the year before until 14 January)",
+        "required": false
+      },
+      {
+        "name": "path",
+        "description": "The dashboard file, e.g. garmin-dashboard-coach.html; empty = the default page",
+        "required": false
+      }
+    ]
   }
 ]

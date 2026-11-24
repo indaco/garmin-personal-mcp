@@ -5,11 +5,10 @@ import { type YearSummary, yearSummary } from "./analytics/year";
 import { confirm } from "./confirm";
 import { type CachedRows, FILL_CAP, type FillResult, type GarminDashboard } from "./dashboard";
 import { type DashboardWriter, filterData } from "./dashboard-page";
-import { localToday } from "./dates";
+import { FIRST_YEAR, localToday, reviewYear } from "./dates";
 import type { Settings } from "./page/settings";
 import { isObject, MODEL_ONLY } from "./tools";
 
-const FIRST_YEAR = 2000;
 const thisYear = () => Number(localToday().slice(0, 4));
 const yearError = () => `Give a whole year from ${FIRST_YEAR} to ${thisYear()}`;
 
@@ -18,12 +17,6 @@ interface Fill extends FillResult {
   readonly asked: "notNeeded" | "tooLarge" | "yes" | "no" | "unasked";
   /** About how many requests the missing days need. */
   readonly estimate: number;
-}
-
-/** The year to review by default: the year before until 14 January. */
-export function reviewYear(today: string): number {
-  const year = Number(today.slice(0, 4));
-  return today.slice(5) <= "01-14" ? year - 1 : year;
 }
 
 // no field of a row is sure in a cache file: yearSummary checks each one that it reads

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { completable, type McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
-import { addDays, localToday } from "./dates";
+import { addDays, FIRST_YEAR, localToday, reviewYear } from "./dates";
 import { hms, swimPaceText } from "./fit";
 import { type Activity, groupOf, mondayOf } from "./analytics/calc";
 import { BUILT_IN } from "./page/i18n/built-in";
@@ -48,6 +48,7 @@ export function registerPrompts(server: McpServer, cache: () => Promise<unknown>
   const trainPrompt = load("train-today.md");
   const weekPrompt = load("week-review.md");
   const blockPrompt = load("block-review.md");
+  const yearPrompt = load("year-review.md");
 
   const dashboardDescription =
     "Build a personal training + recovery dashboard (volume, load, HRV, sleep) from Garmin data";
@@ -66,7 +67,7 @@ export function registerPrompts(server: McpServer, cache: () => Promise<unknown>
       }),
     },
     (args) => {
-      const w = weeks(args.weeks);
+      const w = wholeNumber(args.weeks);
       // Claude Code passes arguments by position: a layout given alone arrives in weeks
       const layout = layoutOf(arg(args.layout) === "" ? args.weeks : args.layout);
       const text =
@@ -112,7 +113,7 @@ export function registerPrompts(server: McpServer, cache: () => Promise<unknown>
           today: localToday(),
           weeksArgument: keepWeeks
             ? "no `weeks` (the page keeps its weeks)"
-            : `\`weeks\` = ${weeks(args.weeks)}`,
+            : `\`weeks\` = ${wholeNumber(args.weeks)}`,
           pathArgument: pathPart(path),
           pathWith: pathWith(path),
         }),
@@ -159,7 +160,7 @@ export function registerPrompts(server: McpServer, cache: () => Promise<unknown>
       result(
         setupDescription,
         render(setupPrompt, {
-          weeks: String(weeks(args.weeks)),
+          weeks: String(wholeNumber(args.weeks)),
           today: localToday(),
           title: en.title,
           headline: en.headline,
@@ -406,7 +407,7 @@ export function registerPrompts(server: McpServer, cache: () => Promise<unknown>
     },
     (args) => {
       const today = localToday();
-      const n = weeks(args.weeks, BLOCK_MIN_WEEKS, BLOCK_MAX_WEEKS, BLOCK_WEEKS);
+      const n = wholeNumber(args.weeks, BLOCK_MIN_WEEKS, BLOCK_MAX_WEEKS, BLOCK_WEEKS);
       const monday = mondayOf(today);
       return result(
         blockDescription,
@@ -415,6 +416,38 @@ export function registerPrompts(server: McpServer, cache: () => Promise<unknown>
           weeks: String(n),
           first: addDays(monday, -7 * n),
           last: addDays(monday, -7),
+        }),
+      );
+    },
+  );
+
+  const yearDescription =
+    "Review a calendar year: totals, sports, months, best block, streaks, records, HRV and resting HR";
+  server.registerPrompt(
+    "year-review",
+    {
+      description: yearDescription,
+      argsSchema: z.object({
+        year: z
+          .string()
+          .describe(
+            `Calendar year, ${FIRST_YEAR} to this year; default this year (the year before until 14 January)`,
+          )
+          .optional(),
+        path: PATH_ARG,
+      }),
+    },
+    (args) => {
+      const today = localToday();
+      const { yearArg, page } = yearAndPage(arg(args.year), arg(args.path));
+      const thisYear = Number(today.slice(0, 4));
+      const year = wholeNumber(yearArg, FIRST_YEAR, thisYear, reviewYear(today));
+      return result(
+        yearDescription,
+        render(yearPrompt, {
+          today,
+          year: String(year),
+          path: pathPart(page),
         }),
       );
     },
@@ -503,6 +536,9 @@ function layoutOf(v: string | undefined): "preset" | "blank" | "freeform" {
   return s === "blank" || s === "freeform" ? s : "preset";
 }
 
+/** A whole number, with or without a sign. */
+const WHOLE = /^[+-]?\d+$/;
+
 const PATH_ARG = z
   .string()
   .describe("The dashboard file, e.g. garmin-dashboard-coach.html; empty = the default page")
@@ -516,6 +552,21 @@ function pathOf(path: string | undefined, positional: string | undefined): strin
   return arg(path) || (/\.html$/i.test(arg(positional)) ? arg(positional) : "");
 }
 
+/**
+ * The year and the page of a year review. Claude Code passes arguments by position, so the page can
+ * stand before the year. Text that is no year is the page: a page that is dropped would show the
+ * data that it excludes.
+ */
+function yearAndPage(first: string, second: string): { yearArg: string; page: string } {
+  if (WHOLE.test(first)) {
+    return { yearArg: first, page: second };
+  }
+  if (first && WHOLE.test(second)) {
+    return { yearArg: second, page: first };
+  }
+  return { yearArg: "", page: `${first} ${second}`.trim() };
+}
+
 /** The text that adds the page file after a "with ..." clause. */
 function pathPart(path: string): string {
   return path ? ` and \`path\` = "${path}"` : "";
@@ -526,10 +577,15 @@ function pathWith(path: string): string {
   return path ? ` with \`path\` = "${path}"` : "";
 }
 
-/** weeks clamped to min..max; the fallback when empty or not a whole number. */
-function weeks(v: string | undefined, min = 1, max = MAX_WEEKS, fallback = DEFAULT_WEEKS): number {
+/** A whole number clamped to min..max (weeks by default); the fallback when empty or not a whole number. */
+function wholeNumber(
+  v: string | undefined,
+  min = 1,
+  max = MAX_WEEKS,
+  fallback = DEFAULT_WEEKS,
+): number {
   const s = arg(v);
-  if (!/^[+-]?\d+$/.test(s)) {
+  if (!WHOLE.test(s)) {
     return fallback;
   }
   return Math.min(Math.max(Number(s), min), max);

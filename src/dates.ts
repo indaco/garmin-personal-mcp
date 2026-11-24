@@ -10,3 +10,12 @@ export function localToday(): string {
   const d = new Date();
   return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 }
+
+/** The first year that a year review takes. */
+export const FIRST_YEAR = 2000;
+
+/** The year to review by default: the year before until 14 January. */
+export function reviewYear(today: string): number {
+  const year = Number(today.slice(0, 4));
+  return today.slice(5) <= "01-14" ? year - 1 : year;
+}

@@ -1488,6 +1488,178 @@ describe("block-review", () => {
     }
   });
 });
+/** The year-review text, whitespace-normalized, with one line for each part of the answer. */
+const yearText = async (args: Record<string, string> = {}) =>
+  (await render("year-review", args))
+    .replace(/\s+/g, " ")
+    .replaceAll(" - **", "\n- **")
+    .replace(" Every number", "\nEvery number");
+
+/** The year-review text before its answer rules. */
+const yearStep = async (args: Record<string, string>) => {
+  const text = await yearText(args);
+  return text.slice(0, text.indexOf(" It reads a local cache."));
+};
+
+/** Noon of a yyyy-MM-dd day in the local time zone. */
+const setToday = (today: string) => {
+  const [y, m, d] = today.split("-").map(Number);
+  vi.setSystemTime(new Date(y, m - 1, d, 12));
+};
+
+describe("year-review", () => {
+  it("lists the optional year and path and names what the year review gives", async () => {
+    const { prompts } = await client.listPrompts();
+    const p = prompts.find((x) => x.name === "year-review");
+    expect(p?.arguments).toEqual([
+      {
+        name: "year",
+        description:
+          "Calendar year, 2000 to this year; default this year (the year before until 14 January)",
+        required: false,
+      },
+      {
+        name: "path",
+        description:
+          "The dashboard file, e.g. garmin-dashboard-coach.html; empty = the default page",
+        required: false,
+      },
+    ]);
+    expect(p?.description).toBe(
+      "Review a calendar year: totals, sports, months, best block, streaks, records, HRV and resting HR",
+    );
+    expect(p?.description?.length).toBeLessThanOrEqual(100);
+    const reply = await client.getPrompt({ name: "year-review", arguments: {} });
+    expect(reply.description).toBe(p?.description);
+  });
+
+  it("gives the whole text for the default year", async () => {
+    expect(await yearText({ year: "" })).toBe(
+      [
+        "Give me my year in review for 2026. Use the tools of the `garmin-personal` MCP server. Today is 2026-10-28. 1. Call `getYearReview` with `year` = 2026. When I name a dashboard page, also give it as `path`: its sports and its excluded data apply. It reads a local cache. When days are missing, it can ask me in a form before it fetches them. Call no other tool, also not for a missing day. If the call fails, say why in one line. If it refuses the `path`, also say which `path` you sent, that text that is not a year is read as the page, and what this command takes: a year, the `.html` file of a dashboard page, or both. Then ask me to correct it and stop: until I do, do not call it again without the `path` or with another `path`. The reply has `year`, `fill`, `lastDayOpen` and `settings`. A field below without one of these names before it is a field of `year`. Then answer in chat, in this order, short:",
+        '- **The year**: the first line. When `coverage.complete` is true, name `year.year` and its days, `from` to `to`. Else name `year.year`, say that the recap covers the days from `coverage.activities.from` to `coverage.activities.to` only, and write "n/a (not in the cache)" for each range of `coverage.missing`. When `coverage.activities` is null, say instead that the cache has no day of this year, and write only the parts Missing days and HRV and resting HR: a 0 in the other parts is not a known value.',
+        '- **Missing days**: one line from `fill.asked`. `notNeeded`: no line. `yes`: the activity list was fetched, with `fill.garminCalls` requests. With a `fill.error`, say instead that the fetch failed, that nothing was saved, and give the `fill.error`. `no`: "nothing was fetched (you said no)". `unasked`, for each range of `coverage.missing`: "n/a from A to B: the assistant cannot show the confirm form, so nothing was fetched". `tooLarge`, for each range: "n/a from A to B: the fetch needs about N requests, which is too many, so nothing was fetched", where N is `fill.estimate`. Offer no other way to fetch these days.',
+        "- **Last day**: only when `lastDayOpen` is true, and `fill.asked` is not `yes` or there is a `fill.error`. Say that `coverage.activities.to`, the last day in the cache, can lack a session that came to Garmin after the last update of the cache. When `fill.asked` is `notNeeded` and the year is the year of today, also say that a dashboard update adds it.",
+        "- **Totals**: from `totals`: the sessions (`activities`), `activeDays`, `km`, `hours`, `ascentM` in metres, `calories` and `load`. When `estimatedLoads` is more than 0, say how many of the loads are estimates from heart rate. When `unlikelyTimes` is more than 0, say how many sessions have a time that is not likely (over 12 h at under 1 km/h), and that this time and a load estimate from it do not count.",
+        "- **Sports**: a table of `sports` in the given order: `sport`, `sessions`, `km`, `hours` and `load`. Then `topSport`, the sport with the most hours. When `hours` is null in each row, it is the sport with the most sessions: say so.",
+        '- **Months**: a table of `months`: `month`, `sessions`, `activeDays`, `km`, `hours` and `load`. A month with `covered` = "none" is "n/a (not in the cache)" in each column. With "part", say that the month counts only its `days` days in the cache.',
+        '- **Highlights**: `biggestMonth`, `biggestWeek` (its `monday`) and `bestBlock` (the best 4 weeks in a row: `from`, `to`, `sessions` and `value`). When `measure` is "load", they compare the load. When it is "hours", no session has a load: say it, and that they compare the hours. The weeks go from Monday to Sunday. A week counts only when all its 7 days are in the year and in the cache. Then `mostConsistentMonth`: `activeDays` of its `days` days, `sharePct` %. A month needs 14 days in the cache for this.',
+        "- **Streaks**: `streaks.days`, the most days in a row with a session, and `streaks.weeks`, the most weeks in a row with a session: the `length`, `from` and `to` of each. A day that is not in the cache ends a streak.",
+        "- **Sessions**: `longest` (`hours` and `km`) and `biggest` (`load`), each with its `date`, its `sport`, and its `name` when it has one. When `estimate` is true, say that this load is an estimate from heart rate.",
+        '- **Records**: from `records`, for each distance the runs that set a new best, in the given order: `date`, `time`, and the time that it beat (`previous`). A null `previous` is "first of the year". Say that these are the bests of the year in the cache, not all-time records. When `settings.sports` is a list without "running", leave this part out. Else an empty `records` is "n/a (no best effort)".',
+        "- **Rhythm**: from `rhythm`: the sessions of each weekday (`weekdays`, Monday first) and the top one (`topWeekday`, where 0 is Monday), and the sessions of each part of the day (`timeOfDay`: night 22:00-4:59, morning 5:00-11:59, afternoon 12:00-17:59, evening 18:00-21:59) and the top one (`topTimeOfDay`).",
+        '- **HRV and resting HR**: one table by month: the `mean` of `hrv` in ms with its `nights`, and the `mean` of `rhr` in bpm with its `days`. A null `mean` is "n/a (N nights; a mean needs 7)" or "n/a (N days; a mean needs 7)": give the number. A month without a row is "n/a". When `settings.exclude` has "recovery", leave this part out. Else a missing `hrv` or `rhr` is "n/a (not in the cache)".',
+        'Every number comes from the tool result: do not compute one. **Never invent or estimate a missing value**: a null or missing value shows as "n/a", never as 0. Do not mention the data or the sports that the `settings` of the reply exclude, also when this chat holds them, and also where a rule above names a missing value. Do not create or change a dashboard. ',
+      ].join("\n"),
+    );
+  });
+
+  it.each([
+    ["2026-10-28", "", 2026],
+    ["2026-10-28", " ", 2026],
+    ["2026-10-28", "2024", 2024],
+    ["2026-10-28", "\u00a02024 ", 2024],
+    ["2026-10-28", "+2024", 2024],
+    ["2026-10-28", "1999", 2000],
+    ["2026-10-28", "2000", 2000],
+    ["2026-10-28", "-2024", 2000],
+    ["2026-10-28", "2026", 2026],
+    ["2026-10-28", "2027", 2026],
+    ["2026-10-28", "99999999999999999999", 2026],
+    // the default is the year before until 14 January, but a year in the argument stays
+    ["2027-01-01", "", 2026],
+    ["2027-01-14", "", 2026],
+    ["2027-01-14", "2027", 2027],
+    ["2027-01-14", "2028", 2027],
+    ["2027-01-15", "", 2027],
+    ["2027-12-31", "", 2027],
+  ])("on %s reads year %j as %i", async (today, year, n) => {
+    setToday(today);
+    expect(await yearStep({ year })).toBe(
+      `Give me my year in review for ${n}. Use the tools of the \`garmin-personal\` MCP server. Today is ${today}. 1. Call \`getYearReview\` with \`year\` = ${n}. When I name a dashboard page, also give it as \`path\`: its sports and its excluded data apply.`,
+    );
+  });
+
+  it("takes the default year without an argument", async () => {
+    expect(await yearStep({})).toContain("1. Call `getYearReview` with `year` = 2026. When I");
+  });
+
+  it.each([
+    // the slots in order
+    ["2025", "garmin-dashboard-coach.html", 2025, "garmin-dashboard-coach.html"],
+    ["2025", " Coach.HTML ", 2025, "Coach.HTML"],
+    ["", "coach.html", 2026, "coach.html"],
+    ["1999", "coach.html", 2000, "coach.html"],
+    // a page alone, or before the year
+    ["garmin-dashboard-coach.html", "", 2026, "garmin-dashboard-coach.html"],
+    [" Coach.HTML ", "", 2026, "Coach.HTML"],
+    ["Coach.HTML", " +2025 ", 2025, "Coach.HTML"],
+    ["coach.html ", "2025", 2025, "coach.html"],
+    ["coach.html", "1999", 2000, "coach.html"],
+    ["coach.html", "-2025", 2000, "coach.html"],
+    ["coach.html", "2027", 2026, "coach.html"],
+    // text that is no year is a page, so the tool refuses it and no page is dropped
+    ["coach", "", 2026, "coach"],
+    ["coach", "2025", 2025, "coach"],
+    ["x2025", "", 2026, "x2025"],
+    ["2025x", "", 2026, "2025x"],
+    ["2025.5", "", 2026, "2025.5"],
+    ["+", "", 2026, "+"],
+    ["2025 coach.html", "", 2026, "2025 coach.html"],
+    ["2025", "coach", 2025, "coach"],
+    // two words are one name
+    ["my", "coach.html", 2026, "my coach.html"],
+    ["a.html ", " b.html", 2026, "a.html b.html"],
+    ["a.html", "2025.5", 2026, "a.html 2025.5"],
+    ["a.html", "v2025", 2026, "a.html v2025"],
+    ["a.html", "20 25", 2026, "a.html 20 25"],
+    // a number in the path is a year only after a page
+    ["2025", "2024", 2025, "2024"],
+    ["", "2024", 2026, "2024"],
+    [" ", "2024", 2026, "2024"],
+  ])("with year %j and path %j reviews %i with the page %j", async (year, path, n, page) => {
+    expect(await yearStep({ year, path })).toContain(
+      `1. Call \`getYearReview\` with \`year\` = ${n} and \`path\` = "${page}". When I name`,
+    );
+  });
+
+  it.each<Record<string, string>>([
+    { year: "2025", path: "" },
+    { year: "2025", path: " " },
+    { year: "2025" },
+  ])("gives no path for %j", async (args) => {
+    expect(await yearStep(args)).toContain(
+      "1. Call `getYearReview` with `year` = 2025. When I name",
+    );
+  });
+
+  it.each([
+    ["2026-10-28", "2026"],
+    ["2027-01-15", "2026"],
+    ["2027-06-01", "2020"],
+  ])("on %s with year %s leaves the last day to the reply", async (today, year) => {
+    setToday(today);
+    expect(await yearText({ year })).toContain(
+      "- **Last day**: only when `lastDayOpen` is true, and `fill.asked` is not `yes` or there is a `fill.error`.",
+    );
+  });
+
+  it("gives no way to fetch the year but the tool, and changes no page", async () => {
+    const text = await yearText();
+    for (const tool of ["getDashboardData", "writeDashboard", "garminGet", "listActivities"])
+      expect(text).not.toContain(tool);
+    expect(text).not.toMatch(/\b\d+[- ]weeks?\b(?! in a row)/);
+    expect(text).toContain("Do not create or change a dashboard.");
+  });
+
+  it("fills every marker and keeps each template line at 100 characters or fewer", async () => {
+    expect((await render("year-review")).includes("{{")).toBe(false);
+    for (const line of template("year-review").split("\n")) {
+      expect(line.length).toBeLessThanOrEqual(100);
+    }
+  });
+});
+
 /** The start of a row `n` days after 1 Jan 2025. */
 const day = (n: number) => `${addDays("2025-01-01", n)} 07:00:00`;
 const cacheOf = (...rows: object[]) => ({

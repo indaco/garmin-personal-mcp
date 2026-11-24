@@ -158,6 +158,7 @@ export function facts(root = ".") {
         "train-today": "every",
         "week-review": "every",
         "block-review": "every",
+        "year-review": "every",
       }[p.name] ?? "running",
   }));
   const themes = [
