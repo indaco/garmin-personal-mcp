@@ -602,6 +602,10 @@
               "type": "boolean",
               "description": "Keep the sleep and resting HR rows of the whole period in the page, not only the last 14 days; off when not set"
             },
+            "yearReview": {
+              "type": "boolean",
+              "description": "Add the recap of the calendar year to the page data, from the local cache; getYearReview fills its missing days after a yes; off when not set"
+            },
             "since": {
               "type": "string",
               "description": "yyyy-MM-dd: the page starts in the week of this day and grows each week, up to 52 weeks; replaces `weeks`, which the call then leaves out"

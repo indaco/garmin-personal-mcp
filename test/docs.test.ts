@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { GROUPS } from "../src/analytics/calc";
 import { LONG_RUN_SHARE_WARN } from "../src/analytics/running";
+import { yearSummary } from "../src/analytics/year";
 import { CATALOGUE } from "../src/page/catalogue";
 import { ABOUT } from "../src/page/catalogue-about";
 import { en } from "../src/page/i18n/en";
@@ -80,6 +81,19 @@ function check(file: string, text: string): void {
 
 const flat = (file: string) => readFileSync(file, "utf8").replace(/\s+/g, " ");
 
+/** A run of March 2025 with a value for each field that the year review reads. */
+const marchRun = (day: number) => ({
+  id: day,
+  name: "Run",
+  type: "running",
+  sport: "running",
+  start: `2025-03-${String(day).padStart(2, "0")} 07:00:00`,
+  duration: "1:00:00",
+  km: 10,
+  trainingLoad: 100,
+  best: { "5k": "25:00" },
+});
+
 describe("guide", () => {
   it("says in the tool guide that a ride or a swim has no plan", () => {
     expect(readFileSync("guide/tools.md", "utf8")).toContain(
@@ -137,6 +151,7 @@ describe("guide", () => {
         "A dashboard update fetches only the days of the dashboard. It can drop the earlier days that a " +
         "review fetched: after an update of the server that changes the cache, or when the dashboard starts " +
         "more than one day after the last cached day. The next review shows the missing days and asks again. " +
+        "A page with the [`yearReview` setting](guide/dashboard.md#page-settings) holds the same recap. " +
         "In the answer, `fill.asked` tells what it did: " +
         "| `fill.asked` | What the server did | | --- | --- | " +
         "| `notNeeded` | no day before today is missing: no question and no request | " +
@@ -188,9 +203,113 @@ describe("guide", () => {
     );
   });
 
+  it("says what the yearReview setting adds, and how to fill its missing days", () => {
+    const guide = flat("guide/dashboard.md");
+    expect(guide).toContain(
+      "| `yearReview` | adds the recap of the calendar year to the page data | off |",
+    );
+    expect(guide).toContain(
+      "`yearReview` adds the recap that `getYearReview` gives: of the year of today, and until 14 January " +
+        "of the year before. Each update reads it again from the cache, with no more requests to Garmin. " +
+        "When it cannot read it, the page has no recap, and only the log of the server says so. " +
+        "A custom widget can read it from `ctx.data.year`. It is off by default, because it holds data of " +
+        "days before the period of the page, also on a page that you share. `sports` and `exclude` apply " +
+        "to it. " +
+        "An update asks Garmin for the activities of the weeks of the page and of as many weeks before " +
+        "them, so a 12-week page can lack the first months of the year. The recap lists these days in " +
+        "`coverage.missing`. To add them, ask your assistant for a [year " +
+        "review](../README.md#year-review) and say yes in the form, then update the page. A client with " +
+        "no form fetches none of them. A review fetches no HRV and no resting HR. An update can drop the " +
+        "days that a review fetched: ask for the review again. `since` is for a page",
+    );
+    const readme = flat("README.md");
+    expect(readme).toContain(
+      "A page can also keep the sleep and resting HR of the whole period (`recoveryHistory`, off by " +
+        "default). The assistant does not ask about the recap of the calendar year (`yearReview`, off by " +
+        "default): ask for it in the chat. A page that has it keeps it, but a page that you share keeps " +
+        "it only when you ask for it. The server writes",
+    );
+  });
+
+  it("says which settings add the settings block to a freeform page", () => {
+    expect(flat("guide/dashboard.md")).toContain(
+      "The freeform prompt adds that block when the new page has settings: `workouts`, `recoveryHistory` or `yearReview`, or the settings that it keeps from the page that it replaces.",
+    );
+    expect(flat("guide/troubleshooting.md")).toContain(
+      "or a new `freeform` page with `workouts`, `recoveryHistory` or `yearReview`, or in place of a page whose settings it keeps: both add that block.",
+    );
+  });
+
+  it("says what the freeform layout asks about the settings of the old page", () => {
+    expect(flat("guide/dashboard.md")).toContain(
+      "With `freeform`, the assistant asks about the sports and the data that the old page leaves out, when it does. It keeps them left out (the default), or uses all sports and all data.",
+    );
+  });
+
+  it("names what the defaults leave out in the dashboard guide", () => {
+    expect(readFileSync("guide/dashboard.md", "utf8").replace(/\s+/g, " ")).toContain(
+      "With the defaults, the page opens in midnight. It has no workout comparison, no Recovery trend and " +
+        "no recap of the calendar year.",
+    );
+  });
+
+  it("gives the fields of the year review in the widget reference, with its condition", () => {
+    const line =
+      "- ctx.data.year: the recap of the calendar year, the year object of the getYearReview answer. It " +
+      "is there only on a page with the setting yearReview. A null value is n/a. Fields: v (the version " +
+      "of this shape), year, from, to, coverage { activities: { from, to }, missing: [{ from, to }], " +
+      'complete, hrv, rhr }, measure ("load" or "hours": what biggestMonth, biggestWeek and bestBlock ' +
+      "compare), totals { activities, activeDays, km, hours, ascentM, calories, load, estimatedLoads, " +
+      "unlikelyTimes }, sports: [{ sport, sessions, km, hours, load }], topSport, months: [{ month " +
+      '("yyyy-MM"), covered ("all", "part" or "none"), days (that the cache holds), activeDays, ' +
+      "sessions, km, hours, load }], biggestMonth { month, km, hours, load }, biggestWeek { monday, km, " +
+      "hours, load }, bestBlock { from, to, value, sessions }, mostConsistentMonth { month, activeDays, " +
+      "days (that the cache holds), sharePct }, streaks { days, weeks } (each { from, to, length }), " +
+      "longest { date, id, name, sport, hours, km }, biggest { date, id, name, sport, load, estimate }, " +
+      'records (by distance, such as "5k": [{ date, id, name, time, previous }], oldest first), rhythm ' +
+      "{ weekdays (7 counts, Monday first), topWeekday (0 is Monday), timeOfDay { night, morning, " +
+      "afternoon, evening }, topTimeOfDay }, hrv: [{ month, mean, nights }], rhr: [{ month, mean, days " +
+      "}]. hrv, rhr, id and name can be absent.";
+    expect(WIDGET_API).toContain(`\n${line}\n`);
+    expect(readFileSync("guide/custom-widgets.md", "utf8")).toContain(line);
+  });
+
+  it("names each field of a whole year review in the widget reference, and no other at the top", () => {
+    const all = { from: "2025-01-01", to: "2025-12-31" };
+    const days = Array.from({ length: 31 }, (_, i) => i + 1);
+    const month = days.map((d) => `2025-03-${String(d).padStart(2, "0")}`);
+    const year = yearSummary(
+      {
+        activities: days.map(marchRun),
+        hrv: month.map((date) => ({ date, hrv: 60 })),
+        recovery: month.map((date) => ({ date, rhr: 50 })),
+        coverage: { activities: { ...all, from: "2025-02-01" }, hrv: all, rhr: all },
+      },
+      2025,
+      "2026-11-23",
+    );
+    const line = /\n- ctx\.data\.year: (.*)\n/.exec(WIDGET_API)?.[1] ?? "";
+    const fields = line.slice(line.indexOf("Fields: ") + 8, line.indexOf(". hrv, rhr, id"));
+    const keys = new Set<string>();
+    const nulls: string[] = [];
+    JSON.stringify(year, (key, v: unknown) => {
+      // an index of a list and a distance are no field names
+      if (key !== "" && !/^\d/.test(key)) keys.add(key);
+      if (v === null) nulls.push(key);
+      return v;
+    });
+    expect([...keys].filter((k) => !new RegExp(`\\b${k}\\b`).test(fields))).toEqual([]);
+    // no block is null here, so the walk above reads the fields of each one
+    const blocks = ["biggestMonth", "biggestWeek", "bestBlock", "mostConsistentMonth", "longest"];
+    expect(nulls.filter((k) => [...blocks, "biggest", "days", "weeks"].includes(k))).toEqual([]);
+    let rest = fields.replace(/\([^()]*\)/g, "");
+    while (/[{[][^{}[\]]*[}\]]/.test(rest)) rest = rest.replace(/[{[][^{}[\]]*[}\]]/g, "");
+    expect(rest.split(",").map((f) => f.replace(":", "").trim())).toEqual(Object.keys(year));
+  });
+
   it("says that a writeDashboard preview writes no page file", () => {
     expect(readFileSync("guide/tools.md", "utf8")).toContain(
-      "`settings` set the title, the sports, the data, the languages, the themes, the workout comparison, the recovery history and the start day (`since`: the page starts in the week of that day and grows by one week at each update, up to 52) of the page; `preview` writes no page file (it updates the data cache, as `getDashboardData` does) and gives the activities of each board and the settings of the page.",
+      "`settings` set the title, the sports, the data, the languages, the themes, the workout comparison, the recovery history, the year review and the start day (`since`: the page starts in the week of that day and grows by one week at each update, up to 52) of the page; `preview` writes no page file (it updates the data cache, as `getDashboardData` does) and gives the activities of each board and the settings of the page.",
     );
     const readme = readFileSync("README.md", "utf8").replace(/\s+/g, " ");
     const preview =

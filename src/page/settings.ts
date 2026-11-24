@@ -24,6 +24,8 @@ export interface Settings {
   workouts?: boolean;
   /** Keep the recovery rows of the whole period, not only the last 14 days. Off when not set. */
   recoveryHistory?: boolean;
+  /** Add the recap of the calendar year to the page data, from the cache. Off when not set. */
+  yearReview?: boolean;
   /** yyyy-MM-dd: the page starts in the week of this day and grows each week, up to 52 weeks; replaces `weeks`. */
   since?: string;
   /** A page for another person, e.g. a coach: the server makes a new file of it that other users can read (644). */

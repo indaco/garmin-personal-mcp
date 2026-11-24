@@ -45,6 +45,16 @@ export function yearOf(
   );
 }
 
+/** The recap that a page with these settings shows: the default year of getYearReview, with no Garmin call. */
+export async function pageYear(
+  dashboard: Pick<GarminDashboard, "readCached">,
+  settings: Settings,
+): Promise<YearSummary> {
+  const today = localToday();
+  const year = reviewYear(today);
+  return yearOf(await dashboard.readCached(`${year}-01-01`, today), settings, year, today);
+}
+
 /** Registers getYearReview. */
 export function registerYearReview(
   server: McpServer,

@@ -34,8 +34,11 @@ page has other settings, for example only one sport or no sleep data, the assist
 settings. When the page excludes data, for example on a page for your coach, the assistant names
 that data. It also tells you that the defaults add that data to the page again. Keep the settings
 (the default), or use the defaults. The defaults are all sports, all data, all themes, and English
-and the language of your Garmin profile. With the defaults, the page opens in midnight. You can also
-type your own choice, for example "all sports, keep the rest".
+and the language of your Garmin profile. With the defaults, the page opens in midnight. It has no
+workout comparison, no Recovery trend and no recap of the calendar year. You can also type your own
+choice, for example "all sports, keep the rest". With `freeform`, the assistant asks about the sports
+and the data that the old page leaves out, when it does. It keeps them left out (the default), or
+uses all sports and all data.
 
 To set the sports and the data of the page too, for example for a page that you share with your
 coach, run `dashboard-setup`. See [Page settings](#page-settings).
@@ -388,6 +391,7 @@ assistant calls `writeDashboard` with `settings`:
 | `theme`           | the theme that the page opens in                                           | `midnight`                                             |
 | `workouts`        | compare the same run workout across weeks (the Workout trend widget)       | off                                                    |
 | `recoveryHistory` | keep sleep and resting HR for the whole period (the Recovery trend widget) | off                                                    |
+| `yearReview`      | adds the recap of the calendar year to the page data                       | off                                                    |
 | `shared`          | a page for another person: a new file of it is readable by other users     | off                                                    |
 | `since`           | the first day of the page, as `yyyy-MM-dd`, in place of `weeks`            | none: the last `weeks` weeks                           |
 
@@ -433,6 +437,19 @@ Garmin has a rate limit of about 100 requests in a short time. One real first up
 page sent 81 requests: 45 calls and 36 .FIT downloads. `workouts` can add up to 8 .FIT files for each
 workout. If the limit stops the recovery data of an update, the next update goes on from what it saved.
 
+`yearReview` adds the recap that `getYearReview` gives: of the year of today, and until 14 January
+of the year before. Each update reads it again from the cache, with no more requests to Garmin. When
+it cannot read it, the page has no recap, and only the log of the server says so. A custom widget can
+read it from `ctx.data.year`. It is off by default, because it holds data of days before the period
+of the page, also on a page that you share. `sports` and `exclude` apply to it.
+
+An update asks Garmin for the activities of the weeks of the page and of as many weeks before them,
+so a 12-week page can lack the first months of the year. The recap lists these days in
+`coverage.missing`. To add them, ask your assistant for a [year review](../README.md#year-review)
+and say yes in the form, then update the page. A client with no form fetches none of them. A review
+fetches no HRV and no resting HR. An update can drop the days that a review fetched: ask for the
+review again.
+
 `since` is for a page that starts on a day, for example the first day of a training plan. The page
 starts on the Monday of the week of that day, and each update adds the new week, up to 52 weeks.
 After 52 weeks, the page shows the last 52 weeks. A day in the week of today gives 1 week and the
@@ -446,7 +463,8 @@ without `since`. A recent `since` also makes the first update cheaper: it asks G
 weeks since that day.
 
 Settings need a page from the template, or a page that the assistant designed (`freeform`) with a
-`garmin-settings` block. The freeform prompt adds that block when you set `workouts` or `recoveryHistory`.
+`garmin-settings` block. The freeform prompt adds that block when the new page has settings: `workouts`,
+`recoveryHistory` or `yearReview`, or the settings that it keeps from the page that it replaces.
 
 ## Keyboard and screen readers
 

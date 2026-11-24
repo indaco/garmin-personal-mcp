@@ -5,34 +5,67 @@ last **{{weeks}} weeks** (today is {{today}}).
 The point of this dashboard is what social training apps do not show: how training load and
 recovery (HRV, sleep, resting heart rate, body battery) move together. Answer in my language.
 
-## Workout comparison
+## Page settings
 
 First call `writeDashboard` with `preview` = true and `weeks` = {{weeks}}. It writes no page file.
-If `repeatedRuns` of its `digest` is not empty, ask me one question before you design the page:
-whether to compare those workouts across weeks. Name them with their number of runs. If your client
-has a tool for questions with choices, use it: "No" (default) and "Yes, compare them across weeks".
-Say that a yes adds a Workout trend section, and that the page then downloads the laps of the last 8
-runs of each workout, once: this build takes longer. On a yes:
+Its `settings` are the settings of the page at the path now: the **old settings**. The `settings`
+that you give replace all of them, so in the first `writeDashboard` call that writes the page, give
+`settings` = a copy of the old settings, with what I say yes to below added. Keep `sports` and
+`exclude` as they are, unless I choose otherwise below: else the new page can hold data that I left
+out. Leave out `since` (this page covers weeks). Leave out `workouts`, `recoveryHistory` and
+`yearReview` too, unless their section below says to give them: a question that you do not ask is
+not a yes. The page keeps these settings. When the `settings` that you give are not empty, put this
+line first in the first inline script of the page, once:
 
-- Put this line first in the first inline script of the page:
-  `window.GARMIN_SETTINGS = /* garmin-settings:start */null/* garmin-settings:end */;`
-- In the first `writeDashboard` call that writes the page, give `settings` = { "workouts": true }.
-  The page keeps it, so its updates load the laps too.
+`window.GARMIN_SETTINGS = /* garmin-settings:start */null/* garmin-settings:end */;`
+
+## Sports and data left out
+
+When the old settings have `sports` or `exclude`, ask me this first. Tell me in words which sports
+the page keeps, and name each item that it excludes. Say that all sports and all data also come back
+on each update: this matters for a page that I share. Options "Keep them left out" (default) and
+"Use all sports and all data". Say that I can type my own choice, for example "all sports, keep the
+rest". When I do not answer, keep them left out. When my choice changes `sports` or `exclude`, call
+the preview again with `weeks` = {{weeks}} and the `settings` that you give, only for `repeatedRuns`
+of its `digest`. Its reply does not change the old settings, and you do not ask this again.
+
+## Workout comparison
+
+If `repeatedRuns` of the `digest` of the last preview is not empty, ask me one question before you
+design the page: whether to compare those workouts across weeks. Name them with their number of
+runs. If your client has a tool for questions with choices, use it: "No" (default) and "Yes, compare
+them across weeks". Say that a yes adds a Workout trend section, and that the page then downloads
+the laps of the last 8 runs of each workout, once: this build takes longer. On a yes:
+
+- Give `"workouts": true` in the `settings` (Page settings). The page keeps it, so its updates load
+  the laps too.
 - Add the Workout trend section to the Run board (below).
 
 ## Recovery trend
 
-After that question, ask whether to add a Recovery trend. Options "No" (default) and "Yes, add the
-Recovery trend". Say that a yes adds a section with the weekly average of sleep, sleep score and
-resting HR for the whole period, and that the page file then holds these values for each day: this
-matters for a page that I share. On a yes:
+After that question, ask whether to add a Recovery trend, only when the `exclude` of the `settings`
+that you give has no `recovery`. Else the page has no Recovery trend. Options "No" (default) and
+"Yes, add the Recovery trend". Say that a yes adds a section with the weekly average of sleep, sleep
+score and resting HR for the whole period, and that the page file then holds these values for each
+day: this matters for a page that I share. On a yes:
 
-- Put the settings line of the Workout comparison first in the first inline script of the page,
-  once.
-- In the first `writeDashboard` call that writes the page, give `settings` with
-  `"recoveryHistory": true`, next to `"workouts": true` when I also said yes to that. The page
-  keeps it.
+- Give `"recoveryHistory": true` in the `settings` (Page settings).
 - Add the Recovery trend to the Recovery board (below).
+
+## Recap of the calendar year
+
+Do not offer the recap of the calendar year: it is for a page whose user asks for it. When I ask for
+it, tell me that the page file then holds data of days before its period, also data that the week
+window does not show. When I share the page, wait for my yes.
+
+When the old settings have `yearReview` = true and I did not ask for it, ask me once whether the new
+page keeps the recap, with the same remark. Options "No" (default) and "Yes, keep the recap". When I
+do not say yes, the new `settings` have no `yearReview`.
+
+When the page gets the recap:
+
+- Give `"yearReview": true` in the `settings` (Page settings).
+- Add the Recap section to the All tab (below).
 
 ## 1. The data
 
@@ -54,6 +87,7 @@ of `getDashboardData` with `weeks` = {{weeks}}, which has:
   `rhr`, body battery `bbHigh` and `bbLow`, `stress`, `steps`, `stepGoal`, `floors`. With
   `recoveryHistory`, the rows cover the whole period: a row older than the last 14 days has only
   `date`, `sleepH`, `sleepScore` and `rhr`, so a panel of the last 14 days uses the last 14 rows.
+- `year`: only with `yearReview`: the recap of the calendar year. Fields: {{yearFields}}
 - `sync`: what the server fetched. The server keeps a local cache and asks Garmin only for the new
   days. If `failedDays` is more than 0, name the dates in `failedDates` in chat. If
   `failedSections` is not empty, name those sections in chat. `zones` and `units` then hold the
@@ -138,10 +172,11 @@ indoor. All other keys are outdoor.
   last 7 days: monotony = mean daily load / standard deviation of daily load (a rest day counts as
   0; flag it above 2.0), and strain = weekly load x monotony (Foster). Label them *estimates*.
 - **Readiness today** (the dashboard's own heuristic, not Garmin's): last night's HRV status, sleep
-  score, resting HR against its average of the 7 days before today, and the load ratio. The verdict
-  is "go easy" if HRV is low, the sleep score is under 60, or resting HR is 5+ bpm above its
-  average. It is "ready to push" if HRV is balanced, the sleep score is 80+ and the load ratio is
-  under 1.3. Otherwise it is "normal". Show the four inputs next to the verdict.
+  score, resting HR against its average of the 7 days before today, and the load ratio. When the HRV
+  status and the sleep score are both missing, the verdict is "n/a". Else it is "go easy" if HRV is
+  low, the sleep score is under 60, or resting HR is 5+ bpm above its average. It is "ready to push"
+  if HRV is balanced, the sleep score is 80+ and the load ratio is under 1.3. Otherwise it is
+  "normal". Show the four inputs next to the verdict.
 - **Intensity minutes** for each week = the sum of `moderateMinutes` + 2 x `vigorousMinutes` of
   the activities of that week. Compare it with the guideline of 150 min/week. Say that it counts
   only activities, not all-day minutes.
@@ -185,9 +220,9 @@ line, which the server fills:
 
 The page groups and calculates everything in the browser. Then:
 
-1. Call `writeDashboard` with `weeks` = {{weeks}} and `page` = the page code. The server puts the
-   data into the page and writes it (an existing page stays as a `.bak` file). The reply has the path
-   of the page and a digest of the data.
+1. Call `writeDashboard` with `weeks` = {{weeks}}, `page` = the page code and the `settings` (Page
+   settings). The server puts the data into the page and writes it (an existing page stays as a
+   `.bak` file). The reply has the path of the page and a digest of the data.
 2. Write the coach notes from the digest (see Coach notes below), and call `writeDashboard` again
    with the same `weeks` and the `notes`, without `page`. Updates later replace only the data, so the
    page code stays as you wrote it.
@@ -217,15 +252,22 @@ Put a tab bar under the header: **All**, **Run**, **Strength**, **Walk**, **Bike
 not come and go with the week window. Each tab label shows its session count. A type with no
 activities in the selected weeks stays visible and shows an empty state ("no sessions in the
 selected weeks"), not empty charts. The URL hash keeps the selected tab, so
-a reload or a shared link opens the same tab.
+a reload or a shared link opens the same tab. The sports of the page can change later with no new
+page code, so the page reads `window.GARMIN_SETTINGS?.sports` when it opens, and fixes nothing from
+it at build time. When it has sports, the data has only these: show only **All** and the tabs and
+chips of these sports, and say under the header which sports the page shows. When it has none, show
+the tabs above. Its values are: `running`, `strengthTraining`, `walking`, `hiking`, `cycling`,
+`swimming`, `racket`, `generic` (Other), and for another sport its name in `sport`.
 
 On the **All** tab, put a row of chips: an "All" chip, then one chip for each type in the colour of
 that type. All types show by default. A click on a type chip shows only that type. A second click on
 the same chip, or a click on "All", shows all types again. The chips filter the header totals,
 weekly volume, consistency calendar, the load bars of load vs. recovery, and the activities table.
 Recovery data (HRV, sleep, resting HR, body battery) is not per type, and the filter never changes
-it. The **load ratio always uses all activities**: say this next to the tile when a filter is
-active.
+it. The **load ratio always uses all activities of the data**: say this next to the tile when a
+filter is active. When `window.GARMIN_SETTINGS?.sports` has sports, say always that it counts only
+these sports: next to the tile, at the load ratio of Readiness today, and at the Load safety
+numbers.
 
 ### All tab, top to bottom
 
@@ -251,13 +293,20 @@ active.
     to the Recovery trend: a weekly chart over the week window with the mean of `sleepH`,
     `sleepScore` and `rhr`. A mean counts only days with a value above 0, and a week with no value
     is a gap, never 0.
-11. **Recent activities**: table with date, type, name, distance, time, pace, avg HR, ascent;
+11. **Recap**, only when the page gets the recap of the calendar year: the totals, the months, the
+    sports, the records and the streaks of `DATA.year`. Only show its values, and calculate nothing
+    from them. When `DATA.year` is missing or a value is null, show "n/a", never 0. When
+    `coverage.complete` is false, name the days of `coverage.missing`: they are not rest days. The
+    section does not follow the week window or the type chips, and says so.
+12. **Recent activities**: table with date, type, name, distance, time, pace, avg HR, ascent;
     the 3 most recent expandable to show laps.
-12. **Coach notes**: at most 5 bullet points, each tied to a specific number in the dashboard
-   (e.g. "HRV 12% below baseline for 3 nights while load ratio is 1.4"). Training suggestions
-   only, no medical advice. Use only numbers of the digest. The page shows `DATA.notes` as HTML.
-   Do not mention in the notes the data or the sports that the `settings` of the reply exclude.
-   This rule applies also to data that another tool showed earlier in this chat.
+13. **Coach notes**. When `exclude` of the `settings` that you give has `notes`, write no notes: do
+   not make the call with the notes, and leave this section out. Else: at most 5 bullet points, each
+   tied to a specific number in the dashboard (e.g. "HRV 12% below baseline for 3 nights while load
+   ratio is 1.4"). Training suggestions only, no medical advice. Use only numbers of the digest. The
+   page shows `DATA.notes` as HTML. Do not mention in the notes the data or the sports that the
+   `settings` of the reply exclude. This rule applies also to data that another tool showed earlier
+   in this chat.
 
 ### Type tabs
 

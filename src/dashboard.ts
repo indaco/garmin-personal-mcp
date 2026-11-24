@@ -255,7 +255,7 @@ export class GarminDashboard {
       try {
         const cache = await this.load();
         await this.#syncActivities(cache, fillPlan(cache, from, to).start, to, sync);
-        await this.#save(cache);
+        await this.#save(cache, true);
         return { garminCalls: sync.calls };
       } catch (e) {
         log("WARN", `Activity list not fetched: ${reasonOf(e)}`);
@@ -522,10 +522,12 @@ export class GarminDashboard {
    * Writes the cache. A fill of another process can have saved earlier days since this one read the
    * file. They stay when no later sync has to ask for them: their last REFRESH_DAYS days are in this
    * cache, or are the last days of this cache too. They then take the place of the rows that this cache
-   * still has from before its first day.
+   * still has from before its first day. A fill writes its activities only: the other values of `cache`
+   * are from before its requests, and another process can have saved newer ones. They stay only when the
+   * file has nothing: a fill must not lose them to a file that it cannot read.
    * shortcut: a write of another process between this read and this write is lost; a lock file if it matters
    */
-  async #save(cache: Json): Promise<void> {
+  async #save(cache: Json, activitiesOnly = false): Promise<void> {
     const now = await this.load();
     const theirs = outdated(now) ? null : rangeOf(now.activitiesFrom, now.activitiesTo);
     const mine = rangeOf(cache.activitiesFrom, cache.activitiesTo);
@@ -543,7 +545,10 @@ export class GarminDashboard {
       }
       cache.activitiesFrom = theirs.from;
     }
-    await writeAtomically(this.#file(), JSON.stringify(cache));
+    const { activities, activitiesFrom, activitiesTo, activitiesSummary } = cache;
+    const base = Object.keys(now).length > 0 ? now : cache;
+    const filled = { ...base, activities, activitiesFrom, activitiesTo, activitiesSummary };
+    await writeAtomically(this.#file(), JSON.stringify(activitiesOnly ? filled : cache));
   }
 
   /** The cache, or an empty one when the file is missing, unreadable or has the wrong shape. */
@@ -663,16 +668,17 @@ function fillPlan(cache: Json, from: string, to: string): FillPlan {
     ? activitiesBetween(cache, held.from, held.to).length / daysIn(held.from, held.to)
     : 1;
   const old = outdated(cache);
-  const plan = (start: string, drops: DayRange | null, perDay = rate): FillPlan => ({
+  const plan = (start: string, drops: DayRange | null, perDay: number): FillPlan => ({
     start,
     requests: searchRequests(old ? null : held, perDay, start, to),
     drops,
   });
-  if (!held || held.from >= from) return plan(from, null);
+  if (!held || held.from >= from) return plan(from, null, rate);
   const gap = addDays(held.to, 1) < from;
-  const keep = plan(held.from, null, gap ? Math.max(1, rate) : rate);
+  const perDay = gap ? Math.max(1, rate) : rate;
+  const keep = plan(held.from, null, perDay);
   if (keep.requests <= FILL_CAP || (!old && !gap)) return keep;
-  return plan(from, { from: held.from, to: gap ? held.to : addDays(from, -1) });
+  return plan(from, { from: held.from, to: gap ? held.to : addDays(from, -1) }, perDay);
 }
 
 /** The days from `from` to `to`, both included. */

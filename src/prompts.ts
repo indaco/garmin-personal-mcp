@@ -7,6 +7,7 @@ import { type Activity, groupOf, mondayOf } from "./analytics/calc";
 import { BUILT_IN } from "./page/i18n/built-in";
 import { en } from "./page/i18n/en";
 import { THEMES } from "./page/theme";
+import { YEAR_FIELDS } from "./page/widget-api";
 import { isObject, NAME_SEARCH } from "./tools";
 
 /**
@@ -72,7 +73,7 @@ export function registerPrompts(server: McpServer, cache: () => Promise<unknown>
       const layout = layoutOf(arg(args.layout) === "" ? args.weeks : args.layout);
       const text =
         layout === "freeform"
-          ? renderDashboard(freeform, w)
+          ? render(renderDashboard(freeform, w), { yearFields: YEAR_FIELDS })
           : render(renderDashboard(build, w), {
               layout,
               title: en.title,
