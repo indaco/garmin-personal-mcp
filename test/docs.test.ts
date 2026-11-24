@@ -167,8 +167,9 @@ describe("guide", () => {
         "is true in the answer when the last cached day is in the year: a later workout of that day can be " +
         "missing. For a recap of the current year with all workouts, update the dashboard first, but only " +
         "when no day before today is missing. " +
-        "Claude Code (tested with 2.1.329) and the MCP Inspector (tested with 2.16.0) show the forms of other " +
-        "tools. Claude Desktop shows no form (tested with 6.6395.1). The form of this tool: not tested. ",
+        "Claude Code shows this form (tested with 2.1.331). The MCP Inspector shows the forms of other tools " +
+        "(tested with 2.16.0). The form of this tool in the MCP Inspector: not tested. Claude Desktop shows no " +
+        "form (tested with 6.6395.1). ",
     );
     expect(flat("guide/tools.md")).toContain(
       "| `getYearReview` | `/activitylist-service/activities/search/activities`, only after a yes | " +
