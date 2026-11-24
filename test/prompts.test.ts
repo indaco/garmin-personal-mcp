@@ -94,26 +94,45 @@ describe("prompts", () => {
     expect(text).toContain("offer at most 3 languages. Name the other built-in languages");
   });
 
-  it("asks to keep the saved settings of a preset or blank page, or to use the defaults", async () => {
+  it("asks to keep the saved settings of a preset or blank page, or to reset them", async () => {
     for (const layout of ["preset", "blank"]) {
       const text = await render("training-dashboard", { weeks: "8", layout });
       expect(text).toContain("1. Call `writeDashboard` with `preview` = true and `weeks` = 8.");
       expect(text).toContain("only when `settings` has more than `title`, `headline` and");
       expect(text).toContain('"Keep these settings" (default)');
       expect(text).toContain(
-        '"Use the defaults: all sports, all data, English and\n     the language of my Garmin profile, all themes, opens in midnight, no workout comparison, no\n     Recovery trend, no recap of the calendar year, the last 8 weeks"',
+        '"Reset these settings: all sports, all data,\n     English and the language of my Garmin profile, all themes, opens in midnight, no workout\n     comparison, no Recovery trend, no recap of the calendar year, the last 8 weeks". Say\n     that I can type my own choice, for example "all sports, keep the rest".',
       );
       expect(text).toContain('"all sports, keep the rest"');
       expect(text).toContain(
-        "name each item that it excludes. Say that the\n     defaults add them to",
+        "name each item that it excludes. Say that a\n     reset adds them to the page again, also on each automatic update",
       );
       expect(text).toContain(
         "If I typed my own choice, give `settings` = `settings` changed as I said.",
       );
       expect(text).toContain('"Keep the title" (default: the `title` of `settings`');
       expect(text).toContain('"Keep the headline" (default: the `headline`\n     of `settings`');
-      expect(text).toContain(`\`weeks\` = 8 and \`layout\` = "${layout}". If I chose the`);
-      expect(text).toContain("also give `settings` = only the `title` and `headline`");
+      expect(text).toContain(`\`weeks\` = 8 and \`layout\` = "${layout}". If I chose`);
+      expect(text.replace(/\s+/g, " ")).toContain(
+        'If I chose "Reset these settings", also give `settings` = only the `title` and `headline` ' +
+          "of `settings`, the ones that it has, or {} when it has none: the reset then removes the " +
+          'other settings. If I asked for a reset with a change, for example "reset, but only ' +
+          'running", add the change to the settings of the reset. If I typed my own choice, give',
+      );
+      // each question has a "(default)" option: a short reply must not drop `exclude`
+      expect(text.replace(/\s+/g, " ")).toContain(
+        'A reply such as "defaults", "use the defaults" or "all defaults" means the option marked ' +
+          "(default) of each question: I keep these settings. With a change, for example " +
+          '"the defaults, but only running", I keep these settings, changed as I said. I choose ' +
+          '"Reset these settings" only when I pick it in the Settings question, by its name or its ' +
+          'number, or ask in my own words for a reset of all the settings, for example "reset" or ' +
+          '"reset, but only running". To reset a part, for example "reset the theme", is my own ' +
+          "choice: take out only that part, and keep the other settings. If you cannot tell which of " +
+          "the two I mean, ask me. 3. Call `writeDashboard`",
+      );
+      // no text calls the reset "the defaults": a reply with that word keeps the settings
+      expect(text).not.toMatch(/"Use\s+the\s+defaults|cho(se|ose)\s+the\s+defaults/);
+      expect(text).not.toMatch(/the\s+defaults\s+(add|then)/);
       // the steps after the questions follow in order
       expect(text.match(/^\d\. /gm)).toEqual(["1. ", "2. ", "3. ", "4. ", "5. ", "6. "]);
       expect(text.includes("{{")).toBe(false);
@@ -898,8 +917,18 @@ describe("recovery trend", () => {
       );
       expect(text).toContain(
         "Do the same with `recoveryHistory` = true if I said yes to the Recovery trend. Do the same " +
-          "with `yearReview` = true if I said yes to the Year tab, or false if I said no to it or chose " +
-          "the defaults without this question: the answer is saved, and no update asks again.",
+          "with `since` if I chose a start day. Give no `weeks` when I chose a start day or keep the " +
+          "`since` of `settings`. Also save the answer about the Year tab: `yearReview` = " +
+          "true if I said yes to it, also as a change to a reset, or false if I said no to it or chose " +
+          '"Reset these settings" without an answer to this question and did not keep the tab. No update ' +
+          "asks again. " +
+          'If I got no question about it or gave no answer to it, did not choose "Reset these settings" ' +
+          "and said nothing about " +
+          "the tab, there is no answer to save: give no `answers`, and " +
+          "leave `yearReview` as it is in `settings`. If there is an answer " +
+          "and this step gives `settings`, put `yearReview` in them, also when they are {}. If there is " +
+          'an answer and it gives none, give `answers` = { "yearReview": true } or { "yearReview": false }: the page ' +
+          "keeps its other settings. Never give `settings` and `answers` together. The server gets the data",
       );
     }
   });
@@ -1878,7 +1907,7 @@ describe("year-review", () => {
       [
         "Give me my year in review for 2026. Use the tools of the `garmin-personal` MCP server. Today is 2026-10-28. 1. Call `getYearReview` with `year` = 2026. When I name a dashboard page, also give it as `path`: its sports and its excluded data apply. It reads a local cache. When days are missing, it can ask me in a form before it fetches them. Call no other tool, also not for a missing day. If the call fails, say why in one line. If it refuses the `path`, also say which `path` you sent, that text that is not a year is read as the page, and what this command takes: a year, the `.html` file of a dashboard page, or both. Then ask me to correct it and stop: until I do, do not call it again without the `path` or with another `path`. The reply has `year`, `fill`, `lastDayOpen` and `settings`. A field below without one of these names before it is a field of `year`. Then answer in chat, in this order, short:",
         '- **The year**: the first line. When `coverage.complete` is true, name `year.year` and its days, `from` to `to`. Else name `year.year`, say that the recap covers the days from `coverage.activities.from` to `coverage.activities.to` only, and write "n/a (not in the cache)" for each range of `coverage.missing`. When `coverage.activities` is null, say instead that the cache has no day of this year, and write only the parts Missing days and HRV and resting HR: a 0 in the other parts is not a known value.',
-        '- **Missing days**: one line from `fill.asked`. `notNeeded`: no line. `yes`: the activity list was fetched, with `fill.garminCalls` requests. With a `fill.error`, say instead that the fetch failed, that nothing was saved, and give the `fill.error`. `no`: "nothing was fetched (you said no)". `unasked`, for each range of `coverage.missing`: "n/a from A to B: the assistant cannot show the confirm form, so nothing was fetched". `tooLarge`, for each range: "n/a from A to B: the fetch needs about N requests, which is too many, so nothing was fetched", where N is `fill.estimate`. With `tooLarge`, when `year.year` is before the year of today, also tell me to review a newer year first, then this one, and that this works only when the assistant can show the confirm form. Offer no other way to fetch these days.',
+        '- **Missing days**: one line from `fill.asked`. `notNeeded`: no line. `yes`: the activity list was fetched, with `fill.garminCalls` requests. With a `fill.error`, say instead that the fetch failed, that no activities were saved, and give the `fill.error`. `no`: "nothing was fetched (you said no)". `unasked`, for each range of `coverage.missing`: "n/a from A to B: the assistant cannot show the confirm form, so nothing was fetched". `tooLarge`, for each range: "n/a from A to B: the fetch needs about N requests, which is too many, so nothing was fetched", where N is `fill.estimate`. With `tooLarge`, when `year.year` is before the year of today, also tell me to review a newer year first, then this one, and that this works only when the assistant can show the confirm form. Offer no other way to fetch these days.',
         "- **Last day**: only when `lastDayOpen` is true, and `fill.asked` is not `yes` or there is a `fill.error`. Say that `coverage.activities.to`, the last day in the cache, can lack a session that came to Garmin after the last update of the cache. When `fill.asked` is `notNeeded` and the year is the year of today, also say that a dashboard update adds it.",
         "- **Totals**: from `totals`: the sessions (`activities`), `activeDays`, `km`, `hours`, `ascentM` in metres, `calories` and `load`. When `estimatedLoads` is more than 0, say how many of the loads are estimates from heart rate. When `unlikelyTimes` is more than 0, say how many sessions have a time that is not likely (over 12 h at under 1 km/h), and that this time and a load estimate from it do not count.",
         "- **Sports**: a table of `sports` in the given order: `sport`, `sessions`, `km`, `hours` and `load`. Then `topSport`, the sport with the most hours. When `hours` is null in each row, it is the sport with the most sessions: say so.",

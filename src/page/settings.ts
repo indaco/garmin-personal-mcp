@@ -31,3 +31,43 @@ export interface Settings {
   /** A page for another person, e.g. a coach: the server makes a new file of it that other users can read (644). */
   shared?: boolean;
 }
+
+const isItem = (v: unknown): v is DataItem => DATA_ITEMS.some((x) => x === v);
+const text = (v: unknown) => (typeof v === "string" && v ? v : undefined);
+const flag = (v: unknown) => (typeof v === "boolean" ? v : undefined);
+const strings = (v: unknown): string[] | undefined =>
+  Array.isArray(v) && v.every((x) => typeof x === "string") ? v : undefined;
+// an empty list would leave a page with nothing
+const names = (v: unknown) => (strings(v)?.length ? strings(v) : undefined);
+
+/**
+ * The settings of a settings block. The user can edit the page, so a block can hold anything: a value
+ * of another type counts as not set. Code reads the settings of a page only through this function. A
+ * new setting does not compile without its line here.
+ */
+export function readSettings(block: unknown): Settings {
+  const v = new Map<string, unknown>(Object.entries(block ?? {}));
+  const exclude = v.get("exclude");
+  const read: { [K in keyof Required<Settings>]: Settings[K] } = {
+    title: text(v.get("title")),
+    headline: text(v.get("headline")),
+    // an empty list keeps no board: not set would show them all
+    sports: strings(v.get("sports")),
+    // what it knows stays left out, also next to a name that it does not know
+    exclude: Array.isArray(exclude) ? exclude.filter(isItem) : undefined,
+    languages: names(v.get("languages")),
+    language: text(v.get("language")),
+    themes: names(v.get("themes")),
+    theme: text(v.get("theme")),
+    workouts: flag(v.get("workouts")),
+    recoveryHistory: flag(v.get("recoveryHistory")),
+    yearReview: flag(v.get("yearReview")),
+    since: text(v.get("since")),
+    shared: flag(v.get("shared")),
+  };
+  // a setting that is not set has no key: each key is saved, and counts as one
+  for (const [key, value] of Object.entries(read)) {
+    if (value === undefined) Reflect.deleteProperty(read, key);
+  }
+  return read;
+}

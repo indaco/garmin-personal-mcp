@@ -625,11 +625,11 @@
               "description": "true adds the Year tab, false keeps it off"
             }
           },
-          "description": "The answers to `offers`; the page keeps its other settings. Not with `settings`"
+          "description": "The answers to `offers`; the page keeps its other settings. Not with `settings` or `preview`"
         },
         "preview": {
           "type": "boolean",
-          "description": "Write nothing: return the digest, the activities of each board and the page settings"
+          "description": "Write nothing: return the digest, the activities of each board, the page settings and `pageFrom` (template or assistant)"
         }
       },
       "$schema": "https://json-schema.org/draft/2020-12/schema"

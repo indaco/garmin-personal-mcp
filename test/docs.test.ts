@@ -154,11 +154,11 @@ describe("guide", () => {
         "In the answer, `fill.asked` tells what it did: " +
         "| `fill.asked` | What the server did | | --- | --- | " +
         "| `notNeeded` | no day before today is missing: no question and no request | " +
-        "| `yes` | you said yes: it fetched the list. When this fails, it saves nothing and `fill.error` tells why | " +
+        "| `yes` | you said yes: it fetched the list. If this fails, it saves no activity: `fill.error` tells why | " +
         "| `no` | you said no: no request | " +
         "| `unasked` | your client has no form: no request | " +
         "| `tooLarge` | the days need more than about 20 requests: no question and no request | " +
-        "A fetch stops at 20 requests and saves nothing when the days need more. `fill.error` then tells " +
+        "A fetch stops at 20 requests and saves no activities when the days need more. `fill.error` then tells " +
         "if another try asks for fewer days, and the form of that try names the days that it drops. " +
         "After `tooLarge` for a year before this year, review a newer year first, then this one. Each yes " +
         "adds earlier days to the cache, so the next review needs fewer requests. This works only in a client with a form. " +
@@ -192,7 +192,7 @@ describe("guide", () => {
     );
     expect(flat("guide/troubleshooting.md")).toContain(
       "Wait a few minutes and update again: it does not fetch again what it saved. A failed fetch of " +
-        "`getYearReview` saves nothing: the next one starts again. |",
+        "`getYearReview` saves no activities: the next one starts again. |",
     );
     expect(flat("guide/how-it-works.md")).toContain(
       "The next call asks Garmin only for the days after the last call. It also asks again for the last " +
@@ -236,6 +236,15 @@ describe("guide", () => {
         "default). The assistant also asks whether to add a Year tab with the recap of the calendar year " +
         "(`yearReview`, off by default). A page that has it keeps it, but a page that you share keeps it " +
         "only when you ask for it. The server writes",
+    );
+  });
+
+  it("says what to do when `answers` need a page from the template", () => {
+    expect(flat("guide/troubleshooting.md")).toContain(
+      "| `answers` need a page from the template | The assistant designed this page (`freeform`), so it " +
+        "has no Year tab. To have the tab, ask for a new page from the template: `layout` = `preset`. The " +
+        "new page keeps its settings. A `freeform` page can use the recap: make a new one with " +
+        "`yearReview`. |",
     );
   });
 
@@ -299,10 +308,13 @@ describe("guide", () => {
     );
   });
 
-  it("names what the defaults leave out in the dashboard guide", () => {
+  it("names what a reset leaves out in the dashboard guide", () => {
     expect(readFileSync("guide/dashboard.md", "utf8").replace(/\s+/g, " ")).toContain(
-      "With the defaults, the page opens in midnight. It has no workout comparison, no Recovery trend and " +
-        "no recap of the calendar year.",
+      "It also tells you that a reset adds that data to the page again. Keep the settings (the default), " +
+        "or reset them. After a reset, the page has all sports, all data, all themes, and English and the " +
+        "language of your Garmin profile. It opens in midnight. It has no workout comparison, no Recovery " +
+        'trend and no recap of the calendar year. A reply such as "use the defaults" does not reset: it ' +
+        "keeps the settings. You can also type your own choice",
     );
   });
 

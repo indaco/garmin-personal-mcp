@@ -24,7 +24,7 @@ import {
   withPresetWidgets,
 } from "./page/layout";
 import { baseline, preset } from "./page/presets";
-import { DATA_ITEMS, type Settings } from "./page/settings";
+import { DATA_ITEMS, type Settings, readSettings } from "./page/settings";
 import { THEMES } from "./page/theme";
 import { WIDGET_API } from "./page/widget-api";
 import { version } from "../package.json";
@@ -409,13 +409,13 @@ const escapeHtml = (s: string) =>
 
 type Json = Record<string, unknown>;
 const listOf = (v: unknown): Json[] => (Array.isArray(v) ? (v as Json[]) : []);
-const same = (a: Settings, b: Settings) => JSON.stringify(a) === JSON.stringify(b);
+const same = (a: object, b: object) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
- * The settings of a page; none for no page or a page without them. They must be an object, and the
- * lists that keep data out must be lists.
+ * The settings block of a page as it is, for a write that keeps it; empty for no page or a page without
+ * it. It must be an object, and the lists that keep data out must be lists.
  */
-function settingsOf(page: string | undefined): Settings {
+function settingsBlock(page: string | undefined): Json {
   const s = page === undefined ? undefined : readBlock(page, "settings");
   if (s === undefined || s === null) return {};
   if (!isObject(s)) throw new Error("The garmin-settings block of the page is not an object");
@@ -429,8 +429,11 @@ function settingsOf(page: string | undefined): Settings {
       throw new Error(`The garmin-settings block of the page has a bad ${key}`);
     }
   }
-  return s as Settings;
+  return s;
 }
+
+/** The settings of a page. */
+const settingsOf = (page: string | undefined): Settings => readSettings(settingsBlock(page));
 
 /** The settings block of the page cannot be read: only new settings, or a new file, help. */
 function unreadable(e: unknown, target: string): Error {
@@ -490,12 +493,13 @@ export function languagesOf(s: Settings, locale: unknown): Record<string, Catalo
 /**
  * A page from the template with the settings: its settings block, its title, and the CSS of the chosen
  * themes. Only rules for one theme alone go: a rule that lists more selectors is kept as it is.
+ * `block`: the settings block to save, which can hold more than the settings.
  */
-export function styled(page: string, s: Settings): string {
-  let next = writeBlock(page, "settings", Object.keys(s).length > 0 ? s : null);
-  if (s.title)
-    next = next.replace(/<title>[^<]*<\/title>/, () => `<title>${escapeHtml(s.title!)}</title>`);
-  const themes = s.themes;
+export function styled(page: string, s: Settings, block: object = s): string {
+  let next = writeBlock(page, "settings", Object.keys(block).length > 0 ? block : null);
+  const { title, themes } = s;
+  if (title)
+    next = next.replace(/<title>[^<]*<\/title>/, () => `<title>${escapeHtml(title)}</title>`);
   if (themes) {
     next = next.replace(/<style>[\s\S]*?<\/style>/, (css) =>
       css.replace(/(?<=[{}>]):root\[data-theme="(\w+)"\]\{[^}]*\}/g, (rule, id: string) =>
@@ -690,8 +694,13 @@ export class DashboardWriter {
    * What a write would show, and the activities of each board, so the user can choose the sports;
    * writes no page file, but updates the data cache.
    */
-  preview(options: Pick<WriteOptions, "weeks" | "path" | "settings">): Promise<PreviewResult> {
+  preview(
+    options: Pick<WriteOptions, "weeks" | "path" | "settings" | "answers">,
+  ): Promise<PreviewResult> {
     const run = this.#queue.then(async () => {
+      if (options.answers) {
+        throw new Error("Give either `preview` or `answers`, not both: a preview saves no answer");
+      }
       const target = this.#target(options.path);
       const old = await readExisting(target);
       let settings: Settings;
@@ -818,20 +827,20 @@ export class DashboardWriter {
     if (onlyExisting && old === undefined) {
       throw new Error(`${target} does not exist: make it first with the training-dashboard prompt`);
     }
-    let oldSettings: Settings;
+    let saved: Json;
     let broken = false;
     try {
-      oldSettings = settingsOf(old);
+      saved = settingsBlock(old);
     } catch (e) {
       // without readable settings, a shared page could get data it must not have: only new settings help
       if (asked === undefined) throw unreadable(e, target);
-      oldSettings = {};
+      saved = {};
       broken = true;
     }
     const answer = answers?.yearReview;
     // not through checkSettings: an older or edited page can hold settings that it refuses
-    const own =
-      asked ?? (answer === undefined ? oldSettings : { ...oldSettings, yearReview: answer });
+    const block = asked ?? (answer === undefined ? saved : { ...saved, yearReview: answer });
+    const own = readSettings(block);
 
     // read before withData gives the page the version of this server
     const previousServer = old === undefined ? "n/a" : serverOf(old);
@@ -857,7 +866,7 @@ export class DashboardWriter {
     } else if (
       old !== undefined &&
       oldCode?.from === "template" &&
-      (needsNewCode(oldCode, templateCode) || !same(own, oldSettings) || broken)
+      (needsNewCode(oldCode, templateCode) || !same(block, saved) || broken)
     ) {
       // other page code or new settings: the user's state lives in the blocks, so it moves over as it is
       next = carryUserBlocks(template, old);
@@ -871,7 +880,7 @@ export class DashboardWriter {
     if (answer !== undefined && pageCode(next).from !== "template") {
       throw new Error("`answers` need a page from the template: a designed page has no Year tab");
     }
-    if (Object.keys(own).length > 0 && !marker("settings").test(next)) {
+    if (Object.keys(block).length > 0 && !marker("settings").test(next)) {
       // the data filter must hold on the next update too, so the page must keep its settings
       throw new Error(
         "Settings need a page from the template; this page has no garmin-settings block",
@@ -914,13 +923,13 @@ export class DashboardWriter {
         next = writeBlock(next, "refresh", record);
       }
     }
-    if (page === undefined && next !== old) next = styled(next, own);
+    if (page === undefined && next !== old) next = styled(next, own, block);
     // a page that Claude wrote keeps its settings in its block too, so its updates filter the same way
     if (
       (page !== undefined || (asked !== undefined && pageCode(next).from === "assistant")) &&
       marker("settings").test(next)
     ) {
-      next = writeBlock(next, "settings", Object.keys(own).length > 0 ? own : null);
+      next = writeBlock(next, "settings", Object.keys(block).length > 0 ? block : null);
     }
     // before the library: a refusal changes no file
     if (hasLanguages(next)) textsOf(next);
@@ -1604,13 +1613,13 @@ export function registerDashboardWriter(server: McpServer, writer: DashboardWrit
               .optional(),
           })
           .describe(
-            "The answers to `offers`; the page keeps its other settings. Not with `settings`",
+            "The answers to `offers`; the page keeps its other settings. Not with `settings` or `preview`",
           )
           .optional(),
         preview: z
           .boolean()
           .describe(
-            "Write nothing: return the digest, the activities of each board and the page settings",
+            "Write nothing: return the digest, the activities of each board, the page settings and `pageFrom` (template or assistant)",
           )
           .optional(),
       }),

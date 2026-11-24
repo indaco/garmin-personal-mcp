@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
 import { DashboardWriter, pageCode, type ViewBlocks, writeBlock } from "../../src/dashboard-page";
 import { data, closePages, launch } from "./page";
 import { preset } from "../../src/page/presets";
+import type { Settings } from "../../src/page/settings";
 
 let browser: Browser;
 let host: string;
@@ -103,6 +104,31 @@ it("shows the Year tab in a host frame, with the note of a page that has no reca
   await frame.click("[role=tab][data-tab=year]");
   expect(await frame.getAttribute("[data-tab=year]", "aria-selected")).toBe("true");
   expect(await frame.innerText(".board-note")).toContain("This page has no recap of the year yet.");
+  expect(errors).toEqual([]);
+});
+
+it.each([[5], [{ a: 1 }], ["paper"], [[]], [[5]]])(
+  "shows the dashboard in a host frame with the hand-edited themes %j",
+  async (value) => {
+    const settings = JSON.parse(JSON.stringify({ themes: value }));
+    const { frame, errors } = await showInHost(template(), { ...(await viewBlocks()), settings });
+    expect(await frame.innerText("#app")).toContain("Training + Recovery");
+    expect(await frame.evaluate(() => document.documentElement.dataset.theme)).toBe("midnight");
+    expect(errors).toEqual([]);
+  },
+);
+
+it.each<[Settings, string, number]>([
+  [{ theme: "paper" }, "paper", 13],
+  [{ themes: ["paper"] }, "paper", 0],
+  [{ themes: ["paper", "mist"] }, "paper", 2],
+  [{ themes: ["paper", "midnight"] }, "midnight", 2],
+  [{ themes: ["paper", "mist"], theme: "mist" }, "mist", 2],
+])("opens in a host frame with the theme of the settings %j", async (settings, theme, choices) => {
+  const { frame, errors } = await showInHost(template(), { ...(await viewBlocks()), settings });
+  expect(await frame.evaluate(() => document.documentElement.dataset.theme)).toBe(theme);
+  // one theme has no menu
+  expect(await frame.locator("#theme option").count()).toBe(choices);
   expect(errors).toEqual([]);
 });
 

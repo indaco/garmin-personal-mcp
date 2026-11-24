@@ -76,8 +76,18 @@ class SearchLimitError extends Error {
   override name = "SearchLimitError";
 }
 
+/** What the user sees of a fill, before a yes. */
+export interface FillOffer {
+  /** About how many requests fillActivities needs. */
+  readonly fillRequests: number;
+  /** The first day that fillActivities asks for. */
+  readonly fillStart: string;
+  /** The earlier cached days that the cache does not cover after fillActivities. */
+  readonly fillDrops: DayRange | null;
+}
+
 /** The cached rows of a range of days. They are read from a file, so each value needs a check. */
-export interface CachedRows {
+export interface CachedRows extends FillOffer {
   readonly activities: Json[];
   readonly hrv: Json[];
   readonly recovery: Json[];
@@ -87,12 +97,6 @@ export interface CachedRows {
     readonly hrv: DayRange | null;
     readonly rhr: DayRange | null;
   };
-  /** About how many requests fillActivities needs for the same range. */
-  readonly fillRequests: number;
-  /** The first day that fillActivities asks for. */
-  readonly fillStart: string;
-  /** The earlier cached days that the cache does not cover after fillActivities. */
-  readonly fillDrops: DayRange | null;
 }
 
 /** What fillActivities did. `error` is a text without a key, a token or an answer of Garmin. */
@@ -112,8 +116,6 @@ const stopsAll = (e: GarminApiError) => e.status === undefined || e.status === 4
 export class GarminDashboard {
   /** Calls run one at a time, so the cache file has one writer. */
   #queue: Promise<unknown> = Promise.resolve();
-  /** The cached days whose fill stopped at FILL_CAP: the next one does not keep them. */
-  #tooFar: string | undefined;
 
   constructor(
     private readonly tools: GarminTools,
@@ -222,7 +224,6 @@ export class GarminDashboard {
     return this.#inTurn(async () => {
       const cache = await this.load();
       const held = outdated(cache) ? null : rangeOf(cache.activitiesFrom, cache.activitiesTo);
-      const plan = this.#fillPlan(cache, from, to);
       const recovery = objectAt(cache, "recovery");
       let rhr: DayRange | null = null;
       for (let day = from, first = ""; day <= to; day = addDays(day, 1)) {
@@ -240,22 +241,23 @@ export class GarminDashboard {
           hrv: clip(rangeOf(cache.hrvFrom, cache.hrvTo), from, to),
           rhr,
         },
-        fillRequests: plan.requests,
-        fillStart: toFetch(held?.from, held?.to, plan.start, to)[0]?.[0] ?? from,
-        fillDrops: plan.drops,
+        ...fillOffer(cache, nextFill(cache, from, to), from, to),
       };
     });
   }
 
   /**
    * Fetches the activity list of [from, to] into the cache: no HRV and no recovery. It saves all of
-   * it or nothing, and stops at FILL_CAP requests: the estimate of a fill can be too low.
+   * it or none, and stops at FILL_CAP requests: the estimate of a fill can be too low. `shown` is what
+   * the user said yes to. The cache can have changed since, also while this call waited in the queue:
+   * undefined, with no request, when the fill is another one now.
    */
-  fillActivities(from: string, to: string): Promise<FillResult> {
+  fillActivities(from: string, to: string, shown: FillOffer): Promise<FillResult | undefined> {
     return this.#inTurn(async () => {
       const sync: Sync = { ...newSync(), searchLimit: FILL_CAP };
       const cache = await this.load();
-      const plan = this.#fillPlan(cache, from, to);
+      const plan = nextFill(cache, from, to);
+      if (offerKey(fillOffer(cache, plan, from, to)) !== offerKey(shown)) return undefined;
       const held = heldDays(cache); // the sync changes the cache
       const canDrop = plan.drops === null && fillPlan(cache, from, to, false).drops !== null;
       try {
@@ -264,16 +266,33 @@ export class GarminDashboard {
         return { garminCalls: sync.calls };
       } catch (e) {
         log("WARN", `Activity list not fetched: ${reasonOf(e)}`);
-        const fewer = canDrop && e instanceof SearchLimitError;
+        let next = " Another try stops too.";
         // no silent retry: the user said yes to a form that names no days to drop
-        if (fewer) this.#tooFar = held;
-        return { garminCalls: sync.calls, error: fillError(e, fewer ? from : undefined) };
+        if (canDrop && e instanceof SearchLimitError)
+          next = (await this.#markStopped(held))
+            ? ` Another try asks for the days from ${from} only: its form names the cached days that it drops.`
+            : "";
+        return { garminCalls: sync.calls, error: fillError(e, next) };
       }
     });
   }
 
-  #fillPlan(cache: Json, from: string, to: string): FillPlan {
-    return fillPlan(cache, from, to, heldDays(cache) !== this.#tooFar);
+  /**
+   * Saves that a fill which keeps the days of `held` stops at FILL_CAP: the next one, of any process, does
+   * not keep them. False when the file does not hold these days any more, or cannot be written. It writes
+   * the whole file, also after a fetch that saved no activities.
+   * shortcut: a write of another process between this read and this write is lost; a lock file if it matters
+   */
+  async #markStopped(held: string): Promise<boolean> {
+    const now = await this.load();
+    if (heldDays(now) !== held) return false;
+    try {
+      await writeAtomically(this.#file(), JSON.stringify({ ...now, fillStopped: held }));
+      return true;
+    } catch (e) {
+      log("WARN", `Stopped fetch not marked: ${reasonOf(e)}`);
+      return false;
+    }
   }
 
   // ------------------------------------------------------------------ sync
@@ -694,9 +713,26 @@ function fillPlan(cache: Json, from: string, to: string, tryKeep: boolean): Fill
   return plan(from, { from: held.from, to: gap ? held.to : addDays(from, -1) }, perDay);
 }
 
-/** The cached range of days, as one key. */
+/** The plan of the next fill: a mark of other days, or a wrong one, does not count. */
+const nextFill = (cache: Json, from: string, to: string): FillPlan =>
+  fillPlan(cache, from, to, cache.fillStopped !== heldDays(cache));
+
+/** What the user sees of a plan for [from, to]. */
+function fillOffer(cache: Json, plan: FillPlan, from: string, to: string): FillOffer {
+  const held = outdated(cache) ? null : rangeOf(cache.activitiesFrom, cache.activitiesTo);
+  return {
+    fillRequests: plan.requests,
+    fillStart: toFetch(held?.from, held?.to, plan.start, to)[0]?.[0] ?? from,
+    fillDrops: plan.drops,
+  };
+}
+
+const offerKey = (o: FillOffer): string =>
+  JSON.stringify([o.fillRequests, o.fillStart, o.fillDrops?.from, o.fillDrops?.to]);
+
+/** The cached range of days and the version of its rows, as one key. */
 const heldDays = (cache: Json): string =>
-  JSON.stringify([cache.activitiesFrom, cache.activitiesTo]);
+  JSON.stringify([cache.activitiesFrom, cache.activitiesTo, cache.activitiesSummary]);
 
 /** The days from `from` to `to`, both included. */
 const daysIn = (from: string, to: string): number =>
@@ -823,12 +859,12 @@ function reasonOf(e: unknown): string {
 }
 
 /**
- * The text of a failed fill for the tool reply: never an answer of Garmin, and no local path. `fewer`
- * is the first day of the next fill, when that one has fewer days.
+ * The text of a failed fill for the tool reply: never an answer of Garmin, and no local path. `next` tells
+ * what another try does after a stop at FILL_CAP.
  */
-function fillError(e: unknown, fewer?: string): string {
+function fillError(e: unknown, next: string): string {
   if (e instanceof SearchLimitError)
-    return `The fetch stopped at ${FILL_CAP} requests and saved nothing: the days need more. Another try ${fewer ? `asks for the days from ${fewer} only: its form names the cached days that it drops` : "stops too"}.`;
+    return `The fetch stopped at ${FILL_CAP} requests and saved no activities: the days need more.${next}`;
   if (e instanceof KeyRefusedError)
     return `Garmin refuses the personal API key: it is incorrect, expired or revoked. Nothing was saved. Create a new key at ${KEY_PAGE_URL} and put it where the server reads it: the key file, or GARMIN_PERSONAL_API_KEY in the MCP client configuration (then restart the client).`;
   if (e instanceof GarminApiError && e.status !== undefined && e.status !== 200)

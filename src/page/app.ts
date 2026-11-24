@@ -66,10 +66,10 @@ import {
   withheld,
   withhold,
 } from "./registry";
-import type { Settings } from "./settings";
+import { type Settings, readSettings } from "./settings";
 import { formatHash, parseHash, type View } from "./state";
 import { rangeDays, typeName } from "./widgets/ui";
-import { DEFAULT_THEME, store, THEMES, themeKey, token } from "./theme";
+import { DEFAULT_THEME, openingTheme, store, THEMES, themeKey, token } from "./theme";
 import "./widgets";
 
 declare global {
@@ -84,7 +84,7 @@ declare global {
       refresh?: unknown;
     };
     /** The page settings, set by the first script of the page. */
-    GARMIN_SETTINGS?: Settings | null;
+    GARMIN_SETTINGS?: unknown;
     Chart?: typeof Chart;
   }
 }
@@ -144,7 +144,9 @@ let newsClosed = false;
 export function start(): void {
   G = window.GARMIN ?? { data: null, layout: null, widgets: [] };
   if (G.data?.notes) G.data.notes = G.data.notes.map(plain);
-  S = window.GARMIN_SETTINGS ?? {};
+  S = readSettings(window.GARMIN_SETTINGS);
+  // the first script chose it before the first paint, but in the chat the settings come later
+  document.documentElement.dataset.theme = openingTheme(S, store.get("garmin-theme"));
   langChoice = store.get("garmin-lang") ?? S.language ?? "auto";
   pageLayout = parseLayout(G.layout);
   const local = readLocal();

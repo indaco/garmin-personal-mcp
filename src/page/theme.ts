@@ -1,4 +1,5 @@
 import type { Key } from "./i18n";
+import type { Settings } from "./settings";
 
 /** The themes of the menu, in groups. Their colours are CSS tokens in styles.css. */
 export const THEMES: { id: string; group: "auto" | "dark" | "light" | "accessible" }[] = [
@@ -17,6 +18,12 @@ export const THEMES: { id: string; group: "auto" | "dark" | "light" | "accessibl
   { id: "hcLight", group: "accessible" },
 ];
 export const DEFAULT_THEME = "midnight";
+
+/** The theme that the page opens with: the saved one when the page has it, else the one of the settings. */
+export function openingTheme({ themes, theme }: Settings, saved: string | null): string {
+  if (saved && (!themes || themes.includes(saved))) return saved;
+  return theme ?? (themes && !themes.includes(DEFAULT_THEME) ? themes[0] : DEFAULT_THEME);
+}
 
 export const themeKey = (id: string) => `theme.${id}` as Key;
 

@@ -54,6 +54,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await closeAll();
+  vi.restoreAllMocks();
   vi.useRealTimers();
   rmSync(dir, { recursive: true, force: true });
 });
@@ -127,6 +128,39 @@ const activity = (id: number, day: string) => ({
   movingDuration: 3600,
 });
 
+/** Runs `change` right after the nth read of the cache: after the yes, the fetch can wait in the queue. */
+const afterRead = (n: number, change: () => void) => {
+  const read = GarminDashboard.prototype.readCached;
+  let reads = 0;
+  vi.spyOn(GarminDashboard.prototype, "readCached").mockImplementation(async function (
+    this: GarminDashboard,
+    ...args
+  ) {
+    const out = await read.apply(this, args);
+    if (++reads === n) change();
+    return out;
+  });
+};
+
+/** The first two calls read the same cache: none goes on before both have read it. */
+const bothRead = () => {
+  let release: (() => void) | undefined;
+  const both = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const read = GarminDashboard.prototype.readCached;
+  let reads = 0;
+  vi.spyOn(GarminDashboard.prototype, "readCached").mockImplementation(async function (
+    this: GarminDashboard,
+    ...args
+  ) {
+    const out = await read.apply(this, args);
+    if (++reads === 2) release?.();
+    await both;
+    return out;
+  });
+};
+
 /** Answers each form in turn; `first` runs while the first form is open. */
 const inTurn = (answers: Answer[], first: () => void): Answer => {
   let form = -1;
@@ -141,6 +175,8 @@ const inTurn = (answers: Answer[], first: () => void): Answer => {
     },
   };
 };
+
+const answers = (...given: Answer[]) => inTurn(given, () => {});
 
 const open = (era: Era, answer: Answer | undefined) =>
   connect(era, answer, (server) => {
@@ -173,6 +209,24 @@ async function review(
     reply: r.isError ? undefined : JSON.parse(text),
     messages: asked.map((p) => (p as { message: string }).message),
   };
+}
+
+/** Opens a client, for more than one call. */
+async function connected(era: Era, answer: Answer) {
+  const { client, asked } = await open(era, answer);
+  const call = async () => {
+    const r = await client.callTool({ name: "getYearReview", arguments: {} });
+    return JSON.parse((r.content as { text: string }[])[0].text);
+  };
+  /** Two calls at the same time, in the order of `fill.asked` and the requests: each can end first. */
+  const callTwice = async () => {
+    bothRead();
+    const replies = await Promise.all([call(), call()]);
+    return replies
+      .map((r) => r.fill)
+      .toSorted((a, b) => a.asked.localeCompare(b.asked) || a.garminCalls - b.garminCalls);
+  };
+  return { call, callTwice, messages: () => asked.map((p) => (p as { message: string }).message) };
 }
 
 /** The keys of a value, at any depth. */
@@ -421,6 +475,84 @@ describe.each<Era>(ERAS)("getYearReview on the %s era", (era) => {
       expect(asked).toHaveLength(1);
       expect(api.getJson).not.toHaveBeenCalled();
       expect(reply.fill).toEqual({ asked: "tooLarge", estimate: 21, garminCalls: 0 });
+    });
+  });
+
+  // the form opens after read 1, and read 2 sees the same cache: the change comes after the yes
+  describe("when the cache changes between the yes and the fetch", () => {
+    const drops = "The cache then no longer covers 2021-01-01 to 2025-12-31";
+
+    it("asks again with the new days, and a no fetches nothing", async () => {
+      saveFromMarch();
+      afterRead(2, saveOldYears);
+      const { reply, messages } = await review({}, answers(YES, NO), era);
+      expect(messages).toHaveLength(2);
+      expect(messages[0]).not.toContain("no longer covers");
+      expect(messages[1]).toContain(drops);
+      expect(api.getJson).not.toHaveBeenCalled();
+      expect(reply.fill).toEqual({ asked: "no", estimate: 3, garminCalls: 0 });
+    });
+
+    it("fetches the days of the second form after a second yes", async () => {
+      saveFromMarch();
+      afterRead(2, saveOldYears);
+      garmin = [activity(1, "2026-03-01")];
+      const { reply, messages } = await review({}, answers(YES, YES), era);
+      expect(messages).toHaveLength(2);
+      expect(reply.fill).toEqual({ asked: "yes", estimate: 3, garminCalls: 1 });
+      expect(reply.year.totals.activities).toBe(1);
+    });
+
+    it("asks a third time after a second change", async () => {
+      saveFromMarch();
+      afterRead(2, () => {
+        saveOldYears();
+        vi.mocked(GarminDashboard.prototype.readCached).mockRestore();
+        afterRead(2, () => saveOldYears("2021-01-02"));
+      });
+      const { reply, messages } = await review({}, answers(YES, YES, NO), era);
+      expect(messages).toHaveLength(3);
+      expect(messages[2]).toContain("no longer covers 2021-01-02 to 2025-12-31");
+      expect(api.getJson).not.toHaveBeenCalled();
+      expect(reply.fill.asked).toBe("no");
+    });
+
+    it("asks nothing more and fetches nothing when no day is missing any more", async () => {
+      saveFromMarch();
+      afterRead(2, () => save({ activities: byId(row(1, "2026-10-20")) }));
+      const { reply, asked } = await review({}, answers(YES), era);
+      expect(asked).toHaveLength(1);
+      expect(api.getJson).not.toHaveBeenCalled();
+      expect(reply.fill).toEqual({ asked: "notNeeded", estimate: 0, garminCalls: 0 });
+      expect(reply.year.totals.activities).toBe(1);
+    });
+
+    it("asks nothing more and fetches nothing when the new fetch is too large", async () => {
+      setToday("2026-06-24");
+      save({ activitiesFrom: "2021-03-01", activitiesTo: "2026-06-24" });
+      afterRead(2, removeCache);
+      const { reply, asked } = await review({ year: 2021 }, answers(YES), era);
+      expect(asked).toHaveLength(1);
+      expect(api.getJson).not.toHaveBeenCalled();
+      expect(reply.fill).toEqual({ asked: "tooLarge", estimate: 21, garminCalls: 0 });
+    });
+
+    it("fetches at once when the change leaves the same question", async () => {
+      saveFromMarch();
+      afterRead(2, saveFromFebruary);
+      const { reply, asked } = await review({}, answers(YES), era);
+      expect(asked).toHaveLength(1);
+      expect(reply.fill).toEqual({ asked: "yes", estimate: 2, garminCalls: 2 });
+    });
+
+    it("asks again with the new day when the day changes", async () => {
+      saveFromMarch();
+      afterRead(2, () => {
+        nextDay();
+        saveOldYears();
+      });
+      const { messages } = await review({}, answers(YES, NO), era);
+      expect(messages[1]).toContain("for 2026-01-01 to 2026-10-27,");
     });
   });
 
@@ -731,7 +863,7 @@ describe("getYearReview", () => {
       expect(text).not.toMatch(/private|"title"|"shared"/);
     });
 
-    it.each([{ sports: null, exclude: null }, { sports: ["running"] }, { exclude: ["names"] }])(
+    it.each([{}, { sports: ["running"] }, { exclude: ["names"] }])(
       "gives the settings %j as they are",
       async (settings) => {
         saveAllKinds();
@@ -739,6 +871,14 @@ describe("getYearReview", () => {
         expect((await review()).reply.settings).toEqual(settings);
       },
     );
+
+    it("gives no setting for null by hand", async () => {
+      saveAllKinds();
+      savePage(JSON.stringify({ sports: null, exclude: null }));
+      const { reply } = await review();
+      expect(reply.settings).toEqual({});
+      expect(reply.year.sports.length).toBeGreaterThan(1);
+    });
 
     it("leaves out what the page at path leaves out", async () => {
       saveAllKinds();
@@ -929,13 +1069,15 @@ describe("getYearReview", () => {
       estimate: 2,
       garminCalls: 20,
       error:
-        "The fetch stopped at 20 requests and saved nothing: the days need more. Another try stops too.",
+        "The fetch stopped at 20 requests and saved no activities: the days need more. Another try stops too.",
     });
   });
 });
 
 describe("getYearReview after a fetch that keeps the cached days and stops at the cap", () => {
-  it.each(ERAS)("asks for fewer days, and names the days that it drops (%s)", async (era) => {
+  const OLD = "The cache then no longer covers 2022-10-01 to 2023-09-30";
+
+  beforeEach(() => {
     // 20 sessions in the cached year make a low rate; in fact there are 2 a day since: 23 requests
     const days: string[] = [];
     for (let d = "2022-10-01"; d <= "2026-10-26"; d = addDays(d, 1)) days.push(d);
@@ -947,30 +1089,64 @@ describe("getYearReview after a fetch that keeps the cached days and stops at th
     garmin = days
       .filter((d) => d > "2023-09-30")
       .flatMap((d, i) => [activity(100 + 2 * i, d), activity(101 + 2 * i, d)]);
-    const { client, asked } = await open(era, YES);
-    const call = async () => {
-      const r = await client.callTool({ name: "getYearReview", arguments: {} });
-      return JSON.parse((r.content as { text: string }[])[0].text);
-    };
-    const message = (i: number) => (asked[i] as { message: string }).message;
+  });
 
+  it.each(ERAS)("asks for fewer days, and names the days that it drops (%s)", async (era) => {
+    const { call, messages } = await connected(era, YES);
     expect((await call()).fill.error).toContain(
       "Another try asks for the days from 2026-01-01 only",
     );
-    expect(message(0)).not.toContain("no longer covers");
+    expect(messages()[0]).not.toContain("no longer covers");
 
     const second = await call();
     expect(second.fill).toEqual({ asked: "yes", estimate: 3, garminCalls: 6 });
     expect(second.year.coverage.complete).toBe(true);
     expect(second.year.totals.activities).toBe(598);
-    expect(message(1)).toContain(
+    expect(messages()[1]).toContain(
       "Fetch the activity list from Garmin for 2026-01-01 to 2026-10-26",
     );
-    expect(message(1)).toContain("The cache then no longer covers 2022-10-01 to 2023-09-30");
+    expect(messages()[1]).toContain(OLD);
 
     // the cache has the year now: nothing to ask
     expect((await call()).fill.asked).toBe("notNeeded");
-    expect(asked).toHaveLength(2);
+    expect(messages()).toHaveLength(2);
+  });
+
+  it.each(ERAS)(
+    "a second call at the same time drops no day that its form does not name (%s)",
+    async (era) => {
+      const before = readFileSync(cacheFile(), "utf8");
+      const { callTwice, messages } = await connected(era, answers(YES, YES, NO));
+      const fills = await callTwice();
+      const [first, second, third] = messages();
+      expect([first, second].join()).not.toContain("no longer covers");
+      expect(third).toContain(OLD);
+      expect(messages()).toHaveLength(3);
+      expect(fills).toEqual([
+        { asked: "no", estimate: 3, garminCalls: 0 },
+        expect.objectContaining({ asked: "yes", garminCalls: 20 }),
+      ]);
+      expect(JSON.parse(readFileSync(cacheFile(), "utf8"))).toMatchObject(JSON.parse(before));
+    },
+  );
+
+  it.each(ERAS)("a second call at the same time fetches after a second yes (%s)", async (era) => {
+    const { callTwice, messages } = await connected(era, YES);
+    const [done, stopped] = await callTwice();
+    expect(messages()).toHaveLength(3);
+    expect(done).toEqual({ asked: "yes", estimate: 3, garminCalls: 6 });
+    expect(stopped).toMatchObject({ asked: "yes", garminCalls: 20 });
+  });
+});
+
+describe("getYearReview twice at the same time", () => {
+  it.each(ERAS)("fetches the days once (%s)", async (era) => {
+    saveFromMarch();
+    garmin = [activity(1, "2026-03-01")];
+    const { callTwice, messages } = await connected(era, YES);
+    expect((await callTwice()).map((fill) => fill.asked)).toEqual(["notNeeded", "yes"]);
+    expect(messages()).toHaveLength(2);
+    expect(api.getJson).toHaveBeenCalledTimes(2);
   });
 });
 

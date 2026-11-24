@@ -32,13 +32,13 @@ With `preset` and `blank`, the assistant first asks for the title and the headli
 the title). Keep them or type your own. Later updates keep them, also the automatic update. When the
 page has other settings, for example only one sport or no sleep data, the assistant tells you these
 settings. When the page excludes data, for example on a page for your coach, the assistant names
-that data. It also tells you that the defaults add that data to the page again. Keep the settings
-(the default), or use the defaults. The defaults are all sports, all data, all themes, and English
-and the language of your Garmin profile. With the defaults, the page opens in midnight. It has no
-workout comparison, no Recovery trend and no recap of the calendar year. You can also type your own
-choice, for example "all sports, keep the rest". With `freeform`, the assistant asks about the sports
-and the data that the old page leaves out, when it does. It keeps them left out (the default), or
-uses all sports and all data.
+that data. It also tells you that a reset adds that data to the page again. Keep the settings
+(the default), or reset them. After a reset, the page has all sports, all data, all themes, and
+English and the language of your Garmin profile. It opens in midnight. It has no workout comparison,
+no Recovery trend and no recap of the calendar year. A reply such as "use the defaults" does not
+reset: it keeps the settings. You can also type your own choice, for example "all sports, keep the
+rest". With `freeform`, the assistant asks about the sports and the data that the old page leaves
+out, when it does. It keeps them left out (the default), or uses all sports and all data.
 
 To set the sports and the data of the page too, for example for a page that you share with your
 coach, run `dashboard-setup`. See [Page settings](#page-settings).
