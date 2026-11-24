@@ -115,6 +115,7 @@ Where each part of the server and the page is.
 | `src/dashboard.ts`                   | the `getDashboardData` tool and its cache                                            |
 | `src/dashboard-page.ts`              | `writeDashboard` and `editDashboard`: the page file and its blocks                   |
 | `src/schedule.ts`                    | `scheduleDashboardRefresh`: the cron, and the job for each system                    |
+| `src/year-review.ts`                 | `getYearReview`: the recap of a year from the cache, and its fill                    |
 | `src/digest.ts`                      | the digest of the data for the coach notes                                           |
 | `src/analytics/`                     | the calculations that the page and the digest share. No I/O: the lint refuses it     |
 | `src/page/`                          | the dashboard page: app, layout, widgets, themes and texts                           |

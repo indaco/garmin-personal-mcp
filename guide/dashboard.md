@@ -84,7 +84,8 @@ browser. The note gives the server version, the preset widgets that the update a
 [What's new](https://garmin-personal-mcp.indaco.dev/whats-new.html) page of the website. An update to an older version with other page code does not show the note and removes the record. Select **Close** to hide it. The dashboard in the chat does not show the note.
 
 The first update sends about 10 requests to Garmin, and one more for each .FIT file that it does not
-have yet. Later updates use the local cache and send about 7.
+have yet. Later updates use the local cache and send about 7. An update fetches only the days of the
+dashboard: it can drop the earlier days of a [year review](../README.md#year-review).
 
 Reload the page in the browser to see the new data.
 
@@ -391,14 +392,14 @@ assistant calls `writeDashboard` with `settings`:
 | `since`           | the first day of the page, as `yyyy-MM-dd`, in place of `weeks`            | none: the last `weeks` weeks                           |
 
 The server leaves the excluded data and sports out of the file, and out of the digest for the coach
-notes. The server cannot remove data from the chat. If another tool showed the data earlier in the
-same chat, the assistant has it. Then only the prompt tells the assistant not to use that data in
-the notes. Make a page for someone else in a new chat. A widget does not show when the settings
-exclude its data. With `recovery` excluded, the page has no Recovery board. `names` removes the
-names of the activities; the sport stays. The file holds only the chosen languages and the CSS of
-the chosen themes. A page without English (`["it"]`) opens in Italian for every reader; English
-stays in the file only for a text that has no translation. With one language or one theme, the page
-has no menu to choose it.
+notes. `getYearReview` leaves them out of its answer too. The server cannot remove data from the
+chat. If another tool showed the data earlier in the same chat, the assistant has it. Then only the
+prompt tells the assistant not to use that data in the notes. Make a page for someone else in a new
+chat. A widget does not show when the settings exclude its data. With `recovery` excluded, the page
+has no Recovery board. `names` removes the names of the activities; the sport stays. The file holds
+only the chosen languages and the CSS of the chosen themes. A page without English (`["it"]`) opens
+in Italian for every reader; English stays in the file only for a text that has no translation. With
+one language or one theme, the page has no menu to choose it.
 
 Each page keeps its own settings, so a personal page and a page for your coach can be two files, for
 example `garmin-dashboard.html` and `garmin-dashboard-coach.html`. In the `dashboard-setup`

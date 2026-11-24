@@ -1188,6 +1188,7 @@ describe("MCP tools", () => {
       "getActivityLaps",
       "getActivitySets",
       "getDashboardData",
+      "getYearReview",
       "scheduleDashboardRefresh",
       "showDashboard",
       "writeDashboard",

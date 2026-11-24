@@ -404,12 +404,16 @@ type Json = Record<string, unknown>;
 const listOf = (v: unknown): Json[] => (Array.isArray(v) ? (v as Json[]) : []);
 const same = (a: Settings, b: Settings) => JSON.stringify(a) === JSON.stringify(b);
 
-/** The settings of a page; none for no page or a page without them. The lists that keep data out must be lists. */
+/**
+ * The settings of a page; none for no page or a page without them. They must be an object, and the
+ * lists that keep data out must be lists.
+ */
 function settingsOf(page: string | undefined): Settings {
   const s = page === undefined ? undefined : readBlock(page, "settings");
-  if (!s || typeof s !== "object") return {};
+  if (s === undefined || s === null) return {};
+  if (!isObject(s)) throw new Error("The garmin-settings block of the page is not an object");
   for (const key of ["exclude", "sports"] as const) {
-    const v = (s as Settings)[key] as unknown;
+    const v = s[key];
     if (
       v !== undefined &&
       v !== null &&
@@ -678,6 +682,21 @@ export class DashboardWriter {
     });
     this.#queue = run.catch(() => {});
     return run;
+  }
+
+  /** The settings of the page at `path`, which must exist; without a path, of the default page if there is one. */
+  async settings(path?: string): Promise<Settings> {
+    const target = this.#target(path);
+    const page = await readExisting(target);
+    // a mistyped path must not give the data that the page leaves out
+    if (path && page === undefined) {
+      throw new Error(`${target} does not exist: give the path of a dashboard page, or no path`);
+    }
+    try {
+      return settingsOf(page);
+    } catch (e) {
+      throw unreadable(e, target);
+    }
   }
 
   /** The template; a build without a page code id would refresh each page on each write, so it stops here. */

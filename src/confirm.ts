@@ -10,7 +10,7 @@ import {
 import * as z from "zod/v4";
 import { isObject } from "./tools";
 
-/** `ask`: return it from the handler. `unasked`: the client cannot ask, so the tool goes on as before. */
+/** `ask`: return it from the handler. `unasked`: the client cannot ask, and the caller decides what to do. */
 export type Confirm = { ask: InputRequiredResult } | { answer: "yes" | "no" | "unasked" };
 
 const ANSWER = z.object({ confirm: z.boolean().describe("Yes, do it") });
