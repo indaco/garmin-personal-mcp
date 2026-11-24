@@ -12,6 +12,7 @@ import {
   named,
   weeksOf,
 } from "../analytics/calc";
+import { CATALOGUE } from "./catalogue";
 import { Chart, chart, destroyCharts, themeCharts } from "./charts";
 import { announce, h, keepFocus } from "./dom";
 import { dragTile, keyMove, resizeTile } from "./edit-drag";
@@ -636,10 +637,7 @@ function setNames(names: string[]): void {
 /** The names of the window on the current board with their counts, the most frequent first; a chosen name stays, so it can be taken off. */
 function namesOf(data: Data): [string, number][] {
   const inWindow = activitiesIn(data.activities, view.from, view.to);
-  const onTab =
-    view.tab === "all" || view.tab === "recovery"
-      ? inWindow
-      : inWindow.filter((a) => groupOf(a) === view.tab);
+  const onTab = boardType() === "all" ? inWindow : inWindow.filter((a) => groupOf(a) === view.tab);
   const counts = new Map<string, number>();
   for (const a of onTab) if (a.name) counts.set(a.name, (counts.get(a.name) ?? 0) + 1);
   for (const n of view.names ?? []) if (!counts.has(n)) counts.set(n, 0);
@@ -743,7 +741,7 @@ function tabBar(data: Data): HTMLElement {
         },
         icon(tab),
         h("span", {}, typeName(t, tab)),
-        tab !== "recovery" && h("span", { class: "count" }, count(tab)),
+        isActivityTab(tab) && h("span", { class: "count" }, count(tab)),
       ),
     ),
   );
@@ -759,12 +757,20 @@ function tabBar(data: Data): HTMLElement {
 
 // ------------------------------------------------------------------ boards
 
+/** The tiles that show the recap of the year only. */
+const YEAR_TILES = new Set(CATALOGUE.filter((c) => c.optIn === "yearReview").map((c) => c.id));
+
 function boardView(data: Data): HTMLElement {
   const board = boardOf(draft ?? layout, view.tab, preset);
   const grid = h("div", { class: `grid${editing ? " editing" : ""}` });
+  // one note on the board, not eight tiles that say the same
+  const noRecap = view.tab === "year" && !data.year;
   // a hidden widget leaves the grid; Add widget lists it to show it again
   const shown = board.filter(
-    (inst) => !inst.hidden && (widget(inst.widget) || (editing && !withheld.has(inst.widget))),
+    (inst) =>
+      !inst.hidden &&
+      (widget(inst.widget) || (editing && !withheld.has(inst.widget))) &&
+      !(noRecap && !editing && YEAR_TILES.has(inst.widget)),
   );
   const tiles = shown.map((inst) => tile(data, inst, widget(inst.widget)));
   // not in edit mode, where the width slider must show the width that is saved
@@ -774,7 +780,7 @@ function boardView(data: Data): HTMLElement {
     }
   }
   grid.append(...tiles);
-  if (grid.childElementCount === 0) {
+  if (grid.childElementCount === 0 && !noRecap) {
     // an empty board offers edit mode itself: the menu is not the only way in
     grid.append(
       h(
@@ -786,7 +792,8 @@ function boardView(data: Data): HTMLElement {
     );
   }
   // one caption for the board instead of the same note under each recovery widget
-  const caption = view.tab === "recovery" && h("p", { class: "muted board-note" }, t("rec.board"));
+  const text = boardNote(data);
+  const caption = text && h("p", { class: "muted board-note" }, text);
   return h(
     "main",
     { id: "board", role: "tabpanel", "aria-labelledby": `tab-${view.tab}`, tabindex: "-1" },
@@ -796,6 +803,16 @@ function boardView(data: Data): HTMLElement {
     caption,
     grid,
   );
+}
+
+/** What a board says above its tiles; undefined on most boards. */
+function boardNote(data: Data): string | undefined {
+  if (view.tab === "recovery") return t("rec.board");
+  if (view.tab !== "year") return undefined;
+  if (!data.year) return t("yr.none");
+  const { year, coverage } = data.year;
+  const text = t("yr.board", { year });
+  return coverage.complete ? text : `${text} ${t("yr.fill")}`;
 }
 
 /** The automatic refresh was due over an hour ago and has not written the page since. */
@@ -901,9 +918,12 @@ function newsBanner(note: News): HTMLElement {
   );
 }
 
-/** The type a board shows: the Recovery board shows all types, like All. */
+/** All and the sports; Recovery and Year are about every type. */
+const isActivityTab = (tab: string) => tab !== "recovery" && tab !== "year";
+
+/** The type a board shows: the Recovery and Year boards show all types, like All. */
 function boardType(): string {
-  return view.tab === "recovery" ? "all" : view.tab;
+  return isActivityTab(view.tab) ? view.tab : "all";
 }
 
 function titleOf(inst: Instance, def: WidgetDef | undefined): string {
@@ -1272,7 +1292,7 @@ function dialog(title: string, ...content: (HTMLElement | false)[]): HTMLDialogE
   return d;
 }
 
-const isOtherSport = (tab: string) => tab !== "all" && tab !== "recovery" && !GROUPS.includes(tab);
+const isOtherSport = (tab: string) => isActivityTab(tab) && tab !== "all" && !GROUPS.includes(tab);
 
 function addDialog(): void {
   const board = currentBoard();

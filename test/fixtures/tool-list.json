@@ -35,7 +35,7 @@
             "properties": {
               "board": {
                 "type": "string",
-                "description": "all, recovery, running, strengthTraining, walking, hiking, cycling, swimming, racket, generic (Other), or another SDK sport name"
+                "description": "all, recovery, year, running, strengthTraining, walking, hiking, cycling, swimming, racket, generic (Other), or another SDK sport name"
               },
               "widget": {
                 "type": "string",
@@ -421,7 +421,7 @@
   },
   {
     "name": "getYearReview",
-    "description": "The recap of a calendar year from the local cache: totals (sessions, active days, km, hours,\nascent in metres, calories, load), sports, months, the biggest month and week, the best 4 weeks,\nthe most consistent month, streaks, the longest and the biggest session, the progression of the\nbest efforts, weekdays, time of day, and HRV and resting HR by month. Use it for a year in review;\nfor the last weeks, use `getDashboardData`. `year.coverage.missing` lists the days that the cache\ndoes not have. With a day before today in it, the tool asks the user first, in a form, and only\nafter a yes it fetches the activity list of these days, and of other days that the cache needs\n(no HRV, no resting HR). `fill.asked` says what came of it: notNeeded (no day before today is\nmissing), yes, no, unasked (this client has no form), or tooLarge (about `estimate` requests, over\n20). Only yes fetches; `fill.error` says why a fetch failed. With\n`lastDayOpen` true, the last cached day, `year.coverage.activities.to`, can lack\nsessions that came after that day's update: say so. When `fill.asked` is notNeeded and the year\nis the year of today, say also that a dashboard update adds them.\nnull is n/a, never 0.",
+    "description": "The recap of a calendar year from the local cache: totals (sessions, active days, km, hours,\nascent in metres, calories, load), sports, months, the biggest month and week, the best 4 weeks,\nthe most consistent month, streaks, the longest and the biggest session, the progression of the\nbest efforts, weekdays, time of day, and HRV and resting HR by month. Use it for a year in review;\nfor the last weeks, use `getDashboardData`. `year.coverage.missing` lists the days that the cache\ndoes not have. With a day before today in it, the tool asks the user first, in a form, and only\nafter a yes it fetches the activity list of these days, and of other days that the cache needs\n(no HRV, no resting HR). `fill.asked` says what came of it: notNeeded (no day before today is\nmissing), yes, no, unasked (this client has no form), or tooLarge (about `estimate` requests, over\n20: for a year before this year, say to review a newer year first, then this one,\nwhich works only in a client with a form). Only yes fetches; `fill.error` says why a fetch failed.\nWith `lastDayOpen` true, the last cached day, `year.coverage.activities.to`, can lack\nsessions that came after that day's update: say so. When `fill.asked` is notNeeded and the year\nis the year of today, say also that a dashboard update adds them.\nnull is n/a, never 0.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -432,7 +432,7 @@
         },
         "path": {
           "type": "string",
-          "description": "The dashboard page whose sports and excluded data apply; it must exist; relative paths are inside the data dir"
+          "description": "The dashboard page whose sports and excluded data apply; it must exist; relative paths are inside the data dir; default: the page garmin-dashboard.html, when there is one"
         }
       },
       "$schema": "https://json-schema.org/draft/2020-12/schema"
@@ -517,7 +517,7 @@
   },
   {
     "name": "writeDashboard",
-    "description": "Writes the training dashboard page (default <data-dir>/garmin-dashboard.html) with the data of the\nlast `weeks` weeks (or, with `settings.since`, from the week of that day: one week more at each\nupdate, up to 52), and returns its path and a short digest of the data (totals, weekly sums, load,\nbest efforts, races, long runs, race predictions, strength top sets, readiness, fitness and form,\nHRV, recovery, fitness age, sync) for the coach notes. Without HRV and sleep data the digest has\nno readiness: give the verdict as n/a.\nAn existing page keeps all its code, layout and widgets: its data is replaced. A page with\ndifferent page code gets the page code of the server and keeps its layout and widgets; the result then has `page: \"upgraded\"`,\n`previousServer` (the server version that wrote the page, n/a when unknown) and `server`. Every page from the template\nalso gets the custom widgets of the widget library (<data-dir>/widgets.json), not placed on a board.\nOn a page from the template, an edited board also gets the widgets that a release adds to its preset, one time;\nthe result lists the ones that the page shows in `addedWidgets` (board -> widget ids).\n`layout` writes a new page\nfrom the template: `preset` (the default widgets) or `blank` (empty boards). It keeps the languages\nadded with editDashboard `languages`. `page` writes your own\npage code instead; it must contain /* garmin-data:start */null/* garmin-data:end */. A replaced\npage is kept as <file>.bak. The .bak keeps the page from before the build: a write that follows\nwithin 15 minutes (the notes, a new title) does not replace it.\n`notes`: at most 5 plain-text coach notes; the server escapes them.\n`settings` replace the page's settings (title, headline, sports, data to leave out, languages,\nthemes); without them the page keeps its own. The page holds only the data, languages and themes\nthey keep. `pageLanguages` in the result lists the languages of the page's Language menu, and\n`settings` the settings that the page keeps. `missingProfileLanguage` is the language of the Garmin\nprofile when the page has no texts in it (it shows English); editDashboard `languages` adds it.\n`missingWidgetTexts` lists the custom widgets that miss texts in a language of the page, with\nthose languages; editDashboard `widgetTexts` adds them.\n`preview: true` writes no page file (it updates the data cache, as getDashboardData does): it\nreturns the digest, the activities of each board and the `settings` of the page.",
+    "description": "Writes the training dashboard page (default <data-dir>/garmin-dashboard.html) with the data of the\nlast `weeks` weeks (or, with `settings.since`, from the week of that day: one week more at each\nupdate, up to 52), and returns its path and a short digest of the data (totals, weekly sums, load,\nbest efforts, races, long runs, race predictions, strength top sets, readiness, fitness and form,\nHRV, recovery, fitness age, sync) for the coach notes. Without HRV and sleep data the digest has\nno readiness: give the verdict as n/a.\nAn existing page keeps all its code, layout and widgets: its data is replaced. A page with\ndifferent page code gets the page code of the server and keeps its layout and widgets; the result then has `page: \"upgraded\"`,\n`previousServer` (the server version that wrote the page, n/a when unknown) and `server`. Every page from the template\nalso gets the custom widgets of the widget library (<data-dir>/widgets.json), not placed on a board.\nOn a page from the template, an edited board also gets the widgets that a release adds to its preset, one time;\nthe result lists the ones that the page shows in `addedWidgets` (board -> widget ids).\n`layout` writes a new page\nfrom the template: `preset` (the default widgets) or `blank` (empty boards). It keeps the languages\nadded with editDashboard `languages`. `page` writes your own\npage code instead; it must contain /* garmin-data:start */null/* garmin-data:end */. A replaced\npage is kept as <file>.bak. The .bak keeps the page from before the build: a write that follows\nwithin 15 minutes (the notes, a new title) does not replace it.\n`notes`: at most 5 plain-text coach notes; the server escapes them.\n`settings` replace the page's settings (title, headline, sports, data to leave out, languages,\nthemes); without them the page keeps its own. The page holds only the data, languages and themes\nthey keep. `pageLanguages` in the result lists the languages of the page's Language menu, and\n`settings` the settings that the page keeps. `offers` lists settings that the page has no answer for:\nask the user one time, and save true or false with `answers`, without `settings`. `missingProfileLanguage` is the language of the Garmin\nprofile when the page has no texts in it (it shows English); editDashboard `languages` adds it.\n`missingWidgetTexts` lists the custom widgets that miss texts in a language of the page, with\nthose languages; editDashboard `widgetTexts` adds them.\n`preview: true` writes no page file (it updates the data cache, as getDashboardData does): it\nreturns the digest, the activities of each board, the `settings` of the page and `pageFrom`\n(template, or assistant for a designed page, which has no Year tab; not there without a page).",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -604,7 +604,7 @@
             },
             "yearReview": {
               "type": "boolean",
-              "description": "Add the recap of the calendar year to the page data, from the local cache; getYearReview fills its missing days after a yes; off when not set"
+              "description": "Add the Year tab with the recap of the calendar year, from the local cache; getYearReview fills its missing days after a yes; false keeps it off and is not offered again; off when not set"
             },
             "since": {
               "type": "string",
@@ -616,6 +616,16 @@
             }
           },
           "description": "The page settings; replaces the page's own"
+        },
+        "answers": {
+          "type": "object",
+          "properties": {
+            "yearReview": {
+              "type": "boolean",
+              "description": "true adds the Year tab, false keeps it off"
+            }
+          },
+          "description": "The answers to `offers`; the page keeps its other settings. Not with `settings`"
         },
         "preview": {
           "type": "boolean",

@@ -8,10 +8,11 @@ Answer in my language.
    puts before " - ").
 2. Then ask the questions below. If your client has a tool for questions with choices, use it;
    without one, ask in chat as numbered lists, with the default first:
-   - **Settings**: only when `settings` has more than `title` and `headline`. Tell me those settings
-     in words, for example "only strength training", "without sleep data" or "Italian only". If
-     `settings` has `exclude`, name each item that it excludes. Say that the defaults add them to
-     the page again, also on each automatic update: this matters for a page that I share.
+   - **Settings**: only when `settings` has more than `title`, `headline` and `yearReview` = false.
+     Tell me those settings in words, for example "only strength training", "without sleep data" or
+     "Italian only". If `settings` has `exclude`, name each item that it excludes. Say that the
+     defaults add them to the page again, also on each automatic update: this matters for a page
+     that I share.
      Options "Keep these settings" (default) and "Use the defaults: all sports, all data, English and
      the language of my Garmin profile, all themes, opens in midnight, no workout comparison, no
      Recovery trend, no recap of the calendar year, the last {{weeks}} weeks". Say that I can type
@@ -29,6 +30,9 @@ Answer in my language.
      `recovery`. Options "No" (default) and "Yes, add the Recovery trend". Say that a yes adds a
      widget with the weekly average of sleep, sleep score and resting HR for the whole period, and
      that the page file then holds these values for each day: this matters for a page that I share.
+   - **Year tab**: only when `settings` has no `yearReview` = true. Options "No" (default) and "Yes,
+     add a Year tab with the recap of the calendar year". Say that the page file then holds data of
+     days before its period: this matters for a page that I share.
    - **Period**: only when `settings` has no `since`. Options "The last {{weeks}} weeks" (default),
      "Since 1 January" with the year of today (for example "Since 1 January 2026") and "From a day I
      choose". Say that I can type the day in my own words. Say that with a day, the page starts in
@@ -41,7 +45,9 @@ Answer in my language.
    has. If I typed my own choice, give `settings` = `settings` changed as I said. If I said yes to
    the workout comparison, give `settings` with `workouts` = true: added to the settings of this
    step, or to `settings` when this step gives none. Do the same with `recoveryHistory` = true if I
-   said yes to the Recovery trend. Do the same with `since` if I chose a start day. Give no `weeks`
+   said yes to the Recovery trend. Do the same with `yearReview` = true if I said yes to the Year
+   tab, or false if I said no to it or chose the defaults without this question: the answer is
+   saved, and no update asks again. Do the same with `since` if I chose a start day. Give no `weeks`
    when I chose a start day or keep the `since` of `settings`. The server gets the data, writes the
    page from its template, and returns the path of the page and a digest of the data. An existing
    page stays as a `.bak` file.

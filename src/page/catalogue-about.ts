@@ -79,4 +79,20 @@ export const ABOUT: Record<string, string> = {
     "Pace and strokes per length of the pool swims of one pool length, swim after swim. Needs a pool swim.",
   racketDetails:
     "Each racket session: sport, HR, time in Z3+, Z4-5 share, calories per hour, training effect, and its load against a run of the same length.",
+  yearTotals:
+    "The calendar year in numbers: sessions, active days, distance, time, ascent, calories and load, with the days that the recap has when some are missing. Needs the setting yearReview.",
+  yearMonths:
+    "Each month of the year: its load as a bar (its time when no session has a load), sessions, active days, distance and time. A month without data shows n/a. Needs the setting yearReview.",
+  yearSports:
+    "Each sport of the year: sessions, distance, time and load, and the top sport. Needs the setting yearReview.",
+  yearRhythm:
+    "The sessions of the year by weekday and by time of day: night 22:00-4:59, morning 5:00-11:59, afternoon 12:00-17:59, evening 18:00-21:59. Needs the setting yearReview.",
+  yearHighlights:
+    "The biggest month and week, the best 4 weeks, the most consistent month, the longest session and the one with the highest load. Needs the setting yearReview.",
+  yearStreaks:
+    "The most days in a row and the most weeks in a row with a session, with their dates. Needs the setting yearReview.",
+  yearRecords:
+    "The best efforts of the runs of the year, distance by distance: each time that was faster than all before it. Needs the setting yearReview.",
+  yearRecovery:
+    "The mean nightly HRV and resting HR of each month of the year, from the days that the cache has. Needs the setting yearReview.",
 };

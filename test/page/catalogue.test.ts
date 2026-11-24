@@ -46,6 +46,18 @@ describe("widget catalogue", () => {
     expect(Object.keys(ABOUT).toSorted()).toEqual(CATALOGUE.map((c) => c.id).toSorted());
   });
 
+  it("names the setting in the description of each opt-in widget", () => {
+    const optIn = CATALOGUE.flatMap((c) => (c.optIn && c.optIn !== "workouts" ? [c] : []));
+    expect(optIn).toHaveLength(9);
+    for (const c of optIn) expect(ABOUT[c.id]).toContain(`Needs the setting ${c.optIn}.`);
+  });
+
+  it("names the bands of the day in the description of the weekdays and times", () => {
+    expect(ABOUT.yearRhythm).toContain(
+      "night 22:00-4:59, morning 5:00-11:59, afternoon 12:00-17:59, evening 18:00-21:59.",
+    );
+  });
+
   it("has an opt-in widget only on a page that turns it on and keeps its data", () => {
     const trend = CATALOGUE.find((c) => c.id === "workoutTrend")!;
     expect(inPage(trend, {})).toBe(false);
@@ -65,6 +77,58 @@ describe("widget catalogue", () => {
     expect(inPage(trend, { recoveryHistory: false })).toBe(false);
     expect(inPage(trend, { recoveryHistory: true })).toBe(true);
     expect(inPage(trend, { recoveryHistory: true, exclude: ["recovery"] })).toBe(false);
+  });
+
+  it("has the Year widgets last, only on a page that asks for the recap of the year", () => {
+    expect(CATALOGUE.slice(-8)).toEqual([
+      { id: "yearTotals", title: "w.yearTotals", optIn: "yearReview", span: 3 },
+      { id: "yearMonths", title: "w.yearMonths", optIn: "yearReview", span: 3 },
+      { id: "yearSports", title: "w.yearSports", optIn: "yearReview", span: 2 },
+      { id: "yearRhythm", title: "w.yearRhythm", optIn: "yearReview", span: 1 },
+      { id: "yearHighlights", title: "w.yearHighlights", optIn: "yearReview", span: 2 },
+      { id: "yearStreaks", title: "w.yearStreaks", optIn: "yearReview", span: 1 },
+      { id: "yearRecords", title: "w.yearRecords", optIn: "yearReview", span: 3 },
+      {
+        id: "yearRecovery",
+        title: "w.yearRecovery",
+        needs: "recovery",
+        optIn: "yearReview",
+        span: 3,
+      },
+    ]);
+  });
+
+  it.each([
+    [{}, []],
+    [{ yearReview: false }, []],
+    [
+      { yearReview: true },
+      [
+        "yearTotals",
+        "yearMonths",
+        "yearSports",
+        "yearRhythm",
+        "yearHighlights",
+        "yearStreaks",
+        "yearRecords",
+        "yearRecovery",
+      ],
+    ],
+    [
+      { yearReview: true, exclude: ["recovery" as const] },
+      [
+        "yearTotals",
+        "yearMonths",
+        "yearSports",
+        "yearRhythm",
+        "yearHighlights",
+        "yearStreaks",
+        "yearRecords",
+      ],
+    ],
+  ])("has these Year widgets with the settings %j", (settings, ids) => {
+    const shown = CATALOGUE.filter((c) => c.optIn === "yearReview" && inPage(c, settings));
+    expect(shown.map((c) => c.id)).toEqual(ids);
   });
 
   it("has the Warning signs right after Readiness, full width, only on a page with the recovery data", () => {
@@ -89,7 +153,7 @@ describe("widget catalogue", () => {
   });
 
   it("has every widget of the presets", () => {
-    const boards = ["all", ...GROUPS];
+    const boards = ["all", "recovery", "year", ...GROUPS];
     const ids = new Set(CATALOGUE.map((c) => c.id));
     for (const board of boards) {
       for (const inst of preset(board))

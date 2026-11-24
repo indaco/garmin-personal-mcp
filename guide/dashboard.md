@@ -247,12 +247,16 @@ sport in the Garmin FIT SDK. Garmin sends that sport as a number with each activ
 gives it the SDK name, for example `running` or `racket`. The Bike board has a Ride efficiency
 widget: the normalized power per heartbeat of the rides below zone 4. It needs a power meter.
 
-The All and Recovery tabs are always there. A sport tab shows only when you have activities of that
-sport. [Page settings](#page-settings) can keep fewer sport tabs, and remove the Recovery tab.
+The All and Recovery tabs are always there. The Year tab shows with the `yearReview` setting. It has
+the totals of the calendar year, each month, the sports, the weekdays and times, the highlights, the
+longest streaks, the records of the runs, and HRV and resting HR by month. A sport tab shows only
+when you have activities of that sport. [Page settings](#page-settings) can keep fewer sport tabs,
+and remove the Recovery tab.
 
 | Tab           | Board key          | Activities                                       |
 | ------------- | ------------------ | ------------------------------------------------ |
 | Recovery      | `recovery`         | all; its widgets show the days, not activities   |
+| Year          | `year`             | all of the calendar year, from the cache         |
 | Run           | `running`          | SDK sport `running`                              |
 | Strength      | `strengthTraining` | Garmin type `strength_training`                  |
 | Walk          | `walking`          | SDK sport `walking`                              |
@@ -391,7 +395,7 @@ assistant calls `writeDashboard` with `settings`:
 | `theme`           | the theme that the page opens in                                           | `midnight`                                             |
 | `workouts`        | compare the same run workout across weeks (the Workout trend widget)       | off                                                    |
 | `recoveryHistory` | keep sleep and resting HR for the whole period (the Recovery trend widget) | off                                                    |
-| `yearReview`      | adds the recap of the calendar year to the page data                       | off                                                    |
+| `yearReview`      | adds the Year tab, with the recap of the calendar year                     | off                                                    |
 | `shared`          | a page for another person: a new file of it is readable by other users     | off                                                    |
 | `since`           | the first day of the page, as `yyyy-MM-dd`, in place of `weeks`            | none: the last `weeks` weeks                           |
 
@@ -437,18 +441,34 @@ Garmin has a rate limit of about 100 requests in a short time. One real first up
 page sent 81 requests: 45 calls and 36 .FIT downloads. `workouts` can add up to 8 .FIT files for each
 workout. If the limit stops the recovery data of an update, the next update goes on from what it saved.
 
-`yearReview` adds the recap that `getYearReview` gives: of the year of today, and until 14 January
-of the year before. Each update reads it again from the cache, with no more requests to Garmin. When
-it cannot read it, the page has no recap, and only the log of the server says so. A custom widget can
-read it from `ctx.data.year`. It is off by default, because it holds data of days before the period
-of the page, also on a page that you share. `sports` and `exclude` apply to it.
+`yearReview` adds the Year tab, with the recap that `getYearReview` gives: of the year of today, and
+until 14 January of the year before. The week window and the activity names do not change the Year
+tab. Each update, also an automatic one, reads it again from the cache, with no more requests to
+Garmin. An update from 1 to 14 January adds the last days of December to the recap of the year that
+ended. When it cannot read it, the page has no recap, and only the log of the server says so. A
+custom widget can read it from `ctx.data.year`. It is off by default, because it holds data of days
+before the period of the page, also on a page that you share. `sports` and `exclude` apply to it.
+
+The first update from 15 January replaces the recap of the year that ended with the recap of the new
+year. An update that changes only the data makes no `.bak` file. To keep the recap, update the page
+from 1 to 14 January, and then copy the file to another name. Do not update the copy. It keeps the
+recap on any later day, and an automatic refresh does not change it, because it updates only the
+pages that you give it.
+
+A page that has no answer about the Year tab gets the offer one time: `training-dashboard-update`
+asks, and saves the answer. The other settings of the page stay as they are. The automatic refresh
+and `refresh` ask nothing and do not add the tab. You can also ask your assistant, in your own
+words, for example "add the Year tab to my dashboard and keep its other settings". The layout, the
+widgets and the languages of the page stay, and the page from before is the `.bak` file. On a page
+that started with empty boards, the Year tab is empty: add its widgets with **Edit layout**. A page
+that you share gets no offer.
 
 An update asks Garmin for the activities of the weeks of the page and of as many weeks before them,
-so a 12-week page can lack the first months of the year. The recap lists these days in
-`coverage.missing`. To add them, ask your assistant for a [year review](../README.md#year-review)
-and say yes in the form, then update the page. A client with no form fetches none of them. A review
-fetches no HRV and no resting HR. An update can drop the days that a review fetched: ask for the
-review again.
+so a 12-week page can lack the first months of the year. The Year tab then says so, and the recap
+lists these days in `coverage.missing`. To add them, ask your assistant for a
+[year review](../README.md#year-review) and say yes in the form, then update the page. A client with
+no form fetches none of them. A review fetches no HRV and no resting HR. An update can drop the days
+that a review fetched: ask for the review again.
 
 `since` is for a page that starts on a day, for example the first day of a training plan. The page
 starts on the Monday of the week of that day, and each update adds the new week, up to 52 weeks.

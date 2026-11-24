@@ -1,13 +1,12 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { GROUPS } from "../src/analytics/calc";
 import { LONG_RUN_SHARE_WARN } from "../src/analytics/running";
 import { yearSummary } from "../src/analytics/year";
 import { CATALOGUE } from "../src/page/catalogue";
 import { ABOUT } from "../src/page/catalogue-about";
 import { en } from "../src/page/i18n/en";
-import { preset } from "../src/page/presets";
+import { PRESET_BOARDS, preset } from "../src/page/presets";
 import { WIDGET_API } from "../src/page/widget-api";
 
 /**
@@ -15,7 +14,6 @@ import { WIDGET_API } from "../src/page/widget-api";
  * not current, so the guide never drifts from the widgets and the texts.
  */
 
-const BOARDS = ["all", ...GROUPS];
 const cell = (s: string) => s.replaceAll("|", "\\|").replaceAll("\n", " ");
 
 /** The types of a widget for the table: every type in short, or a list. */
@@ -47,7 +45,7 @@ function widgetsDoc(): string {
     "",
     "| Board | Widgets, in order |",
     "| ----- | ----------------- |",
-    ...BOARDS.map(
+    ...PRESET_BOARDS.map(
       (b) =>
         `| ${b} | ${preset(b)
           .map((i) => `\`${i.widget}\``)
@@ -151,7 +149,8 @@ describe("guide", () => {
         "A dashboard update fetches only the days of the dashboard. It can drop the earlier days that a " +
         "review fetched: after an update of the server that changes the cache, or when the dashboard starts " +
         "more than one day after the last cached day. The next review shows the missing days and asks again. " +
-        "A page with the [`yearReview` setting](guide/dashboard.md#page-settings) holds the same recap. " +
+        "A page with the [`yearReview` setting](guide/dashboard.md#page-settings) shows the same recap in " +
+        "its Year tab. " +
         "In the answer, `fill.asked` tells what it did: " +
         "| `fill.asked` | What the server did | | --- | --- | " +
         "| `notNeeded` | no day before today is missing: no question and no request | " +
@@ -159,6 +158,10 @@ describe("guide", () => {
         "| `no` | you said no: no request | " +
         "| `unasked` | your client has no form: no request | " +
         "| `tooLarge` | the days need more than about 20 requests: no question and no request | " +
+        "A fetch stops at 20 requests and saves nothing when the days need more. `fill.error` then tells " +
+        "if another try asks for fewer days, and the form of that try names the days that it drops. " +
+        "After `tooLarge` for a year before this year, review a newer year first, then this one. Each yes " +
+        "adds earlier days to the cache, so the next review needs fewer requests. This works only in a client with a form. " +
         "When only today is missing, the server does not ask. A workout that came to Garmin after the last " +
         "update of the cache is then not in the recap, and its day can look like a rest day. `lastDayOpen` " +
         "is true in the answer when the last cached day is in the year: a later workout of that day can be " +
@@ -171,7 +174,7 @@ describe("guide", () => {
       "| `getYearReview` | `/activitylist-service/activities/search/activities`, only after a yes | " +
         "the recap of a calendar year (`year`, default this year; until 14 January, the year before) from " +
         "the cache. When days before today are missing, it asks in a form and fetches the activity list after a yes, " +
-        "at most 20 pages; it never fetches HRV and resting HR. `path` is the dashboard page whose " +
+        "at most 20 pages. For more pages, review a newer year first, then this one, in a client with a form. It never fetches HRV and resting HR. `path` is the dashboard page whose " +
         "sports and excluded data apply; it must exist. `fill.asked` in the answer: see " +
         "[Year review](../README.md#year-review) |",
     );
@@ -206,18 +209,23 @@ describe("guide", () => {
   it("says what the yearReview setting adds, and how to fill its missing days", () => {
     const guide = flat("guide/dashboard.md");
     expect(guide).toContain(
-      "| `yearReview` | adds the recap of the calendar year to the page data | off |",
+      "| `yearReview` | adds the Year tab, with the recap of the calendar year | off |",
     );
     expect(guide).toContain(
-      "`yearReview` adds the recap that `getYearReview` gives: of the year of today, and until 14 January " +
-        "of the year before. Each update reads it again from the cache, with no more requests to Garmin. " +
+      "`yearReview` adds the Year tab, with the recap that `getYearReview` gives: of the year of today, " +
+        "and until 14 January of the year before. The week window and the activity names do not change " +
+        "the Year tab. Each update, also an automatic one, reads it again from the cache, with no more requests to " +
+        "Garmin. An update from 1 to 14 January adds the last days of December to the recap of the year " +
+        "that ended. " +
         "When it cannot read it, the page has no recap, and only the log of the server says so. " +
         "A custom widget can read it from `ctx.data.year`. It is off by default, because it holds data of " +
         "days before the period of the page, also on a page that you share. `sports` and `exclude` apply " +
-        "to it. " +
-        "An update asks Garmin for the activities of the weeks of the page and of as many weeks before " +
-        "them, so a 12-week page can lack the first months of the year. The recap lists these days in " +
-        "`coverage.missing`. To add them, ask your assistant for a [year " +
+        "to it. The first update from 15 January",
+    );
+    expect(guide).toContain(
+      "A page that you share gets no offer. An update asks Garmin for the activities of the weeks of the page and of as many weeks before " +
+        "them, so a 12-week page can lack the first months of the year. The Year tab then says so, and the recap " +
+        "lists these days in `coverage.missing`. To add them, ask your assistant for a [year " +
         "review](../README.md#year-review) and say yes in the form, then update the page. A client with " +
         "no form fetches none of them. A review fetches no HRV and no resting HR. An update can drop the " +
         "days that a review fetched: ask for the review again. `since` is for a page",
@@ -225,9 +233,9 @@ describe("guide", () => {
     const readme = flat("README.md");
     expect(readme).toContain(
       "A page can also keep the sleep and resting HR of the whole period (`recoveryHistory`, off by " +
-        "default). The assistant does not ask about the recap of the calendar year (`yearReview`, off by " +
-        "default): ask for it in the chat. A page that has it keeps it, but a page that you share keeps " +
-        "it only when you ask for it. The server writes",
+        "default). The assistant also asks whether to add a Year tab with the recap of the calendar year " +
+        "(`yearReview`, off by default). A page that has it keeps it, but a page that you share keeps it " +
+        "only when you ask for it. The server writes",
     );
   });
 
@@ -243,6 +251,51 @@ describe("guide", () => {
   it("says what the freeform layout asks about the settings of the old page", () => {
     expect(flat("guide/dashboard.md")).toContain(
       "With `freeform`, the assistant asks about the sports and the data that the old page leaves out, when it does. It keeps them left out (the default), or uses all sports and all data.",
+    );
+  });
+
+  it("says how an existing page gets the Year tab", () => {
+    const guide = flat("guide/dashboard.md");
+    expect(guide.slice(guide.indexOf("## Page settings"))).toContain(
+      "A page that has no answer about the Year tab gets the offer one time: `training-dashboard-update` " +
+        "asks, and saves the answer. The other settings of the page stay as they are. The automatic refresh and `refresh` ask nothing and do not add the " +
+        'tab. You can also ask your assistant, in your own words, for example "add the Year tab to my ' +
+        'dashboard and keep its other settings". The layout, the widgets and the languages of the page ' +
+        "stay, and the page from before is the `.bak` file. On a page that started with empty boards, " +
+        "the Year tab is empty: add its widgets with **Edit layout**. A page that you share gets no offer.",
+    );
+    const readme = flat("README.md");
+    const update = readme.indexOf("### training-dashboard-update");
+    expect(readme.slice(update, readme.indexOf("### ", update + 4))).toContain(
+      "When the page has no answer about the Year tab, the assistant asks one time whether to add it. " +
+        "The default is no. See [Page settings](guide/dashboard.md#page-settings).",
+    );
+    expect(flat("guide/tools.md")).toContain(
+      "the year review and the start day (`since`: the page starts in the week of that day and grows by " +
+        "one week at each update, up to 52) of the page; `offers` in the result lists the settings that " +
+        "the page has no answer for (`yearReview`); `answers` saves `true` or `false` and keeps the other " +
+        "settings, and the answer ends the offer; `preview`",
+    );
+  });
+
+  // All is the first tab: the text above the table names it
+  it.each(PRESET_BOARDS.filter((b) => b !== "all"))("lists the board key %s", (board) => {
+    const guide = readFileSync("guide/dashboard.md", "utf8");
+    const table = guide.slice(guide.indexOf("| Board key "), guide.indexOf("Two Garmin types"));
+    expect(table).toMatch(new RegExp(`^\\| [^|]+ \\| \`${board}\` +\\|`, "m"));
+  });
+
+  it("tells when the Year tab is there", () => {
+    expect(flat("guide/dashboard.md")).toContain(
+      "The All and Recovery tabs are always there. The Year tab shows with the `yearReview` setting. It " +
+        "has the totals of the calendar year, each month, the sports, the weekdays and times, the " +
+        "highlights, the longest streaks, the records of the runs, and HRV and resting HR by month. A " +
+        "sport tab shows only when",
+    );
+    expect(flat("README.md")).toContain(
+      "The assistant also asks whether to add a Year tab. The default is no. A yes adds a board with " +
+        "the recap of the calendar year, and the file then holds data of days before the period of the " +
+        "page. See [Page settings](guide/dashboard.md#page-settings).",
     );
   });
 
@@ -309,7 +362,7 @@ describe("guide", () => {
 
   it("says that a writeDashboard preview writes no page file", () => {
     expect(readFileSync("guide/tools.md", "utf8")).toContain(
-      "`settings` set the title, the sports, the data, the languages, the themes, the workout comparison, the recovery history, the year review and the start day (`since`: the page starts in the week of that day and grows by one week at each update, up to 52) of the page; `preview` writes no page file (it updates the data cache, as `getDashboardData` does) and gives the activities of each board and the settings of the page.",
+      "`settings` set the title, the sports, the data, the languages, the themes, the workout comparison, the recovery history, the year review and the start day (`since`: the page starts in the week of that day and grows by one week at each update, up to 52) of the page; `offers` in the result lists the settings that the page has no answer for (`yearReview`); `answers` saves `true` or `false` and keeps the other settings, and the answer ends the offer; `preview` writes no page file (it updates the data cache, as `getDashboardData` does) and gives the activities of each board, the settings of the page, and whether the page is from the template or designed by the assistant (`pageFrom`).",
     );
     const readme = readFileSync("README.md", "utf8").replace(/\s+/g, " ");
     const preview =
@@ -377,6 +430,16 @@ describe("guide", () => {
         "says what the prompt takes, and asks you to correct it. It gives no review before that, so a " +
         "mistyped name does not show the data that the page excludes. After a year, Claude Code cuts a page " +
         "name at its first space: name such a page in the chat. ",
+    );
+  });
+
+  it("says when an update replaces the recap of a year, and how to keep it", () => {
+    expect(flat("guide/dashboard.md")).toContain(
+      "The first update from 15 January replaces the recap of the year that ended with the recap of the " +
+        "new year. An update that changes only the data makes no `.bak` file. To keep the recap, update " +
+        "the page from 1 to 14 January, and then copy the file to another name. Do not update the copy. " +
+        "It keeps the recap on any later day, and an automatic refresh does not change it, because it " +
+        "updates only the pages that you give it. ",
     );
   });
 

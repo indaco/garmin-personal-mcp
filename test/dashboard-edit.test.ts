@@ -149,6 +149,23 @@ describe("editDashboard", () => {
     expect(recovery.at(-1)).toMatchObject({ widget: "calendar", span: 1 });
   });
 
+  it("places a widget on the Year board, after its preset", async () => {
+    await writer.edit({
+      widgets: [{ ...widget, types: ["year"] }],
+      place: [{ board: "year", widget: "longest-ride", span: 2 }],
+    });
+    const year = layout().boards.year as { widget: string }[];
+    expect(year.at(0)).toMatchObject({ widget: "yearTotals" });
+    expect(year.at(-1)).toMatchObject({ widget: "longest-ride", span: 2 });
+    expect(readBlock(page(), "widgets")).toMatchObject([{ types: ["year"] }]);
+  });
+
+  it("names the Year board among the boards of a refused place", async () => {
+    await expect(writer.edit({ place: [{ board: "chess", widget: "kpis" }] })).rejects.toThrow(
+      "Unknown board chess: use all, recovery, year, running,",
+    );
+  });
+
   it("places a widget on the board of any SDK sport", async () => {
     await writer.edit({
       widgets: [{ ...widget, types: ["alpineSkiing"] }],

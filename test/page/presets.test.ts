@@ -28,6 +28,16 @@ const FROZEN: Record<string, string[]> = {
     "bedtime",
     "bodyBattery",
   ],
+  year: [
+    "yearTotals",
+    "yearMonths",
+    "yearSports",
+    "yearRhythm",
+    "yearHighlights",
+    "yearStreaks",
+    "yearRecords",
+    "yearRecovery",
+  ],
   running: [
     "typeKpis",
     "typeWeekly",
@@ -110,11 +120,30 @@ describe("preset", () => {
       ["recoveryTrend", 3],
     ]);
   });
+
+  it("has the recap of the calendar year on the Year board", () => {
+    expect(preset("year").map((i) => [i.widget, i.span])).toEqual([
+      ["yearTotals", 3],
+      ["yearMonths", 3],
+      ["yearSports", 2],
+      ["yearRhythm", 1],
+      ["yearHighlights", 2],
+      ["yearStreaks", 1],
+      ["yearRecords", 3],
+      ["yearRecovery", 3],
+    ]);
+  });
+
+  it("guard: gives a Year board that lost a tile nothing back", () => {
+    const year = preset("year").filter((i) => i.widget !== "yearRhythm");
+    const r = withPresetWidgets(parseLayout({ boards: { year } }), preset, baseline);
+    expect(r.added).toEqual({});
+  });
 });
 
 describe("sport boards", () => {
   it("have the records in one place, right after the HR zones", () => {
-    const sports = PRESET_BOARDS.filter((b) => b !== "all" && b !== "recovery");
+    const sports = PRESET_BOARDS.filter((b) => b !== "all" && b !== "recovery" && b !== "year");
     expect(sports).toContain("generic");
     for (const board of sports) {
       const list = names(board);

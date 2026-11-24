@@ -1,4 +1,5 @@
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -129,6 +130,18 @@ describe("toFetch and covered", () => {
   });
 });
 
+/** Loads a damaged cache file after `end`, and gives what was logged. */
+const loadDamaged = async (end: (file: string) => void) => {
+  const dir = mkdtempSync(join(tmpdir(), "garmin-dash-"));
+  const file = join(dir, "dashboard-cache.json");
+  writeFileSync(file, "SECRET: not JSON");
+  end(file);
+  vi.mocked(logMock).mockClear();
+  const loaded = await new GarminDashboard({} as GarminTools, {} as GarminApiClient, dir).load();
+  rmSync(dir, { recursive: true, force: true });
+  return { loaded, logged: vi.mocked(logMock).mock.calls };
+};
+
 describe("cache file", () => {
   it("starts again from an empty cache when the file has the wrong shape", async () => {
     const dir = mkdtempSync(join(tmpdir(), "garmin-dash-"));
@@ -139,6 +152,25 @@ describe("cache file", () => {
     expect((await d.load()).recoveryTo).toBe("2026-10-26");
     writeFileSync(join(dir, "dashboard-cache.json"), "{not json");
     expect(await d.load()).toEqual({});
+  });
+
+  describe("the log of a file that cannot be read", () => {
+    it("has no part of a damaged file", async () => {
+      expect(await loadDamaged(() => {})).toEqual({
+        loaded: {},
+        logged: [["WARN", "Dashboard cache unreadable, starting again: SyntaxError"]],
+      });
+    });
+
+    it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+      "has the code and no path of a file without access",
+      async () => {
+        expect(await loadDamaged((file) => chmodSync(file, 0o000))).toEqual({
+          loaded: {},
+          logged: [["WARN", "Dashboard cache unreadable, starting again: Error EACCES"]],
+        });
+      },
+    );
   });
 
   it("writes the file atomically and leaves no temp file", async () => {
@@ -2815,6 +2847,11 @@ describe("readCached", () => {
 });
 
 describe("fillActivities", () => {
+  const stopped = "The fetch stopped at 20 requests and saved nothing: the days need more.";
+  const stopsToo = `${stopped} Another try stops too.`;
+  const lessDays = (from: string) =>
+    `${stopped} Another try asks for the days from ${from} only: its form names the cached days that it drops.`;
+
   it("asks only the activity list: the gap by pages of 100, then the days that can change", async () => {
     save({ activities: byId([row(900, "2026-10-01"), row(901, "2026-10-10")]) });
     garminActivities = [...many(150, "2026-03-01"), activity(901, "2026-10-10")];
@@ -3018,13 +3055,101 @@ describe("fillActivities", () => {
     save({ activitiesFrom: "2024-01-01", activitiesTo: "2024-12-31", activities: {} });
     const before = readFileSync(cacheFile(), "utf8");
     garminActivities = many(2000, "2025-03-01", 1000);
-    expect(await fillFrom()).toEqual({
-      garminCalls: 20,
-      error:
-        "The fetch stopped at 20 requests and saved nothing: the days need more. Another try stops too.",
-    });
+    expect(await fillFrom()).toEqual({ garminCalls: 20, error: lessDays("2026-01-01") });
     expect(searches()).toEqual(pages(20, "2024-12-18", "2026-10-26"));
     expect(readFileSync(cacheFile(), "utf8")).toBe(before);
+  });
+
+  describe("after a fill that keeps the cached days and stops at the cap", () => {
+    const year = { from: "2022-10-01", to: "2023-09-30" };
+    /** 20 cached sessions of one year, then 2 a day to today: 12 requests by the estimate, 23 in fact. */
+    const saveYear = (extra: Record<string, unknown> = {}) => {
+      const rows = daysOf(year.from, "2022-10-20").map((d, i) => row(i, d));
+      save({ activitiesFrom: year.from, activitiesTo: year.to, activities: byId(rows), ...extra });
+      garminActivities = daysOf("2023-10-01", "2026-10-26").flatMap((d, i) => [
+        activity(1000 + 2 * i, d),
+        activity(1001 + 2 * i, d),
+      ]);
+    };
+
+    it("the next one fetches the asked days only, and names the days that it drops", async () => {
+      saveYear();
+      expect((await readRange()).fillDrops).toBeNull();
+      expect(await fillFrom()).toEqual({ garminCalls: 20, error: lessDays("2026-01-01") });
+      const { fillStart, fillDrops, fillRequests } = await readRange();
+      expect({ fillStart, fillDrops, fillRequests }).toEqual({
+        fillStart: "2026-01-01",
+        fillDrops: year,
+        fillRequests: 3,
+      });
+      api.getJson.mockClear();
+      // 299 days, 598 sessions
+      expect(await fillFrom()).toEqual({ garminCalls: 6 });
+      expect(searches()).toEqual(pages(6, "2026-01-01", "2026-10-26"));
+      expect(heldRange()).toEqual(["2026-01-01", "2026-10-26"]);
+    });
+
+    it("holds for another year, with the first day of that year", async () => {
+      saveYear();
+      await fillFrom();
+      const out = await dashboard.readCached("2025-01-01", "2026-10-26");
+      expect([out.fillStart, out.fillDrops]).toEqual(["2025-01-01", year]);
+    });
+
+    it("holds for cached days of an older summary too", async () => {
+      // 1 a day by the cache: 14 requests for the cached days to today; in fact 3 a day
+      const days = daysOf("2022-10-01", "2026-10-26");
+      save({
+        activitiesSummary: 2,
+        activitiesFrom: days[0],
+        activities: byId(days.map((d, i) => row(i, d))),
+      });
+      garminActivities = days.flatMap((d, i) => [0, 1, 2].map((n) => activity(3 * i + n, d)));
+      expect(await fillFrom()).toEqual({ garminCalls: 20, error: lessDays("2026-01-01") });
+      expect((await readRange()).fillDrops).toEqual({ from: "2022-10-01", to: "2025-12-31" });
+      expect(await fillFrom()).toEqual({ garminCalls: 9 }); // 897 sessions
+      expect(heldRange()).toEqual(["2026-01-01", "2026-10-26"]);
+    });
+
+    it("keeps the cached days again when the cache has other days", async () => {
+      saveYear();
+      await fillFrom();
+      save({ activitiesFrom: "2025-11-01", activitiesTo: "2025-12-20", activities: {} });
+      const out = await readRange();
+      expect(out.fillDrops).toBeNull();
+    });
+
+    it.each([
+      ["2022-10-02", year.to],
+      [year.from, "2023-09-29"],
+    ])(
+      "tries again to keep the cached days from %s to %s",
+      async (activitiesFrom, activitiesTo) => {
+        saveYear();
+        await fillFrom();
+        saveYear({ activitiesFrom, activitiesTo });
+        expect((await readRange()).fillDrops).toBeNull();
+      },
+    );
+
+    it("says that another try stops too when the asked days alone need too many", async () => {
+      saveYear();
+      garminActivities.push(...many(2000, "2026-03-01", 100_000));
+      await fillFrom();
+      expect(await fillFrom()).toEqual({ garminCalls: 20, error: stopsToo });
+      expect((await readRange()).fillDrops).toEqual(year);
+    });
+
+    it("does not drop the cached days after another failure", async () => {
+      saveYear();
+      answer({
+        [SEARCH]: () => {
+          throw rateLimit();
+        },
+      });
+      await fillFrom();
+      expect((await readRange()).fillDrops).toBeNull();
+    });
   });
 
   it("stops at the cap, whatever the estimate said, and saves nothing", async () => {
@@ -3032,11 +3157,7 @@ describe("fillActivities", () => {
     const before = readFileSync(cacheFile(), "utf8");
     // 20 whole pages of the gap: the next one would be request 21
     garminActivities = many(2000, "2026-03-01", 1000);
-    expect(await fillFrom()).toEqual({
-      garminCalls: 20,
-      error:
-        "The fetch stopped at 20 requests and saved nothing: the days need more. Another try stops too.",
-    });
+    expect(await fillFrom()).toEqual({ garminCalls: 20, error: stopsToo });
     expect(searches()).toEqual(pages(20, "2026-01-01", "2026-08-31"));
     expect(readFileSync(cacheFile(), "utf8")).toBe(before);
   });
