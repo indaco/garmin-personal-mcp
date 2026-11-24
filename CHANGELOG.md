@@ -4,6 +4,68 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The changelog is generated and managed by [sley](https://github.com/indaco/sley).
 
+## v0.15.0 - 2026-11-24
+
+### Highlights
+
+The end of the year is near, and this release adds your year in review, training block reviews, recovery warning signs and update checks.
+
+- **See your year in review.** The new `year-review` prompt and an optional Year tab show your totals, records, streaks, best 4 weeks and monthly trends.
+- **Review a training block.** The new `block-review` prompt compares the load, monotony, intensity and aerobic efficiency of your last 4 to 12 whole weeks.
+- **See warning signs early.** The Recovery board, `train-today` and `week-review` show the days when your resting HR, HRV and sleep give two or more signs.
+- **Trust your automatic updates.** `info` shows the last run and the last sync, and `doctor` tells you what to do after a late or failed run.
+
+#### Upgrading
+
+If your client configuration has `@latest`, restart the client to get this release:
+
+- Claude Code: start a new session.
+- Claude Desktop: quit the client, then start it again.
+
+If the configuration has a fixed version after the package name, the client keeps that version. Change the version to `@latest`, then restart the client.
+
+A release can add functions to the dashboard and correct problems in it. These changes also apply to your existing pages. To get them, update the page. Use the `/mcp__garmin-personal__training-dashboard-update` prompt or this command:
+
+```bash
+npx -y @indaco/garmin-personal-mcp@latest refresh
+```
+
+This command updates `garmin-dashboard.html`. For another page, add its file name to the command. A scheduled refresh does the same update.
+
+The update keeps your layout, custom widgets, languages and page settings. For more data, see [Update the page code after a release](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md#update-the-page-code-after-a-release).
+
+If you are new to garmin-personal-mcp, see the [quick start](https://github.com/indaco/garmin-personal-mcp#quick-start).
+
+---
+
+### 🚀 Enhancements
+
+- **cli:** show in info and doctor if the automatic update works ([f37e652](https://github.com/indaco/garmin-personal-mcp/commit/f37e652)) ([#287](https://github.com/indaco/garmin-personal-mcp/pull/287))
+- **dashboard:** show the Year tab as charts ([02f2117](https://github.com/indaco/garmin-personal-mcp/commit/02f2117)) ([#286](https://github.com/indaco/garmin-personal-mcp/pull/286))
+- **site:** show the Year tab and the Recovery trend in the demo ([acffead](https://github.com/indaco/garmin-personal-mcp/commit/acffead)) ([#285](https://github.com/indaco/garmin-personal-mcp/pull/285))
+- **dashboard:** a Year tab with the recap of the calendar year ([091662a](https://github.com/indaco/garmin-personal-mcp/commit/091662a)) ([#282](https://github.com/indaco/garmin-personal-mcp/pull/282))
+- **dashboard:** add the recap of the year to a page that asks for it ([ad07723](https://github.com/indaco/garmin-personal-mcp/commit/ad07723)) ([#281](https://github.com/indaco/garmin-personal-mcp/pull/281))
+- **prompts:** review the calendar year in the chat ([b83afb8](https://github.com/indaco/garmin-personal-mcp/commit/b83afb8)) ([#280](https://github.com/indaco/garmin-personal-mcp/pull/280))
+- review a calendar year from the cache, and fill it after a yes ([f9a9cf3](https://github.com/indaco/garmin-personal-mcp/commit/f9a9cf3)) ([#278](https://github.com/indaco/garmin-personal-mcp/pull/278))
+- **analytics:** compute the recap of a calendar year ([48c50e5](https://github.com/indaco/garmin-personal-mcp/commit/48c50e5)) ([#277](https://github.com/indaco/garmin-personal-mcp/pull/277))
+- **dashboard:** weekly monotony and strain in Load safety, and a Ride efficiency widget ([5a155a5](https://github.com/indaco/garmin-personal-mcp/commit/5a155a5)) ([#276](https://github.com/indaco/garmin-personal-mcp/pull/276))
+- **prompts:** review the last weeks as one training block ([84a16c5](https://github.com/indaco/garmin-personal-mcp/commit/84a16c5)) ([#275](https://github.com/indaco/garmin-personal-mcp/pull/275))
+- **digest:** give the easy/hard share and the aerobic efficiency of rides ([f5f3499](https://github.com/indaco/garmin-personal-mcp/commit/f5f3499)) ([#273](https://github.com/indaco/garmin-personal-mcp/pull/273))
+- **digest:** give each week's monotony and strain ([dee36bc](https://github.com/indaco/garmin-personal-mcp/commit/dee36bc)) ([#272](https://github.com/indaco/garmin-personal-mcp/pull/272))
+- **dashboard:** a Warning signs widget on the Recovery board ([13908e4](https://github.com/indaco/garmin-personal-mcp/commit/13908e4)) ([#270](https://github.com/indaco/garmin-personal-mcp/pull/270))
+- **prompts:** show the days in a row with warning signs in train-today and week-review ([015fa87](https://github.com/indaco/garmin-personal-mcp/commit/015fa87)) ([#269](https://github.com/indaco/garmin-personal-mcp/pull/269))
+- **digest:** name the days in a row with warning signs ([f860eb8](https://github.com/indaco/garmin-personal-mcp/commit/f860eb8)) ([#268](https://github.com/indaco/garmin-personal-mcp/pull/268))
+- suggest prompt arguments and ask before changes that have no undo ([d6942d0](https://github.com/indaco/garmin-personal-mcp/commit/d6942d0)) ([#267](https://github.com/indaco/garmin-personal-mcp/pull/267))
+
+### 🩹 Fixes
+
+- **dashboard:** keep unknown excluded names and settle the prompt replies ([6fe2854](https://github.com/indaco/garmin-personal-mcp/commit/6fe2854)) ([#284](https://github.com/indaco/garmin-personal-mcp/pull/284))
+- **year-review:** fetch only what the form showed ([8741b7d](https://github.com/indaco/garmin-personal-mcp/commit/8741b7d)) ([#283](https://github.com/indaco/garmin-personal-mcp/pull/283))
+
+### ❤️ Contributors
+
+- [@indaco](https://github.com/indaco)
+
 ## v0.14.0 - 2026-11-17
 
 ### Highlights
