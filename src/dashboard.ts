@@ -587,18 +587,21 @@ export class GarminDashboard {
     try {
       if ((await stat(this.#file()).catch(() => undefined))?.isFile()) {
         const o: unknown = JSON.parse(await readFile(this.#file(), "utf8"));
-        if (
-          isObject(o) &&
-          ["activities", "hrv", "recovery"].every((f) => o[f] === undefined || isObject(o[f]))
-        ) {
-          return o;
-        }
+        if (isCache(o)) return o;
       }
     } catch (e) {
       log("WARN", `Dashboard cache unreadable, starting again: ${reasonOf(e)}`);
     }
     return {};
   }
+}
+
+/** Whether this is a cache that the server uses; it starts again with another one. */
+export function isCache(v: unknown): v is Json {
+  return (
+    isObject(v) &&
+    ["activities", "hrv", "recovery"].every((f) => v[f] === undefined || isObject(v[f]))
+  );
 }
 
 // ------------------------------------------------------------------ date ranges

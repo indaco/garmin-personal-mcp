@@ -298,7 +298,7 @@ if (WINDOWS) {
     "info: shows the home folder as ~",
     r.code === 0 &&
       !r.stdout.includes(home) &&
-      r.stdout.includes(`${join("~", ".config", "garmin-mcp", "api-key")} (found)`),
+      r.stdout.includes(`${join("~", ".config", "garmin-mcp", "api-key")} (found, default)`),
     r.all,
   );
 

@@ -36,8 +36,8 @@ Usage: garmin-personal-mcp [command]
 Without a command, the MCP server starts on stdin and stdout.
 
 Commands:
-  info                                show the version, the settings and where the files are
-  doctor                              test the API key, the folders and the schedule
+  info                                show the version, the settings, the pages and the schedule
+  doctor                              test the API key, the folders, the data files and the schedule
   setup [--force]                     test the API key and save it in the key file
   refresh [page.html]                 update a dashboard page
                                       (default: <data-dir>/garmin-dashboard.html)
@@ -55,37 +55,67 @@ Run garmin-personal-mcp <command> --help to see the help of a command.
 
 ## info
 
-`info` shows the version, the settings and where the server keeps its files:
+`info` shows the version, the settings, where the server keeps its files, the last sync with Garmin,
+the dashboard pages and the schedule:
 
 ```text
-garmin-personal-mcp 0.8.1
-Node.js:      v22.12.0 on darwin
-API host:     https://personal.connectapi.garmin.com
-API key:      from the key file
-Key file:     ~/.config/garmin-mcp/api-key (found)
-Data folder:  ~/workspace/garmin-data (found)
-  .FIT files: 42
-  pages:      garmin-dashboard-coach.html, garmin-dashboard.html
-  exercises.json: found
+garmin-personal-mcp 0.15.0
+
+Node.js:                v24.22.1 on darwin
+API host:               https://personal.connectapi.garmin.com (default)
+API key:                from the key file
+Key file:               ~/.config/garmin-mcp/api-key (found, default)
+Data folder:            ~/my-data (found, from GARMIN_DATA_DIR)
+  .FIT files:           42
+  last sync:            2026-11-20 18:12
+  activities:           2025-11-21 to 2026-11-20
+  HRV:                  2025-11-21 to 2026-11-20
+  pages:                2
+    - coach.html: updated 2026-11-20 18:12, by 0.14.0
+    - garmin-dashboard.html: updated 2026-11-16 07:00, by 0.15.0, scheduled
+  exercises.json:       found
   dashboard-cache.json: found
-  widgets.json: missing
-  auto-refresh.json: found
-Server log:   ~/.cache/garmin-personal-mcp/garmin-personal-mcp.log
-Refresh log:  ~/.cache/garmin-personal-mcp/refresh.log
-Schedule:     Automatic refresh "0 7 * * *" with launchd, next: 2026-11-04 07:00, ...
+  widgets.json:         none
+  auto-refresh.json:    found
+Server log:             ~/.cache/garmin-personal-mcp/garmin-personal-mcp.log
+Refresh log:            ~/.cache/garmin-personal-mcp/refresh.log
+Schedule:               Automatic refresh "0 7 * * 1" with launchd
+  last run:             2026-11-23 07:00, failed:
+    - ~/my-data/garmin-dashboard.html: Network error obtaining token: fetch failed
+  last success:         2026-11-16 07:00
+  next:                 2026-11-30 07:00, 2026-12-07 07:00, 2026-12-14 07:00
 ```
 
+- A setting is the default, or it comes from the variable that the line names. `info` reads the
+  variables of the terminal: your MCP client can have other ones.
 - `API key` says where the key comes from. When `GARMIN_PERSONAL_API_KEY` is set, the key comes
   from the variable. When it is not set, the key comes from the key file.
 - `info` never reads or shows the key. It shows your home folder as `~` (your user folder on
   Windows), so that you can share the output without your user name. A path outside the home
   folder stays as it is.
 - `info` always shows `Key file`, because the automatic update reads the key only from that file.
-- `pages` are the `.html` files in the data folder. [The data folder](tools.md#the-data-folder)
-  tells what each file has.
-- `Schedule` is the first line of [`schedule`](#schedule). When `auto-refresh.json` is damaged,
-  this line gives the error.
-- A file or a folder that is missing is not an error. The server makes them when it needs them.
+- `last sync` is the last time that the dashboard data was fetched. `activities` and `HRV` are the
+  days that the cache has.
+- `pages` are the `.html` files in the data folder, and the scheduled pages that are in another
+  folder. Each line has the time of the last update and the version of the server that made it. A
+  scheduled page that is gone shows as `missing`. A file that is not a page of the server shows as
+  `not a dashboard page`.
+  [The data folder](tools.md#the-data-folder) tells what each file has.
+- `last run` is the last automatic update. A run with gaps in the data of Garmin is a success: the
+  lines below it give the gaps. `last success` appears only after a run that failed.
+- `info` cuts an error of the last run, because the rest can have data that you do not want to share.
+  `schedule` and `doctor` show the full error. `info` cuts:
+  - all the text after a status (`HTTP 502`) or after `Response is not JSON`.
+  - all the text from ` (Content-Type`, in an error about the token.
+  - the cause of a network error, in brackets, which can have the host or its address. Only its code
+    stays (`ENOTFOUND`), when it has one.
+- The times are in local time. A value that is missing or not correct shows as `n/a`.
+- `last success` is `n/a` when the server does not know it, until the next success. The job of an
+  older version does not save it, so it is not known after a failed run of that job. A success with
+  a time in the future does not count, because the clock of the computer was ahead.
+- When `auto-refresh.json` is damaged, `Schedule` gives the error.
+- A `.json` file that shows `none`, or a data folder that is missing, is not an error. The server makes
+  them when it needs them.
 - `info` does not connect to the network. To test the key, see
   [Test the key](troubleshooting.md#test-the-key).
 
@@ -98,8 +128,9 @@ ok      Key file: ~/.config/garmin-mcp/api-key
 failed  API key: Token request failed: HTTP 401 (...) - the personal API key is incorrect, expired or revoked. ...
 ok      Data folder: ~/workspace/garmin-data
 ok      Log folder: ~/.cache/garmin-personal-mcp
-ok      Schedule: Automatic refresh "0 7 * * *" with launchd, next: 2026-11-04 07:00, ...
-1 check failed.
+ok      Data files: readable
+failed  Schedule: no run since 2026-11-16 07:00, expected 2026-11-23 07:00. The computer was perhaps off. If no update is in progress, update the pages with: npx -y @indaco/garmin-personal-mcp@latest refresh --auto
+2 checks failed.
 ```
 
 - `Key file` is missing without a problem only when `GARMIN_PERSONAL_API_KEY` is set and no schedule
@@ -112,8 +143,17 @@ ok      Schedule: Automatic refresh "0 7 * * *" with launchd, next: 2026-11-04 0
   a second token request.
 - `Data folder` and `Log folder` make a test folder and remove it. A missing folder is not an error
   when the server can make it.
-- `Schedule` fails when the job is missing from the system scheduler, or when the last run could not
-  update a page.
+- `Data files` reads `exercises.json`, `dashboard-cache.json` and `widgets.json`. It fails on a file
+  that it cannot read, or that the server cannot use. A missing file is not an error.
+- `Schedule` gives the first problem that it finds:
+  - The job is missing from the system scheduler, or its Node.js or server file is gone.
+  - A scheduled page is gone.
+  - The last run could not update a page. A page that was updated after that run, or that is no
+    longer scheduled, does not count.
+  - A run is more than 1 hour late, and a page was not updated since. The note on the page uses the
+    same limit.
+- A run with gaps in the data of Garmin does not fail. The line gives the pages and the gaps.
+- The exit code is 1 when a check fails.
 
 `doctor` runs on macOS, Linux and Windows, and CI tests it on each one.
 
@@ -158,7 +198,7 @@ notes, because old notes do not agree with the new data. To get new notes, run t
 from `GARMIN_PERSONAL_API_KEY` or from the key file.
 
 The job of the automatic update runs `refresh --auto`. It updates the pages that have a schedule,
-only when a run time was missed. Do not run it yourself.
+only when a run time was missed. Run it yourself only when [`doctor`](#doctor) tells you to.
 
 ## schedule
 
@@ -181,7 +221,8 @@ A cron expression has 5 fields in local time: minute, hour, day of the month, mo
 (0 is Sunday), with numbers, lists (`1,4`), ranges (`1-5`) and steps (`*/6`). A file name ends in
 `.html`. A relative path is in the data folder.
 
-The output gives the schedule, the next updates, the pages, the last run and the log. [Update the
+The output gives the schedule, the next updates, the pages, the last run and the log. After a run that
+failed, it also gives the last success. The times are in local time. [Update the
 dashboard on a schedule](dashboard.md#update-the-dashboard-on-a-schedule) tells how the job works on
 each system.
 

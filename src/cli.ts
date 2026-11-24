@@ -1,23 +1,27 @@
-import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve as absolute } from "node:path";
 import { createInterface } from "node:readline";
 import { Writable } from "node:stream";
 import { version } from "../package.json";
 import { GarminApiClient, KEY_PAGE_URL, KeyRefusedError } from "./api-client";
 import { type Config, loadConfig } from "./config";
-import type { DashboardWriter } from "./dashboard-page";
+import { isCache } from "./dashboard";
+import { type DashboardWriter, isDay, pageInfo } from "./dashboard-page";
 import { LOG_DIR } from "./log";
 import {
   type AutoRefresh,
   cronOf,
+  isTime,
   type LastRun,
+  localTime,
   refreshPages,
   type Run,
   run,
   type Status,
 } from "./schedule";
+import { isCatalogue } from "./tools";
 
 /** The commands for a terminal or a scheduler. Only a start without arguments is the MCP server. */
 const COMMANDS = [
@@ -43,8 +47,8 @@ export const HELP = `Usage: garmin-personal-mcp [command]
 Without a command, the MCP server starts on stdin and stdout.
 
 Commands:
-  info                                show the version, the settings and where the files are
-  doctor                              test the API key, the folders and the schedule
+  info                                show the version, the settings, the pages and the schedule
+  doctor                              test the API key, the folders, the data files and the schedule
   setup [--force]                     test the API key and save it in the key file
   refresh [page.html]                 update a dashboard page
                                       (default: <data-dir>/garmin-dashboard.html)
@@ -63,16 +67,17 @@ Run garmin-personal-mcp <command> --help to see the help of a command.`;
 export const COMMAND_HELP: Partial<Record<string, string>> = {
   info: `Usage: garmin-personal-mcp info
 
-Show the version, the settings and where the files are.
-It never shows the API key, and it does not connect to the network.
+Show the version, the settings, where the files are, the last sync with Garmin, the dashboard
+pages and the schedule. It never shows the API key, and it does not connect to the network.
 
 Flags:
   -h, --help  show this help`,
   doctor: `Usage: garmin-personal-mcp doctor
 
 Test the setup, and tell how to fix what fails. It tests the key file, the API key with
-a token request to Garmin, the data folder, the log folder and the schedule. With a schedule
-and a key in the environment, it also tests the key in the key file.
+a token request to Garmin, the data folder, the log folder, the data files and the schedule:
+the scheduled pages, the last run and a run that is late. With a schedule and a key in the
+environment, it also tests the key in the key file.
 It never shows the key. The exit code is 1 when a check fails.
 
 Flags:
@@ -144,7 +149,7 @@ const usage = (error: string): CliResult => ({ code: 1, stderr: `${error}\n\n${H
 export async function cli(
   command: string,
   args: string[],
-  auto: Pick<AutoRefresh, "pages" | "status" | "set" | "off" | "saveRun" | "missed">,
+  auto: Pick<AutoRefresh, "pages" | "status" | "set" | "off" | "saveRun" | "missed" | "late">,
   writer: () => Pick<DashboardWriter, "write">,
   sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms)),
   config: Config = loadConfig(),
@@ -165,11 +170,8 @@ export async function cli(
   if (command === "setup") return setup(args, config);
   if (command === "info") {
     // a damaged auto-refresh.json must not stop info: the Schedule line shows the error
-    const schedule = await auto.status().then(
-      (s) => summary(s).split("\n")[0],
-      (e: Error) => `cannot read it: ${e.message}`,
-    );
-    return { code: 0, stdout: info(config, schedule) };
+    const status = await auto.status().catch((e: Error) => e);
+    return { code: 0, stdout: info(config, status) };
   }
   try {
     if (command === "refresh") {
@@ -240,7 +242,106 @@ export function hideHome(text: string, home = homedir()): string {
 /** The files in the data folder that `info` checks. guide/tools.md tells what each file has. */
 const DATA_FILES = ["exercises.json", "dashboard-cache.json", "widgets.json", "auto-refresh.json"];
 
-const found = (path: string) => `${path} (${existsSync(path) ? "found" : "missing"})`;
+const found = (path: string, from: string) =>
+  `${path} (${existsSync(path) ? "found" : "missing"}, ${from})`;
+
+/** Where a setting comes from; an empty variable gives the default, as in `loadConfig`. */
+const source = (env: NodeJS.ProcessEnv, variable: string) =>
+  env[variable] ? `from ${variable}` : "default";
+
+/**
+ * Text for one line. A file name, and an error with a part of an answer from Garmin, can have line
+ * ends that make a false line, and control characters that change the terminal.
+ */
+const plain = (text: string) => text.replace(/[\p{Cc}\p{Zl}\p{Zp}]+/gu, " ");
+
+/**
+ * An error without the answer from Garmin, and without the cause of a network error, which can have an
+ * address: `info` text goes into public issues. The code of the cause (ENOTFOUND) stays.
+ */
+const withoutAnswer = (error: string) =>
+  error
+    .replace(/(HTTP \d{3}\b|Response is not JSON)[\s\S]*| \(Content-Type[\s\S]*/, "$1")
+    .replace(
+      /(Network error [^(]*) \((?:(?:\w+ )?(E[A-Z0-9_]+)(?=[ )]))?[\s\S]*/,
+      (_, start: string, code?: string) => (code ? `${start} (${code})` : start),
+    );
+
+function isFile(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/** The text of a file; undefined when it cannot be read. A read of a FIFO can wait without an end. */
+function textOf(path: string): string | undefined {
+  try {
+    return statSync(path).isFile() ? readFileSync(path, "utf8") : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const dayRange = (from: unknown, to: unknown) =>
+  isDay(from) && isDay(to) ? `${from} to ${to}` : "n/a";
+
+/** A dashboard page; undefined for another file, and for one that cannot be read. */
+const pageAt = (path: string) => pageInfo(textOf(path) ?? "");
+
+/** A line of `info`. The values are in one column: the longest label is `  dashboard-cache.json`. */
+const row = (label: string, value: string | number) => `${label}:`.padEnd(24) + value;
+
+/** When the dashboard data was fetched last, and the days that the cache has of it. */
+function syncLines(dataDir: string): string[] {
+  let cache: Record<string, unknown> = {};
+  try {
+    const saved: unknown = JSON.parse(textOf(join(dataDir, "dashboard-cache.json")) ?? "null");
+    if (isCache(saved)) cache = saved;
+  } catch {
+    // stays empty: a damaged cache shows as n/a
+  }
+  return [
+    row("  last sync", localTime(cache.syncedAt)),
+    row("  activities", dayRange(cache.activitiesFrom, cache.activitiesTo)),
+    row("  HRV", dayRange(cache.hrvFrom, cache.hrvTo)),
+  ];
+}
+
+/** The pages in the data folder, then the scheduled pages that are not there. */
+function pageLines(dataDir: string, scheduled: string[]): string[] {
+  const own = files(dataDir, ".html").toSorted();
+  const inFolder = own.map((f) => absolute(dataDir, f));
+  const planned = new Set(scheduled.map((p) => absolute(p)));
+  const line = (label: string, path: string) => {
+    const end = planned.has(path) ? ", scheduled" : "";
+    if (!existsSync(path)) return `    - ${label}: missing${end}`;
+    const page = pageAt(path);
+    if (!page) return `    - ${label}: not a dashboard page${end}`;
+    return `    - ${label}: updated ${localTime(page.updated)}, by ${page.server}${end}`;
+  };
+  const lines = [
+    ...own.map((f, i) => line(f, inFolder[i])),
+    ...[...planned].filter((p) => !inFolder.includes(p)).map((p) => line(p, p)),
+  ];
+  return [row("  pages", lines.length || "none"), ...lines];
+}
+
+/** The `Schedule` lines of `info`. */
+function scheduleLines(s: Status | Error): string[] {
+  if (s instanceof Error) return [`cannot read it: ${s.message}`];
+  if (!s.scheduled) return ["off"];
+  const [first, ...details] = s.last ? lastRun(s.last, withoutAnswer) : ["n/a"];
+  return [
+    header(s),
+    ...(s.installed ? [] : [`  ${missingJob(s)}`]),
+    row("  last run", first),
+    ...details.map((d) => `  ${d.replace(/^ {2}/, "  - ")}`),
+    ...(hasFailed(s) ? [row("  last success", localTime(s.lastOk))] : []),
+    row("  next", nextText(s)),
+  ];
+}
 
 /** The names of the files in `dir` that end in `ext`. The list is empty when `dir` is missing. */
 function files(dir: string, ext: string): string[] {
@@ -257,32 +358,36 @@ const keySource = (env: NodeJS.ProcessEnv) =>
 /**
  * The text of `info`: the version, the settings and where the files are, with `~` for the home
  * folder. It says where the API key comes from, but it never shows the key. It does not connect to
- * the network.
+ * the network. Each line is plain text, without the answer of a failed request.
  */
 export function info(
   config: Config,
-  schedule: string,
+  status: Status | Error,
   env: NodeJS.ProcessEnv = process.env,
   home = homedir(),
 ): string {
   const { dataDir } = config;
-  const pages = files(dataDir, ".html").toSorted();
+  const scheduled = status instanceof Error ? [] : (status.pages ?? []);
   const logs = join(home, LOG_DIR);
-  const text = [
+  const [schedule, ...scheduleDetails] = scheduleLines(status);
+  const lines = [
     `garmin-personal-mcp ${version}`,
-    `Node.js:      ${process.version} on ${process.platform}`,
-    `API host:     ${config.baseUrl}`,
-    `API key:      ${keySource(env)}`,
-    `Key file:     ${found(config.apiKeyFile)}`,
-    `Data folder:  ${found(dataDir)}`,
-    `  .FIT files: ${files(join(dataDir, "fit"), ".fit").length}`,
-    `  pages:      ${pages.join(", ") || "none"}`,
-    ...DATA_FILES.map((f) => `  ${f}: ${existsSync(join(dataDir, f)) ? "found" : "missing"}`),
-    `Server log:   ${join(logs, "garmin-personal-mcp.log")}`,
-    `Refresh log:  ${join(logs, "refresh.log")}`,
-    `Schedule:     ${schedule}`,
-  ].join("\n");
-  return hideHome(text, home);
+    "",
+    row("Node.js", `${process.version} on ${process.platform}`),
+    row("API host", `${config.baseUrl} (${source(env, "GARMIN_BASE_URL")})`),
+    row("API key", keySource(env)),
+    row("Key file", found(config.apiKeyFile, source(env, "GARMIN_API_KEY_FILE"))),
+    row("Data folder", found(dataDir, source(env, "GARMIN_DATA_DIR"))),
+    row("  .FIT files", files(join(dataDir, "fit"), ".fit").length),
+    ...syncLines(dataDir),
+    ...pageLines(dataDir, scheduled),
+    ...DATA_FILES.map((f) => row(`  ${f}`, existsSync(join(dataDir, f)) ? "found" : "none")),
+    row("Server log", join(logs, "garmin-personal-mcp.log")),
+    row("Refresh log", join(logs, "refresh.log")),
+    row("Schedule", schedule),
+    ...scheduleDetails,
+  ];
+  return hideHome(lines.map(plain).join("\n"), home);
 }
 
 interface Check {
@@ -353,23 +458,103 @@ function folderCheck(name: string, dir: string): Check {
   return { ok: true, name, text };
 }
 
-function scheduleCheck(status: Status | Error): Check {
+/**
+ * Whether the page says that it was updated after `time`; never when it is not a dashboard page, and
+ * never with a time in the future: the clock was wrong.
+ */
+function updatedAfter(path: string, time: string): boolean {
+  const updated = pageAt(path)?.updated;
+  if (!isTime(updated)) return false;
+  const at = Date.parse(updated);
+  return at > Date.parse(time) && at <= Date.now();
+}
+
+/**
+ * The automatic update works. A failure of the last run does not count for a page that was updated
+ * later or taken off the schedule, and a late run does not count when the user updated each page.
+ */
+function scheduleCheck(status: Status | Error, late: string | undefined): Check {
   const name = "Schedule";
-  if (status instanceof Error) {
-    return { ok: false, name, text: `cannot read it: ${status.message}` };
-  }
+  const bad = (text: string): Check => ({ ok: false, name, text });
+  if (status instanceof Error) return bad(`cannot read it: ${status.message}`);
   if (!status.scheduled) return { ok: true, name, text: "off" };
-  if (status.installed === false) {
-    const text = `the job is missing from ${status.scheduler}. Set the schedule again.`;
-    return { ok: false, name, text };
+  if (!status.installed) return bad(missingJob(status));
+  const { last } = status;
+  const pages = status.pages!;
+  const gone = pages.filter((p) => !isFile(p));
+  if (gone.length > 0) {
+    return bad(
+      `no page ${gone.join(", ")}. Make the page again, or run: ${NPX} schedule off <page>`,
+    );
   }
-  const failed = status.last?.failed ?? [];
-  if (failed.length > 0) {
-    const pages = failed.map((f) => `${f.path}: ${f.error}`).join(", ");
-    const text = `the last run (${status.last!.at}) could not update ${pages}`;
-    return { ok: false, name, text };
+  const failed = last?.failed.filter(
+    (f) => pages.includes(f.path) && !updatedAfter(f.path, last.at),
+  );
+  if (failed?.length) {
+    const list = failed.map((f) => `${f.path}: ${f.error}`).join(", ");
+    return bad(`the last run (${localTime(last!.at)}) could not update ${list}`);
   }
-  return { ok: true, name, text: summary(status).split("\n")[0] };
+  if (late && !pages.every((p) => updatedAfter(p, late))) {
+    const since = last ? sinceText(last.at) : "no run yet";
+    return bad(
+      `${since}, expected ${localTime(late)}. The computer was perhaps off. If no update is in progress, update the pages with: ${NPX} refresh --auto`,
+    );
+  }
+  return {
+    ok: true,
+    name,
+    text: `${header(status)}, last run: ${lastRunText(last)}, next: ${nextText(status)}`,
+  };
+}
+
+/** Says that no run came after the last one, at `at`. A time in the future comes from a clock that was ahead. */
+const sinceText = (at: string) =>
+  Date.parse(at) > Date.now()
+    ? "the last run is unknown (its time is in the future)"
+    : `no run since ${localTime(at)}`;
+
+/** The last run on one line, for a check that passes. */
+function lastRunText(last: LastRun | undefined): string {
+  if (!last) return "n/a";
+  const gaps = (last.partial ?? []).map((p) => `${p.path}: ${p.gaps}`).join("; ");
+  return [
+    localTime(last.at),
+    ...(last.failed.length > 0
+      ? ["its failed pages were updated or taken off the schedule since"]
+      : []),
+    ...(gaps ? [`updated with gaps: ${gaps}`] : []),
+    ...(last.failed.length === 0 && !gaps ? ["every page updated"] : []),
+  ].join(", ");
+}
+
+/** What each file in the data folder must hold for the server to use it, and the fix when it does not. */
+const FILE_CHECKS: [file: string, right: (v: unknown) => boolean, fix: string][] = [
+  ["exercises.json", isCatalogue, "delete it, the server makes it again"],
+  ["dashboard-cache.json", isCache, "delete it, the server makes it again"],
+  ["widgets.json", Array.isArray, "correct or delete it"],
+];
+
+/** The files that the server reads are not damaged. A missing file is right: the server makes it. */
+function dataFilesCheck(dataDir: string): Check {
+  const name = "Data files";
+  const errors = FILE_CHECKS.flatMap(([file, right, fix]) => {
+    const path = join(dataDir, file);
+    let text: string;
+    try {
+      if (!statSync(path).isFile()) return [`cannot read ${path}: it is not a file`];
+      text = readFileSync(path, "utf8");
+    } catch (e) {
+      const { code, message } = e as NodeJS.ErrnoException;
+      return code === "ENOENT" || code === "ENOTDIR" ? [] : [`cannot read ${path}: ${message}`];
+    }
+    try {
+      if (right(JSON.parse(text))) return [];
+    } catch {
+      // not JSON: damaged
+    }
+    return [`${path} is damaged: ${fix}`];
+  });
+  return { ok: errors.length === 0, name, text: errors.join(", ") || "readable" };
 }
 
 /** The job reads only the key file: with another key in the environment, the test of the API key says nothing about it. */
@@ -389,11 +574,18 @@ async function scheduleKeyCheck(config: Config): Promise<Check> {
  */
 export async function doctor(
   config: Config,
-  auto: Pick<AutoRefresh, "status">,
+  auto: Pick<AutoRefresh, "status" | "late">,
   platform: NodeJS.Platform = process.platform,
   home = homedir(),
 ): Promise<CliResult> {
-  const status = await auto.status().catch((e: Error) => e);
+  let status: Status | Error;
+  let late: string | undefined;
+  try {
+    status = await auto.status();
+    late = await auto.late();
+  } catch (e) {
+    status = e as Error;
+  }
   const scheduled = !(status instanceof Error) && status.scheduled;
   const apiKey: Check = await new GarminApiClient(config).testKey().then(
     () => ({
@@ -411,10 +603,11 @@ export async function doctor(
       : []),
     folderCheck("Data folder", config.dataDir),
     folderCheck("Log folder", join(home, LOG_DIR)),
-    scheduleCheck(status),
+    dataFilesCheck(config.dataDir),
+    scheduleCheck(status, late),
   ];
   const failed = checks.filter((c) => !c.ok).length;
-  const lines = checks.map((c) => `${c.ok ? "ok    " : "failed"}  ${c.name}: ${c.text}`);
+  const lines = checks.map((c) => plain(`${c.ok ? "ok    " : "failed"}  ${c.name}: ${c.text}`));
   lines.push(
     failed === 0 ? "All checks passed." : `${failed} ${failed === 1 ? "check" : "checks"} failed.`,
   );
@@ -565,33 +758,47 @@ export async function setup(
   };
 }
 
-function lastLine(last: LastRun): string {
+/** What the last run did: one line, and the pages that failed (with `shown` of the error) or have gaps. */
+function lastRun(last: LastRun, shown = (error: string) => error): string[] {
+  const at = localTime(last.at);
   const partial = last.partial ?? [];
-  if (last.failed.length === 0 && partial.length === 0) {
-    return `Last run: ${last.at}, every page updated`;
-  }
   const gaps = partial.map((p) => `  ${p.path}: ${p.gaps}`);
-  if (last.failed.length === 0)
-    return [`Last run: ${last.at}, updated with gaps:`, ...gaps].join("\n");
+  if (last.failed.length === 0) {
+    return partial.length === 0
+      ? [`${at}, every page updated`]
+      : [`${at}, updated with gaps:`, ...gaps];
+  }
   return [
-    `Last run: ${last.at}, failed:`,
-    ...last.failed.map((f) => `  ${f.path}: ${f.error}`),
+    `${at}, failed:`,
+    ...last.failed.map((f) => `  ${f.path}: ${shown(f.error)}`),
     ...(partial.length > 0 ? ["updated with gaps:", ...gaps] : []),
-  ].join("\n");
+  ];
 }
 
+const header = (s: Status) => `Automatic refresh "${s.cron}" with ${s.scheduler}`;
+
+const nextText = (s: Status) => s.next?.join(", ") || "n/a";
+
+/** A successful last run is the last success, so that gets a line only after a failed run. */
+const hasFailed = (s: Status) => (s.last?.failed.length ?? 0) > 0;
+
+const missingJob = (s: Status) =>
+  `The job is missing from ${s.scheduler} or cannot start (its Node.js or server file is gone). Run the schedule again.`;
+
+/** The text of `schedule`. */
 export function summary(s: Status): string {
   if (!s.scheduled) return "Automatic refresh is off.";
+  const [first, ...details] = s.last ? lastRun(s.last) : [];
   return [
-    `Automatic refresh "${s.cron}" with ${s.scheduler}, next: ${s.next!.join(", ")}`,
+    header(s),
+    `Next: ${nextText(s)}`,
     "Pages:",
     ...s.pages!.map((p) => `  ${p}`),
-    ...(s.installed
-      ? []
-      : [
-          `The job is missing from ${s.scheduler} or cannot start (its Node.js or server file is gone): run the schedule again.`,
-        ]),
-    ...(s.last ? [lastLine(s.last)] : []),
+    ...(s.installed ? [] : [missingJob(s)]),
+    ...(s.last ? [`Last run: ${first}`, ...details] : []),
+    ...(hasFailed(s) ? [`Last success: ${localTime(s.lastOk)}`] : []),
     `Log: ${s.log}`,
-  ].join("\n");
+  ]
+    .map(plain)
+    .join("\n");
 }

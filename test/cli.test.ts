@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
@@ -6,6 +7,7 @@ import {
   readdirSync,
   readFileSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir, userInfo } from "node:os";
@@ -25,7 +27,7 @@ import {
   setup,
   summary,
 } from "../src/cli";
-import type { Config } from "../src/config";
+import { type Config, loadConfig } from "../src/config";
 import type { LastRun, Status } from "../src/schedule";
 
 const on: Status = {
@@ -38,6 +40,13 @@ const on: Status = {
   log: "/h/refresh.log",
 };
 
+/** A page with this data block. */
+const pageOf = (data: object) =>
+  `<script>const D = /* garmin-data:start */${JSON.stringify(data)}/* garmin-data:end */;</script>`;
+
+/** An ISO time on 23 November 2026, local time. */
+const nov23 = (hour: number) => new Date(2026, 10, 23, hour, 5).toISOString();
+
 function fakes() {
   const auto = {
     pages: vi.fn(async () => ["a.html", "b.html"]),
@@ -45,6 +54,7 @@ function fakes() {
     set: vi.fn(async () => on),
     off: vi.fn(async (): Promise<Status> => ({ scheduled: false })),
     missed: vi.fn(async () => true),
+    late: vi.fn(async (): Promise<string | undefined> => undefined),
     saveRun: vi.fn<(last: LastRun) => Promise<void>>(async () => {}),
   };
   const written: (string | undefined)[] = [];
@@ -368,6 +378,20 @@ describe("cli", () => {
     expect(HELP).toMatch(new RegExp(`^  ${command}\\b`, "m"));
   });
 
+  it.each<[string, RegExp[]]>([
+    ["info", [/version/, /settings/, /files/, /last sync/, /pages/, /schedule/]],
+    ["doctor", [/key file/, /API key/, /data folder/, /log folder/, /data files/, /schedule/]],
+  ])("tells in the help of %s what it shows", (command, parts) => {
+    for (const part of parts) expect(COMMAND_HELP[command]).toMatch(part);
+  });
+
+  it("tells in the main help what info and doctor show", () => {
+    expect(HELP).toMatch(/^ {2}info +show the version, the settings, the pages and the schedule$/m);
+    expect(HELP).toMatch(
+      /^ {2}doctor +test the API key, the folders, the data files and the schedule$/m,
+    );
+  });
+
   it("has the main help in the guide", () => {
     expect(readFileSync(new URL("../guide/cli.md", import.meta.url), "utf8")).toContain(HELP);
   });
@@ -594,32 +618,71 @@ describe("cli", () => {
     writeFileSync(join(data, "Coach.HTML"), "");
     writeFileSync(join(data, "widgets.json"), "[]");
     const config = { baseUrl: "https://api.test", apiKeyFile: join(dir, "api-key"), dataDir: data };
-    const text = info(config, "off", { GARMIN_PERSONAL_API_KEY: "s3cret-key" }, dir);
+    const text = info(config, { scheduled: false }, { GARMIN_PERSONAL_API_KEY: "s3cret-key" }, dir);
     expect(text).not.toContain("s3cret-key");
-    expect(text).toMatch(new RegExp(`^garmin-personal-mcp ${version}\\n`));
-    expect(text).toContain(`\nNode.js:      ${process.version} on ${process.platform}\n`);
-    expect(text).toContain("API host:     https://api.test");
-    expect(text).toContain("API key:      from GARMIN_PERSONAL_API_KEY");
-    expect(text).toContain(`Key file:     ${join("~", "api-key")} (missing)`);
-    expect(text).toContain(`Data folder:  ${join("~", "data")} (found)`);
-    expect(text).toContain("  .FIT files: 2");
-    expect(text).toContain("  pages:      Coach.HTML, garmin-dashboard.html\n");
-    expect(text).toContain("  widgets.json: found\n  auto-refresh.json: missing");
-    expect(text).toContain(
-      `Server log:   ${join("~", ".cache/garmin-personal-mcp/garmin-personal-mcp.log")}`,
+    expect(text).toMatch(
+      new RegExp(`^garmin-personal-mcp ${version}\\n\\nNode.js:                `),
     );
-    expect(text).toContain(`Refresh log:  ${join("~", ".cache/garmin-personal-mcp/refresh.log")}`);
+    expect(text).toContain(`\nNode.js:                ${process.version} on ${process.platform}\n`);
+    expect(text).toContain("API host:               https://api.test (default)\n");
+    expect(text).toContain("API key:                from GARMIN_PERSONAL_API_KEY");
+    expect(text).toContain(`Key file:               ${join("~", "api-key")} (missing, default)`);
+    expect(text).toContain(`Data folder:            ${join("~", "data")} (found, default)`);
+    expect(text).toContain("  .FIT files:           2");
+    expect(text).toContain(
+      [
+        "  last sync:            n/a",
+        "  activities:           n/a",
+        "  HRV:                  n/a",
+        "  pages:                2",
+        "    - Coach.HTML: not a dashboard page",
+        "    - garmin-dashboard.html: not a dashboard page",
+        "  exercises.json:       none",
+      ].join("\n"),
+    );
+    expect(text).toContain("  widgets.json:         found\n  auto-refresh.json:    none");
+    expect(text).toContain(
+      `Server log:             ${join("~", ".cache/garmin-personal-mcp/garmin-personal-mcp.log")}`,
+    );
+    expect(text).toContain(
+      `Refresh log:            ${join("~", ".cache/garmin-personal-mcp/refresh.log")}`,
+    );
     expect(text).not.toContain(dir);
-    expect(text).toMatch(/Schedule:     off$/);
+    expect(text).toMatch(/Schedule:               off$/);
 
     writeFileSync(join(dir, "api-key"), "k");
     const noData = { ...config, dataDir: join(dir, "none") };
     // a key of only spaces is no key, as in the API client: the key file is used
-    const other = info(noData, "off", { GARMIN_PERSONAL_API_KEY: " \n" }, dir);
-    expect(other).toContain("API key:      from the key file");
-    expect(other).toContain(`Key file:     ${join("~", "api-key")} (found)`);
-    expect(other).toContain(`Data folder:  ${join("~", "none")} (missing)`);
-    expect(other).toContain("  .FIT files: 0\n  pages:      none");
+    const other = info(noData, { scheduled: false }, { GARMIN_PERSONAL_API_KEY: " \n" }, dir);
+    expect(other).toContain("API key:                from the key file");
+    expect(other).toContain(`Key file:               ${join("~", "api-key")} (found, default)`);
+    expect(other).toContain(`Data folder:            ${join("~", "none")} (missing, default)`);
+    expect(other).toContain("  .FIT files:           0\n  last sync:            n/a\n");
+    expect(other).toContain("  pages:                none\n  exercises.json:       none");
+  });
+
+  it.each([
+    ["a schedule", { ...on, last: { at: "2026-11-23T10:00:00Z", failed: [] } }],
+    ["no schedule", { scheduled: false }],
+    ["a damaged schedule", new Error("bad JSON")],
+    [
+      "a failed run",
+      { ...on, last: { at: "2026-11-23T10:00:00Z", failed: [failure("/d/a.html")] } },
+    ],
+  ])("puts each value in one column with %s", (_, status) => {
+    const text = info(
+      { ...loadConfig(), dataDir: join(tmpdir(), "no-data") },
+      status as Status | Error,
+      {},
+      "/h",
+    );
+    // the lines of a page or of a failed page have 4 spaces, and a label of any length
+    const rows = text
+      .split("\n")
+      .slice(2)
+      .filter((l) => !l.startsWith("    "));
+    expect(rows.length).toBeGreaterThan(14);
+    for (const line of rows) expect(line).toMatch(/^(?=.{23} \S)(?: {2})?\S[^:]*: +\S/);
   });
 
   it("hides the home folder in the schedule error of info, and keeps a path outside it", () => {
@@ -630,10 +693,327 @@ describe("cli", () => {
       apiKeyFile: join(outside, "k"),
       dataDir: outside,
     };
-    const text = info(config, `cannot read it: open '${join(home, "a.json")}'`, {}, home);
+    const text = info(config, new Error(`open '${join(home, "a.json")}'`), {}, home);
     expect(text).toContain(`cannot read it: open '${join("~", "a.json")}'`);
-    expect(text).toContain(`Key file:     ${join(outside, "k")} (missing)`);
-    expect(text).toContain(`Data folder:  ${outside} (found)`);
+    expect(text).toContain(`Key file:               ${join(outside, "k")} (missing, default)`);
+    expect(text).toContain(`Data folder:            ${outside} (found, default)`);
+  });
+
+  it("names the variable exactly when the server uses it", () => {
+    const vars = ["GARMIN_BASE_URL", "GARMIN_API_KEY_FILE", "GARMIN_DATA_DIR"];
+    const used = (value: string) => {
+      for (const v of vars) vi.stubEnv(v, value);
+      const defaults = info(loadConfig(), { scheduled: false }).split("\n");
+      vi.unstubAllEnvs();
+      return vars.map((v) => defaults.some((l) => l.includes(`from ${v}`)));
+    };
+    expect(used("")).toEqual([false, false, false]);
+    expect(used("/x")).toEqual([true, true, true]);
+  });
+
+  it("says which variable a setting comes from", () => {
+    const config = { baseUrl: "https://api.test", apiKeyFile: "/no/key", dataDir: "/no/data" };
+    const env = {
+      GARMIN_BASE_URL: "https://api.test",
+      GARMIN_API_KEY_FILE: "/no/key",
+      GARMIN_DATA_DIR: "/no/data",
+    };
+    const lines = (e: NodeJS.ProcessEnv) => info(config, { scheduled: false }, e).split("\n");
+    expect(lines(env)).toEqual(
+      expect.arrayContaining([
+        "API host:               https://api.test (from GARMIN_BASE_URL)",
+        "Key file:               /no/key (missing, from GARMIN_API_KEY_FILE)",
+        "Data folder:            /no/data (missing, from GARMIN_DATA_DIR)",
+      ]),
+    );
+    // an empty variable gives the default, as when the server reads the settings
+    const empty = { GARMIN_BASE_URL: "", GARMIN_API_KEY_FILE: "", GARMIN_DATA_DIR: "" };
+    expect(lines(empty)).toEqual(
+      expect.arrayContaining([
+        "API host:               https://api.test (default)",
+        "Key file:               /no/key (missing, default)",
+        "Data folder:            /no/data (missing, default)",
+      ]),
+    );
+  });
+
+  describe("the data of info", () => {
+    let dir: string;
+    beforeEach(() => {
+      dir = mkdtempSync(join(tmpdir(), "garmin-info-"));
+    });
+    const put = (file: string, text: string) => writeFileSync(join(dir, file), text);
+    const text = (status: Status | Error = { scheduled: false }) =>
+      info({ baseUrl: "b", apiKeyFile: "/no/key", dataDir: dir }, status, {}, "/h");
+
+    it("shows the last sync and the days that the cache holds", () => {
+      const cache = {
+        syncedAt: nov23(11),
+        activitiesFrom: "2025-11-24",
+        activitiesTo: "2026-11-23",
+        hrvFrom: "2026-01-01",
+        hrvTo: "2026-11-22",
+      };
+      put("dashboard-cache.json", JSON.stringify(cache));
+      expect(text()).toContain(
+        [
+          "  last sync:            2026-11-23 11:05",
+          "  activities:           2025-11-24 to 2026-11-23",
+          "  HRV:                  2026-01-01 to 2026-11-22",
+        ].join("\n"),
+      );
+      put(
+        "dashboard-cache.json",
+        JSON.stringify({ ...cache, activitiesTo: undefined, hrvFrom: 5 }),
+      );
+      expect(text()).toContain("  activities:           n/a\n  HRV:                  n/a\n");
+      put("dashboard-cache.json", JSON.stringify({ ...cache, hrvTo: "2026-02-30" }));
+      expect(text()).toContain("to 2026-11-23\n  HRV:                  n/a\n");
+    });
+
+    it.each([
+      "{",
+      "null",
+      "5",
+      "[]",
+      '{"syncedAt":"soon"}',
+      '{"syncedAt":5}',
+      // the server does not use this one
+      `{"syncedAt":"${nov23(11)}","activitiesFrom":"2025-11-24","activitiesTo":"2026-11-23","hrv":[]}`,
+    ])("shows n/a for a cache of %s", (json) => {
+      put("dashboard-cache.json", json);
+      expect(text()).toContain(
+        "  last sync:            n/a\n  activities:           n/a\n  HRV:                  n/a\n",
+      );
+    });
+
+    it("shows when each page was updated, by which version, and whether it is scheduled", () => {
+      const elsewhere = join(mkdtempSync(join(tmpdir(), "garmin-page-")), "far.html");
+      writeFileSync(elsewhere, pageOf({ server: "0.14.0", updated: nov23(9) }));
+      put("a.html", pageOf({ server: "0.14.0", updated: nov23(11) }));
+      put("b.html", pageOf({ server: "dev", updated: "soon" }));
+      put("c.html", pageOf({}));
+      put("d.html", pageOf({ updated: 5 }));
+      put("e.html", pageOf({ updated: "a 5", server: 5 }));
+      put("null.html", "/* garmin-data:start */null/* garmin-data:end */");
+      put("text.html", '/* garmin-data:start */"a"/* garmin-data:end */');
+      put("bad.html", "/* garmin-data:start */{/* garmin-data:end */");
+      put("foreign.html", "<p>hello</p>");
+      mkdirSync(join(dir, "folder.html"));
+      const pages = [join(dir, "a.html"), elsewhere, join(dir, "gone.html")];
+      expect(text({ ...on, pages })).toContain(
+        [
+          "  pages:                12",
+          "    - a.html: updated 2026-11-23 11:05, by 0.14.0, scheduled",
+          "    - b.html: updated n/a, by n/a",
+          "    - bad.html: not a dashboard page",
+          "    - c.html: updated n/a, by n/a",
+          "    - d.html: updated n/a, by n/a",
+          "    - e.html: updated n/a, by n/a",
+          "    - folder.html: not a dashboard page",
+          "    - foreign.html: not a dashboard page",
+          "    - null.html: not a dashboard page",
+          "    - text.html: not a dashboard page",
+          `    - ${elsewhere}: updated 2026-11-23 09:05, by 0.14.0, scheduled`,
+          `    - ${join(dir, "gone.html")}: missing, scheduled`,
+          "  exercises.json:",
+        ].join("\n"),
+      );
+    });
+
+    it("lists a scheduled page once, also with another spelling, and hides the home folder", () => {
+      put("a.html", pageOf({ server: "0.14.0", updated: nov23(11) }));
+      const home = mkdtempSync(join(tmpdir(), "garmin-home-"));
+      const far = join(home, "far.html");
+      writeFileSync(far, pageOf({ server: "0.14.0", updated: nov23(9) }));
+      const a = join(dir, "a.html");
+      const pages = [a, a, `${dir}/x/../a.html`, far, far];
+      const config = { baseUrl: "b", apiKeyFile: "/no/key", dataDir: dir };
+      expect(info(config, { ...on, pages }, {}, home)).toContain(
+        [
+          "  pages:                2",
+          "    - a.html: updated 2026-11-23 11:05, by 0.14.0, scheduled",
+          `    - ${join("~", "far.html")}: updated 2026-11-23 09:05, by 0.14.0, scheduled`,
+          "  exercises.json:",
+        ].join("\n"),
+      );
+    });
+
+    it("lists a missing scheduled page when the data folder is missing", () => {
+      const config = { baseUrl: "b", apiKeyFile: "/no/key", dataDir: join(dir, "none") };
+      const gone = join(dir, "none", "gone.html");
+      expect(info(config, { ...on, pages: [gone] }, {}, "/h")).toContain(
+        `  pages:                1\n    - ${gone}: missing, scheduled\n`,
+      );
+      expect(info(config, { ...on, pages: [] }, {}, "/h")).toContain(
+        "  pages:                none\n",
+      );
+    });
+
+    it.skipIf(process.platform === "win32")(
+      "shows a link to a page that is gone as missing",
+      () => {
+        symlinkSync(join(dir, "gone"), join(dir, "a.html"));
+        expect(text()).toContain("  pages:                1\n    - a.html: missing\n");
+      },
+    );
+
+    it("lists the pages also when the schedule cannot be read", () => {
+      put("a.html", pageOf({ server: "0.14.0", updated: nov23(11) }));
+      expect(text(new Error("bad JSON"))).toContain(
+        "  pages:                1\n    - a.html: updated 2026-11-23 11:05, by 0.14.0\n",
+      );
+    });
+
+    const block = (o: Partial<Status>) => {
+      const all = text({ ...on, ...o });
+      return all.slice(all.indexOf("Schedule:")).split("\n");
+    };
+    const HEAD = 'Schedule:               Automatic refresh "0 7 * * 1" with launchd';
+    const NEXT = "  next:                 2026-11-02 07:00, 2026-11-09 07:00";
+    const good = { at: nov23(11), failed: [] };
+    const bad = { at: nov23(11), failed: [{ path: "/d/a.html", error: "HTTP 401" }] };
+    const partial = [{ path: "/d/b.html", gaps: "days: 2" }];
+
+    it.each<[string, Partial<Status>, string[]]>([
+      ["no run", {}, ["  last run:             n/a"]],
+      [
+        "a good run",
+        { last: good, lastOk: nov23(11) },
+        ["  last run:             2026-11-23 11:05, every page updated"],
+      ],
+      [
+        "a run with gaps",
+        { last: { ...good, partial }, lastOk: nov23(11) },
+        [
+          "  last run:             2026-11-23 11:05, updated with gaps:",
+          "    - /d/b.html: days: 2",
+        ],
+      ],
+      [
+        "a failed run after a success",
+        { last: { ...bad, partial }, lastOk: nov23(9) },
+        [
+          "  last run:             2026-11-23 11:05, failed:",
+          "    - /d/a.html: HTTP 401",
+          "  updated with gaps:",
+          "    - /d/b.html: days: 2",
+          "  last success:         2026-11-23 09:05",
+        ],
+      ],
+      [
+        "a failed run and no known success",
+        { last: bad },
+        [
+          "  last run:             2026-11-23 11:05, failed:",
+          "    - /d/a.html: HTTP 401",
+          "  last success:         n/a",
+        ],
+      ],
+    ])("shows the schedule after %s", (_name, o, lines) => {
+      expect(block(o)).toEqual([HEAD, ...lines, NEXT]);
+    });
+
+    it.each([
+      ["GET /a -> HTTP 502: <p>203.0.113.7</p>\nreq 1", "GET /a -> HTTP 502"],
+      ["GET /a -> HTTP 429", "GET /a -> HTTP 429"],
+      ["Response is not JSON: <p>203.0.113.7</p>", "Response is not JSON"],
+      [
+        "Token request failed: HTTP 401 (Content-Type: text/html, body: x) - the key",
+        "Token request failed: HTTP 401",
+      ],
+      [
+        "Network error obtaining token: fetch failed",
+        "Network error obtaining token: fetch failed",
+      ],
+      ["Token response is empty (Content-Type: text/html; 203.0.113.7)", "Token response is empty"],
+      [
+        "Token response is not a token (Content-Type: 203.0.113.7)",
+        "Token response is not a token",
+      ],
+      [
+        "Token response is not valid JSON (Content-Type: none, 203.0.113.7 characters)",
+        "Token response is not valid JSON",
+      ],
+      [
+        "Token response has no access token field (Content-Type: a (b)). Fields: 203.0.113.7\nx",
+        "Token response has no access token field",
+      ],
+      [
+        "The page: Network error calling /a: fetch failed (connect ECONNREFUSED 203.0.113.7:443)",
+        "The page: Network error calling /a: fetch failed (ECONNREFUSED)",
+      ],
+      [
+        "Network error obtaining token: fetch failed (getaddrinfo ENOTFOUND 203.0.113.7)",
+        "Network error obtaining token: fetch failed (ENOTFOUND)",
+      ],
+      [
+        "Network error calling /a: fetch failed (connect ECONNREFUSED 203.0.113.7:443)",
+        "Network error calling /a: fetch failed (ECONNREFUSED)",
+      ],
+      [
+        "Network error calling /a: fetch failed (ECONNRESET)",
+        "Network error calling /a: fetch failed (ECONNRESET)",
+      ],
+      [
+        "Network error calling /a: fetch failed (getaddrinfo EAI_AGAIN 203.0.113.7)",
+        "Network error calling /a: fetch failed (EAI_AGAIN)",
+      ],
+      [
+        "Network error calling /a: fetch failed (UND_ERR_X 203.0.113.7)",
+        "Network error calling /a: fetch failed",
+      ],
+      [
+        "Network error calling /a: fetch failed (Hostname/IP does not match certificate's altnames: IP: 203.0.113.7 is not in the cert's list: )",
+        "Network error calling /a: fetch failed",
+      ],
+      [
+        "Network error calling /a: fetch failed (Host: EXAMPLE.203.0.113.7)",
+        "Network error calling /a: fetch failed",
+      ],
+      [
+        "Network error calling /a: fetch failed (connect EXAMPLE.203.0.113.7)",
+        "Network error calling /a: fetch failed",
+      ],
+      [
+        "Network error calling /a: fetch failed (write EPROTO 203.0.113.7:error (b)\nx\n)",
+        "Network error calling /a: fetch failed (EPROTO)",
+      ],
+      ["Page (a) is not a page", "Page (a) is not a page"],
+      ["no page\u001B[2K\r\nx", "no page [2K x"],
+      ["HTTP 50: a", "HTTP 50: a"],
+      ["HTTP 5020: a", "HTTP 5020: a"],
+    ])("shows no body of an answer in the error %j", (error, shown) => {
+      const last = { at: nov23(11), failed: [{ path: "/d/a.html", error }] };
+      const lines = text({ ...on, last }).split("\n");
+      expect(lines).toContain(`    - /d/a.html: ${shown}`);
+      expect(lines.join("\n")).not.toContain("203.0.113.7");
+      // schedule shows all of it, on one line
+      const whole = error.replaceAll("\n", " ").replace("\u001B[2K\r ", " [2K ");
+      expect(summary({ ...on, last }).split("\n")).toContain(`  /d/a.html: ${whole}`);
+    });
+
+    it("gives each file name on one line", () => {
+      const name = "a\nServer log: x\u001B[2K.html";
+      const last = { at: nov23(11), failed: [], partial: [{ path: `/d/${name}`, gaps: "a\tb" }] };
+      const shown = "a Server log: x [2K.html";
+      const all = text({ ...on, pages: [`/d/${name}`], last });
+      expect(all).toContain(`    - /d/${shown}: missing, scheduled\n`);
+      expect(all).toContain(`    - /d/${shown}: a b\n`);
+      expect(text(new Error("crontab\nfailed"))).toContain("cannot read it: crontab failed");
+      const schedule = summary({ ...on, pages: [`/d/${name}`], last });
+      expect(schedule).toContain(`\n  /d/${shown}\n`);
+      expect(schedule).toContain(`\n  /d/${shown}: a b\n`);
+    });
+
+    it("shows that the job is missing, and no next run when there is none", () => {
+      expect(block({ installed: false, next: [] })).toEqual([
+        HEAD,
+        "  The job is missing from launchd or cannot start (its Node.js or server file is gone). Run the schedule again.",
+        "  last run:             n/a",
+        "  next:                 n/a",
+      ]);
+    });
   });
 
   it.each([
@@ -675,49 +1055,58 @@ describe("cli", () => {
     expect(hideHome(text, home)).toBe(expected);
   });
 
-  it("runs info with the first line of the schedule, or the error when it cannot read the schedule", async () => {
+  it("runs info with the schedule, or the error when it cannot read the schedule", async () => {
     const f = fakes();
     const config = { baseUrl: "b", apiKeyFile: "/no/key", dataDir: "/no/data" };
     const r = await cli("info", [], f.auto, f.writer, undefined, config);
     expect(r.code).toBe(0);
-    expect(r.stdout).toMatch(/Schedule:     Automatic refresh "0 7 \* \* 1" with launchd/);
+    expect(r.stdout).toMatch(
+      /Schedule:               Automatic refresh "0 7 \* \* 1" with launchd\n/,
+    );
     f.auto.status.mockRejectedValueOnce(new Error("bad JSON"));
     const bad = await cli("info", [], f.auto, f.writer, undefined, config);
     expect(bad).toMatchObject({ code: 0 });
-    expect(bad.stdout).toMatch(/Schedule:     cannot read it: bad JSON$/);
+    expect(bad.stdout).toMatch(/Schedule:               cannot read it: bad JSON$/);
     expect(HELP).toContain("  info ");
   });
 
   it("says when the job is missing from the scheduler", () => {
     expect(summary(on)).toBe(
       [
-        'Automatic refresh "0 7 * * 1" with launchd, next: 2026-11-02 07:00, 2026-11-09 07:00',
+        'Automatic refresh "0 7 * * 1" with launchd',
+        "Next: 2026-11-02 07:00, 2026-11-09 07:00",
         "Pages:",
         "  /d/garmin-dashboard.html",
         "Log: /h/refresh.log",
       ].join("\n"),
     );
     expect(summary({ ...on, installed: false })).toContain(
-      "The job is missing from launchd or cannot start (its Node.js or server file is gone): run the schedule again.",
+      "The job is missing from launchd or cannot start (its Node.js or server file is gone). Run the schedule again.",
     );
   });
 
   it("prints the last run and the pages it could not update", () => {
-    const ok = { at: "2026-11-02T06:00:00.000Z", failed: [] };
+    const ok = { at: new Date(2026, 10, 2, 7, 0, 3).toISOString(), failed: [] };
     expect(summary({ ...on, last: ok })).toContain(
-      "Last run: 2026-11-02T06:00:00.000Z, every page updated\nLog:",
+      "Last run: 2026-11-02 07:00, every page updated\nLog:",
     );
     const bad = { ...ok, failed: [{ path: "/d/a.html", error: "HTTP 401" }] };
     expect(summary({ ...on, last: bad })).toContain(
-      "Last run: 2026-11-02T06:00:00.000Z, failed:\n  /d/a.html: HTTP 401\nLog:",
+      "Last run: 2026-11-02 07:00, failed:\n  /d/a.html: HTTP 401\nLast success: n/a\nLog:",
     );
     const gaps = { ...ok, partial: [{ path: "/d/b.html", gaps: "days: 2" }] };
     expect(summary({ ...on, last: gaps })).toContain(
-      "Last run: 2026-11-02T06:00:00.000Z, updated with gaps:\n  /d/b.html: days: 2\nLog:",
+      "Last run: 2026-11-02 07:00, updated with gaps:\n  /d/b.html: days: 2\nLog:",
     );
     expect(summary({ ...on, last: { ...bad, partial: gaps.partial } })).toContain(
-      "Last run: 2026-11-02T06:00:00.000Z, failed:\n  /d/a.html: HTTP 401\nupdated with gaps:\n  /d/b.html: days: 2\nLog:",
+      "Last run: 2026-11-02 07:00, failed:\n  /d/a.html: HTTP 401\nupdated with gaps:\n  /d/b.html: days: 2\nLast success: n/a\nLog:",
     );
+    const lastOk = new Date(2026, 9, 26, 7, 0).toISOString();
+    expect(summary({ ...on, last: bad, lastOk })).toContain(
+      "\nLast success: 2026-10-26 07:00\nLog:",
+    );
+    expect(summary({ ...on, last: ok, lastOk: ok.at })).not.toContain("Last success");
+    expect(summary({ ...on, next: [] })).toContain("\nNext: n/a\n");
   });
 });
 
@@ -754,8 +1143,28 @@ function garmin(status = 200, body = `{"access_token":"t0ken"}`) {
 
 const off = () => ({ ...fakes().auto, status: vi.fn(async () => ({ scheduled: false })) });
 
-const run = (config: Config, home: string, auto = fakes().auto) =>
+/** A schedule that works; its page list is empty, so no page can be missing. */
+const scheduled = () => ({ ...fakes().auto, status: vi.fn(async () => ({ ...on, pages: [] })) });
+
+const run = (config: Config, home: string, auto: Parameters<typeof doctor>[1] = scheduled()) =>
   doctor(config, auto, process.platform, home);
+
+const failure = (path: string) => ({ path, error: "HTTP 401" });
+const tilde = (name: string) => join("~", "data", name);
+/** A last run at 07:05 that failed on a.html and b.html of the folder. */
+const twoFailed = (dir: string) => ({
+  last: {
+    at: nov23(7),
+    failed: [failure(join(dir, "a.html")), failure(join(dir, "b.html"))],
+  },
+});
+const failedWithGaps = (dir: string) => ({
+  last: { ...twoFailed(dir).last, partial: [{ path: "/d/c.html", gaps: "days: 2" }] },
+});
+const couldNot = (names: string[]) =>
+  `failed  Schedule: the last run (2026-11-23 07:05) could not update ${names.map((n) => `${tilde(n)}: HTTP 401`).join(", ")}`;
+const lateText = (since: string) =>
+  `failed  Schedule: ${since}, expected 2026-11-23 11:05. The computer was perhaps off. If no update is in progress, update the pages with: npx -y @indaco/garmin-personal-mcp@latest refresh --auto`;
 
 describe("doctor", () => {
   const KEY = "s3cret-key";
@@ -769,6 +1178,18 @@ describe("doctor", () => {
     writeFileSync(apiKeyFile, KEY);
     chmodSync(apiKeyFile, mode);
     return { home, config: { baseUrl: "https://api.test", apiKeyFile, dataDir } };
+  }
+
+  /** The Data files line of `doctor`, for a data folder with these files. */
+  async function dataFiles(put: (dir: string) => void) {
+    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+    garmin();
+    const { home, config } = setUp();
+    put(config.dataDir);
+    const r = await run(config, home, off());
+    const line = r.stdout!.split("\n").find((l) => l.includes("Data files: "))!;
+    expect(r.code).toBe(line.startsWith("failed") ? 1 : 0);
+    return line;
   }
 
   const skipIfNoMode = it.skipIf(process.platform === "win32" || process.getuid?.() === 0);
@@ -789,6 +1210,7 @@ describe("doctor", () => {
       "ok      API key: Garmin accepts it (from the key file)",
       `ok      Data folder: ${join("~", "data")}`,
       `ok      Log folder: ${join("~", ".cache/garmin-personal-mcp")} is missing, the server makes it when it needs it`,
+      "ok      Data files: readable",
       "ok      Schedule: off",
       "All checks passed.",
     ]);
@@ -1156,50 +1578,288 @@ describe("doctor", () => {
     expect(r.stdout).toMatch(/2 checks failed\.$/);
   });
 
-  it("shows a schedule that works", async () => {
-    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
-    garmin();
-    const { home, config } = setUp();
-    const r = await doctor(config, fakes().auto, process.platform, home);
-    expect(r.code).toBe(0);
-    expect(r.stdout).toContain('ok      Schedule: Automatic refresh "0 7 * * 1" with launchd');
-  });
+  describe("the schedule", () => {
+    const A = "a.html";
+    const ran = nov23(7);
 
-  it("fails when the job is missing from the scheduler", async () => {
-    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
-    garmin();
-    const { home, config } = setUp();
-    const auto = { ...fakes().auto, status: vi.fn(async () => ({ ...on, installed: false })) };
-    const r = await doctor(config, auto, process.platform, home);
-    expect(r.code).toBe(1);
-    expect(r.stdout).toContain(
-      "failed  Schedule: the job is missing from launchd. Set the schedule again.",
+    beforeEach(() => {
+      vi.useFakeTimers({ now: Date.parse(nov23(23)), toFake: ["Date"] });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** The Schedule line of `doctor`, for pages in the data folder with the time of their update. */
+    async function schedule(
+      o: Partial<Status> | ((dir: string) => Partial<Status>) = {},
+      pages: Record<string, string | undefined> = { [A]: nov23(7) },
+      late?: string,
+    ) {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+      garmin();
+      const { home, config } = setUp();
+      const paths = Object.entries(pages).map(([name, updated]) => {
+        const path = join(config.dataDir, name);
+        if (updated !== undefined) writeFileSync(path, pageOf({ updated }));
+        return path;
+      });
+      const status = { ...on, pages: paths, ...(typeof o === "function" ? o(config.dataDir) : o) };
+      const auto = {
+        ...fakes().auto,
+        status: vi.fn(async () => status),
+        late: vi.fn(async () => late),
+      };
+      const r = await doctor(config, auto, process.platform, home);
+      const lines = r.stdout!.split("\n").filter((l) => l.includes("  Schedule: "));
+      expect(lines).toHaveLength(1);
+      expect(r.code).toBe(lines[0].startsWith("failed") ? 1 : 0);
+      return lines[0];
+    }
+    const HEAD = 'ok      Schedule: Automatic refresh "0 7 * * 1" with launchd';
+    const NEXT = "next: 2026-11-02 07:00, 2026-11-09 07:00";
+
+    it("passes without a run, and after a run that updated every page", async () => {
+      expect(await schedule()).toBe(`${HEAD}, last run: n/a, ${NEXT}`);
+      expect(await schedule({ last: { at: ran, failed: [] } })).toBe(
+        `${HEAD}, last run: 2026-11-23 07:05, every page updated, ${NEXT}`,
+      );
+    });
+
+    it("passes after a run with gaps, and gives them", async () => {
+      const partial = [
+        { path: "/d/a.html", gaps: "days: 2" },
+        { path: "/d/b.html", gaps: "hrv" },
+      ];
+      expect(await schedule({ last: { at: ran, failed: [], partial } })).toBe(
+        `${HEAD}, last run: 2026-11-23 07:05, updated with gaps: /d/a.html: days: 2; /d/b.html: hrv, ${NEXT}`,
+      );
+    });
+
+    it("fails when the job is missing from the scheduler or cannot start", async () => {
+      expect(await schedule({ installed: false })).toBe(
+        "failed  Schedule: The job is missing from launchd or cannot start (its Node.js or server file is gone). Run the schedule again.",
+      );
+    });
+
+    it("fails when a scheduled page is gone, also before a failed run", async () => {
+      const gone = `failed  Schedule: no page ${tilde("b.html")}. Make the page again, or run: npx -y @indaco/garmin-personal-mcp@latest schedule off <page>`;
+      expect(await schedule({}, { [A]: nov23(7), "b.html": undefined })).toBe(gone);
+      expect(await schedule(twoFailed, { "b.html": undefined })).toBe(gone);
+      expect(await schedule({}, { [A]: undefined, "b.html": undefined })).toContain(
+        `no page ${tilde(A)}, ${tilde("b.html")}. Make`,
+      );
+    });
+
+    it("fails while a page is not updated since the run that failed", async () => {
+      const before = new Date(Date.parse(ran) - 1).toISOString();
+      const after = new Date(Date.parse(ran) + 1).toISOString();
+      expect(await schedule(twoFailed, { [A]: before, "b.html": before })).toBe(
+        couldNot([A, "b.html"]),
+      );
+      // a page that says the time of the run itself was not made by a later update
+      expect(await schedule(twoFailed, { [A]: ran, "b.html": after })).toBe(couldNot([A]));
+      expect(await schedule(twoFailed, { [A]: "soon", "b.html": after })).toBe(couldNot([A]));
+      expect(await schedule(twoFailed, { [A]: after, "b.html": after })).toBe(
+        `${HEAD}, last run: 2026-11-23 07:05, its failed pages were updated or taken off the schedule since, ${NEXT}`,
+      );
+      // schedule off took b.html off
+      expect(await schedule(twoFailed, { [A]: after })).toContain("taken off the schedule since");
+    });
+
+    it.each([
+      ["another page", (path: string) => writeFileSync(path, "<p>hello</p>"), "could not update"],
+      ["a folder", (path: string) => mkdirSync(path), "no page"],
+    ])("fails while a page that a run failed on is %s", async (_name, put, text) => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+      garmin();
+      const { home, config } = setUp();
+      const path = join(config.dataDir, A);
+      put(path);
+      const last = { at: ran, failed: [failure(path)] };
+      const auto = { ...fakes().auto, status: vi.fn(async () => ({ ...on, pages: [path], last })) };
+      const r = await doctor(config, auto, process.platform, home);
+      expect(r.stdout).toContain(`${text} ${tilde(A)}`);
+    });
+
+    it("gives a saved error and a file name on one line, without control characters", async () => {
+      const error = "HTTP 502: \u001B[31mno\r\nok      API key:\u2028x\u2029y\u009Bm\u0000";
+      const last = (dir: string) => ({
+        last: { at: ran, failed: [{ path: join(dir, A), error }] },
+      });
+      expect(await schedule(last, { [A]: ran })).toBe(
+        `failed  Schedule: the last run (2026-11-23 07:05) could not update ${tilde(A)}: HTTP 502:  [31mno ok      API key: x y m `,
+      );
+      const partial = [{ path: "/d/\na.html", gaps: "days: 2\n3" }];
+      expect(await schedule({ last: { at: ran, failed: [], partial } })).toContain(
+        "updated with gaps: /d/ a.html: days: 2 3, ",
+      );
+    });
+
+    it("gives the gaps of a run whose failed pages were updated since", async () => {
+      const after = new Date(Date.parse(ran) + 1).toISOString();
+      expect(await schedule(failedWithGaps, { [A]: after, "b.html": after })).toBe(
+        `${HEAD}, last run: 2026-11-23 07:05, its failed pages were updated or taken off the schedule since, updated with gaps: /d/c.html: days: 2, ${NEXT}`,
+      );
+    });
+
+    it.each(["a 9999", "9999", "2099-02-30T07:00:00.000Z"])(
+      "does not take an update time of %j as later",
+      async (updated) => {
+        const last = { at: ran, failed: [] };
+        expect(await schedule(twoFailed, { [A]: updated })).toContain("could not update");
+        expect(await schedule({ last }, { [A]: updated }, nov23(11))).toContain("no run since");
+      },
     );
+
+    it("does not take an update time in the future as later: the clock was ahead", async () => {
+      vi.setSystemTime(nov23(12));
+      const last = { at: ran, failed: [] };
+      const now = nov23(12);
+      const ahead = new Date(Date.parse(now) + 1).toISOString();
+      expect(await schedule(twoFailed, { [A]: ahead })).toBe(couldNot([A]));
+      expect(await schedule({ last }, { [A]: ahead }, nov23(11))).toContain("no run since");
+      // an update at this moment is one
+      expect(await schedule(twoFailed, { [A]: now })).toMatch(/^ok /);
+      expect(await schedule({ last }, { [A]: now }, nov23(11))).toMatch(/^ok /);
+    });
+
+    it("passes when a run is late and no page is scheduled", async () => {
+      expect(await schedule({}, {}, nov23(11))).toBe(`${HEAD}, last run: n/a, ${NEXT}`);
+    });
+
+    it("fails for the first problem only", async () => {
+      const late = nov23(11);
+      const all = { installed: false, last: { at: ran, failed: [failure("/d/a.html")] } };
+      expect(await schedule(all, { [A]: undefined }, late)).toContain("The job is missing");
+      const { last } = all;
+      expect(await schedule({ last }, { [A]: undefined }, late)).toContain("no page ");
+      expect(await schedule(twoFailed, { [A]: nov23(6) }, late)).toContain("could not update");
+      expect(await schedule({ last }, { [A]: nov23(6) }, late)).toContain("no run since");
+    });
+
+    it("fails when a run is late and a page was not updated since", async () => {
+      const late = nov23(11);
+      const before = new Date(Date.parse(late) - 1).toISOString();
+      const after = new Date(Date.parse(late) + 1).toISOString();
+      const last = { at: ran, failed: [] };
+      const since = lateText("no run since 2026-11-23 07:05");
+      expect(await schedule({ last }, { [A]: before }, late)).toBe(since);
+      expect(await schedule({ last }, { [A]: after, "b.html": before }, late)).toBe(since);
+      expect(await schedule({}, { [A]: before }, late)).toBe(lateText("no run yet"));
+      // a last run at this moment, and one from a clock that was ahead
+      const now = { at: nov23(23), failed: [] };
+      expect(await schedule({ last: now }, { [A]: before }, late)).toBe(
+        lateText("no run since 2026-11-23 23:05"),
+      );
+      const ahead = { at: new Date(Date.parse(nov23(23)) + 1).toISOString(), failed: [] };
+      expect(await schedule({ last: ahead }, { [A]: before }, late)).toBe(
+        lateText("the last run is unknown (its time is in the future)"),
+      );
+      // the user updated every page by hand
+      expect(await schedule({ last }, { [A]: after }, late)).toBe(
+        `${HEAD}, last run: 2026-11-23 07:05, every page updated, ${NEXT}`,
+      );
+    });
+
+    it("shows a schedule that cannot be read again as an error", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+      garmin();
+      const { home, config } = setUp();
+      const auto = { ...fakes().auto, late: vi.fn().mockRejectedValue(new Error("bad JSON")) };
+      const r = await doctor(config, auto, process.platform, home);
+      expect(r).toMatchObject({ code: 1 });
+      expect(r.stdout).toContain("failed  Schedule: cannot read it: bad JSON");
+    });
   });
 
-  it("fails when the last run could not update a page", async () => {
+  describe("the data files", () => {
+    const REBUILT = "is damaged: delete it, the server makes it again";
+    const OWN = "is damaged: correct or delete it";
+
+    it.each([
+      ["exercises.json", "{", REBUILT],
+      ["exercises.json", "null", REBUILT],
+      ["exercises.json", "[]", REBUILT],
+      ["exercises.json", "{}", REBUILT],
+      ["exercises.json", '{"categories":[]}', REBUILT],
+      ["dashboard-cache.json", "", REBUILT],
+      ["dashboard-cache.json", "5", REBUILT],
+      ["dashboard-cache.json", '{"activities":[]}', REBUILT],
+      ["dashboard-cache.json", '{"hrv":null}', REBUILT],
+      ["dashboard-cache.json", '{"activities":{},"recovery":5}', REBUILT],
+      ["widgets.json", "[", OWN],
+      ["widgets.json", "{}", OWN],
+      ["widgets.json", "null", OWN],
+    ])("fails on a damaged %s: %j", async (file, text, fix) => {
+      expect(await dataFiles((dir) => writeFileSync(join(dir, file), text))).toBe(
+        `failed  Data files: ${join("~", "data", file)} ${fix}`,
+      );
+    });
+
+    it("gives each damaged file", async () => {
+      const line = await dataFiles((dir) => {
+        writeFileSync(join(dir, "exercises.json"), "{");
+        writeFileSync(join(dir, "widgets.json"), "{}");
+        writeFileSync(join(dir, "dashboard-cache.json"), "{}");
+      });
+      expect(line).toBe(
+        `failed  Data files: ${join("~", "data", "exercises.json")} ${REBUILT}, ${join("~", "data", "widgets.json")} ${OWN}`,
+      );
+    });
+
+    it("passes on files that are right", async () => {
+      const line = await dataFiles((dir) => {
+        writeFileSync(join(dir, "exercises.json"), '{"categories":{}}');
+        writeFileSync(join(dir, "dashboard-cache.json"), '{"activities":{},"hrv":{},"x":[]}');
+        writeFileSync(join(dir, "widgets.json"), "[]");
+      });
+      expect(line).toBe("ok      Data files: readable");
+    });
+
+    it("fails on a file that cannot be read", async () => {
+      const line = await dataFiles((dir) => mkdirSync(join(dir, "widgets.json")));
+      expect(line).toBe(
+        `failed  Data files: cannot read ${join("~", "data", "widgets.json")}: it is not a file`,
+      );
+    });
+
+    skipIfNoMode("fails on a file that the user has no access to", async () => {
+      const line = await dataFiles((dir) =>
+        writeFileSync(join(dir, "widgets.json"), "[]", { mode: 0o000 }),
+      );
+      expect(line).toMatch(/^failed {2}Data files: cannot read .*widgets\.json: EACCES/);
+    });
+
+    it("leaves a data folder under a file to its own check", async () => {
+      vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
+      garmin();
+      const { home, config } = setUp();
+      const dataDir = join(config.apiKeyFile, "data");
+      const r = await run({ ...config, dataDir }, home, off());
+      expect(r.stdout).toContain("ok      Data files: readable");
+    });
+  });
+
+  // readFileSync waits for a writer of a FIFO without an end
+  it.skipIf(process.platform === "win32")("does not read a file that is a FIFO", async () => {
     vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
     garmin();
     const { home, config } = setUp();
-    const last = {
-      at: "2026-11-02T07:00:00Z",
-      failed: [{ path: join(home, "a.html"), error: "gone" }],
+    const fifo = (name: string) => {
+      execFileSync("mkfifo", [join(config.dataDir, name)]);
+      return join(config.dataDir, name);
     };
-    const auto = { ...fakes().auto, status: vi.fn(async () => ({ ...on, last })) };
+    const pages = [fifo("a.html")];
+    fifo("widgets.json");
+    fifo("dashboard-cache.json");
+    const auto = { ...fakes().auto, status: vi.fn(async () => ({ ...on, pages })) };
     const r = await doctor(config, auto, process.platform, home);
-    expect(r.code).toBe(1);
-    expect(r.stdout).toContain(
-      `failed  Schedule: the last run (2026-11-02T07:00:00Z) could not update ${join("~", "a.html")}: gone`,
-    );
-  });
-
-  it("accepts a last run that updated every page", async () => {
-    vi.stubEnv("GARMIN_PERSONAL_API_KEY", "");
-    garmin();
-    const { home, config } = setUp();
-    const last = { at: "2026-11-02T07:00:00Z", failed: [] };
-    const auto = { ...fakes().auto, status: vi.fn(async () => ({ ...on, last })) };
-    expect((await doctor(config, auto, process.platform, home)).code).toBe(0);
+    expect(r.stdout).toContain(`cannot read ${tilde("widgets.json")}: it is not a file`);
+    expect(r.stdout).toContain(`failed  Schedule: no page ${tilde("a.html")}.`);
+    const text = info(config, { ...on, pages }, {}, home);
+    expect(text).toContain("    - a.html: not a dashboard page, scheduled");
+    expect(text).toContain("  last sync:            n/a");
   });
 
   it("fails on a damaged schedule file and still does the other checks", async () => {
