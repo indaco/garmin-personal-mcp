@@ -404,10 +404,16 @@ notes. `getYearReview` leaves them out of its answer too. The server cannot remo
 chat. If another tool showed the data earlier in the same chat, the assistant has it. Then only the
 prompt tells the assistant not to use that data in the notes. Make a page for someone else in a new
 chat. A widget does not show when the settings exclude its data. With `recovery` excluded, the page
-has no Recovery board. `names` removes the names of the activities; the sport stays. The file holds
-only the chosen languages and the CSS of the chosen themes. A page without English (`["it"]`) opens
-in Italian for every reader; English stays in the file only for a text that has no translation. With
-one language or one theme, the page has no menu to choose it.
+has no Recovery board. `names` removes the names of the activities; the sport stays. A page can have
+a name in `exclude` that your version of the server does not know, for example from a newer version.
+Your version cannot leave out the data of that name: the data is in the file until a version that
+knows the name writes the page. New settings that have `exclude`, also as an empty list, keep the
+name when the settings block is valid JSON. Settings without `exclude` remove it, and they also put
+all the excluded data back in the page. To remove only that name, edit `exclude` in the
+`garmin-settings` block of the file. The file holds only the chosen languages and the CSS of the
+chosen themes. A page without English (`["it"]`) opens in Italian for every reader; English stays in
+the file only for a text that has no translation. With one language or one theme, the page has no
+menu to choose it.
 
 Each page keeps its own settings, so a personal page and a page for your coach can be two files, for
 example `garmin-dashboard.html` and `garmin-dashboard-coach.html`. In the `dashboard-setup`

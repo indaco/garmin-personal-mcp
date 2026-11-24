@@ -42,8 +42,9 @@ const names = (v: unknown) => (strings(v)?.length ? strings(v) : undefined);
 
 /**
  * The settings of a settings block. The user can edit the page, so a block can hold anything: a value
- * of another type counts as not set. Code reads the settings of a page only through this function. A
- * new setting does not compile without its line here.
+ * of another type and an empty text count as not set, and so does an empty list of languages or themes.
+ * Code reads the settings of a page only through this function. A new setting does not compile without
+ * its line here.
  */
 export function readSettings(block: unknown): Settings {
   const v = new Map<string, unknown>(Object.entries(block ?? {}));

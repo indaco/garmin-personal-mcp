@@ -40,39 +40,52 @@ Answer in my language.
      the last 52 weeks. Say that the page does not start again on 1 January: in a new year it keeps
      its start day.
    When I choose "Type my own" and give no text, ask for the text in chat.
+   The questions are for the `settings` of the preview. A change that I make in my answers adds no
+   question: without my word, the page keeps the default of that question.
    A reply such as "defaults", "use the defaults" or "all defaults" means the option marked
    (default) of each question: I keep these settings. With a change, for example "the defaults, but
    only running", I keep these settings, changed as I said. I choose "Reset these settings" only
    when I pick it in the Settings question, by its name or its number, or ask in my own words for a
    reset of all the settings, for example "reset" or "reset, but only running". To reset a part, for
    example "reset the theme", is my own choice: take out only that part, and keep the other
-   settings. If you cannot tell which of the two I mean, ask me.
+   settings. To reset the Year tab is not my own choice for the settings, but a no to the Year tab.
+   If you cannot tell whether I mean all the settings or a part, or which setting the part is, ask
+   me: for example for "reset recovery" when `exclude` has `recovery` and `recoveryHistory` is true.
+   Each time that a change takes an item out of `exclude`, say that the page has that data again.
 3. Call `writeDashboard` with `weeks` = {{weeks}} and `layout` = "{{layout}}". If I chose "Reset
    these settings", also give `settings` = only the `title` and `headline` of `settings`, the ones
    that it has, or {} when it has none: the reset then removes the other settings. If I asked for a
    reset with a change, for example "reset, but only running", add the change to the settings of the
    reset.
-   If I typed my own choice, give `settings` = `settings` changed as I said. If I said yes to the
-   workout comparison, give `settings` with `workouts` = true: added to the settings of this step,
-   or to `settings` when this step gives none. Do the same with `recoveryHistory` = true if I said
-   yes to the Recovery trend. Do the same with `since` if I chose a start day. Give no `weeks` when
-   I chose a start day or keep the `since` of `settings`. Also save the answer about the Year tab:
-   `yearReview` = true if I said yes to it, also as a change to a reset, or false if I said no to it
-   or chose "Reset these settings" without an answer to this question and did not keep the tab. No
-   update asks again. If I got no question about it or gave no answer to it, did not choose "Reset
-   these settings" and said nothing about the tab, there is no answer to save: give no `answers`,
-   and leave `yearReview` as it is in `settings`. If there is an answer and this step gives
-   `settings`, put `yearReview` in them, also when they are {}. If there is an answer and it gives
-   none, give `answers` = { "yearReview": true } or { "yearReview": false }: the page keeps its
-   other settings. Never give `settings` and `answers` together. The server gets the data, writes
-   the page from its template, and returns the path of the page and a digest of the data. An
-   existing page stays as a `.bak` file.
+   If I typed my own choice for the settings, give `settings` = `settings` changed as I said. My own
+   title or headline is not such a choice: it is for step 5. If I said yes to the workout
+   comparison, give `settings` with `workouts` = true: added to the settings of this step, or to
+   `settings` when this step gives none. Do the same with `recoveryHistory` = true if I said yes to
+   the Recovery trend. Do the same with `since` if I chose a start day. Give no `weeks` when I chose
+   a start day or keep the `since` of `settings`.
+   Also save my answer about the Year tab. It is the first of these that applies:
+   - true: I said yes to it, also as a change to a reset, for example "reset, but keep the Year
+     tab".
+   - false: I said no to it, you asked about it and I replied "defaults", or I chose "Reset these
+     settings".
+   - no answer, in all other cases: give no `answers`, and leave `yearReview` as it is in
+     `settings`.
+   With an answer: if this step gives `settings` for another reason, also when they are {}, put
+   `yearReview` in them. Else give `answers` = { "yearReview": true } or { "yearReview": false }:
+   the page keeps its other settings. Never give `settings` and `answers` together. No update asks
+   again. The server gets the data, writes the page from its template, and returns the path of the
+   page and a digest of the data. An existing page stays as a `.bak` file.
 4. Write at most 5 coach notes from the digest. Each note names a specific number of the digest, for
    example "load ratio 1.18 while HRV was under its weekly average on 3 of the last 7 nights".
    Training suggestions only, no medical advice. Plain text, in my language.
 5. Call `writeDashboard` again with the same `weeks` and the `notes`, without `layout`. The page keeps
    its layout. If I typed my own title or headline, also give `settings` = the `settings` of the
    last result with `title` and `headline` set to my texts: the other settings of the page stay.
+   If the reply of step 3 has `offers`, I gave no answer about the Year tab: do not ask again and
+   say nothing about the tab, the `training-dashboard-update` prompt asks later. If I answer after
+   step 3, save the answer in the next `writeDashboard` call: `yearReview` in its `settings` if it
+   gives them, else `answers`. If no such call is left, make one more with `answers` and the same
+   `weeks` and `notes`, without `layout`.
 6. If the result has `missingProfileLanguage`, say first that my Garmin profile uses that language,
    that the page has no texts in it yet, so the page shows English, and that you can add it.
    Make that language the default of the question below instead of "No".

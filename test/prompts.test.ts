@@ -107,8 +107,10 @@ describe("prompts", () => {
       expect(text).toContain(
         "name each item that it excludes. Say that a\n     reset adds them to the page again, also on each automatic update",
       );
-      expect(text).toContain(
-        "If I typed my own choice, give `settings` = `settings` changed as I said.",
+      expect(text.replace(/\s+/g, " ")).toContain(
+        "If I typed my own choice for the settings, give `settings` = `settings` changed as I said. " +
+          "My own title or headline is not such a choice: it is for step 5. If I said yes to the " +
+          "workout comparison, give `settings` with `workouts` = true:",
       );
       expect(text).toContain('"Keep the title" (default: the `title` of `settings`');
       expect(text).toContain('"Keep the headline" (default: the `headline`\n     of `settings`');
@@ -117,18 +119,23 @@ describe("prompts", () => {
         'If I chose "Reset these settings", also give `settings` = only the `title` and `headline` ' +
           "of `settings`, the ones that it has, or {} when it has none: the reset then removes the " +
           'other settings. If I asked for a reset with a change, for example "reset, but only ' +
-          'running", add the change to the settings of the reset. If I typed my own choice, give',
+          'running", add the change to the settings of the reset. If I typed my own choice for the settings, give',
       );
       // each question has a "(default)" option: a short reply must not drop `exclude`
       expect(text.replace(/\s+/g, " ")).toContain(
-        'A reply such as "defaults", "use the defaults" or "all defaults" means the option marked ' +
+        "The questions are for the `settings` of the preview. A change that I make in my answers adds " +
+          "no question: without my word, the page keeps the default of that question. " +
+          'A reply such as "defaults", "use the defaults" or "all defaults" means the option marked ' +
           "(default) of each question: I keep these settings. With a change, for example " +
           '"the defaults, but only running", I keep these settings, changed as I said. I choose ' +
           '"Reset these settings" only when I pick it in the Settings question, by its name or its ' +
           'number, or ask in my own words for a reset of all the settings, for example "reset" or ' +
           '"reset, but only running". To reset a part, for example "reset the theme", is my own ' +
-          "choice: take out only that part, and keep the other settings. If you cannot tell which of " +
-          "the two I mean, ask me. 3. Call `writeDashboard`",
+          "choice: take out only that part, and keep the other settings. To reset the Year tab is not my " +
+          "own choice for the settings, but a no to the Year tab. If you cannot tell whether I mean all the settings or a part, or which setting the " +
+          'part is, ask me: for example for "reset recovery" when `exclude` has `recovery` and ' +
+          "`recoveryHistory` is true. Each time that a change takes an item out of `exclude`, say that " +
+          "the page has that data again. 3. Call `writeDashboard`",
       );
       // no text calls the reset "the defaults": a reply with that word keeps the settings
       expect(text).not.toMatch(/"Use\s+the\s+defaults|cho(se|ose)\s+the\s+defaults/);
@@ -899,9 +906,31 @@ describe("recovery trend", () => {
   it("keeps the recap of the calendar year in the setup prompt, but not on a shared page without a yes", async () => {
     const setup = await pageText("dashboard-setup");
     expect(setup.replace(/\s+/g, " ")).toContain(
-      "When the `settings` of the preview have `yearReview` = true, tell me whether the page keeps the recap of " +
-        "the calendar year, which holds days before its period, and that I can change this. A page for a " +
-        "person I share it with does not keep it without my yes.",
+      "After this call, when the `settings` of the preview have `yearReview` = true, tell me, without " +
+        "a question, whether the page keeps the recap of the calendar year, which holds days before " +
+        "its period, and that I can change this. A page for a person I share it with does not keep it " +
+        'without my yes. With `pageFrom` = "assistant", speak of the recap in the file of the page, not ' +
+        "of a Year tab: a designed page has none. Tell me also when those settings have a `title` or `headline` that the page " +
+        "does not keep. If the reply has `addedWidgets`",
+    );
+  });
+
+  it("takes no short reply for the data of a shared page in the setup prompt", async () => {
+    expect(await pageText("dashboard-setup")).toContain(
+      "For me, the default is all of them. For a shared page, ask about each one. A shared page has no " +
+        'default here: a reply such as "defaults", or no reply, does not answer this question. Ask it ' +
+        "again at once, and go to step 3 only with my answer. A selection answers for all four, also " +
+        '"none". The server removes from the file the data that I do not select.',
+    );
+  });
+
+  it("replaces the settings of the page in the setup prompt, and leaves out each default", async () => {
+    expect(await pageText("dashboard-setup")).toContain(
+      "These settings replace those of the page: a setting that you leave out goes back to its " +
+        "default. Give `settings` also when they are {}. Leave out each setting that keeps its default, also `title` or `headline` when I " +
+        "chose the text that the question offers: the page then shows its own text in each language. " +
+        "The exception is `yearReview` = false, which is saved. If there is no page at the path, also " +
+        'give `layout` = "preset". `yearReview` is',
     );
   });
 
@@ -918,17 +947,14 @@ describe("recovery trend", () => {
       expect(text).toContain(
         "Do the same with `recoveryHistory` = true if I said yes to the Recovery trend. Do the same " +
           "with `since` if I chose a start day. Give no `weeks` when I chose a start day or keep the " +
-          "`since` of `settings`. Also save the answer about the Year tab: `yearReview` = " +
-          "true if I said yes to it, also as a change to a reset, or false if I said no to it or chose " +
-          '"Reset these settings" without an answer to this question and did not keep the tab. No update ' +
-          "asks again. " +
-          'If I got no question about it or gave no answer to it, did not choose "Reset these settings" ' +
-          "and said nothing about " +
-          "the tab, there is no answer to save: give no `answers`, and " +
-          "leave `yearReview` as it is in `settings`. If there is an answer " +
-          "and this step gives `settings`, put `yearReview` in them, also when they are {}. If there is " +
-          'an answer and it gives none, give `answers` = { "yearReview": true } or { "yearReview": false }: the page ' +
-          "keeps its other settings. Never give `settings` and `answers` together. The server gets the data",
+          "`since` of `settings`. Also save my answer about the Year tab. It is the first of these that " +
+          'applies: - true: I said yes to it, also as a change to a reset, for example "reset, but keep ' +
+          'the Year tab". - false: I said no to it, you asked about it and I replied "defaults", or I ' +
+          'chose "Reset these settings". - no answer, in all other cases: give no `answers`, and leave ' +
+          "`yearReview` as it is in `settings`. With an answer: if this step gives `settings` for " +
+          "another reason, also when they are {}, put `yearReview` in them. Else give `answers` = " +
+          '{ "yearReview": true } or { "yearReview": false }: the page keeps its other settings. Never ' +
+          "give `settings` and `answers` together. No update asks again. The server gets the data",
       );
     }
   });
@@ -944,10 +970,45 @@ describe("recovery trend", () => {
         "data of days before its period: this matters for a page that I share.",
     );
     expect(setup).toContain(
-      "`yearReview` (true when I said yes to the Year tab, when the page is for me and the " +
-        "`settings` of the preview have it as true, or when I ask for it; else false: the answer is " +
-        'saved, and no update asks again; with `pageFrom` = "assistant", do not give it as false), `shared`',
+      "`yearReview` (see below), `shared` (true when the page is for a person I share it with),",
     );
+    expect(setup).toContain(
+      "`yearReview` is the first of these that applies: - true: I said yes to the Year tab or asked " +
+        "for it, or the page is for me, the `settings` of the preview have it as true and I did not " +
+        'say no. - left out: `pageFrom` is "assistant". - false: I said no, you asked and I replied ' +
+        '"defaults", or the page is for a person I share it with and the `settings` of the preview ' +
+        "have it as true. The answer is saved: no update asks again. - no answer, in all other cases: " +
+        "as the `settings` of the preview have it, or left out when they do not have it. After this " +
+        "call,",
+    );
+  });
+
+  it("does not ask again after the questions, and saves a late answer, in the preset and blank prompts", async () => {
+    for (const layout of ["preset", "blank"]) {
+      const text = await pageText("training-dashboard", { layout });
+      const step5 = text.slice(text.indexOf("5. Call"), text.indexOf("6. If the result has"));
+      expect(step5).toContain(
+        "the other settings of the page stay. If the reply of step 3 has `offers`, I gave no answer about " +
+          "the Year tab: do not ask again and say nothing about the tab, the " +
+          "`training-dashboard-update` prompt asks later. If I " +
+          "answer after step 3, save the answer in the next `writeDashboard` call: `yearReview` in its " +
+          "`settings` if it gives them, else `answers`. If no such call is left, make one more with " +
+          "`answers` and the same `weeks` and `notes`, without `layout`.",
+      );
+    }
+  });
+
+  it("saves no answer in the setup prompt when I gave none, and does not ask again", async () => {
+    const setup = await pageText("dashboard-setup");
+    // step 5 is not for each page: without coach notes it has no call
+    const step4 = setup.slice(setup.indexOf("4. Call"), setup.indexOf("5. Unless"));
+    expect(step4).toContain(
+      "If the reply of this call has `offers`, I gave no answer about the Year tab: do not ask again " +
+        "and say nothing about the tab, the `training-dashboard-update` prompt asks later. If I answer after this call, save the " +
+        "answer with `answers`: in the call of step 5, or in one more `writeDashboard` call with the " +
+        "same `weeks` and `path`, and the same `notes` if there are any.",
+    );
+    expect(setup).not.toContain("else false");
   });
 
   it("does not ask about the settings of a page that has only an answer about the Year tab", async () => {
