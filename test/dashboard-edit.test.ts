@@ -31,6 +31,55 @@ window.GARMIN = {
 };
 </script>
 `;
+
+describe("readBlock", () => {
+  it.each([
+    [
+      "the first block",
+      "/* garmin-data:start */1/* garmin-data:end *//* garmin-data:start */2/* garmin-data:end */",
+      1,
+    ],
+    [
+      "spaces and line ends in the comments",
+      "/*\n garmin-data:start  */[2]/*garmin-data:end\n*/",
+      [2],
+    ],
+    [
+      "the end comment after the start comment",
+      "/* garmin-data:end *//* garmin-data:start */3/* garmin-data:end */",
+      3,
+    ],
+    ["no start comment", "1/* garmin-data:end */", undefined],
+    ["no end comment", "/* garmin-data:start */1", undefined],
+    [
+      "an end comment before the start comment only",
+      "/* garmin-data:end *//* garmin-data:start */1",
+      undefined,
+    ],
+    ["another block", "/* garmin-layout:start */1/* garmin-layout:end */", undefined],
+    [
+      "the end comment of another block",
+      "/* garmin-data:start */1/* garmin-layout:end */",
+      undefined,
+    ],
+    ["an empty page", "", undefined],
+  ])("reads a page with %s", (_name, page, value) => {
+    expect(readBlock(page, "data")).toEqual(value);
+  });
+
+  it("refuses two start comments before one end comment", () => {
+    const page = "/* garmin-data:start */1/* garmin-data:start */2/* garmin-data:end */";
+    expect(() => readBlock(page, "data")).toThrow("not valid JSON");
+  });
+
+  // with a search from each start comment, this page takes more than 10 seconds
+  it("reads a long page with many start comments and no end comment", () => {
+    const before = performance.now();
+    expect(readBlock("/* garmin-data:start */".repeat(40_000), "data")).toBeUndefined();
+    expect(performance.now() - before).toBeLessThan(2_000);
+  });
+});
+
 const data = {
   start: "2026-08-03",
   end: "2026-10-26",

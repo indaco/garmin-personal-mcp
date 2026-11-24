@@ -225,10 +225,14 @@ function jsonOf(block: Block, value: unknown, space?: number): string {
 
 /** The JSON value of a block; undefined when the page has no such block. */
 export function readBlock(page: string, block: Block): unknown {
-  const m = marker(block).exec(page);
-  if (!m) return undefined;
+  // in two steps: with many start comments and no end comment, `marker` reads the page once for each
+  const start = new RegExp(`/\\*\\s*garmin-${block}:start\\s*\\*/`).exec(page);
+  if (!start) return undefined;
+  const rest = page.slice(start.index + start[0].length);
+  const end = new RegExp(`/\\*\\s*garmin-${block}:end\\s*\\*/`).exec(rest);
+  if (!end) return undefined;
   try {
-    return JSON.parse(m[1]);
+    return JSON.parse(rest.slice(0, end.index));
   } catch {
     throw new BadBlockError(`The garmin-${block} block of the page is not valid JSON`);
   }
@@ -319,7 +323,7 @@ function weeksOf(page: string | undefined): number | undefined {
 }
 
 /** A real day written as yyyy-MM-dd: Date.parse turns 2026-02-30 into March 2, and 2026-13-01 into NaN. */
-function isDay(v: unknown): v is string {
+export function isDay(v: unknown): v is string {
   if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
   const t = Date.parse(`${v}T00:00:00Z`);
   return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === v;
@@ -346,6 +350,16 @@ function serverOf(page: string): string {
     return typeof v === "string" && /^\d+\.\d+\.\d+$/.test(v) ? v : "n/a";
   } catch {
     return "n/a";
+  }
+}
+
+/** What the data block of a page says; undefined when the text is not a dashboard page. */
+export function pageInfo(page: string): { server: string; updated: unknown } | undefined {
+  try {
+    const data = readBlock(page, "data");
+    return isObject(data) ? { server: serverOf(page), updated: data.updated } : undefined;
+  } catch {
+    return undefined;
   }
 }
 
