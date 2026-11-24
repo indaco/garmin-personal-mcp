@@ -61,6 +61,10 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
   assistants".
 - **Dependencies are the latest versions.** Runtime libraries are dev dependencies, because tsdown
   bundles them into `dist/index.js`.
+- **Strict types.** Give unknown data the type `unknown` and narrow it. The only `any` in `src/` is
+  the decoded .FIT message in `src/fit.ts`. Use string-literal unions in place of `enum`, and named
+  exports. Correct the code, not `tsconfig.json`, when it does not compile. Do not use `@ts-ignore`.
+- **Unit tests do not wait in real time.** Use `vi.useFakeTimers()`.
 - **No personal data.** Tests use synthetic data and `fitFile()` from `test/fit-file.ts`, never a
   real .FIT file or a real Garmin call.
 
