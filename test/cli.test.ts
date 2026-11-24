@@ -13,6 +13,7 @@ import {
 import { tmpdir, userInfo } from "node:os";
 import { dirname, join } from "node:path";
 import { PassThrough } from "node:stream";
+import { stripVTControlCharacters } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { version } from "../package.json";
 import {
@@ -25,6 +26,7 @@ import {
   promptKey,
   RETRY_MS,
   setup,
+  styled,
   summary,
 } from "../src/cli";
 import { type Config, loadConfig } from "../src/config";
@@ -1109,6 +1111,131 @@ describe("cli", () => {
     expect(summary({ ...on, next: [] })).toContain("\nNext: n/a\n");
   });
 });
+
+const bold = (text: string) => `\u001B[1m${text}\u001B[22m`;
+const green = (text: string) => `\u001B[32m${text}\u001B[39m`;
+const red = (text: string) => `\u001B[31m${text}\u001B[39m`;
+
+describe("styled", () => {
+  it.each([
+    [
+      "a label",
+      "Key file:     ~/k (found, default)",
+      `${bold("Key file:")}     ~/k (found, default)`,
+    ],
+    [
+      "an indented label",
+      "  last run:     2026-11-23 11:00",
+      `  ${bold("last run:")}     2026-11-23 11:00`,
+    ],
+    [
+      "a value with a colon",
+      "API host:     https://x:8 (default)",
+      `${bold("API host:")}     https://x:8 (default)`,
+    ],
+    [
+      "a value that ends with a colon",
+      "  last run:     n/a, failed:",
+      `  ${bold("last run:")}     n/a, failed:`,
+    ],
+    ["a Windows path", "    C:\\d\\a.html: HTTP 401", `    ${bold("C:\\d\\a.html:")} HTTP 401`],
+    ["a list item, not its dash,", "    - /d/a.html: n/a", `    - ${bold("/d/a.html:")} n/a`],
+    ["a label that starts with a dash", "    -a.html: n/a", `    ${bold("-a.html:")} n/a`],
+    ["a label without a value", "Schedule:", bold("Schedule:")],
+  ])("makes %s bold in info", (_, line, expected) => {
+    expect(styled("info", line)).toBe(expected);
+  });
+
+  it.each([["garmin-personal-mcp 0.15.0"], ["C:\\d\\a.html"], [""], ["   "], [": x"]])(
+    "does not change the info line %j, which has no label",
+    (line) => {
+      expect(styled("info", line)).toBe(line);
+    },
+  );
+
+  it.each([
+    ["ok      Key file: ~/k", `${green("ok")}      ${bold("Key file:")} ~/k`],
+    ["failed  API key: HTTP 401: denied", `${red("failed")}  ${bold("API key:")} HTTP 401: denied`],
+    ["All checks passed.", green("All checks passed.")],
+    ["1 check failed.", red("1 check failed.")],
+    ["12 checks failed.", red("12 checks failed.")],
+  ])("styles the doctor line %j", (line, expected) => {
+    expect(styled("doctor", line)).toBe(expected);
+  });
+
+  it.each([
+    ["okay  Key file: x"],
+    ["failedx Key file: x"],
+    ["  ok  Key file: x"],
+    ["ok      no name"],
+    ["a detail: of an error"],
+    ["All checks passed. Not"],
+    ["Not All checks passed."],
+    ["0 of 3 checks failed."],
+    ["1 check failed. More"],
+    [""],
+  ])("does not change the doctor line %j", (line) => {
+    expect(styled("doctor", line)).toBe(line);
+  });
+
+  it("does not change the sentence about a missing job", () => {
+    const config = { baseUrl: "https://api.test", apiKeyFile: "/h/key", dataDir: "/h/none" };
+    const line = info(config, { ...on, installed: false }, {}, "/h")
+      .split("\n")
+      .filter((l) => l.includes("job is missing"));
+    expect(line).toHaveLength(1);
+    expect(styled("info", line[0])).toBe(line[0]);
+  });
+
+  it("styles each line of a text", () => {
+    expect(styled("info", "v 1\nA: 1\n  B: 2")).toBe(`v 1\n${bold("A:")} 1\n  ${bold("B:")} 2`);
+    expect(styled("doctor", "ok      A: 1\nfailed  B: 2\nmore: text\n1 check failed.")).toBe(
+      `${green("ok")}      ${bold("A:")} 1\n${red("failed")}  ${bold("B:")} 2\nmore: text\n${red("1 check failed.")}`,
+    );
+    expect(styled("doctor", "ok      A: 1\nAll checks passed.")).toBe(
+      `${green("ok")}      ${bold("A:")} 1\n${green("All checks passed.")}`,
+    );
+  });
+
+  it("does not change another command or a help", () => {
+    for (const command of ["schedule", "refresh", "setup", "--version", "--help"]) {
+      expect(styled(command, "Next: n/a\nok      A: 1")).toBe("Next: n/a\nok      A: 1");
+    }
+    for (const command of ["info", "doctor"]) {
+      const help = COMMAND_HELP[command]!;
+      expect(styled(command, help)).toBe(help);
+    }
+  });
+
+  it("only adds styles: the text and its alignment stay", () => {
+    const status = {
+      scheduled: true,
+      installed: true,
+      pages: ["/d/a.html"],
+      last: { at: "2026-11-23T10:00:00Z", failed: [{ path: "/d/a.html", error: "HTTP 401: no" }] },
+    } as Status;
+    const text = info({ ...loadConfig(), dataDir: join(tmpdir(), "no-data") }, status);
+    const out = styled("info", text);
+    expect(out).not.toBe(text);
+    expect(stripVTControlCharacters(out)).toBe(text);
+  });
+});
+
+/** Runs `task` with this answer of stdout to "do you have colors"; a pipe and a file have no answer. */
+async function withColors<T>(hasColors: (() => boolean) | undefined, task: () => Promise<T>) {
+  const own = Object.getOwnPropertyDescriptor(process.stdout, "hasColors");
+  Object.defineProperty(process.stdout, "hasColors", { value: hasColors, configurable: true });
+  try {
+    return await task();
+  } finally {
+    if (own) Object.defineProperty(process.stdout, "hasColors", own);
+    else Reflect.deleteProperty(process.stdout, "hasColors");
+  }
+}
+
+const yes = () => true;
+const no = () => false;
+const TEXT = "ok      A: 1";
 
 /** Imports the entry point with these arguments, the transport and the commands mocked. */
 async function start(
@@ -2411,6 +2538,23 @@ describe("the entry point", () => {
     expect(stdout).not.toHaveBeenCalled();
     expect(stderr).toHaveBeenCalledWith(`${error}\n\n${HELP}\n`);
     expect(process.exitCode).toBe(1);
+  });
+
+  it.each([
+    ["styles info in a terminal", "info", yes, `${bold("ok      A:")} 1`],
+    ["styles doctor in a terminal", "doctor", yes, `${green("ok")}      ${bold("A:")} 1`],
+    ["styles no other command", "schedule", yes, TEXT],
+    ["styles nothing when the terminal has no colors or NO_COLOR is set", "info", no, TEXT],
+    ["styles nothing in a pipe or a file", "info", undefined, TEXT],
+  ])("%s", async (_, command, hasColors, expected) => {
+    const s = await withColors(hasColors, () => start([command], { code: 0, stdout: TEXT }));
+    expect(s.stdout).toHaveBeenCalledWith(`${expected}\n`);
+  });
+
+  it("styles no error", async () => {
+    const s = await withColors(yes, () => start(["info"], { code: 1, stderr: TEXT }));
+    expect(s.stdout).not.toHaveBeenCalled();
+    expect(s.stderr).toHaveBeenCalledWith(`${TEXT}\n`);
   });
 
   it.each(["info", "refresh", "schedule"])(

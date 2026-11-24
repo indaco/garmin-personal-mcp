@@ -28,6 +28,9 @@ set it in the terminal too:
 GARMIN_DATA_DIR=/path/to/garmin-data npx -y @indaco/garmin-personal-mcp@latest info
 ```
 
+In a terminal, `info` and `doctor` use bold text and colors from the theme of the terminal. In a pipe
+or a file, or when `NO_COLOR` is set to a value (for example `NO_COLOR=1`), the output is plain text.
+
 `--help` lists the commands:
 
 ```text

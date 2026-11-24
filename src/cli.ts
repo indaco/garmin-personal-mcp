@@ -4,6 +4,7 @@ import { homedir, userInfo } from "node:os";
 import { dirname, join, resolve as absolute } from "node:path";
 import { createInterface } from "node:readline";
 import { Writable } from "node:stream";
+import { styleText } from "node:util";
 import { version } from "../package.json";
 import { GarminApiClient, KEY_PAGE_URL, KeyRefusedError } from "./api-client";
 import { type Config, loadConfig } from "./config";
@@ -135,6 +136,34 @@ export interface CliResult {
   code: number;
   stdout?: string;
   stderr?: string;
+}
+
+type Style = Parameters<typeof styleText>[0];
+
+// the caller knows that the terminal has colors; a Node.js 22 without this option does not look either
+const style = (as: Style, text: string): string => styleText(as, text, { validateStream: false });
+
+/**
+ * The text of `info` or `doctor` with styles, for a terminal with colors; another text as it is. Only
+ * bold, green and red: the terminal theme gives the colors, so a light and a dark one can show them.
+ */
+export function styled(command: string, text: string): string {
+  if (text === COMMAND_HELP[command]) return text;
+  if (command === "info") {
+    return text.replace(
+      /^([^\S\n]*(?:- )?)(\S.*?:)(?=\s|$)/gm,
+      (_, indent: string, label: string) => indent + style("bold", label),
+    );
+  }
+  if (command !== "doctor") return text;
+  return text
+    .replace(
+      /^(ok|failed)( +)(\S.*?:)(?=\s|$)/gm,
+      (_, result: string, space: string, name: string) =>
+        style(result === "ok" ? "green" : "red", result) + space + style("bold", name),
+    )
+    .replace(/^All checks passed\.$/m, (line) => style("green", line))
+    .replace(/^\d+ checks? failed\.$/m, (line) => style("red", line));
 }
 
 /** A wrong command or flag: the error and the help, on stderr. */
