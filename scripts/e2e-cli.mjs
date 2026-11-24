@@ -544,8 +544,9 @@ if (ptyPath) {
     check("terminal: Ctrl-C does not show what you typed", !r.out.includes("abc"), r.out);
   }
   for (const command of ["info", "doctor"]) {
-    // an empty NO_COLOR is not set
-    const { env } = newHome({ TERM: "xterm-256color", NO_COLOR: "" });
+    const { env } = newHome({ TERM: "xterm-256color" });
+    // Node.js 22 takes an empty one as set
+    delete env.NO_COLOR;
     delete env.NODE_DISABLE_COLORS;
     delete env.FORCE_COLOR;
     await run(["setup"], env, `${KEY}\n`);
