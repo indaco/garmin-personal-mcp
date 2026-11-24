@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir, userInfo } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { PassThrough } from "node:stream";
 import { stripVTControlCharacters } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -1000,7 +1000,7 @@ describe("cli", () => {
       const last = { at: nov23(11), failed: [], partial: [{ path: `/d/${name}`, gaps: "a\tb" }] };
       const shown = "a Server log: x [2K.html";
       const all = text({ ...on, pages: [`/d/${name}`], last });
-      expect(all).toContain(`    - /d/${shown}: missing, scheduled\n`);
+      expect(all).toContain(`    - ${resolve(`/d/${shown}`)}: missing, scheduled\n`);
       expect(all).toContain(`    - /d/${shown}: a b\n`);
       expect(text(new Error("crontab\nfailed"))).toContain("cannot read it: crontab failed");
       const schedule = summary({ ...on, pages: [`/d/${name}`], last });
