@@ -1086,10 +1086,21 @@ describe("exercise catalogue", () => {
     expect(log).toHaveBeenCalledWith("WARN", "Cannot read the exercise catalogue: boom");
   });
 
+  it.each(["{}", "null", '{"categories":[]}', '{"categories":null}'])(
+    "gives sets without muscles when the saved copy is %s",
+    async (text) => {
+      writeFileSync(catalogueFile(), text);
+      const out = JSON.parse(await tools.getActivitySets(1));
+      expect(out.exercises[0]).not.toHaveProperty("primaryMuscles");
+      expect(log).not.toHaveBeenCalled();
+    },
+  );
+
   it("gives sets without muscles when there is no catalogue at all", async () => {
     api.getExerciseCatalogue.mockResolvedValue(new TextEncoder().encode('{"no":"categories"}'));
     const out = JSON.parse(await tools.getActivitySets(1));
     expect(out.exercises[0]).not.toHaveProperty("primaryMuscles");
+    expect(existsSync(catalogueFile())).toBe(false);
   });
 });
 

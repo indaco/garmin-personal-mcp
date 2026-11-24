@@ -659,15 +659,15 @@ log.
 The server is also a command for a terminal. A command does one task and stops: it does not start
 the MCP server.
 
-| Command                                  | What it does                                                                     |
-| ---------------------------------------- | -------------------------------------------------------------------------------- |
-| `info`                                   | shows the version, the settings and where the files are. It never shows the key. |
-| `doctor`                                 | tests the API key, the folders and the schedule. It never shows the key.         |
-| `setup [--force]`                        | tests the API key and saves it in a file that only you can read                  |
-| `refresh [page.html]`                    | updates a dashboard page one time                                                |
-| `schedule [daily\|weekdays\|weekly ...]` | shows, sets or stops the automatic update of a page                              |
-| `--version`, `-v`                        | shows the version                                                                |
-| `--help`, `-h`                           | lists the commands. After a command, it shows the help of that command.          |
+| Command                                  | What it does                                                                                    |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `info`                                   | shows the version, the settings, the files, the pages and the schedule. It never shows the key. |
+| `doctor`                                 | tests the API key, folders, data files and the schedule. It never shows the key.                |
+| `setup [--force]`                        | tests the API key and saves it in a file that only you can read                                 |
+| `refresh [page.html]`                    | updates a dashboard page one time                                                               |
+| `schedule [daily\|weekdays\|weekly ...]` | shows, sets or stops the automatic update of a page                                             |
+| `--version`, `-v`                        | shows the version                                                                               |
+| `--help`, `-h`                           | lists the commands. After a command, it shows the help of that command.                         |
 
 ```bash
 npx -y @indaco/garmin-personal-mcp@latest info

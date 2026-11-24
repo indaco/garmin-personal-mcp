@@ -298,7 +298,7 @@ if (WINDOWS) {
     "info: shows the home folder as ~",
     r.code === 0 &&
       !r.stdout.includes(home) &&
-      r.stdout.includes(`${join("~", ".config", "garmin-mcp", "api-key")} (found)`),
+      r.stdout.includes(`${join("~", ".config", "garmin-mcp", "api-key")} (found, default)`),
     r.all,
   );
 
@@ -488,10 +488,10 @@ const ptyPath = process.env.E2E_PTY;
 if (ptyPath) {
   const pty = createRequire(import.meta.url)(ptyPath);
 
-  /** Runs setup in a terminal, and types when the prompt shows: a fast paste must stay hidden. */
-  const terminal = (env, typed) =>
+  /** Runs a command in a terminal. For setup, it types when the prompt shows: a fast paste must stay hidden. */
+  const terminal = (env, typed, command = "setup") =>
     new Promise((done, fail) => {
-      const term = pty.spawn(process.execPath, [ENTRY, "setup"], {
+      const term = pty.spawn(process.execPath, [ENTRY, command], {
         cols: 160,
         rows: 40,
         cwd: root,
@@ -511,7 +511,7 @@ if (ptyPath) {
       });
       term.onExit(({ exitCode }) => {
         clearTimeout(timer);
-        done({ code: exitCode, out: plain(out) });
+        done({ code: exitCode, out: plain(out), raw: out });
       });
     });
 
@@ -542,6 +542,25 @@ if (ptyPath) {
       r.out,
     );
     check("terminal: Ctrl-C does not show what you typed", !r.out.includes("abc"), r.out);
+  }
+  for (const command of ["info", "doctor"]) {
+    const { env } = newHome({ TERM: "xterm-256color" });
+    // Node.js 22 takes an empty one as set
+    delete env.NO_COLOR;
+    delete env.NODE_DISABLE_COLORS;
+    delete env.FORCE_COLOR;
+    await run(["setup"], env, `${KEY}\n`);
+    const r = await terminal(env, "", command);
+    check(`terminal: ${command} has styles`, r.code === 0 && r.raw.includes("\x1b[1m"), r.raw);
+    const off = await terminal({ ...env, NO_COLOR: "1" }, "", command);
+    check(
+      `terminal: ${command} has no styles with NO_COLOR`,
+      // the terminal of Windows adds codes of its own, but not these
+      off.code === 0 && ["1", "31", "32"].every((code) => !off.raw.includes(`\x1b[${code}m`)),
+      off.raw,
+    );
+    const piped = await run([command], { ...env, FORCE_COLOR: "1" });
+    check(`pipe: ${command} has no styles`, !piped.stdout.includes("\x1b"), piped.stdout);
   }
 } else {
   console.log("SKIP  terminal: E2E_PTY is not set");

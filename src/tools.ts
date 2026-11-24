@@ -286,7 +286,7 @@ export class GarminTools {
       if (!fresh && Date.now() > this.#catalogueRetryAt) {
         try {
           const data = await this.api.getExerciseCatalogue();
-          if (!isObject((JSON.parse(new TextDecoder().decode(data)) as Json | null)?.categories)) {
+          if (!isCatalogue(JSON.parse(new TextDecoder().decode(data)))) {
             throw new GarminApiError("the exercise catalogue has no categories");
           }
           await writeAtomically(file, data);
@@ -301,8 +301,8 @@ export class GarminTools {
         }
       }
       if ((await stat(file).catch(() => undefined))?.isFile()) {
-        const categories = (JSON.parse(await readFile(file, "utf8")) as Json | null)?.categories;
-        this.#catalogue = isObject(categories) ? (categories as Catalogue) : undefined;
+        const saved: unknown = JSON.parse(await readFile(file, "utf8"));
+        this.#catalogue = isCatalogue(saved) ? saved.categories : undefined;
       }
     } catch (e) {
       log("WARN", `Cannot read the exercise catalogue: ${(e as Error).message}`);
@@ -573,6 +573,11 @@ function copy(from: Json, to: Json, name: string, as: string): void {
 
 export function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** Whether this is an exercise catalogue that the server uses. */
+export function isCatalogue(v: unknown): v is { categories: Catalogue } {
+  return isObject(v) && isObject(v.categories);
 }
 
 function field(v: unknown, name: string): unknown {

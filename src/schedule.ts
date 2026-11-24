@@ -6,9 +6,10 @@ import { delimiter, dirname, join } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { name } from "../package.json";
+import { isLate } from "./analytics/calc";
 import type { Config } from "./config";
 import { confirm } from "./confirm";
-import { type DashboardWriter, pageTarget, patchDue } from "./dashboard-page";
+import { type DashboardWriter, isDay, pageTarget, patchDue } from "./dashboard-page";
 import { syncGaps } from "./digest";
 import { LOG_DIR, log } from "./log";
 import { MODEL_ONLY, writeAtomically } from "./tools";
@@ -71,6 +72,8 @@ export interface Status {
   log?: string;
   /** The last run of `refresh --auto`, and the pages it could not update. */
   last?: LastRun;
+  /** The last run that updated every page, as an ISO time. Unknown after a failed run of an older version. */
+  lastOk?: string;
 }
 
 export interface LastRun {
@@ -86,6 +89,10 @@ interface State {
   /** When the schedule was set: a run time before it is not missed. */
   since?: string;
   last?: LastRun;
+  /** Kept beside `last`: a failed run replaces `last`. */
+  lastOk?: string;
+  /** The time of the last run that `lastOk` was saved with: the job of an older version saves only `last`. */
+  lastOkRun?: string;
   /** What the job starts: status checks that it still exists. */
   job?: { program: string; entry?: string };
 }
@@ -237,11 +244,78 @@ export function nextRuns(c: Cron, from: Date, count: number): string[] {
   const runs: string[] = [];
   for (const at of runDates(c, from)) {
     if (runs.length === count) break;
-    runs.push(
-      `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`,
-    );
+    runs.push(local(at));
   }
   return runs;
+}
+
+const local = (at: Date): string =>
+  `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
+
+/** A saved ISO time. Date.parse alone also takes "a 5", and turns 2026-02-30 into March 2. */
+export const isTime = (v: unknown): v is string =>
+  typeof v === "string" &&
+  isDay(v.split("T")[0]) &&
+  v.includes("T") &&
+  !Number.isNaN(Date.parse(v));
+
+/** A saved ISO time as local "YYYY-MM-DD HH:MM"; n/a when it is not a time. */
+export function localTime(iso: unknown): string {
+  return isTime(iso) ? local(new Date(iso)) : "n/a";
+}
+
+/** A list of `{path, [key]}` texts, as the last run keeps them. */
+const isPageList = (list: unknown, key: string): boolean =>
+  Array.isArray(list) &&
+  list.every((e) => typeof e?.path === "string" && typeof e[key] === "string");
+
+/** The last run of a state file, which a user can edit; undefined when a part of it is not right. */
+function lastRunOf(v: unknown, dataDir: string): LastRun | undefined {
+  const saved = v as Partial<LastRun> | null | undefined;
+  if (
+    !isTime(saved?.at) ||
+    !isPageList(saved.failed, "error") ||
+    (saved.partial !== undefined && !isPageList(saved.partial, "gaps"))
+  ) {
+    return undefined;
+  }
+  const { at, failed, partial } = saved as LastRun;
+  const inPlace = <T extends { path: string }>(e: T): T => ({
+    ...e,
+    path: pageTarget(dataDir, e.path),
+  });
+  try {
+    return {
+      at,
+      failed: failed.map(inPlace),
+      ...(partial ? { partial: partial.map(inPlace) } : {}),
+    };
+  } catch {
+    // a path that is no page
+    return undefined;
+  }
+}
+
+/**
+ * The last success of a state file; undefined when it is not known. After a failed run of an older
+ * version it is not: a success before that run is not in the file. A time in the future comes from a
+ * clock that was ahead.
+ */
+function lastOkOf(state: Partial<State>, last: LastRun | undefined): string | undefined {
+  if (!last) return undefined;
+  const saved = state.lastOkRun === last.at ? state.lastOk : undefined;
+  const at = last.failed.length === 0 ? last.at : saved;
+  return isTime(at) && Date.parse(at) <= Date.now() ? at : undefined;
+}
+
+/** The pages of a state file as the job updates them; undefined when one of them is no page. */
+function pagesOf(v: unknown, dataDir: string): string[] | undefined {
+  if (!Array.isArray(v) || !v.every((p) => typeof p === "string")) return undefined;
+  try {
+    return [...new Set(v.map((p) => pageTarget(dataDir, p)))];
+  } catch {
+    return undefined;
+  }
 }
 
 /** The next run of the cron as an ISO time, for the page's `due`; undefined when it never runs. */
@@ -455,6 +529,7 @@ export class AutoRefresh {
       installed: (await this.#installed()) && this.#canStart(state),
       log: this.#log,
       ...(state.last ? { last: state.last } : {}),
+      ...(state.lastOk ? { lastOk: state.lastOk } : {}),
     };
   }
 
@@ -481,18 +556,30 @@ export class AutoRefresh {
     const state = await this.#state();
     if (!state) return false;
     const time = lastRunTime(parseCron(state.cron), now);
-    // the later of the last run and the start: a new cron does not catch up its times before it
-    const after = Math.max(
-      Date.parse(state.last?.at ?? "") || 0,
-      Date.parse(state.since ?? "") || 0,
-    );
-    return time !== undefined && after < time.getTime();
+    return time !== undefined && startOf(state, now) < time.getTime();
+  }
+
+  /**
+   * The newest run time that passed more than 1 hour ago, when no run came since, as an ISO time: the
+   * limit of the note on the page. `doctor` only: a page that the user updated since is not late.
+   */
+  async late(now = new Date()): Promise<string | undefined> {
+    const state = await this.#state();
+    if (!state) return undefined;
+    const cron = parseCron(state.cron);
+    let time = lastRunTime(cron, now);
+    while (time && !isLate(time.toISOString(), now.getTime())) {
+      time = lastRunTime(cron, new Date(time.getTime() - 1));
+    }
+    return time && startOf(state, now) < time.getTime() ? time.toISOString() : undefined;
   }
 
   /** Keeps the result of a `refresh --auto` run for the status; nothing when no page is scheduled. */
   async saveRun(last: LastRun): Promise<void> {
     const state = await this.#state();
-    if (state) await this.#save({ ...state, last });
+    if (!state) return;
+    const lastOk = last.failed.length ? state.lastOk : last.at;
+    await this.#save({ ...state, last, lastOk, lastOkRun: last.at });
   }
 
   /** The schedule that `set` would save, with the same checks and no write. */
@@ -684,14 +771,28 @@ export class AutoRefresh {
     } catch {
       // stays null: damaged
     }
-    if (typeof state?.cron !== "string" || !validCron(state.cron) || !Array.isArray(state.pages)) {
+    const { dataDir } = this.config;
+    const pages = pagesOf(state?.pages, dataDir);
+    if (typeof state?.cron !== "string" || !validCron(state.cron) || !pages) {
       throw new Error(
         `${this.#stateFile} is damaged: stop the automatic refresh (off), then set it again`,
       );
     }
-    return state as State;
+    const last = lastRunOf(state.last, dataDir);
+    return { ...(state as State), pages, last, lastOk: lastOkOf(state, last) };
   }
 }
+
+/**
+ * The later of the last run and the start: a new cron does not catch up its times before it. A time
+ * after `now` comes from a clock that was ahead: with it, no run would come until that time.
+ */
+const startOf = (state: State, now: Date): number =>
+  Math.max(
+    ...[state.last?.at, state.since]
+      .map((t) => (isTime(t) ? Date.parse(t) : 0))
+      .filter((t) => t <= now.getTime()),
+  );
 
 /** The real path of the running script, so the job does not follow a link that can change. */
 export function realEntry(path: string | undefined): string {
@@ -761,7 +862,7 @@ export function registerSchedule(server: McpServer, auto: AutoRefresh): void {
         "with new data. The computer must be on at that time. The page must exist (writeDashboard first).",
         "`last` is the last automatic run: its time, the pages that it could not update, with the error,",
         "and in `partial` the pages that it updated with gaps. A page shows a note when its update is",
-        "more than 1 hour late: `last` tells why.",
+        "more than 1 hour late: `last` tells why. `lastOk` is the last run that updated every page.",
         "`cron`: convert what the user says, in any language, into a 5-field cron expression in local",
         'time: minute hour day-of-month month weekday, numbers only (0 = Sunday), e.g. "0 7 * * 1-5" for',
         "weekdays at 7. Two runs must be at least 1 hour apart. The cron is for all scheduled pages;",

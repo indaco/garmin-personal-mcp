@@ -9,7 +9,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { McpServer } from "@modelcontextprotocol/server";
@@ -24,6 +24,7 @@ import {
   cronOf,
   type Job,
   lastRunTime,
+  localTime,
   nextRuns,
   parseCron,
   type Plan,
@@ -374,6 +375,10 @@ const dataOf = (file: string) =>
   );
 
 // these tests fake launchd or crontab: their paths and process.getuid need a real POSIX system
+const nov = (day: number, hour: number, minute = 0) => new Date(2026, 10, day, hour, minute);
+const iso = (day: number, hour: number) => nov(day, hour).toISOString();
+const ranAt = (day: number, hour: number) => ({ last: { at: iso(day, hour), failed: [] } });
+
 const onPosix = it.skipIf(process.platform === "win32");
 
 describe("AutoRefresh", () => {
@@ -412,6 +417,7 @@ describe("AutoRefresh", () => {
   const stateOf = () => JSON.parse(readFileSync(join(config.dataDir, "auto-refresh.json"), "utf8"));
 
   beforeEach(() => {
+    vi.useFakeTimers({ now: nov(23, 12), toFake: ["Date"] });
     dir = mkdtempSync(join(tmpdir(), "schedule-"));
     config = {
       baseUrl: "https://example.test",
@@ -425,6 +431,7 @@ describe("AutoRefresh", () => {
     writeFileSync(join(config.dataDir, "garmin-dashboard.html"), "page");
     writeFileSync(join(config.dataDir, "coach.html"), "page");
   });
+  afterEach(() => vi.useRealTimers());
 
   onPosix("is off until the user turns it on", async () => {
     const a = auto("darwin");
@@ -931,12 +938,374 @@ describe("AutoRefresh", () => {
     expect(await a.status()).not.toHaveProperty("last");
     const last = {
       at: "2026-11-02T06:00:01.000Z",
-      failed: [{ path: "a.html", error: "HTTP 401" }],
+      failed: [{ path: join(config.dataDir, "a.html"), error: "HTTP 401" }],
     };
     await a.saveRun(last);
     expect((await a.status()).last).toEqual(last);
     await a.set({ cron: "0 6 * * *" });
     expect((await a.status()).last).toEqual(last);
+  });
+
+  it("keeps the last success when a later run fails", async () => {
+    const a = auto("linux");
+    await a.set({});
+    expect(await a.status()).not.toHaveProperty("lastOk");
+    const bad = [{ path: "a.html", error: "HTTP 401" }];
+    await a.saveRun({ at: "2026-11-01T06:00:00.000Z", failed: bad });
+    // no run has succeeded yet
+    expect(await a.status()).not.toHaveProperty("lastOk");
+    // a run with gaps updated every page
+    const gaps = [{ path: "a.html", gaps: "days: 2" }];
+    await a.saveRun({ at: "2026-11-02T06:00:00.000Z", failed: [], partial: gaps });
+    expect((await a.status()).lastOk).toBe("2026-11-02T06:00:00.000Z");
+    await a.saveRun({ at: "2026-11-03T06:00:00.000Z", failed: bad });
+    await a.saveRun({ at: "2026-11-04T06:00:00.000Z", failed: bad });
+    expect((await a.status()).lastOk).toBe("2026-11-02T06:00:00.000Z");
+    await a.set({ cron: "0 6 * * *" });
+    expect((await a.status()).lastOk).toBe("2026-11-02T06:00:00.000Z");
+    await a.saveRun({ at: "2026-11-05T06:00:00.000Z", failed: [] });
+    expect((await a.status()).lastOk).toBe("2026-11-05T06:00:00.000Z");
+  });
+
+  it("knows the last success of a file from before it was kept", async () => {
+    const page = join(config.dataDir, "garmin-dashboard.html");
+    const old = (last: object) =>
+      writeFileSync(
+        join(config.dataDir, "auto-refresh.json"),
+        JSON.stringify({ cron: "0 7 * * *", pages: [page], last }),
+      );
+    const bad = [{ path: page, error: "HTTP 401" }];
+    old({ at: "2026-11-02T06:00:00.000Z", failed: [] });
+    expect((await auto("linux").status()).lastOk).toBe("2026-11-02T06:00:00.000Z");
+    // the first failed run after the upgrade must not lose it
+    await auto("linux").saveRun({ at: "2026-11-03T06:00:00.000Z", failed: bad });
+    expect((await auto("linux").status()).lastOk).toBe("2026-11-02T06:00:00.000Z");
+    old({ at: "2026-11-02T06:00:00.000Z", failed: bad });
+    expect(await auto("linux").status()).not.toHaveProperty("lastOk");
+  });
+
+  // the job of an older version keeps the other fields as they are, and changes only the last run
+  describe("the last success, with an older version of the job", () => {
+    it.each([
+      ["before the last run", iso(1, 7)],
+      ["after the last run, from a clock that was ahead", iso(20, 7)],
+    ])("is a successful last run: lastOk is %s", async (_name, old) => {
+      state({ lastOk: old, lastOkRun: old, ...ranAt(3, 7) });
+      expect(await lastSuccess()).toBe(iso(3, 7));
+      await auto("linux").saveRun({ at: iso(4, 7), failed: refused() });
+      expect(await lastSuccess()).toBe(iso(3, 7));
+    });
+
+    it.each([
+      ["the job failed after it", []],
+      ["the job succeeded and then failed", [{ at: iso(3, 7), failed: [] }]],
+    ])("is unknown when %s: the file does not tell", async (_name, runs) => {
+      await auto("linux").set({});
+      await auto("linux").saveRun({ at: iso(2, 7), failed: [] });
+      for (const last of [...runs, { at: iso(4, 7), failed: refused() }])
+        state({ ...stateOf(), last });
+      expect((await auto("linux").status()).last!.at).toBe(iso(4, 7));
+      expect(await lastSuccess()).toBeUndefined();
+      // and it stays unknown after the next failure of this version, until a success
+      await auto("linux").saveRun({ at: iso(5, 7), failed: refused() });
+      expect(await lastSuccess()).toBeUndefined();
+      await auto("linux").saveRun({ at: iso(6, 7), failed: [] });
+      await auto("linux").saveRun({ at: iso(7, 7), failed: refused() });
+      expect(await lastSuccess()).toBe(iso(6, 7));
+    });
+
+    it.each([
+      ["no", {}],
+      ["another", { lastOkRun: iso(3, 7) }],
+      ["a wrong", { lastOkRun: 5 }],
+    ])("is unknown after a failure with %s run beside it", async (_name, o) => {
+      state({ lastOk: iso(1, 7), last: { at: iso(4, 7), failed: refused() }, ...o });
+      expect(await lastSuccess()).toBeUndefined();
+    });
+
+    it("is unknown without a last run that can be read", async () => {
+      state({ lastOk: iso(1, 7) });
+      expect(await lastSuccess()).toBeUndefined();
+      state({ lastOk: iso(1, 7), lastOkRun: iso(4, 7), last: { at: iso(4, 7) } });
+      expect(await lastSuccess()).toBeUndefined();
+    });
+  });
+
+  it("does not show the run that the last success was saved with", async () => {
+    await auto("linux").set({});
+    await auto("linux").saveRun({ at: iso(2, 7), failed: [] });
+    expect(await auto("linux").status()).toMatchObject({ lastOk: iso(2, 7) });
+    expect(await auto("linux").status()).not.toHaveProperty("lastOkRun");
+    // the file has the same success, and a later failure keeps it
+    expect(stateOf()).toMatchObject({ lastOk: iso(2, 7), lastOkRun: iso(2, 7) });
+    await auto("linux").saveRun({ at: iso(3, 7), failed: refused() });
+    expect(stateOf()).toMatchObject({ lastOk: iso(2, 7), lastOkRun: iso(3, 7) });
+  });
+
+  it("does not take a success in the future as the last success: the clock was ahead", async () => {
+    const a = auto("linux");
+    await a.set({});
+    const now = new Date();
+    const ahead = new Date(now.getTime() + 1).toISOString();
+    await a.saveRun({ at: ahead, failed: [] });
+    expect(await lastSuccess()).toBeUndefined();
+    await a.saveRun({ at: now.toISOString(), failed: refused() });
+    expect(await lastSuccess()).toBeUndefined();
+    // it stays away when its time has passed
+    vi.setSystemTime(now.getTime() + 60_000);
+    expect(await lastSuccess()).toBeUndefined();
+    // a time that is now is right, and a failure in the future does not hide it
+    const right = new Date().toISOString();
+    await a.saveRun({ at: right, failed: [] });
+    await a.saveRun({ at: iso(30, 7), failed: refused() });
+    expect(await lastSuccess()).toBe(right);
+    state({
+      lastOk: iso(30, 7),
+      lastOkRun: iso(20, 7),
+      last: { at: iso(20, 7), failed: refused() },
+    });
+    expect(await lastSuccess()).toBeUndefined();
+  });
+
+  const mainPage = () => join(config.dataDir, "garmin-dashboard.html");
+  const refused = () => [{ path: mainPage(), error: "HTTP 401" }];
+  const lastSuccess = async () => (await auto("linux").status()).lastOk;
+  const state = (o: object) =>
+    writeFileSync(
+      join(config.dataDir, "auto-refresh.json"),
+      JSON.stringify({ cron: "0 7 * * *", pages: [], ...o }),
+    );
+
+  it.each([
+    ["no last run", undefined],
+    ["null", null],
+    ["a text", "yesterday"],
+    ["no time", { failed: [] }],
+    ["a time that is not a date", { at: "yesterday", failed: [] }],
+    ["a time that only Date.parse reads", { at: "a 5", failed: [] }],
+    ["a number as the time", { at: 5, failed: [] }],
+    ["a day without a time", { at: "2026-11-02", failed: [] }],
+    ["a day that does not exist", { at: "2026-02-30T06:00:00.000Z", failed: [] }],
+    ["an hour that does not exist", { at: "2026-11-02T25:00:00.000Z", failed: [] }],
+    ["no list of failed pages", { at: "2026-11-02T06:00:00.000Z" }],
+    ["a failed page that is null", { at: "2026-11-02T06:00:00.000Z", failed: [null] }],
+    [
+      "a failed page without an error",
+      { at: "2026-11-02T06:00:00.000Z", failed: [{ path: "a.html" }] },
+    ],
+    ["a failed page without a path", { at: "2026-11-02T06:00:00.000Z", failed: [{ error: "a" }] }],
+    ["gaps that are not a list", { at: "2026-11-02T06:00:00.000Z", failed: [], partial: 5 }],
+    ["no list of gaps", { at: "2026-11-02T06:00:00.000Z", failed: [], partial: null }],
+    ["gaps that are null", { at: "2026-11-02T06:00:00.000Z", failed: [], partial: [null] }],
+    [
+      "gaps without a text",
+      { at: "2026-11-02T06:00:00.000Z", failed: [], partial: [{ path: "a.html" }] },
+    ],
+  ])("takes a hand-edited last run as unknown: %s", async (_name, last) => {
+    state({ last });
+    const status = await auto("linux").status();
+    expect(status.scheduled).toBe(true);
+    expect(status).not.toHaveProperty("last");
+    expect(status).not.toHaveProperty("lastOk");
+  });
+
+  it.each(["soon", "a 5", "", "2026-02-30T06:00:00.000Z", 5, null, {}])(
+    "takes a hand-edited last success of %j as unknown",
+    async (lastOk) => {
+      const failed = [{ path: mainPage(), error: "HTTP 401" }];
+      state({ lastOk, lastOkRun: iso(2, 7), last: { at: iso(2, 7), failed } });
+      expect(await auto("linux").status()).not.toHaveProperty("lastOk");
+      // a good last run still gives it
+      state({ lastOk, ...ranAt(2, 7) });
+      expect((await auto("linux").status()).lastOk).toBe(iso(2, 7));
+    },
+  );
+
+  it("drops a damaged last run and last success when a run fails", async () => {
+    state({ last: { at: "yesterday", failed: [] }, lastOk: "soon" });
+    const failed = { at: iso(3, 7), failed: [{ path: mainPage(), error: "HTTP 401" }] };
+    await auto("linux").saveRun(failed);
+    const status = await auto("linux").status();
+    expect(status.last).toEqual(failed);
+    expect(status).not.toHaveProperty("lastOk");
+  });
+
+  it("keeps no run and no last success without a schedule", async () => {
+    await auto("linux").saveRun({ at: iso(3, 7), failed: [] });
+    expect(existsSync(join(config.dataDir, "auto-refresh.json"))).toBe(false);
+    expect(await auto("linux").status()).toEqual({ scheduled: false });
+  });
+
+  it.each([[5], ["notes.txt"], ["~"], [null]])(
+    "says that the file is damaged when a page is %j",
+    async (p) => {
+      state({ pages: [mainPage(), p] });
+      await expect(auto("linux").status()).rejects.toThrow(/auto-refresh\.json is damaged/);
+      expect(await auto("linux").due(mainPage())).toBeUndefined();
+    },
+  );
+
+  describe("a page that the user typed in the file", () => {
+    const far = join(homedir(), "far.html");
+
+    it("is the page that the job updates: in the data folder, ~ is the home folder", async () => {
+      state({
+        pages: ["coach.html", "~/far.html", "", join(config.dataDir, "sub", "..", "b.html")],
+      });
+      const pages = ["coach.html", "garmin-dashboard.html", "b.html"].map((f) =>
+        join(config.dataDir, f),
+      );
+      const all = [pages[0], far, pages[1], pages[2]];
+      expect(await auto("linux").pages()).toEqual(all);
+      expect((await auto("linux").status()).pages).toEqual(all);
+      expect(await auto("linux").due(pages[0])).toEqual(expect.any(String));
+    });
+
+    it("is in the list once", async () => {
+      state({ pages: ["coach.html", join(config.dataDir, "coach.html"), "./coach.html"] });
+      expect(await auto("linux").pages()).toEqual([join(config.dataDir, "coach.html")]);
+    });
+
+    it("is stopped by its name", async () => {
+      state({ pages: ["coach.html", "other.html"] });
+      const status = await auto("linux").off("coach.html");
+      expect(status.pages).toEqual([join(config.dataDir, "other.html")]);
+    });
+
+    it("has the same path in the last run", async () => {
+      const last = { at: iso(2, 7) };
+      state({
+        pages: ["coach.html"],
+        last: {
+          ...last,
+          failed: [{ path: "coach.html", error: "HTTP 401" }],
+          partial: [{ path: "~/far.html", gaps: "days: 2" }],
+        },
+      });
+      expect((await auto("linux").status()).last).toEqual({
+        ...last,
+        failed: [{ path: join(config.dataDir, "coach.html"), error: "HTTP 401" }],
+        partial: [{ path: far, gaps: "days: 2" }],
+      });
+    });
+  });
+
+  it.each([
+    ["failed", { failed: [{ path: "a.txt", error: "HTTP 401" }] }],
+    ["partial", { failed: [], partial: [{ path: "a.txt", gaps: "days: 2" }] }],
+  ])("takes a last run with a %s page that is no page as unknown", async (_name, o) => {
+    state({ last: { at: iso(2, 7), ...o } });
+    const status = await auto("linux").status();
+    expect(status.scheduled).toBe(true);
+    expect(status).not.toHaveProperty("last");
+  });
+
+  async function late(o: object, now: Date) {
+    state(o);
+    return auto("linux").late(now);
+  }
+
+  describe("late", () => {
+    it("is not known without a schedule, and not in the status", async () => {
+      expect(await auto("linux").late()).toBeUndefined();
+      state(ranAt(1, 8));
+      expect(await auto("linux").late(nov(2, 12))).toBe(iso(2, 7));
+      // the default is the current time
+      vi.setSystemTime(nov(3, 12));
+      expect(await auto("linux").late()).toBe(iso(3, 7));
+      expect(await auto("linux").late(nov(11, 12))).toBe(iso(11, 7));
+      expect(await auto("linux").status()).not.toHaveProperty("late");
+    });
+
+    it("is a run time without a run, more than 1 hour ago", async () => {
+      // the same limit as the note on the page: 60 minutes is not late
+      expect(await late(ranAt(10, 8), nov(11, 7, 59))).toBeUndefined();
+      expect(await late(ranAt(10, 8), nov(11, 8))).toBeUndefined();
+      expect(await late(ranAt(10, 8), nov(11, 8, 1))).toBe(iso(11, 7));
+      // the first of two missed times, also when the newer one is a minute ago
+      expect(await late(ranAt(10, 8), nov(12, 7, 1))).toBe(iso(11, 7));
+    });
+
+    it("is the newest missed run, so a page updated after an older one is late", async () => {
+      expect(await late(ranAt(8, 8), nov(11, 12))).toBe(iso(11, 7));
+      // the run of the 11th is not 1 hour late yet: the one before it
+      expect(await late(ranAt(8, 8), nov(11, 8))).toBe(iso(10, 7));
+    });
+
+    it("counts a run at the run time itself, and a failed run", async () => {
+      expect(await late(ranAt(11, 7), nov(11, 12))).toBeUndefined();
+      const failed = [{ path: "a.html", error: "HTTP 401" }];
+      expect(await late({ last: { at: iso(11, 7), failed } }, nov(11, 12))).toBeUndefined();
+    });
+
+    it("starts at the later of the last run and the start of the schedule", async () => {
+      expect(await late({ ...ranAt(8, 8), since: iso(11, 8) }, nov(11, 12))).toBeUndefined();
+      expect(await late({ ...ranAt(8, 8), since: iso(10, 8) }, nov(11, 12))).toBe(iso(11, 7));
+      expect(await late({ ...ranAt(10, 8), since: iso(8, 8) }, nov(11, 12))).toBe(iso(11, 7));
+      expect(await late({ since: iso(10, 8) }, nov(11, 12))).toBe(iso(11, 7));
+    });
+
+    it.each([["yesterday"], ["a 5"], ["2026-02-30T07:00:00.000Z"], [5], [null]])(
+      "takes a hand-edited start of %j as unknown",
+      async (since) => {
+        // 2001 is what Date.parse gives for 5
+        expect(await late({ since }, nov(11, 12))).toBe(iso(11, 7));
+        expect(await late({ since, ...ranAt(10, 8) }, nov(11, 12))).toBe(iso(11, 7));
+        expect(await late({ since, ...ranAt(11, 8) }, nov(11, 12))).toBeUndefined();
+      },
+    );
+
+    it.each([
+      ["last run", ranAt(20, 8)],
+      ["start", { since: iso(20, 8) }],
+      ["last run and start", { ...ranAt(20, 8), since: iso(20, 8) }],
+    ])("ignores a %s in the future: the clock was ahead", async (_name, o) => {
+      expect(await late(o, nov(11, 12))).toBe(iso(11, 7));
+      expect(await auto("linux").missed(nov(11, 12))).toBe(true);
+    });
+
+    it("ignores a start that is not an ISO time", async () => {
+      expect(await late({ since: "Nov 11 2026 08:00" }, nov(11, 12))).toBe(iso(11, 7));
+    });
+
+    it("uses the other time when one is in the future", async () => {
+      expect(await late({ ...ranAt(11, 8), since: iso(20, 8) }, nov(11, 12))).toBeUndefined();
+      expect(await auto("linux").missed(nov(11, 12))).toBe(false);
+      expect(await late({ ...ranAt(20, 8), since: iso(11, 8) }, nov(11, 12))).toBeUndefined();
+      expect(await auto("linux").missed(nov(11, 12))).toBe(false);
+    });
+
+    it("takes a last run at this moment as a run, and one a millisecond later not", async () => {
+      const now = nov(11, 12);
+      const ranIn = (ms: number) => ({
+        last: { at: new Date(now.getTime() + ms).toISOString(), failed: [] },
+      });
+      expect(await late(ranIn(0), now)).toBeUndefined();
+      expect(await late(ranIn(1), now)).toBe(iso(11, 7));
+    });
+
+    it("is the missed time of the second daily run", async () => {
+      const twice = { cron: "0 7,19 * * *", ...ranAt(11, 7) };
+      expect(await late(twice, nov(11, 20))).toBeUndefined();
+      expect(await late(twice, nov(11, 20, 1))).toBe(iso(11, 19));
+    });
+
+    it("is the run before the newest one for hourly runs", async () => {
+      const hourly = { cron: "0 * * * *", ...ranAt(11, 7) };
+      expect(await late(hourly, nov(11, 9))).toBeUndefined();
+      expect(await late(hourly, nov(11, 9, 1))).toBe(iso(11, 8));
+      expect(await late(hourly, nov(11, 12, 30))).toBe(iso(11, 11));
+    });
+
+    it("says that the file is damaged", async () => {
+      state({ pages: "a" });
+      await expect(auto("linux").late()).rejects.toThrow(/is damaged/);
+    });
+
+    it("takes the last run time for a file without a run and a start", async () => {
+      expect(await late({}, nov(11, 12))).toBe(iso(11, 7));
+      expect(await late({}, nov(11, 7, 30))).toBe(iso(10, 7));
+    });
   });
 
   onPosix("runs once for a missed run time, and not for a time before the schedule", async () => {
@@ -947,13 +1316,11 @@ describe("AutoRefresh", () => {
     expect(await a.missed()).toBe(false);
     const later = new Date(Date.now() + 2 * 86_400_000);
     expect(await a.missed(later)).toBe(true);
-    await a.saveRun({ at: later.toISOString(), failed: [{ path: "a.html", error: "HTTP 401" }] });
+    const failed = [{ path: join(config.dataDir, "a.html"), error: "HTTP 401" }];
+    await a.saveRun({ at: later.toISOString(), failed });
     // a failed run counts too: the next try is the next run time, not a loop on a broken key
     expect(await a.missed(later)).toBe(false);
-    expect((await a.status()).last).toEqual({
-      at: later.toISOString(),
-      failed: [{ path: "a.html", error: "HTTP 401" }],
-    });
+    expect((await a.status()).last).toEqual({ at: later.toISOString(), failed });
     // the same cron again keeps the last run and the start
     await a.set({ path: "coach.html" });
     expect(await a.missed(later)).toBe(false);
@@ -1001,6 +1368,14 @@ describe("AutoRefresh", () => {
     await auto("linux").saveRun({ at: new Date().toISOString(), failed: [] });
     expect(existsSync(join(config.dataDir, "auto-refresh.json"))).toBe(false);
   });
+});
+
+it("shows a time in local time, and n/a for a text that is not a time", () => {
+  expect(localTime(new Date(2026, 0, 2, 3, 4, 59).toISOString())).toBe("2026-01-02 03:04");
+  expect(localTime(new Date(2026, 10, 23, 11, 0).toISOString())).toBe("2026-11-23 11:00");
+  for (const v of ["yesterday", "a 5", "5", "", "2026-11-02", "2026-02-30T07:00:00Z", 5, null, {}])
+    expect([v, localTime(v)]).toEqual([v, "n/a"]);
+  expect(localTime(undefined)).toBe("n/a");
 });
 
 it("refreshPages goes on after a page fails", async () => {

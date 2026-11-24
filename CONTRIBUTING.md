@@ -188,6 +188,9 @@ file does not match the bundle.
   same PR.
 - **Dependencies are the latest versions.** Runtime libraries are dev dependencies, because tsdown
   bundles them into `dist/index.js`, and `npx` installs nothing else.
+- **Strict types.** Give unknown data the type `unknown` and narrow it. The only `any` in `src/` is
+  the decoded .FIT message in `src/fit.ts`. Use string-literal unions in place of `enum`, and named
+  exports. Correct the code, not `tsconfig.json`, when it does not compile. Do not use `@ts-ignore`.
 
 ## Tests
 
@@ -199,6 +202,8 @@ module that they test (`test/tools.test.ts` for `src/tools.ts`).
 - **No real Garmin calls.** Mock `fetch`, or give the code a mocked API client.
 - **No writes to your home folder.** Use a temporary folder for the data folder, and set `HOME`
   for tests of the log.
+- **No waits in real time.** Use `vi.useFakeTimers()`. One exception: a wait of 0 ms that lets promise
+  callbacks run, as in `test/page/mcp-app.test.ts`.
 - **Synthetic page data.** The page tests use the synthetic data in
   `test/fixtures/dashboard-data.json`.
 
