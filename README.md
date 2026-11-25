@@ -3,40 +3,35 @@
   garmin-personal-mcp
 </h1>
 
-<p align="center"><b>Ask Claude, Codex or another AI assistant about your Garmin training, and get a training dashboard, also inside the chat. Official Personal API, read-only, runs with one command.</b></p>
+<p align="center"><b>Ask your AI assistant about your Garmin training in your own words, then get a training dashboard of it.</b></p>
 
 <p align="center">
-  🌐 <a href="https://garmin-personal-mcp.indaco.dev/"><b>Website</b></a> &nbsp;&middot;&nbsp; 👉
-  <a href="https://garmin-personal-mcp.indaco.dev/demo/"><b>Try the live demo</b></a>
-</p>
-
-<p align="center">
-  <a href="https://mcpservers.org/servers/indaco/garmin-personal-mcp"><img src="https://mcpservers.org/badge.svg" alt="Listed on mcpservers.org" /></a>
-  <a href="https://glama.ai/mcp/servers/indaco/garmin-personal-mcp"><img src="https://glama.ai/mcp/servers/indaco/garmin-personal-mcp/badges/score.svg" alt="Garmin Personal MCP MCP server – quality and maintenance score on Glama" /></a>
-  <a href="https://www.npmjs.com/package/@indaco/garmin-personal-mcp"><img src="https://img.shields.io/npm/v/@indaco/garmin-personal-mcp.svg" alt="npm version" /></a>
-  <a href="https://codecov.io/gh/indaco/garmin-personal-mcp"><img src="https://codecov.io/gh/indaco/garmin-personal-mcp/branch/main/graph/badge.svg" alt="Code coverage" /></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg" alt="Node.js 22 or later" /></a>
-  <a href="tsconfig.json"><img src="https://img.shields.io/badge/TypeScript-strict-3178c6.svg" alt="TypeScript strict" /></a>
-  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-stdio%20server-8a2be2.svg" alt="MCP stdio server" /></a>
-  <a href="https://developer.garmin.com/gc-developer-program/personal/"><img src="https://img.shields.io/badge/Garmin-Personal%20API-007cc3.svg" alt="Garmin Connect Personal API" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
-  <a href="https://www.jetify.com/devbox/docs/contributor-quickstart/"><img src="https://www.jetify.com/img/devbox/shield_galaxy.svg" alt="Built with Devbox" /></a>
-</p>
-
-<p align="center">
+  👉 <a href="https://garmin-personal-mcp.indaco.dev/demo/"><b>Live demo</b></a> &middot;
   <b><a href="#quick-start">Quick start</a></b> &middot;
-  <b><a href="#what-you-can-ask">What you can ask</a></b> &middot;
-  <b><a href="#tools">Tools</a></b> &middot;
-  <b><a href="#dashboard">Dashboard</a></b> &middot;
-  <b><a href="#dashboard-in-the-chat">Dashboard in the chat</a></b> &middot;
+  <b><a href="guide/setup-claude-desktop.md">No terminal? Claude Desktop setup</a></b> &middot;
+  🌐 <a href="https://garmin-personal-mcp.indaco.dev/"><b>Website</b></a> &middot;
   <b><a href="guide/README.md">Guide</a></b>
 </p>
 
 <p align="center">
-  An MCP server: a small program that your AI app starts on your computer, so that the assistant
-  can read your Garmin data. Activities, laps, strength sets, sleep, HRV and more. Ask questions in
-  your own words, or get a training dashboard: as a page file, or inside the chat in Claude Desktop.
+  <a href="https://www.npmjs.com/package/@indaco/garmin-personal-mcp"><img src="https://img.shields.io/npm/v/@indaco/garmin-personal-mcp.svg" alt="npm version" /></a>
+  <a href="https://glama.ai/mcp/servers/indaco/garmin-personal-mcp"><img src="https://glama.ai/mcp/servers/indaco/garmin-personal-mcp/badges/score.svg" alt="Garmin Personal MCP MCP server – quality and maintenance score on Glama" /></a>
+  <a href="https://codecov.io/gh/indaco/garmin-personal-mcp"><img src="https://codecov.io/gh/indaco/garmin-personal-mcp/branch/main/graph/badge.svg" alt="Code coverage" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
+  <a href="https://mcpservers.org/servers/indaco/garmin-personal-mcp"><img src="https://mcpservers.org/badge.svg" alt="Listed on mcpservers.org" /></a>
+  <a href="https://www.jetify.com/devbox/docs/contributor-quickstart/"><img src="https://www.jetify.com/img/devbox/shield_galaxy.svg" alt="Built with Devbox" /></a>
 </p>
+
+This is an MCP server: a small program that your AI app starts on your computer, so that the
+assistant can read your Garmin data. Activities, laps, strength sets, sleep, HRV and more. Ask
+questions in your own words, or get a training dashboard: as a page file, or inside the chat in
+Claude Desktop.
+
+- **Official**: it uses the Garmin Connect Personal API. Garmin does not endorse this project.
+- **Read-only**: it writes nothing back to Garmin.
+- **Your key**: the server sends the API key only to the Garmin token endpoint.
+- **Tested with Claude Desktop and Claude Code.** Other MCP clients that use stdio, such as Codex,
+  can connect.
 
 <p align="center">
   <img src="assets/dashboard.gif" alt="The training dashboard: the All board, load against recovery, the Run board, strength trends, the Year tab, edit mode (drag a widget to a new place, hide a widget, add widgets from the catalogue to an empty board), and the light and high-contrast themes" width="800">
@@ -50,37 +45,39 @@
 Ask your assistant anything about your Garmin data, in your own words and in any language. The
 assistant chooses the tools and can combine their data. Some examples:
 
+- All together: "My run on Saturday felt hard. Compare it with my sleep and HRV of the nights
+  before."
+- Recovery: "Should I train hard today?"
 - Activities: "List my last 5 activities, with pace and heart rate."
-- Activities: "How much time did I spend in each HR zone on my runs this month?"
-- Activities: "How did my sessions named Tempo 5k and Long run change over the last 2 months?"
 - Laps: "Show the laps of my last run."
 - Bike: "Compare the grit and flow of my last mountain-bike rides."
+- Strength: "Which of my lifts have stalled over the last 6 weeks?"
+- Workouts: "Did I do the reps and rests my workout planned?"
+- Body: "How has my weight changed over the last 3 months?"
+
+<details>
+<summary><b>12 more questions</b></summary>
+
+- Activities: "How much time did I spend in each HR zone on my runs this month?"
+- Activities: "How did my sessions named Tempo 5k and Long run change over the last 2 months?"
 - Bike: "How many metres per hour did I climb on my last 5 rides?"
 - Bike: "How much of my riding time was in Z1-2 and how much in Z4-5 over my last 5 rides?"
 - Strength: "Compare my sets of this week with the week before."
 - Strength: "Which muscles did I train most this week?"
 - Strength: "What was my heaviest squat set this month, and what 1RM does it suggest?"
-- Strength: "Which of my lifts have stalled over the last 6 weeks?"
 - Strength: "How long did I rest between sets in my last strength session?"
 - Strength: "How much weight did I lift in total in each strength session this month?"
-- Workouts: "Did I do the reps and rests my workout planned?"
 - Recovery: "How did I sleep this week, and how was my HRV?"
-- Recovery: "Should I train hard today?"
 - Recovery: "Show my steps, stress and Body Battery for the last 7 days."
 - Recovery: "Did my Body Battery recover overnight this week, and which days drained it most?"
-- Body: "How has my weight changed over the last 3 months?"
-- All together: "My run on Saturday felt hard. Compare it with my sleep and HRV of the nights
-  before."
+
+</details>
 
 ## Features
 
-- **Official and read-only**: uses the Garmin Connect Personal API, writes nothing back, and runs
-  with `npx`.
 - **All of your data**: laps and strength sets from the original .FIT files, with the muscles of
   each set; HRV, sleep, heart rate, stress and Body Battery; [`garminGet`](#tools) for the other
   endpoints.
-- **All stdio clients**: Claude Desktop, Claude Code, Codex and the other MCP clients that use
-  stdio. Tested with Claude Desktop and Claude Code.
 - **A dashboard in less than a minute**: your training load next to recovery, for you or for your
   coach, with your own widgets and languages. See [Dashboard](#dashboard).
 - **The dashboard in the chat**: in Claude Desktop, ask "show my training dashboard" and the page
@@ -120,9 +117,8 @@ reads only the key file.
 
 ### 2. Connect your client
 
-**Claude Desktop**: select Settings → Developer → _Edit Config_. Add a top-level `mcpServers` key
-next to the keys that the file has, not in `preferences`
-([example](guide/setup-claude-desktop.md#4-add-the-server-to-the-configuration-file)):
+Each client starts the same command: `npx -y @indaco/garmin-personal-mcp@latest`. Most clients use
+this `mcpServers` block in their MCP configuration:
 
 ```json
 {
@@ -135,10 +131,22 @@ next to the keys that the file has, not in `preferences`
 }
 ```
 
+<details>
+<summary><b>Claude Desktop</b></summary>
+
+Select Settings → Developer → _Edit Config_. Add the top-level `mcpServers` key from the block above
+next to the keys that the file has, not in `preferences`
+([example](guide/setup-claude-desktop.md#4-add-the-server-to-the-configuration-file)).
+
 Then quit Claude Desktop **fully**, including the tray icon, and start it again. Settings →
 Developer shows garmin-personal.
 
-**Claude Code**: this command adds the server to all your projects:
+</details>
+
+<details>
+<summary><b>Claude Code</b></summary>
+
+This command adds the server to all your projects:
 
 ```bash
 claude mcp add garmin-personal --scope user -- npx -y @indaco/garmin-personal-mcp@latest
@@ -147,8 +155,13 @@ claude mcp list          # garmin-personal: ... ✔ Connected
 
 Use `--scope project` to write a `.mcp.json` file that you can share in the current repository.
 
-**Codex**: add this table to `~/.codex/config.toml`. The first `npx` download can take longer than
-the default start time, so the table sets a longer one:
+</details>
+
+<details>
+<summary><b>Codex</b></summary>
+
+Add this table to `~/.codex/config.toml`. The first `npx` download can take longer than the default
+start time, so the table sets a longer one:
 
 ```toml
 [mcp_servers.garmin-personal]
@@ -158,12 +171,19 @@ startup_timeout_sec = 60
 ```
 
 Codex does not send your shell environment to the server. Use the key file, or add
-`env = { GARMIN_PERSONAL_API_KEY = "..." }` to the table. The automatic dashboard refresh
-needs the key file.
+`env = { GARMIN_PERSONAL_API_KEY = "..." }` to the table. The automatic dashboard refresh needs the
+key file.
 
-**Other clients** (Gemini CLI, VS Code, Cursor and others): in the MCP configuration of the client,
-set the command `npx` and the arguments `-y @indaco/garmin-personal-mcp@latest`. Some clients do not
-show MCP prompts. In these clients, ask for the dashboard in your own words. The tools are the same.
+</details>
+
+<details>
+<summary><b>Other clients</b> (Gemini CLI, VS Code, Cursor and others)</summary>
+
+In the MCP configuration of the client, set the command `npx` and the arguments
+`-y @indaco/garmin-personal-mcp@latest`. Some clients do not show MCP prompts. In these clients, ask
+for the dashboard in your own words. The tools are the same.
+
+</details>
 
 ### 3. Ask your assistant
 
@@ -207,137 +227,26 @@ the **+** menu of the message box, under _garmin-personal_. In Claude Code, they
 use the full name, `/mcp__garmin-personal__<prompt>`. The short form `/garmin-personal:<prompt>` can
 reach the assistant as the command name only, without the prompt.
 
-| Prompt                                                  | What it does                                                                              | Claude Code example                                       |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| [training-dashboard](#training-dashboard)               | makes the page                                                                            | `/mcp__garmin-personal__training-dashboard 8`             |
-| [training-dashboard-update](#training-dashboard-update) | adds the new data, your layout stays                                                      | `/mcp__garmin-personal__training-dashboard-update`        |
-| [dashboard-setup](#dashboard-setup)                     | makes a page for you or for your coach, with only the sports and the data that you select | `/mcp__garmin-personal__dashboard-setup`                  |
-| [dashboard-widget](#dashboard-widget)                   | makes a new widget from your idea                                                         | `/mcp__garmin-personal__dashboard-widget my longest ride` |
-| [dashboard-language](#dashboard-language)               | adds a language to the page                                                               | `/mcp__garmin-personal__dashboard-language Dutch`         |
+| Prompt                                                                  | What it does                                                                              | Claude Code example                                       |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| [training-dashboard](guide/prompts.md#training-dashboard)               | makes the page                                                                            | `/mcp__garmin-personal__training-dashboard 8`             |
+| [training-dashboard-update](guide/prompts.md#training-dashboard-update) | adds the new data, your layout stays                                                      | `/mcp__garmin-personal__training-dashboard-update`        |
+| [dashboard-setup](guide/prompts.md#dashboard-setup)                     | makes a page for you or for your coach, with only the sports and the data that you select | `/mcp__garmin-personal__dashboard-setup`                  |
+| [dashboard-widget](guide/prompts.md#dashboard-widget)                   | makes a new widget from your idea                                                         | `/mcp__garmin-personal__dashboard-widget my longest ride` |
+| [dashboard-language](guide/prompts.md#dashboard-language)               | adds a language to the page                                                               | `/mcp__garmin-personal__dashboard-language Dutch`         |
 
-The prompts remove all spaces around an argument, also the no-break space from a phone keyboard.
-
-### training-dashboard
-
-The server writes the dashboard page from its template, and the assistant writes the coach notes.
-The page is one HTML file, `garmin-dashboard.html` in the data folder. A page from the template
-works offline. A freeform page loads Chart.js from the web.
-
-| Argument | Values                            | Default  |
-| -------- | --------------------------------- | -------- |
-| `weeks`  | 1 to 52 (a larger value gives 52) | 12       |
-| `layout` | `preset`, `blank` or `freeform`   | `preset` |
-
-- `preset` gives the built-in widgets on each board.
-- `blank` gives empty boards: you add the widgets that you want.
-- `freeform` lets the assistant design the whole page. This takes much longer, and each page looks
-  different.
-
-In Claude Code, the arguments are in order and separated by spaces: first `weeks`, then `layout`.
-You can also give only the layout: `/mcp__garmin-personal__training-dashboard freeform`.
-
-The assistant gives you the path of the page and the command to open it. The page has a board for
-all your training, a Recovery board and a board for each sport. A missing value shows as "n/a".
-
-When your runs repeat a name, for example the "Tempo Run" of a training plan, the assistant asks
-whether to compare those workouts across weeks. The default is no. A yes adds the Workout trend
-widget. The server downloads the laps of the last 8 runs of each workout once and keeps them, so
-the comparison grows with each update. See
-[Page settings](guide/dashboard.md#page-settings).
-
-The assistant also asks whether to add the Recovery trend. The default is no. A yes adds a widget
-with the weekly average of sleep, sleep score and resting HR for the whole period, and the file then
-holds these values for each day. See [Page settings](guide/dashboard.md#page-settings).
-
-The assistant also asks whether to add a Year tab. The default is no. A yes adds a board with the
-recap of the calendar year, and the file then holds data of days before the period of the page. See
-[Page settings](guide/dashboard.md#page-settings).
+[Prompts](guide/prompts.md#dashboard-prompts) has the arguments and the details of each prompt.
 
 [The dashboard guide](guide/dashboard.md) tells about the title and the headline, the boards, the
 themes and languages, the units and the activity-name filter, and how to change the layout.
 [The widget catalogue](guide/widgets.md) lists every widget.
 
-### training-dashboard-update
-
-This prompt replaces the data and the coach notes of the page. Your layout, your custom widgets and
-your languages stay. Only a new preset widget of a release can join a board that you edited, one
-time. Reload the page to see the new data.
-
-When the page has no answer about the Year tab, the assistant asks one time whether to add it. The
-default is no. See [Page settings](guide/dashboard.md#page-settings).
-
-| Argument | Values                                                                  | Default                 |
-| -------- | ----------------------------------------------------------------------- | ----------------------- |
-| `weeks`  | the weeks to cover                                                      | the weeks of the page   |
-| `path`   | the dashboard file, for example `garmin-dashboard-coach.html` (`.html`) | `garmin-dashboard.html` |
-
-In Claude Code: `/mcp__garmin-personal__training-dashboard-update coach.html` updates `coach.html`. A
-value that ends in `.html` is the file, also in the first place.
-
-To update the data without coach notes, see
-[Update the dashboard](guide/dashboard.md#update-the-dashboard).
-
-After a release, this prompt also writes the new page code. Restart the client first. See
-[Update the page code after a release](guide/dashboard.md#update-the-page-code-after-a-release).
-
-To update the page automatically, tell your assistant when, in your own words, for example "update
-my dashboard every Monday at 7". Before it writes the schedule, Claude Code and the MCP Inspector
-ask you to confirm the next three updates in a form (tested with 2.1.329 and 2.16.0; Claude
-Desktop: not tested). See
-[Update the dashboard on a schedule](guide/dashboard.md#update-the-dashboard-on-a-schedule).
-
-### dashboard-setup
-
-The assistant asks you some questions, then writes a page with your answers. First, it asks who the
-page is for:
-
-- **Personal**: a page for you, with all your data.
-- **Shared**: a page for your coach or personal trainer. You select each type of data to include,
-  for example HR zones yes, fitness age and sleep no. Other users of your computer can read the new
-  file, for example through a shared folder.
-
-Then the assistant asks for the file (any name or path), the title, the headline, the sports, the
-languages and the themes, whether to compare the workouts that your runs repeat, and the period: the
-last `weeks` weeks, or from a day that you choose (`since`), with one more week at each update, up
-to 52. A page can also keep the sleep and resting HR of the whole period (`recoveryHistory`,
-off by default). The assistant also asks whether to add a Year tab with the recap of the calendar
-year (`yearReview`, off by default). A page that has it keeps it, but a page that you share keeps it
-only when you ask for it. The server writes only the data that you select into the file. Other data
-is not in the file, so you can send the file safely. A personal page and a shared page can be two
-files side by side. Each page keeps its settings on each update. The argument `weeks` is optional
-(default 12).
-
-[Page settings](guide/dashboard.md#page-settings) tells more.
-
-### dashboard-widget
-
-This prompt makes a new widget from your idea, for example "my longest ride of each month". The
-assistant writes a small widget, and `editDashboard` stores it in the page and in your widget
-library (`widgets.json` in the data folder). The widget stays after each update, and each new page
-gets it too. The argument `idea` is required. The argument `path` is optional: it is the file of the
-page, for example `coach.html`. In Claude Code:
-`/mcp__garmin-personal__dashboard-widget my longest ride each month coach.html`. Reload the page to see
-the widget.
-[Custom widgets](guide/custom-widgets.md) tells more.
-
-### dashboard-language
-
-This prompt adds a language to the dashboard. The assistant translates the texts of the page, and
-`editDashboard` stores them in the page. The argument `language` is optional: the default is the
-language of the conversation. The argument `path` is optional: it is the file of the page, for
-example `coach.html`. In Claude Code: `/mcp__garmin-personal__dashboard-language Dutch coach.html`.
-A text without a translation shows in English. To remove an added language, ask your assistant to
-remove it: `editDashboard` with `removeLanguages`. Before it deletes the texts, Claude Code asks you
-to confirm in a form (tested with 2.1.329), and so does the MCP Inspector (tested with 2.16.0).
-Claude Desktop shows no form and deletes the texts at once (tested with 6.6395.1).
-[Languages](guide/languages.md) tells more.
-
 ### Presets or freeform
 
 In many setup guides for Claude and Garmin, Claude reads the data and writes the whole dashboard
 page. With a preset, the server writes the page from a tested template, and the assistant writes
-only the coach notes. My measurements for a first build, with Claude Code and Opus
-(other clients and models give other times and costs):
+only the coach notes. My measurements for a first build, with Claude Code and Opus on synthetic
+data (75 activities in 12 weeks; other clients and models give other times and costs):
 
 | First build            | Time         | Cost         |
 | ---------------------- | ------------ | ------------ |
@@ -375,263 +284,31 @@ the limits.
 
 ## Year review
 
-`getYearReview` gives the recap of a calendar year in the chat. Ask, for example, "give me my year
-in review". The server reads its local cache. A day that the cache does not have is not a rest day:
-the answer lists it in `coverage.missing`.
-
-| Argument | Values                                               | Default                                      |
-| -------- | ---------------------------------------------------- | -------------------------------------------- |
-| `year`   | a year from 2000 to this year                        | this year; until 14 January, the year before |
-| `path`   | a dashboard page: its sports and excluded data apply | `garmin-dashboard.html` in the data folder   |
-
-A `path` to a page that does not exist is an error.
-
-When a day of the year before today is missing, the server asks you in a form before it fetches the
-activity list. It asks for at most 20 pages of the list, and it does not fetch HRV and resting HR. A
-page that Garmin refuses can be asked for again. The cache keeps one range of days, so the first day
-in the form can be in an earlier year. When the earlier days would need more than about 20 requests,
-the fetch starts in the year itself. The form then names the earlier days that the cache no longer
-covers after the fetch.
-
-A dashboard update fetches only the days of the dashboard. It can drop the earlier days that a
-review fetched: after an update of the server that changes the cache, or when the dashboard starts
-more than one day after the last cached day. The next review shows the missing days and asks again.
-A page with the [`yearReview` setting](guide/dashboard.md#page-settings) shows the same recap in its
-Year tab.
-
-In the answer, `fill.asked` tells what it did:
-
-| `fill.asked` | What the server did                                                                            |
-| ------------ | ---------------------------------------------------------------------------------------------- |
-| `notNeeded`  | no day before today is missing: no question and no request                                     |
-| `yes`        | you said yes: it fetched the list. If this fails, it saves no activity: `fill.error` tells why |
-| `no`         | you said no: no request                                                                        |
-| `unasked`    | your client has no form: no request                                                            |
-| `tooLarge`   | the days need more than about 20 requests: no question and no request                          |
-
-A fetch stops at 20 requests and saves no activities when the days need more. `fill.error` then
-tells if another try asks for fewer days, and the form of that try names the days that it drops.
-
-After `tooLarge` for a year before this year, review a newer year first, then this one. Each yes
-adds earlier days to the cache, so the next review needs fewer requests. This works only in a client
-with a form.
-
-When only today is missing, the server does not ask. A workout that came to Garmin after the last
-update of the cache is then not in the recap, and its day can look like a rest day. `lastDayOpen` is
-true in the answer when the last cached day is in the year: a later workout of that day can be
-missing. For a recap of the current year with all workouts, update the dashboard first, but only
-when no day before today is missing.
-
-Claude Code shows this form (tested with 2.1.331). The MCP Inspector shows the forms of other tools
-(tested with 2.16.0). The form of this tool in the MCP Inspector: not tested. Claude Desktop shows no
-form (tested with 6.6395.1).
-
-### year-review prompt
-
-The assistant calls `getYearReview` and gives the year in a fixed order: the totals, the sports, the
-months, the biggest month and week, the best 4 weeks, the most consistent month, the streaks, the
-longest and the biggest session, the new bests of each running distance, the weekdays and the time
-of day, and the HRV and the resting HR of each month. When days are missing, the answer names the
-days that the recap covers, and the other days are "n/a". It says why nothing was fetched, and it
-offers no other fetch. When `unlikelyTimes` is above 0, it says how many sessions have a time that
-is not likely (over 12 h at under 1 km/h). This time and a load estimate from it do not count.
-
-The argument `year` is optional: the calendar year, 2000 to this year. The default is this year, and
-until 14 January the year before. A value under 2000 gives 2000, a value over this year gives this
-year.
-
-The argument `path` is optional: the dashboard page whose sports and excluded data apply, for
-example `/mcp__garmin-personal__year-review 2025 garmin-dashboard-coach.html`. The default page
-applies without it. The name of a page alone, or before the year, works too. Text that is not a
-year is read as the page. When this page does not exist or is not a `.html` file, the answer names
-it, says what the prompt takes, and asks you to correct it. It gives no review before that, so a
-mistyped name does not show the data that the page excludes. After a year, Claude Code cuts a page
-name at its first space: name such a page in the chat.
+Ask, for example, "give me my year in review". `getYearReview` gives the recap of a calendar year in
+the chat from the local cache, and asks before it fetches the missing days.
+[Year review](guide/year-review.md) has its arguments, the answers of the form and the limits.
 
 ## Coach prompts
 
 These prompts answer in the chat. They do not change a dashboard.
 
-| Prompt                              | What it does                                                | Claude Code example                                             |
-| ----------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------- |
-| [run-review](#run-review)           | reviews one run as a coach                                  | `/mcp__garmin-personal__run-review`                             |
-| [race-readiness](#race-readiness)   | tells if you are ready for a race, with a plan for its pace | `/mcp__garmin-personal__race-readiness 2026-11-15 half 1:45:00` |
-| [strength-review](#strength-review) | reviews one strength session as a coach                     | `/mcp__garmin-personal__strength-review`                        |
-| [swim-review](#swim-review)         | reviews one swim as a coach                                 | `/mcp__garmin-personal__swim-review`                            |
-| [swim-readiness](#swim-readiness)   | tells if you are ready for a swim event                     | `/mcp__garmin-personal__swim-readiness 2026-08-01 1.9 km`       |
-| [ride-review](#ride-review)         | reviews one ride as a coach                                 | `/mcp__garmin-personal__ride-review`                            |
-| [train-today](#train-today)         | tells if you should train hard today, with fitness and form | `/mcp__garmin-personal__train-today`                            |
-| [week-review](#week-review)         | reviews your last whole week against the weeks before       | `/mcp__garmin-personal__week-review`                            |
-| [block-review](#block-review)       | reviews your last 4 to 12 whole weeks as one training block | `/mcp__garmin-personal__block-review 8`                         |
-| [year-review](#year-review-prompt)  | gives the recap of a calendar year                          | `/mcp__garmin-personal__year-review 2025`                       |
+| Prompt                                                 | What it does                                                | Claude Code example                                             |
+| ------------------------------------------------------ | ----------------------------------------------------------- | --------------------------------------------------------------- |
+| [run-review](guide/prompts.md#run-review)              | reviews one run as a coach                                  | `/mcp__garmin-personal__run-review`                             |
+| [race-readiness](guide/prompts.md#race-readiness)      | tells if you are ready for a race, with a plan for its pace | `/mcp__garmin-personal__race-readiness 2026-11-15 half 1:45:00` |
+| [strength-review](guide/prompts.md#strength-review)    | reviews one strength session as a coach                     | `/mcp__garmin-personal__strength-review`                        |
+| [swim-review](guide/prompts.md#swim-review)            | reviews one swim as a coach                                 | `/mcp__garmin-personal__swim-review`                            |
+| [swim-readiness](guide/prompts.md#swim-readiness)      | tells if you are ready for a swim event                     | `/mcp__garmin-personal__swim-readiness 2026-08-01 1.9 km`       |
+| [ride-review](guide/prompts.md#ride-review)            | reviews one ride as a coach                                 | `/mcp__garmin-personal__ride-review`                            |
+| [train-today](guide/prompts.md#train-today)            | tells if you should train hard today, with fitness and form | `/mcp__garmin-personal__train-today`                            |
+| [week-review](guide/prompts.md#week-review)            | reviews your last whole week against the weeks before       | `/mcp__garmin-personal__week-review`                            |
+| [block-review](guide/prompts.md#block-review)          | reviews your last 4 to 12 whole weeks as one training block | `/mcp__garmin-personal__block-review 8`                         |
+| [year-review](guide/year-review.md#year-review-prompt) | gives the recap of a calendar year                          | `/mcp__garmin-personal__year-review 2025`                       |
 
 A missing value shows as "n/a": the assistant does not estimate it.
 
-In a client that shows MCP completions, the `activity` argument of `run-review`, `strength-review`,
-`swim-review` and `ride-review` suggests the names of your recent activities as you type. The
-names come from the dashboard data on your computer (your newest 200 activities), not from Garmin,
-so the suggestions start after your first dashboard update. The MCP Inspector shows suggestions
-(tested with 2.16.0 on the `distance` argument of `race-readiness`). Claude Code (tested with
-2.1.329) and Claude Desktop (tested with 6.6395.1 on `distance`) do not show them.
-
-### run-review
-
-The assistant compares the planned workout that your watch ran with the laps of the run: the target,
-what the lap did, and hit or miss. The server finds hit or miss from the run's .FIT file, so two
-reviews of one run give the same result. For intervals, it gives the fade from the first rep to the
-last. For a steady run, it gives the HR drift: the drop in distance per heartbeat from the first
-half to the second half. It ends with the sleep and HRV of the night after the run, and a short
-coach note.
-
-| Argument   | Values                                                     | Default      |
-| ---------- | ---------------------------------------------------------- | ------------ |
-| `activity` | an activity id, or words of the activity name (`Long Run`) | the last run |
-
-### race-readiness
-
-The assistant reads the server's summary of 12 weeks (a `writeDashboard` preview, which writes no
-page file). It has the weekly run distance and load, the weekly share of easy and hard zone time
-(zones 1-2 and 4-5), the share of the longest run in the weekly run distance (above 35% is the
-page's warning level), the long runs with their pace split and HR drift, the aerobic efficiency
-(distance per heartbeat of the easy runs, last 4 weeks against the first 4) and the race
-predictions, as the dashboard computes them. The assistant gives the days to the race and these
-numbers, and tells whether your load drops in the last 2 weeks (the taper). The race prediction uses
-your best efforts of 5 km or more (Riegel, an estimate: the fastest prediction counts). The
-assistant compares it with your goal and checks the HRV and sleep of the last 7 nights. It ends with
-a target pace for each quarter of the race.
-
-| Argument   | Values                                         | Default                  |
-| ---------- | ---------------------------------------------- | ------------------------ |
-| `date`     | the race date, `yyyy-MM-dd`                    | none: the assistant asks |
-| `distance` | `5k`, `10k`, `half`, `marathon`, or a distance | none: the assistant asks |
-| `goal`     | your goal time, for example `1:45:00`          | no goal: prediction only |
-
-In a client that shows MCP completions, `distance` suggests `5k`, `10k`, `half` and `marathon` as
-you type (the clients are in [Coach prompts](#coach-prompts)).
-
-In Claude Code, give the values in any order: a value in the form `yyyy-MM-dd` is the date, a value
-in the form `1:45:00` is the goal, and the other words are the distance. For example
-`/mcp__garmin-personal__race-readiness half marathon 2026-11-15`.
-
-### strength-review
-
-The assistant compares the planned workout that your watch ran with the sets you did: the planned
-sets and reps of each exercise, what you did, and hit or miss. The server finds hit or miss from the
-session's .FIT file, so two reviews of one session give the same result. Garmin plans no weights, so
-the plan shows none. For each
-exercise it gives the top set and its estimated 1RM against the previous session of the same name,
-and the rep drop from the first set to the last at the same weight. It compares your rest with the
-planned rest, and ends with the sleep and HRV of the night after the session, and a short coach note.
-
-| Argument   | Values                                                       | Default                   |
-| ---------- | ------------------------------------------------------------ | ------------------------- |
-| `activity` | an activity id, or words of the activity name (`Upper Body`) | the last strength session |
-
-### swim-review
-
-The assistant gives the summary of one swim, and keeps pool and open water apart. For a pool swim it
-shows each interval: distance, stroke, pace per 100 m, SWOLF, strokes and the rest after it. For each
-repeated set it shows the pace and SWOLF of the first and the last repeat, and the fade in %. It
-shows the planned workout beside the laps, without hit or miss, and ends with the sleep and HRV of
-the night after the swim, and a short coach note. It does not judge a swim on heart rate alone.
-
-| Argument   | Values                                                    | Default       |
-| ---------- | --------------------------------------------------------- | ------------- |
-| `activity` | an activity id, or words of the activity name (`Morning`) | the last swim |
-
-The prompt needs one .FIT file. A set is laps in a row of one distance, stroke and intensity. Two
-sets of the same distance, stroke and intensity read as one.
-
-### swim-readiness
-
-The assistant reads the server's summary of 12 weeks (a `writeDashboard` preview, which writes no
-page file). It gives the days to the event, the swims and km of each week, the longest swim against
-the event distance, and your recent pace, with pool and open water in separate tables. For the pool
-it compares your last swims with as many before them, in one pool length. It ends with your load,
-HRV and sleep, and a short verdict. It gives no predicted time.
-
-| Argument   | Values                                   | Default                  |
-| ---------- | ---------------------------------------- | ------------------------ |
-| `date`     | the event date, `yyyy-MM-dd`             | none: the assistant asks |
-| `distance` | the event distance, for example `1.9 km` | none: the assistant asks |
-| `tests`    | your 200 m and 400 m times, `3:10 6:40`  | no CSS                   |
-
-CSS (critical swim speed) shows only when you give both test times, from all-out swims on one day. The
-server computes it: (400 m time - 200 m time) / 2. It is never estimated from your swims.
-
-In Claude Code, give the values in any order: a value in the form `yyyy-MM-dd` is the date, values in
-the form `3:10` are the test times (the larger one is the 400 m), and the other words are the
-distance. For example `/mcp__garmin-personal__swim-readiness 1.9 km 2026-08-01 3:10 6:40`.
-
-### ride-review
-
-The assistant gives the summary of one ride: distance, moving time, speed, ascent and ascent per
-hour, heart rate, training effect and load, and the time in the easy and hard HR zones. It shows the
-power only when the ride has power data, and the grit and flow of a mountain-bike ride. It shows the
-planned workout beside the laps, without hit or miss, and a table of the laps. It compares the ride
-with your earlier rides of the same name and a similar distance, among the last 20 activities of that
-name before it, because a hillier route changes speed and climbing at the same fitness. It ends with
-the sleep and HRV of the night after the ride, and a short coach note.
-
-| Argument   | Values                                                       | Default       |
-| ---------- | ------------------------------------------------------------ | ------------- |
-| `activity` | an activity id, or words of the activity name (`Trail Loop`) | the last ride |
-
-The laps need one .FIT file. Not checked on real data: power, a planned ride, an earlier ride of the
-same name, and the laps of a mountain-bike or indoor ride.
-
-### train-today
-
-The assistant reads the server's summary of the dashboard data (a `writeDashboard` preview, which
-writes no page file). It uses the weeks of your dashboard page, so the numbers are the same as on
-the page. It gives the verdict of the dashboard's Readiness widget: go easy, normal or ready to
-push. This verdict is the dashboard's own rule, not Garmin's Training Readiness. A table shows each
-input and the rule it meets: the HRV status, the sleep score, the resting HR against the average of
-the 7 days before, and the load ratio of 7 to 28 days. When a value is from an older night, the
-assistant gives its date. Then it names the days in a row with warning signs, when 2 or more of
-these were off: the resting HR 5 bpm or more above its 7-day base, last night's HRV under the low
-end of its range, and a sleep score under 60. One such day is a note; 2 in a row are a warning. Each
-day comes with its numbers. The signs do not change the verdict and are not a diagnosis. Then it
-gives your fitness, fatigue and form, and a short coach note.
-
-Without HRV and sleep data, for example when the page leaves out the recovery data, the summary has
-no readiness: the verdict and its inputs show as "n/a". The prompt has no arguments.
-
-### week-review
-
-The assistant reads the server's summary of the dashboard data (a `writeDashboard` preview, which
-writes no page file). It uses the weeks of your dashboard page, so the numbers are the same as on
-the page. It compares your last whole week, Monday to Sunday, with up to 4 weeks before it:
-sessions, hours, km, run km and load, and the load ramp against the week before (above 10% is the
-page's warning level). Then it gives the load ratio, the monotony and strain of the last 7 days and
-the form of today. It names the warning-sign days of the week (2 or more of these in one day: the
-resting HR 5 bpm or more above its 7-day base, last night's HRV under the low end of its range, a
-sleep score under 60) with their numbers, and the days in a row with signs up to the newest day: 2
-in a row are a warning, not a diagnosis. Then it gives the new run bests of the week with the time
-each one beat. These are bests since the page's first week, not all-time records: a faster run
-before that week is not counted. It gives the planned strength exercises hit and missed in the week,
-and the exercises that miss most. These count only the sessions you did: a skipped planned session
-leaves no file and is not seen. It gives the laps of the week's runs on the planned target and off
-it, the drills that miss most, and how many runs it could not read (the page setting `workouts`
-reads more of them). It ends with a short coach note. The summary has no split by sport for each
-week, so the review has none. The prompt has no arguments.
-
-### block-review
-
-The assistant reads the server's summary of the block (a `writeDashboard` preview, which writes no
-page file). The block is your last 4 to 12 whole weeks, Monday to Sunday, 8 by default. The week in
-progress is not in it. The assistant gives a table of the weeks with their sessions, hours, km,
-load, load ramp against the week before, monotony, strain, and the easy and hard share of the runs
-and of the rides. It names the weeks that the page flags (a ramp above 10%, a monotony above 2) and
-the strain of the first and the last week. It compares the easy and hard share of the first and the
-last week. Then it compares the aerobic efficiency at the start and at the end of the block: the
-metres per heartbeat of the runs and the normalized power per heartbeat of the rides, both below
-zone 4. Each end is 4 weeks, or half of a shorter block. The change needs 3 sessions at each end, so
-in a short block it is often "n/a", with the session count of each end. Both values need your HR
-zones, and the ride value needs a power meter. It ends with a short coach note.
-
-The argument `weeks` is optional (default 8): the number of whole weeks in the block. A value under
-4 gives 4, a value over 12 gives 12, and a value that is not a whole number gives 8.
+[Prompts](guide/prompts.md#coach-prompts) has the arguments of each prompt and what each one
+compares.
 
 ## Configuration
 

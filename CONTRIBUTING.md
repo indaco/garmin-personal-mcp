@@ -184,8 +184,9 @@ file does not match the bundle.
   with the prompts and with the dashboards that users already have. A change to them needs an
   issue first.
 - **The dashboard cache keeps its format.** Other servers can use the same data folder.
-- **The README documents each tool, prompt argument and environment variable.** Update it in the
-  same PR.
+- **The README lists each tool, prompt and environment variable.** `guide/prompts.md` documents each
+  prompt argument, and `guide/year-review.md` those of `year-review`. Update them in the same PR. Do
+  not put the details of a prompt in the README.
 - **Dependencies are the latest versions.** Runtime libraries are dev dependencies, because tsdown
   bundles them into `dist/index.js`, and `npx` installs nothing else.
 - **Strict types.** Give unknown data the type `unknown` and narrow it. The only `any` in `src/` is

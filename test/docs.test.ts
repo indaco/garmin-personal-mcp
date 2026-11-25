@@ -128,12 +128,10 @@ describe("guide", () => {
     expect(readme).toContain(
       "| `getYearReview` | the recap of a calendar year from the cache; it asks before it fetches the missing days |",
     );
-    const section = readme.slice(
-      readme.indexOf("## Year review "),
-      readme.indexOf("### year-review prompt "),
-    );
+    const review = flat("guide/year-review.md");
+    const section = review.slice(0, review.indexOf("## year-review prompt "));
     expect(section.replace(/-{3,}/g, "---")).toBe(
-      "## Year review `getYearReview` gives the recap of a calendar year in the chat. Ask, for example, " +
+      "# Year review `getYearReview` gives the recap of a calendar year in the chat. Ask, for example, " +
         '"give me my year in review". The server reads its local cache. A day that the cache does not have ' +
         "is not a rest day: the answer lists it in `coverage.missing`. " +
         "| Argument | Values | Default | | --- | --- | --- | " +
@@ -149,7 +147,7 @@ describe("guide", () => {
         "A dashboard update fetches only the days of the dashboard. It can drop the earlier days that a " +
         "review fetched: after an update of the server that changes the cache, or when the dashboard starts " +
         "more than one day after the last cached day. The next review shows the missing days and asks again. " +
-        "A page with the [`yearReview` setting](guide/dashboard.md#page-settings) shows the same recap in " +
+        "A page with the [`yearReview` setting](dashboard.md#page-settings) shows the same recap in " +
         "its Year tab. " +
         "In the answer, `fill.asked` tells what it did: " +
         "| `fill.asked` | What the server did | | --- | --- | " +
@@ -177,7 +175,7 @@ describe("guide", () => {
         "the cache. When days before today are missing, it asks in a form and fetches the activity list after a yes, " +
         "at most 20 pages. For more pages, review a newer year first, then this one, in a client with a form. It never fetches HRV and resting HR. `path` is the dashboard page whose " +
         "sports and excluded data apply; it must exist. `fill.asked` in the answer: see " +
-        "[Year review](../README.md#year-review) |",
+        "[Year review](year-review.md) |",
     );
     expect(flat("guide/tools.md")).toContain(
       "| `dashboard-cache.json` | the dashboard data of the last calls, and the days that `getYearReview` fetched: an update or a later fetch can drop them |",
@@ -189,7 +187,7 @@ describe("guide", () => {
     );
     expect(flat("guide/dashboard.md")).toContain(
       "Later updates use the local cache and send about 7. An update fetches only the days of the " +
-        "dashboard: it can drop the earlier days of a [year review](../README.md#year-review).",
+        "dashboard: it can drop the earlier days of a [year review](year-review.md).",
     );
     expect(flat("guide/troubleshooting.md")).toContain(
       "Wait a few minutes and update again: it does not fetch again what it saved. A failed fetch of " +
@@ -227,12 +225,12 @@ describe("guide", () => {
       "A page that you share gets no offer. An update asks Garmin for the activities of the weeks of the page and of as many weeks before " +
         "them, so a 12-week page can lack the first months of the year. The Year tab then says so, and the recap " +
         "lists these days in `coverage.missing`. To add them, ask your assistant for a [year " +
-        "review](../README.md#year-review) and say yes in the form, then update the page. A client with " +
+        "review](year-review.md) and say yes in the form, then update the page. A client with " +
         "no form fetches none of them. A review fetches no HRV and no resting HR. An update can drop the " +
         "days that a review fetched: ask for the review again. `since` is for a page",
     );
-    const readme = flat("README.md");
-    expect(readme).toContain(
+    const prompts = flat("guide/prompts.md");
+    expect(prompts).toContain(
       "A page can also keep the sleep and resting HR of the whole period (`recoveryHistory`, off by " +
         "default). The assistant also asks whether to add a Year tab with the recap of the calendar year " +
         "(`yearReview`, off by default). A page that has it keeps it, but a page that you share keeps it " +
@@ -274,11 +272,11 @@ describe("guide", () => {
         "stay, and the page from before is the `.bak` file. On a page that started with empty boards, " +
         "the Year tab is empty: add its widgets with **Edit layout**. A page that you share gets no offer.",
     );
-    const readme = flat("README.md");
-    const update = readme.indexOf("### training-dashboard-update");
-    expect(readme.slice(update, readme.indexOf("### ", update + 4))).toContain(
+    const prompts = flat("guide/prompts.md");
+    const update = prompts.indexOf("### training-dashboard-update");
+    expect(prompts.slice(update, prompts.indexOf("### ", update + 4))).toContain(
       "When the page has no answer about the Year tab, the assistant asks one time whether to add it. " +
-        "The default is no. See [Page settings](guide/dashboard.md#page-settings).",
+        "The default is no. See [Page settings](dashboard.md#page-settings).",
     );
     expect(flat("guide/tools.md")).toContain(
       "the year review and the start day (`since`: the page starts in the week of that day and grows by " +
@@ -313,10 +311,10 @@ describe("guide", () => {
         "highlights, the longest streaks, the records of the runs, and HRV and resting HR by month. A " +
         "sport tab shows only when",
     );
-    expect(flat("README.md")).toContain(
+    expect(flat("guide/prompts.md")).toContain(
       "The assistant also asks whether to add a Year tab. The default is no. A yes adds a board with " +
         "the recap of the calendar year, and the file then holds data of days before the period of the " +
-        "page. See [Page settings](guide/dashboard.md#page-settings).",
+        "page. See [Page settings](dashboard.md#page-settings).",
     );
   });
 
@@ -388,55 +386,50 @@ describe("guide", () => {
     expect(readFileSync("guide/tools.md", "utf8")).toContain(
       "`settings` set the title, the sports, the data, the languages, the themes, the workout comparison, the recovery history, the year review and the start day (`since`: the page starts in the week of that day and grows by one week at each update, up to 52) of the page; `offers` in the result lists the settings that the page has no answer for (`yearReview`); `answers` saves `true` or `false` and keeps the other settings, and the answer ends the offer; `preview` writes no page file (it updates the data cache, as `getDashboardData` does) and gives the activities of each board, the settings of the page, and whether the page is from the template or designed by the assistant (`pageFrom`).",
     );
-    const readme = readFileSync("README.md", "utf8").replace(/\s+/g, " ");
+    const prompts = flat("guide/prompts.md");
     const preview =
       "The assistant reads the server's summary of the dashboard data (a `writeDashboard` preview, which writes no page file).";
     // train-today and week-review both say it: toContain alone passes with one
-    expect(readme.split(preview).length - 1).toBe(2);
-    expect(readme).toContain(
+    expect(prompts.split(preview).length - 1).toBe(2);
+    expect(prompts).toContain(
       `${preview} It uses the weeks of your dashboard page, so the numbers are the same as on the page. It gives the verdict of the dashboard's Readiness widget: go easy, normal or ready to push. This verdict is the dashboard's own rule, not Garmin's Training Readiness. A table shows each input and the rule it meets: the HRV status, the sleep score, the resting HR against the average of the 7 days before, and the load ratio of 7 to 28 days. When a value is from an older night, the assistant gives its date. Then it names the days in a row with warning signs, when 2 or more of these were off: the resting HR 5 bpm or more above its 7-day base, last night's HRV under the low end of its range, and a sleep score under 60. One such day is a note; 2 in a row are a warning. Each day comes with its numbers. The signs do not change the verdict and are not a diagnosis. Then it gives your fitness, fatigue and form, and a short coach note.`,
     );
-    expect(readme).toContain(
+    expect(prompts).toContain(
       `${preview} It uses the weeks of your dashboard page, so the numbers are the same as on the page. It compares your last whole week, Monday to Sunday, with up to 4 weeks before it: sessions, hours, km, run km and load, and the load ramp against the week before (above 10% is the page's warning level). Then it gives the load ratio, the monotony and strain of the last 7 days and the form of today. It names the warning-sign days of the week (2 or more of these in one day: the resting HR 5 bpm or more above its 7-day base, last night's HRV under the low end of its range, a sleep score under 60) with their numbers, and the days in a row with signs up to the newest day: 2 in a row are a warning, not a diagnosis. Then it gives the new run bests of the week with the time each one beat. These are bests since the page's first week, not all-time records: a faster run before that week is not counted. It gives the planned strength exercises hit and missed in the week, and the exercises that miss most. These count only the sessions you did: a skipped planned session leaves no file and is not seen. It gives the laps of the week's runs on the planned target and off it, the drills that miss most, and how many runs it could not read (the page setting \`workouts\` reads more of them). It ends with a short coach note. The summary has no split by sport for each week, so the review has none. The prompt has no arguments.`,
     );
     const preview12 =
       "The assistant reads the server's summary of 12 weeks (a `writeDashboard` preview, which writes no page file).";
     // race-readiness and swim-readiness both say it
-    expect(readme.split(preview12).length - 1).toBe(2);
-    expect(readme).toContain(
+    expect(prompts.split(preview12).length - 1).toBe(2);
+    expect(prompts).toContain(
       `${preview12} It has the weekly run distance and load, the weekly share of easy and hard zone time (zones 1-2 and 4-5), the share of the longest run in the weekly run distance (above ${LONG_RUN_SHARE_WARN}% is the page's warning level), the long runs with their pace split and HR drift, the aerobic efficiency (distance per heartbeat of the easy runs, last 4 weeks against the first 4) and the race predictions, as the dashboard computes them. The assistant gives the days to the race and these numbers, and tells whether your load drops in the last 2 weeks (the taper). The race prediction uses your best efforts of 5 km or more (Riegel, an estimate: the fastest prediction counts). The assistant compares it with your goal and checks the HRV and sleep of the last 7 nights. It ends with a target pace for each quarter of the race.`,
     );
-    expect(readme).toContain(
+    expect(prompts).toContain(
       `${preview12} It gives the days to the event, the swims and km of each week, the longest swim against the event distance, and your recent pace, with pool and open water in separate tables.`,
     );
-    expect(readme).not.toContain("which writes nothing");
+    expect(prompts).not.toContain("which writes nothing");
   });
 
-  it("documents the block-review prompt and its weeks argument in the README", () => {
-    const readme = readFileSync("README.md", "utf8").replace(/\s+/g, " ");
-    expect(readme).toContain(
-      "| [block-review](#block-review) | reviews your last 4 to 12 whole weeks as one training block | `/mcp__garmin-personal__block-review 8` |",
+  it("documents the block-review prompt and its weeks argument", () => {
+    expect(flat("README.md")).toContain(
+      "| [block-review](guide/prompts.md#block-review) | reviews your last 4 to 12 whole weeks as one training block | `/mcp__garmin-personal__block-review 8` |",
     );
-    expect(readme).toContain(
-      '### block-review The assistant reads the server\'s summary of the block (a `writeDashboard` preview, which writes no page file). The block is your last 4 to 12 whole weeks, Monday to Sunday, 8 by default. The week in progress is not in it. The assistant gives a table of the weeks with their sessions, hours, km, load, load ramp against the week before, monotony, strain, and the easy and hard share of the runs and of the rides. It names the weeks that the page flags (a ramp above 10%, a monotony above 2) and the strain of the first and the last week. It compares the easy and hard share of the first and the last week. Then it compares the aerobic efficiency at the start and at the end of the block: the metres per heartbeat of the runs and the normalized power per heartbeat of the rides, both below zone 4. Each end is 4 weeks, or half of a shorter block. The change needs 3 sessions at each end, so in a short block it is often "n/a", with the session count of each end. Both values need your HR zones, and the ride value needs a power meter. It ends with a short coach note. The argument `weeks` is optional (default 8): the number of whole weeks in the block. A value under 4 gives 4, a value over 12 gives 12, and a value that is not a whole number gives 8. ## Configuration',
+    expect(flat("guide/prompts.md")).toContain(
+      '### block-review The assistant reads the server\'s summary of the block (a `writeDashboard` preview, which writes no page file). The block is your last 4 to 12 whole weeks, Monday to Sunday, 8 by default. The week in progress is not in it. The assistant gives a table of the weeks with their sessions, hours, km, load, load ramp against the week before, monotony, strain, and the easy and hard share of the runs and of the rides. It names the weeks that the page flags (a ramp above 10%, a monotony above 2) and the strain of the first and the last week. It compares the easy and hard share of the first and the last week. Then it compares the aerobic efficiency at the start and at the end of the block: the metres per heartbeat of the runs and the normalized power per heartbeat of the rides, both below zone 4. Each end is 4 weeks, or half of a shorter block. The change needs 3 sessions at each end, so in a short block it is often "n/a", with the session count of each end. Both values need your HR zones, and the ride value needs a power meter. It ends with a short coach note. The argument `weeks` is optional (default 8): the number of whole weeks in the block. A value under 4 gives 4, a value over 12 gives 12, and a value that is not a whole number gives 8. ',
     );
   });
 
-  it("documents the year-review prompt and its arguments in the README", () => {
+  it("documents the year-review prompt and its arguments", () => {
     const readme = flat("README.md");
     expect(readme).toContain(
-      "| [year-review](#year-review-prompt) | gives the recap of a calendar year | `/mcp__garmin-personal__year-review 2025` |",
+      "| [year-review](guide/year-review.md#year-review-prompt) | gives the recap of a calendar year | `/mcp__garmin-personal__year-review 2025` |",
     );
     expect(readme).toContain(
       "a review of the week or of the calendar year, a readiness check before a race or a swim event,",
     );
-    expect(
-      readme.slice(
-        readme.indexOf("### year-review prompt "),
-        readme.indexOf("## Coach prompts These"),
-      ),
-    ).toBe(
-      "### year-review prompt " +
+    const review = flat("guide/year-review.md");
+    expect(review.slice(review.indexOf("## year-review prompt "))).toBe(
+      "## year-review prompt " +
         "The assistant calls `getYearReview` and gives the year in a fixed order: the totals, the sports, the " +
         "months, the biggest month and week, the best 4 weeks, the most consistent month, the streaks, the " +
         "longest and the biggest session, the new bests of each running distance, the weekdays and the time " +
@@ -551,13 +544,31 @@ describe("setup steps", () => {
   });
 });
 
-describe("README review texts", () => {
-  it("says in the README that a ride is compared with the last 20 activities of its name", () => {
-    const readme = readFileSync("README.md", "utf8");
-    expect(readme).toContain(
+describe("prompt reference", () => {
+  const prompts: { name: string; arguments?: { name: string }[] }[] = JSON.parse(
+    readFileSync("test/fixtures/prompt-list.json", "utf8"),
+  );
+
+  it.each(prompts)("links $name in the README to its arguments in the guide", (prompt) => {
+    const link = readFileSync("README.md", "utf8").match(
+      new RegExp(`^\\| \\[${prompt.name}\\]\\((guide/[\\w-]+\\.md)#([\\w-]+)\\)`, "m"),
+    );
+    const [, file = "", anchor = ""] = link ?? [];
+    const sections = readFileSync(file, "utf8").split(/^#{1,6} /m);
+    const section = sections.find((s) => s.split("\n")[0].replaceAll(" ", "-") === anchor);
+    expect(section).toBeDefined();
+    for (const argument of prompt.arguments ?? [])
+      expect(section).toContain(`\`${argument.name}\``);
+  });
+});
+
+describe("review texts", () => {
+  it("says in the prompt guide that a ride is compared with the last 20 activities of its name", () => {
+    const prompts = readFileSync("guide/prompts.md", "utf8");
+    expect(prompts).toContain(
       "It compares the ride\nwith your earlier rides of the same name and a similar distance, among the last 20 activities of that\nname before it, because a hillier route changes speed and climbing at the same fitness.",
     );
-    expect(readme).toContain(
+    expect(prompts).toContain(
       "It ends with\nthe sleep and HRV of the night after the ride, and a short coach note.",
     );
   });

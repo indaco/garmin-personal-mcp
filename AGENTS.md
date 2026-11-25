@@ -48,8 +48,9 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
   issue.
 - **Generated files**: do not edit the generated parts of `guide/` (run `pnpm guide`) or
   `THIRD-PARTY-NOTICES.md` (the build writes it).
-- **The README documents each tool, prompt argument and environment variable.** Update it in the
-  same change.
+- **The README lists each tool, prompt and environment variable.** `guide/prompts.md` documents each
+  prompt argument, and `guide/year-review.md` those of `year-review`. Update them in the same change.
+  Do not put the details of a prompt in the README.
 - **The guide has an index.** A new, renamed or removed page in `guide/` changes its line in
   `guide/README.md`.
 - **Client-neutral text.** The server runs in every stdio MCP client. Text that a user or a model

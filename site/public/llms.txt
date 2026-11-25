@@ -11,6 +11,8 @@ The server is read-only: it writes nothing back to Garmin. Laps and strength set
 - [Guide](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/README.md): the index of the guide pages
 - [How it works](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/how-it-works.md): transport, authentication with the API key, laps and sets from the .FIT files, the automatic update and the dashboard cache
 - [Tools](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/tools.md): every tool, its endpoints, and the data that the Personal API does not have
+- [Prompts](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/prompts.md): each prompt, its arguments, and what it compares
+- [Year review](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/year-review.md): the recap of a calendar year, its form and its limits
 - [Dashboard](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/dashboard.md): make and update the page, show it in the chat, boards and widgets, themes, languages and page settings
 - [Troubleshooting](https://github.com/indaco/garmin-personal-mcp/blob/main/guide/troubleshooting.md): problems and their solutions
 - [What's new]({{url}}whats-new.html): the highlights of each release, and how to update

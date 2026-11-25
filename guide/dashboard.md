@@ -88,7 +88,7 @@ browser. The note gives the server version, the preset widgets that the update a
 
 The first update sends about 10 requests to Garmin, and one more for each .FIT file that it does not
 have yet. Later updates use the local cache and send about 7. An update fetches only the days of the
-dashboard: it can drop the earlier days of a [year review](../README.md#year-review).
+dashboard: it can drop the earlier days of a [year review](year-review.md).
 
 Reload the page in the browser to see the new data.
 
@@ -472,7 +472,7 @@ that you share gets no offer.
 An update asks Garmin for the activities of the weeks of the page and of as many weeks before them,
 so a 12-week page can lack the first months of the year. The Year tab then says so, and the recap
 lists these days in `coverage.missing`. To add them, ask your assistant for a
-[year review](../README.md#year-review) and say yes in the form, then update the page. A client with
+[year review](year-review.md) and say yes in the form, then update the page. A client with
 no form fetches none of them. A review fetches no HRV and no resting HR. An update can drop the days
 that a review fetched: ask for the review again.
 
