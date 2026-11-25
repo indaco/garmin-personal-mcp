@@ -14,6 +14,8 @@ The guide tells how to use garmin-personal-mcp after the
   have. The data folder and its files.
 - [How it works](how-it-works.md): how the client starts the server, the API key and the access
   token, laps and sets from the .FIT files, and the caches.
+- [Prompts](prompts.md): each prompt, its arguments, and what it compares.
+- [Year review](year-review.md): the recap of a calendar year, its form and its limits.
 
 ## The dashboard
 
