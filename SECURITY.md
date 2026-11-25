@@ -37,6 +37,9 @@
   700, so put the page in a folder that others can already open. To share another page in this way,
   give it mode 644 yourself. `.gitignore` excludes `api-key`,
   `*.fit` and `*.zip` files.
+- **Your assistant**: your AI app reads the results of the tools. Your Garmin data, for example sleep,
+  heart rate and weight, can then go to the provider of your assistant's model, under the terms of
+  that provider. The server cannot control this.
 - **Paths**: `garminGet` accepts only a relative API path. It refuses a full URL and `..`, so
   the token goes only to the Personal API host.
 - **Revoke the key**: you can revoke the key at any time on the Garmin Connect page where you

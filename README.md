@@ -364,6 +364,9 @@ create a new one. No tool result has your Garmin user id, name or profile image,
 your devices and daily records, also with `raw` and `garminGet`. Your .FIT files can have your GPS
 track, so keep the data folder private.
 
+Your AI app reads the results of the tools. Your Garmin data can then go to the provider of your
+assistant's model, under the terms of that provider.
+
 [SECURITY.md](SECURITY.md) tells how the server protects your data and how to report a
 vulnerability. Do not open a public issue for a vulnerability.
 
